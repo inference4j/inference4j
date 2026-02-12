@@ -12,8 +12,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class SentenceTransformer implements EmbeddingModel {
 
@@ -49,12 +51,14 @@ public class SentenceTransformer implements EmbeddingModel {
         EncodedInput encoded = tokenizer.encode(text, maxLength);
 
         long[] shape = {1, encoded.inputIds().length};
+        Set<String> expectedInputs = session.inputNames();
 
-        Map<String, Tensor> inputs = Map.of(
-                "input_ids", Tensor.fromLongs(encoded.inputIds(), shape),
-                "attention_mask", Tensor.fromLongs(encoded.attentionMask(), shape),
-                "token_type_ids", Tensor.fromLongs(encoded.tokenTypeIds(), shape)
-        );
+        Map<String, Tensor> inputs = new LinkedHashMap<>();
+        inputs.put("input_ids", Tensor.fromLongs(encoded.inputIds(), shape));
+        inputs.put("attention_mask", Tensor.fromLongs(encoded.attentionMask(), shape));
+        if (expectedInputs.contains("token_type_ids")) {
+            inputs.put("token_type_ids", Tensor.fromLongs(encoded.tokenTypeIds(), shape));
+        }
 
         Map<String, Tensor> outputs = session.run(inputs);
 

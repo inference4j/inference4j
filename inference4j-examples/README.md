@@ -6,18 +6,31 @@ Runnable examples demonstrating inference4j capabilities.
 
 ### 1. Download the model
 
-These examples use [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2), a lightweight sentence embedding model (~90 MB).
+All examples use [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) (~90 MB). The router example also uses [all-MiniLM-L12-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L12-v2) (~120 MB), and the comparison example uses [all-mpnet-base-v2](https://huggingface.co/sentence-transformers/all-mpnet-base-v2) (~420 MB).
 
 ```bash
 # From the project root:
-mkdir -p inference4j-examples/models/all-MiniLM-L6-v2
 
-# Download model and vocabulary
+# all-MiniLM-L6-v2 (required by all examples)
+mkdir -p inference4j-examples/models/all-MiniLM-L6-v2
 curl -L -o inference4j-examples/models/all-MiniLM-L6-v2/model.onnx \
   https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx
-
 curl -L -o inference4j-examples/models/all-MiniLM-L6-v2/vocab.txt \
   https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/vocab.txt
+
+# all-MiniLM-L12-v2 (required by ModelRouterExample)
+mkdir -p inference4j-examples/models/all-MiniLM-L12-v2
+curl -L -o inference4j-examples/models/all-MiniLM-L12-v2/model.onnx \
+  https://huggingface.co/sentence-transformers/all-MiniLM-L12-v2/resolve/main/onnx/model.onnx
+curl -L -o inference4j-examples/models/all-MiniLM-L12-v2/vocab.txt \
+  https://huggingface.co/sentence-transformers/all-MiniLM-L12-v2/resolve/main/vocab.txt
+
+# all-mpnet-base-v2 (required by ModelComparisonExample)
+mkdir -p inference4j-examples/models/all-mpnet-base-v2
+curl -L -o inference4j-examples/models/all-mpnet-base-v2/model.onnx \
+  https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/onnx/model.onnx
+curl -L -o inference4j-examples/models/all-mpnet-base-v2/vocab.txt \
+  https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/vocab.txt
 ```
 
 ### 2. Run an example
@@ -28,6 +41,12 @@ curl -L -o inference4j-examples/models/all-MiniLM-L6-v2/vocab.txt \
 
 # Semantic search — query a document corpus
 ./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.SemanticSearchExample
+
+# Model router — A/B test with metrics tracking
+./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.ModelRouterExample
+
+# Model comparison — same queries, two models side by side
+./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.ModelComparisonExample
 ```
 
 ## Examples
@@ -36,3 +55,5 @@ curl -L -o inference4j-examples/models/all-MiniLM-L6-v2/vocab.txt \
 |---------|-------------|
 | `SemanticSimilarityExample` | Encodes sentence pairs and computes cosine similarity scores |
 | `SemanticSearchExample` | Encodes a document corpus, then ranks documents by relevance to queries |
+| `ModelRouterExample` | A/B tests MiniLM-L6 vs L12 with round-robin routing and per-request metrics |
+| `ModelComparisonExample` | Runs semantic search with two models and compares their rankings side by side |
