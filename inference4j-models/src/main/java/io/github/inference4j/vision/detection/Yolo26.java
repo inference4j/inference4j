@@ -21,44 +21,40 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * YOLOv8 object detection model wrapper.
+ * YOLO26 object detection model wrapper.
  *
  * <p>This wrapper supports the
- * <a href="https://docs.ultralytics.com/models/yolov8/">YOLOv8</a> output layout
- * ({@code [1, 4+numClasses, numCandidates]}). It is also compatible with
- * <a href="https://docs.ultralytics.com/models/yolo11/">YOLO11</a>, which uses
- * the same output topology.
+ * <a href="https://huggingface.co/onnx-community/yolo26x-ONNX">YOLO26</a> NMS-free
+ * architecture. Unlike YOLOv8, YOLO26 outputs 300 deduplicated proposals directly —
+ * no non-maximum suppression is needed.
  *
- * <p><strong>Not compatible with YOLOv5</strong> (different layout with separate
- * objectness score) or <strong>YOLO26</strong> (NMS-free architecture with
- * different output format).
+ * <p><strong>Not compatible with YOLOv8/YOLO11</strong> (different output layout with
+ * NMS-based post-processing).
  *
  * <h2>Tested model</h2>
  * <p>Tested against
- * <a href="https://huggingface.co/Kalray/yolov8">YOLOv8n</a> (Ultralytics architecture).
- * That model outputs shape {@code [1, 84, 8400]} — 4 box coordinates
- * ({@code cx, cy, w, h}) plus 80 COCO class scores for 8400 candidate detections.
- * Class scores have sigmoid already applied (no additional activation needed).
+ * <a href="https://huggingface.co/onnx-community/yolo26x-ONNX">yolo26x-ONNX</a>.
+ * That model outputs two tensors:
+ * <ul>
+ *   <li>{@code logits}: shape {@code [1, 300, 80]} — raw class scores (sigmoid needed)</li>
+ *   <li>{@code pred_boxes}: shape {@code [1, 300, 4]} — normalized {@code [cx, cy, w, h]} in 0–1</li>
+ * </ul>
  *
- * <h2>Compatibility</h2>
- * <table>
- *   <tr><th>Version</th><th>Compatible</th><th>Output layout</th></tr>
- *   <tr><td>YOLOv8</td><td>Yes</td><td>{@code [1, 4+C, N]} — no objectness score</td></tr>
- *   <tr><td>YOLO11</td><td>Yes</td><td>{@code [1, 4+C, N]} — same as v8</td></tr>
- *   <tr><td>YOLOv5</td><td>No</td><td>{@code [1, N, 5+C]} — has objectness column</td></tr>
- *   <tr><td>YOLO26</td><td>No</td><td>NMS-free, different output</td></tr>
- * </table>
+ * <h2>Output identification</h2>
+ * <p>Output tensors are identified by shape rather than name — the tensor whose last
+ * dimension is 4 is treated as boxes, the other as logits. This is robust across
+ * different ONNX exporters.
  *
  * <h2>Preprocessing</h2>
  * <ul>
- *   <li>Letterbox resize: preserves aspect ratio, pads with gray (114/255)</li>
- *   <li>Normalization: {@code pixel / 255} only (no ImageNet mean/std)</li>
+ *   <li>Resize to {@code inputSize x inputSize} via bilinear interpolation (aspect ratio NOT preserved)</li>
+ *   <li>Normalization: {@code pixel / 255} only (no ImageNet mean/std, no letterbox padding)</li>
  *   <li>Input layout: NCHW {@code [1, 3, inputSize, inputSize]}</li>
  * </ul>
  *
  * <h2>Quick start</h2>
  * <pre>{@code
- * try (YoloV8 yolo = YoloV8.fromPretrained("models/yolov8n")) {
+ * try (Yolo26 yolo = Yolo26.fromPretrained("models/yolo26n")) {
  *     List<Detection> detections = yolo.detect(Path.of("street.jpg"));
  *     for (Detection d : detections) {
  *         System.out.printf("%s (%.2f) at [%.0f, %.0f, %.0f, %.0f]%n",
@@ -70,12 +66,11 @@ import java.util.Map;
  *
  * <h2>Custom configuration</h2>
  * <pre>{@code
- * try (YoloV8 yolo = YoloV8.builder()
+ * try (Yolo26 yolo = Yolo26.builder()
  *         .session(InferenceSession.create(modelPath))
  *         .labels(Labels.fromFile(Path.of("custom-labels.txt")))
  *         .inputSize(640)
  *         .confidenceThreshold(0.5f)
- *         .iouThreshold(0.4f)
  *         .build()) {
  *     List<Detection> detections = yolo.detect(image);
  * }
@@ -83,35 +78,31 @@ import java.util.Map;
  *
  * @see Detection
  * @see BoundingBox
- * @see Yolo26
+ * @see YoloV8
  */
-public class YoloV8 implements ObjectDetectionModel {
-
-    private static final float LETTERBOX_PAD_VALUE = 114f / 255f;
+public class Yolo26 implements ObjectDetectionModel {
 
     private final InferenceSession session;
     private final Labels labels;
     private final String inputName;
     private final int inputSize;
     private final float defaultConfidenceThreshold;
-    private final float defaultIouThreshold;
 
-    private YoloV8(InferenceSession session, Labels labels, String inputName,
-                 int inputSize, float defaultConfidenceThreshold, float defaultIouThreshold) {
+    private Yolo26(InferenceSession session, Labels labels, String inputName,
+                   int inputSize, float defaultConfidenceThreshold) {
         this.session = session;
         this.labels = labels;
         this.inputName = inputName;
         this.inputSize = inputSize;
         this.defaultConfidenceThreshold = defaultConfidenceThreshold;
-        this.defaultIouThreshold = defaultIouThreshold;
     }
 
-    public static YoloV8 fromPretrained(String modelPath) {
+    public static Yolo26 fromPretrained(String modelPath) {
         Path dir = Path.of(modelPath);
         return fromModelDirectory(dir);
     }
 
-    public static YoloV8 fromPretrained(String modelId, ModelSource source) {
+    public static Yolo26 fromPretrained(String modelId, ModelSource source) {
         Path dir = source.resolve(modelId);
         return fromModelDirectory(dir);
     }
@@ -122,33 +113,65 @@ public class YoloV8 implements ObjectDetectionModel {
 
     @Override
     public List<Detection> detect(BufferedImage image) {
-        return detect(image, defaultConfidenceThreshold, defaultIouThreshold);
+        return detect(image, defaultConfidenceThreshold, 0f);
     }
 
+    /**
+     * Detects objects in the given image.
+     *
+     * <p>The {@code iouThreshold} parameter is accepted for interface compatibility but
+     * is ignored — YOLO26 uses an NMS-free architecture where the model outputs
+     * deduplicated proposals directly.
+     */
     @Override
     public List<Detection> detect(BufferedImage image, float confidenceThreshold, float iouThreshold) {
         int origW = image.getWidth();
         int origH = image.getHeight();
 
-        LetterboxResult lb = letterbox(image, inputSize);
-        Tensor inputTensor = imageToTensor(lb.image);
+        BufferedImage resized = resize(image, inputSize);
+        Tensor inputTensor = imageToTensor(resized);
 
         Map<String, Tensor> inputs = new LinkedHashMap<>();
         inputs.put(inputName, inputTensor);
 
         Map<String, Tensor> outputs = session.run(inputs);
-        Tensor outputTensor = outputs.values().iterator().next();
 
-        return postProcess(outputTensor.toFloats(), outputTensor.shape(),
-                labels, confidenceThreshold, iouThreshold,
-                lb.scale, lb.padX, lb.padY, origW, origH);
+        // Identify outputs by shape: last dim 4 = boxes, other = logits
+        float[] logitsData = null;
+        long[] logitsShape = null;
+        float[] boxesData = null;
+        long[] boxesShape = null;
+
+        for (Tensor tensor : outputs.values()) {
+            long[] shape = tensor.shape();
+            if (shape.length >= 2 && shape[shape.length - 1] == 4) {
+                boxesData = tensor.toFloats();
+                boxesShape = shape;
+            } else {
+                logitsData = tensor.toFloats();
+                logitsShape = shape;
+            }
+        }
+
+        if (logitsData == null || boxesData == null) {
+            throw new InferenceException("Expected two output tensors (logits and boxes), got: " + outputs.size());
+        }
+
+        return postProcess(logitsData, logitsShape, boxesData, boxesShape,
+                labels, confidenceThreshold, origW, origH);
     }
 
     @Override
     public List<Detection> detect(Path imagePath) {
-        return detect(imagePath, defaultConfidenceThreshold, defaultIouThreshold);
+        return detect(imagePath, defaultConfidenceThreshold, 0f);
     }
 
+    /**
+     * Detects objects in the given image file.
+     *
+     * <p>The {@code iouThreshold} parameter is accepted for interface compatibility but
+     * is ignored — YOLO26 uses an NMS-free architecture.
+     */
     @Override
     public List<Detection> detect(Path imagePath, float confidenceThreshold, float iouThreshold) {
         return detect(loadImage(imagePath), confidenceThreshold, iouThreshold);
@@ -161,33 +184,13 @@ public class YoloV8 implements ObjectDetectionModel {
 
     // --- Preprocessing ---
 
-    record LetterboxResult(BufferedImage image, float scale, float padX, float padY) {
-    }
-
-    static LetterboxResult letterbox(BufferedImage image, int targetSize) {
-        int origW = image.getWidth();
-        int origH = image.getHeight();
-
-        float scale = Math.min((float) targetSize / origW, (float) targetSize / origH);
-        int scaledW = Math.round(origW * scale);
-        int scaledH = Math.round(origH * scale);
-
-        float padX = (targetSize - scaledW) / 2f;
-        float padY = (targetSize - scaledH) / 2f;
-
+    static BufferedImage resize(BufferedImage image, int targetSize) {
         BufferedImage result = new BufferedImage(targetSize, targetSize, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = result.createGraphics();
-
-        // Fill with gray padding
-        int padGray = Math.round(114f);
-        g.setColor(new Color(padGray, padGray, padGray));
-        g.fillRect(0, 0, targetSize, targetSize);
-
-        // Draw scaled image centered
-        g.drawImage(image, Math.round(padX), Math.round(padY), scaledW, scaledH, null);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(image, 0, 0, targetSize, targetSize, null);
         g.dispose();
-
-        return new LetterboxResult(result, scale, padX, padY);
+        return result;
     }
 
     private static Tensor imageToTensor(BufferedImage image) {
@@ -215,45 +218,37 @@ public class YoloV8 implements ObjectDetectionModel {
     // --- Post-processing ---
 
     /**
-     * Post-processes raw YOLOv8 output into a list of detections.
+     * Post-processes raw YOLO26 outputs into a list of detections.
      *
      * <p>Package-visible for unit testing without an ONNX session.
      *
-     * @param rawOutput   flat float array from model output
-     * @param outputShape shape of the output tensor (e.g., {@code [1, 84, 8400]})
-     * @param labels      class labels
+     * @param logitsData   flat float array of raw class logits
+     * @param logitsShape  shape of the logits tensor (e.g., {@code [1, 300, 80]})
+     * @param boxesData    flat float array of normalized box coordinates
+     * @param boxesShape   shape of the boxes tensor (e.g., {@code [1, 300, 4]})
+     * @param labels       class labels
      * @param confThreshold minimum confidence to keep a detection
-     * @param iouThreshold  IoU threshold for NMS
-     * @param scale       letterbox scale factor
-     * @param padX        horizontal padding added by letterbox
-     * @param padY        vertical padding added by letterbox
-     * @param origWidth   original image width
-     * @param origHeight  original image height
+     * @param origWidth    original image width
+     * @param origHeight   original image height
      * @return detections sorted by confidence descending
      */
-    static List<Detection> postProcess(float[] rawOutput, long[] outputShape,
-                                       Labels labels,
-                                       float confThreshold, float iouThreshold,
-                                       float scale, float padX, float padY,
+    static List<Detection> postProcess(float[] logitsData, long[] logitsShape,
+                                       float[] boxesData, long[] boxesShape,
+                                       Labels labels, float confThreshold,
                                        int origWidth, int origHeight) {
-        // YOLOv8 output: [1, numOutputs, numCandidates] where numOutputs = 4 + numClasses
-        int numOutputs = (int) outputShape[1];
-        int numCandidates = (int) outputShape[2];
-        int numClasses = numOutputs - 4;
+        // logits: [1, numProposals, numClasses], boxes: [1, numProposals, 4]
+        int numProposals = (int) logitsShape[1];
+        int numClasses = (int) logitsShape[2];
 
-        // Collect candidates above confidence threshold
-        List<float[]> boxList = new ArrayList<>();
-        List<Float> scoreList = new ArrayList<>();
-        List<Integer> classList = new ArrayList<>();
+        List<Detection> detections = new ArrayList<>();
 
-        for (int c = 0; c < numCandidates; c++) {
-            // Find best class for this candidate
+        for (int p = 0; p < numProposals; p++) {
+            // Apply sigmoid to logits for this proposal and find best class
             int bestClass = -1;
             float bestScore = -1f;
             for (int cls = 0; cls < numClasses; cls++) {
-                // Output is [1, numOutputs, numCandidates] — row-major:
-                // element at [0, row, col] = rawOutput[row * numCandidates + col]
-                float score = rawOutput[(4 + cls) * numCandidates + c];
+                float logit = logitsData[p * numClasses + cls];
+                float score = (float) (1.0 / (1.0 + Math.exp(-logit)));
                 if (score > bestScore) {
                     bestScore = score;
                     bestClass = cls;
@@ -264,50 +259,31 @@ public class YoloV8 implements ObjectDetectionModel {
                 continue;
             }
 
-            // Extract box [cx, cy, w, h]
-            float cx = rawOutput[0 * numCandidates + c];
-            float cy = rawOutput[1 * numCandidates + c];
-            float bw = rawOutput[2 * numCandidates + c];
-            float bh = rawOutput[3 * numCandidates + c];
+            // Extract normalized box [cx, cy, w, h]
+            float cx = boxesData[p * 4];
+            float cy = boxesData[p * 4 + 1];
+            float bw = boxesData[p * 4 + 2];
+            float bh = boxesData[p * 4 + 3];
 
             // Convert to [x1, y1, x2, y2]
             float[] xyxy = MathOps.cxcywh2xyxy(new float[]{cx, cy, bw, bh});
 
-            // Rescale to original image coordinates
-            xyxy[0] = Math.max(0, Math.min((xyxy[0] - padX) / scale, origWidth));
-            xyxy[1] = Math.max(0, Math.min((xyxy[1] - padY) / scale, origHeight));
-            xyxy[2] = Math.max(0, Math.min((xyxy[2] - padX) / scale, origWidth));
-            xyxy[3] = Math.max(0, Math.min((xyxy[3] - padY) / scale, origHeight));
+            // Scale normalized coords to original image dimensions and clip
+            xyxy[0] = Math.max(0, Math.min(xyxy[0] * origWidth, origWidth));
+            xyxy[1] = Math.max(0, Math.min(xyxy[1] * origHeight, origHeight));
+            xyxy[2] = Math.max(0, Math.min(xyxy[2] * origWidth, origWidth));
+            xyxy[3] = Math.max(0, Math.min(xyxy[3] * origHeight, origHeight));
 
-            boxList.add(xyxy);
-            scoreList.add(bestScore);
-            classList.add(bestClass);
-        }
-
-        if (boxList.isEmpty()) {
-            return List.of();
-        }
-
-        // Flatten boxes for NMS
-        float[] allBoxes = new float[boxList.size() * 4];
-        float[] allScores = new float[scoreList.size()];
-        for (int i = 0; i < boxList.size(); i++) {
-            System.arraycopy(boxList.get(i), 0, allBoxes, i * 4, 4);
-            allScores[i] = scoreList.get(i);
-        }
-
-        int[] kept = MathOps.nms(allBoxes, allScores, iouThreshold);
-
-        List<Detection> detections = new ArrayList<>(kept.length);
-        for (int idx : kept) {
-            float[] box = boxList.get(idx);
             detections.add(new Detection(
-                    new BoundingBox(box[0], box[1], box[2], box[3]),
-                    labels.get(classList.get(idx)),
-                    classList.get(idx),
-                    scoreList.get(idx)
+                    new BoundingBox(xyxy[0], xyxy[1], xyxy[2], xyxy[3]),
+                    labels.get(bestClass),
+                    bestClass,
+                    bestScore
             ));
         }
+
+        // Sort by confidence descending
+        detections.sort((a, b) -> Float.compare(b.confidence(), a.confidence()));
 
         return detections;
     }
@@ -326,7 +302,7 @@ public class YoloV8 implements ObjectDetectionModel {
         }
     }
 
-    private static YoloV8 fromModelDirectory(Path dir) {
+    private static Yolo26 fromModelDirectory(Path dir) {
         if (!Files.isDirectory(dir)) {
             throw new ModelSourceException("Model directory not found: " + dir);
         }
@@ -347,7 +323,7 @@ public class YoloV8 implements ObjectDetectionModel {
             ImageLayout layout = ImageLayout.detect(inputShape);
             int inputSize = layout.imageSize(inputShape);
 
-            return new YoloV8(session, labels, inputName, inputSize, 0.25f, 0.45f);
+            return new Yolo26(session, labels, inputName, inputSize, 0.5f);
         } catch (Exception e) {
             session.close();
             throw e;
@@ -359,8 +335,7 @@ public class YoloV8 implements ObjectDetectionModel {
         private Labels labels = Labels.coco();
         private String inputName;
         private int inputSize = 640;
-        private float confidenceThreshold = 0.25f;
-        private float iouThreshold = 0.45f;
+        private float confidenceThreshold = 0.5f;
 
         public Builder session(InferenceSession session) {
             this.session = session;
@@ -387,20 +362,23 @@ public class YoloV8 implements ObjectDetectionModel {
             return this;
         }
 
+        /**
+         * Sets the IoU threshold. This parameter is accepted for API consistency but
+         * has no effect — YOLO26 is NMS-free.
+         */
         public Builder iouThreshold(float iouThreshold) {
-            this.iouThreshold = iouThreshold;
+            // Accepted but ignored — YOLO26 is NMS-free
             return this;
         }
 
-        public YoloV8 build() {
+        public Yolo26 build() {
             if (session == null) {
                 throw new IllegalStateException("InferenceSession is required");
             }
             if (inputName == null) {
                 inputName = session.inputNames().iterator().next();
             }
-            return new YoloV8(session, labels, inputName, inputSize,
-                    confidenceThreshold, iouThreshold);
+            return new Yolo26(session, labels, inputName, inputSize, confidenceThreshold);
         }
     }
 }
