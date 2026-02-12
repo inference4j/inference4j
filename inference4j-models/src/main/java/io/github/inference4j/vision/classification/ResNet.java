@@ -13,24 +13,47 @@ import java.nio.file.Path;
 /**
  * Image classification model for ResNet architectures.
  *
- * <p>Quick start:
+ * <h2>Tested model</h2>
+ * <p>This wrapper is tested against
+ * <a href="https://huggingface.co/onnxmodelzoo/resnet50-v1-7">ResNet-50 v1.7</a>
+ * (ONNX Model Zoo). That model outputs <strong>raw logits</strong> (no activation on
+ * the final layer), so this wrapper applies {@link OutputOperator#softmax()} by default
+ * to produce probabilities.
+ *
+ * <p><strong>Other ResNet exports may differ.</strong> Some exporters (e.g., PyTorch's
+ * {@code torch.onnx.export} with a model that includes {@code F.softmax}) bake softmax
+ * into the graph. Using this wrapper with such a model would apply softmax twice,
+ * silently compressing confidence scores. If your model already outputs probabilities,
+ * override with {@code .outputOperator(OutputOperator.identity())} via the builder.
+ *
+ * <h2>Preprocessing</h2>
+ * <ul>
+ *   <li>Normalization: ImageNet mean {@code [0.485, 0.456, 0.406]}, std {@code [0.229, 0.224, 0.225]}</li>
+ *   <li>Input layout: auto-detected from model (typically NCHW)</li>
+ *   <li>Input size: auto-detected from model (typically 224x224)</li>
+ * </ul>
+ *
+ * <h2>Quick start</h2>
  * <pre>{@code
  * try (ResNet model = ResNet.fromPretrained("models/resnet50")) {
  *     List<Classification> results = model.classify(Path.of("cat.jpg"));
  * }
  * }</pre>
  *
- * <p>Custom configuration:
+ * <h2>Custom configuration</h2>
  * <pre>{@code
  * try (ResNet model = ResNet.builder()
  *         .session(InferenceSession.create(modelPath))
  *         .pipeline(ImageTransformPipeline.imagenet(224))
  *         .labels(Labels.fromFile(Path.of("my-labels.txt")))
+ *         .outputOperator(OutputOperator.identity()) // if model has built-in softmax
  *         .defaultTopK(10)
  *         .build()) {
  *     List<Classification> results = model.classify(image, 3);
  * }
  * }</pre>
+ *
+ * @see OutputOperator
  */
 public class ResNet extends AbstractImageClassificationModel {
 

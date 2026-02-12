@@ -13,24 +13,47 @@ import java.nio.file.Path;
 /**
  * Image classification model for EfficientNet architectures.
  *
- * <p>Quick start with EfficientNet-B0 (224x224):
+ * <h2>Tested model</h2>
+ * <p>This wrapper is tested against
+ * <a href="https://huggingface.co/onnx/EfficientNet-Lite4">EfficientNet-Lite4</a>
+ * (ONNX format, TensorFlow origin). That model has <strong>softmax built into the
+ * graph</strong>, so this wrapper uses {@link OutputOperator#identity()} by default —
+ * the output values are already probabilities.
+ *
+ * <p><strong>Other EfficientNet exports may differ.</strong> Some ONNX exports (e.g.,
+ * from PyTorch's {@code timm} library) output raw logits without a final activation.
+ * Using this wrapper with such a model would pass raw logits as confidence scores.
+ * If your model outputs logits, override with
+ * {@code .outputOperator(OutputOperator.softmax())} via the builder.
+ *
+ * <h2>Preprocessing</h2>
+ * <ul>
+ *   <li>Normalization: mean {@code [127/255, 127/255, 127/255]}, std {@code [128/255, 128/255, 128/255]}</li>
+ *   <li>Input layout: auto-detected from model (typically NHWC for TF-origin models)</li>
+ *   <li>Input size: auto-detected from model (B0=224, B1=240, B2=260, B3=300, B4=380, Lite4=280)</li>
+ * </ul>
+ *
+ * <h2>Quick start</h2>
  * <pre>{@code
- * try (EfficientNet model = EfficientNet.fromPretrained("models/efficientnet-b0")) {
+ * try (EfficientNet model = EfficientNet.fromPretrained("models/efficientnet-lite4")) {
  *     List<Classification> results = model.classify(Path.of("cat.jpg"));
  * }
  * }</pre>
  *
- * <p>Larger variants (B1=240, B2=260, B3=300, etc.) via builder:
+ * <h2>Larger variants via builder</h2>
  * <pre>{@code
  * try (EfficientNet model = EfficientNet.builder()
  *         .session(InferenceSession.create(modelPath))
  *         .pipeline(ImageTransformPipeline.imagenet(260))
  *         .labels(Labels.fromFile(Path.of("my-labels.txt")))
+ *         .outputOperator(OutputOperator.softmax()) // if model outputs raw logits
  *         .defaultTopK(10)
  *         .build()) {
  *     List<Classification> results = model.classify(image, 3);
  * }
  * }</pre>
+ *
+ * @see OutputOperator
  */
 public class EfficientNet extends AbstractImageClassificationModel {
 
