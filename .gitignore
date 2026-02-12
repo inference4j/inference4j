@@ -20,6 +20,10 @@ gradle-app.setting
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
 
+# IDE
+.idea/
+*.iml
+
 # Private project docs
 docs/
 CLAUDE.md
