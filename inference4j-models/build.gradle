@@ -3,4 +3,5 @@ description = 'Handcrafted model wrappers for inference4j'
 dependencies {
     api project(':inference4j-core')
     api project(':inference4j-preprocessing')
+    api project(':inference4j-runtime')
 }

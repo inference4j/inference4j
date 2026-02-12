@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class InferenceSession implements AutoCloseable {
 
@@ -37,6 +38,10 @@ public class InferenceSession implements AutoCloseable {
             throw new ModelLoadException(
                     "Failed to load model from " + modelPath + ": " + e.getMessage(), e);
         }
+    }
+
+    public Set<String> inputNames() {
+        return session.getInputNames();
     }
 
     public Map<String, Tensor> run(Map<String, Tensor> inputs) {

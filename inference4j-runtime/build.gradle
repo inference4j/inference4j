@@ -1,0 +1,7 @@
+description = 'Operational runtime for inference4j: routing, metrics'
+
+dependencies {
+    api project(':inference4j-core')
+    compileOnly 'io.micrometer:micrometer-core:1.14.4'
+    testImplementation 'io.micrometer:micrometer-core:1.14.4'
+}
