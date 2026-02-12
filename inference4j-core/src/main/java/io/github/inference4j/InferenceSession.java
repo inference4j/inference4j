@@ -1,6 +1,12 @@
 package io.github.inference4j;
 
-import ai.onnxruntime.*;
+import ai.onnxruntime.NodeInfo;
+import ai.onnxruntime.OnnxTensor;
+import ai.onnxruntime.OnnxValue;
+import ai.onnxruntime.OrtEnvironment;
+import ai.onnxruntime.OrtException;
+import ai.onnxruntime.OrtSession;
+import ai.onnxruntime.TensorInfo;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.exception.TensorConversionException;
@@ -42,6 +48,18 @@ public class InferenceSession implements AutoCloseable {
 
     public Set<String> inputNames() {
         return session.getInputNames();
+    }
+
+    public long[] inputShape(String name) {
+        try {
+            NodeInfo info = session.getInputInfo().get(name);
+            if (info == null) {
+                throw new InferenceException("Unknown input: " + name);
+            }
+            return ((TensorInfo) info.getInfo()).getShape();
+        } catch (OrtException e) {
+            throw new InferenceException("Failed to get input shape: " + e.getMessage(), e);
+        }
     }
 
     public Map<String, Tensor> run(Map<String, Tensor> inputs) {
