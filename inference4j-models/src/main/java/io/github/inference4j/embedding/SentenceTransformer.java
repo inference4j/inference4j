@@ -15,27 +15,27 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-public class BertEmbeddings implements AutoCloseable {
+public class SentenceTransformer implements EmbeddingModel {
 
     private final InferenceSession session;
     private final Tokenizer tokenizer;
     private final PoolingStrategy poolingStrategy;
     private final int maxLength;
 
-    private BertEmbeddings(InferenceSession session, Tokenizer tokenizer,
-                           PoolingStrategy poolingStrategy, int maxLength) {
+    private SentenceTransformer(InferenceSession session, Tokenizer tokenizer,
+                                PoolingStrategy poolingStrategy, int maxLength) {
         this.session = session;
         this.tokenizer = tokenizer;
         this.poolingStrategy = poolingStrategy;
         this.maxLength = maxLength;
     }
 
-    public static BertEmbeddings fromPretrained(String modelPath) {
+    public static SentenceTransformer fromPretrained(String modelPath) {
         Path dir = Path.of(modelPath);
         return fromModelDirectory(dir);
     }
 
-    public static BertEmbeddings fromPretrained(String modelId, ModelSource source) {
+    public static SentenceTransformer fromPretrained(String modelId, ModelSource source) {
         Path dir = source.resolve(modelId);
         return fromModelDirectory(dir);
     }
@@ -44,6 +44,7 @@ public class BertEmbeddings implements AutoCloseable {
         return new Builder();
     }
 
+    @Override
     public float[] encode(String text) {
         EncodedInput encoded = tokenizer.encode(text, maxLength);
 
@@ -62,6 +63,7 @@ public class BertEmbeddings implements AutoCloseable {
                 encoded.attentionMask(), poolingStrategy);
     }
 
+    @Override
     public List<float[]> encodeBatch(List<String> texts) {
         List<float[]> results = new ArrayList<>(texts.size());
         for (String text : texts) {
@@ -124,7 +126,7 @@ public class BertEmbeddings implements AutoCloseable {
         session.close();
     }
 
-    private static BertEmbeddings fromModelDirectory(Path dir) {
+    private static SentenceTransformer fromModelDirectory(Path dir) {
         if (!Files.isDirectory(dir)) {
             throw new ModelSourceException("Model directory not found: " + dir);
         }
@@ -142,7 +144,7 @@ public class BertEmbeddings implements AutoCloseable {
         InferenceSession session = InferenceSession.create(modelPath);
         try {
             Tokenizer tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
-            return new BertEmbeddings(session, tokenizer, PoolingStrategy.MEAN, 512);
+            return new SentenceTransformer(session, tokenizer, PoolingStrategy.MEAN, 512);
         } catch (Exception e) {
             session.close();
             throw e;
@@ -175,14 +177,14 @@ public class BertEmbeddings implements AutoCloseable {
             return this;
         }
 
-        public BertEmbeddings build() {
+        public SentenceTransformer build() {
             if (session == null) {
                 throw new IllegalStateException("InferenceSession is required");
             }
             if (tokenizer == null) {
                 throw new IllegalStateException("Tokenizer is required");
             }
-            return new BertEmbeddings(session, tokenizer, poolingStrategy, maxLength);
+            return new SentenceTransformer(session, tokenizer, poolingStrategy, maxLength);
         }
     }
 }

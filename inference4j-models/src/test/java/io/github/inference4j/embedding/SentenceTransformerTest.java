@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class BertEmbeddingsTest {
+class SentenceTransformerTest {
 
     @Test
     void meanPooling_averagesAcrossTokensWeightedByMask() {
@@ -17,7 +17,7 @@ class BertEmbeddingsTest {
         long[] shape = {1, 3, 4};
         long[] attentionMask = {1, 1, 0}; // only first 2 tokens are real
 
-        float[] result = BertEmbeddings.applyPooling(flatOutput, shape, attentionMask, PoolingStrategy.MEAN);
+        float[] result = SentenceTransformer.applyPooling(flatOutput, shape, attentionMask, PoolingStrategy.MEAN);
 
         // Mean of token 0 and token 1: (1+5)/2, (2+6)/2, (3+7)/2, (4+8)/2
         assertArrayEquals(new float[]{3f, 4f, 5f, 6f}, result, 0.001f);
@@ -33,7 +33,7 @@ class BertEmbeddingsTest {
         long[] shape = {1, 3, 4};
         long[] attentionMask = {1, 1, 1};
 
-        float[] result = BertEmbeddings.applyPooling(flatOutput, shape, attentionMask, PoolingStrategy.CLS);
+        float[] result = SentenceTransformer.applyPooling(flatOutput, shape, attentionMask, PoolingStrategy.CLS);
 
         assertArrayEquals(new float[]{1f, 2f, 3f, 4f}, result);
     }
@@ -48,7 +48,7 @@ class BertEmbeddingsTest {
         long[] shape = {1, 3, 4};
         long[] attentionMask = {1, 1, 0};
 
-        float[] result = BertEmbeddings.applyPooling(flatOutput, shape, attentionMask, PoolingStrategy.MAX);
+        float[] result = SentenceTransformer.applyPooling(flatOutput, shape, attentionMask, PoolingStrategy.MAX);
 
         // Max of token 0 and 1: max(1,5), max(6,2), max(3,7), max(8,4)
         assertArrayEquals(new float[]{5f, 6f, 7f, 8f}, result);
@@ -60,7 +60,7 @@ class BertEmbeddingsTest {
         long[] shape = {1, 1, 4};
         long[] attentionMask = {0};
 
-        float[] result = BertEmbeddings.applyPooling(flatOutput, shape, attentionMask, PoolingStrategy.MEAN);
+        float[] result = SentenceTransformer.applyPooling(flatOutput, shape, attentionMask, PoolingStrategy.MEAN);
 
         assertArrayEquals(new float[]{0f, 0f, 0f, 0f}, result);
     }

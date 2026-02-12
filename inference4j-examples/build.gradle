@@ -1,0 +1,19 @@
+plugins {
+    id 'application'
+}
+
+description = 'Usage examples for inference4j'
+
+application {
+    mainClass = providers.gradleProperty('mainClass')
+            .orElse('io.github.inference4j.examples.SemanticSimilarityExample')
+}
+
+tasks.named('run') {
+    workingDir = rootProject.projectDir
+}
+
+dependencies {
+    implementation project(':inference4j-models')
+    runtimeOnly 'org.slf4j:slf4j-simple:2.0.16'
+}

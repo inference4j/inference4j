@@ -24,6 +24,9 @@ gradle-app.setting
 .idea/
 *.iml
 
+# Downloaded models
+**/models/
+
 # Private project docs
 docs/
 CLAUDE.md
