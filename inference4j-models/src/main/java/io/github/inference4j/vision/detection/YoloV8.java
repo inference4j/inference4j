@@ -23,10 +23,15 @@ import java.util.Map;
 /**
  * YOLOv8 object detection model wrapper.
  *
- * <p>This wrapper is specific to the
- * <a href="https://docs.ultralytics.com/models/yolov8/">YOLOv8</a> output layout.
- * Other YOLO versions (v5, v9, v10, v11) have different output topologies and
- * require their own wrappers.
+ * <p>This wrapper supports the
+ * <a href="https://docs.ultralytics.com/models/yolov8/">YOLOv8</a> output layout
+ * ({@code [1, 4+numClasses, numCandidates]}). It is also compatible with
+ * <a href="https://docs.ultralytics.com/models/yolo11/">YOLO11</a>, which uses
+ * the same output topology.
+ *
+ * <p><strong>Not compatible with YOLOv5</strong> (different layout with separate
+ * objectness score) or <strong>YOLO26</strong> (NMS-free architecture with
+ * different output format).
  *
  * <h2>Tested model</h2>
  * <p>Tested against
@@ -35,10 +40,14 @@ import java.util.Map;
  * ({@code cx, cy, w, h}) plus 80 COCO class scores for 8400 candidate detections.
  * Class scores have sigmoid already applied (no additional activation needed).
  *
- * <h2>Output layout (YOLOv8 vs v5)</h2>
- * <p>YOLOv8 outputs {@code [1, 4+numClasses, numCandidates]} — no objectness score,
- * class scores are the final confidence. YOLOv5 outputs {@code [1, numCandidates, 5+numClasses]}
- * with a separate objectness column. <strong>Do not use this wrapper with YOLOv5 models.</strong>
+ * <h2>Compatibility</h2>
+ * <table>
+ *   <tr><th>Version</th><th>Compatible</th><th>Output layout</th></tr>
+ *   <tr><td>YOLOv8</td><td>Yes</td><td>{@code [1, 4+C, N]} — no objectness score</td></tr>
+ *   <tr><td>YOLO11</td><td>Yes</td><td>{@code [1, 4+C, N]} — same as v8</td></tr>
+ *   <tr><td>YOLOv5</td><td>No</td><td>{@code [1, N, 5+C]} — has objectness column</td></tr>
+ *   <tr><td>YOLO26</td><td>No</td><td>NMS-free, different output</td></tr>
+ * </table>
  *
  * <h2>Preprocessing</h2>
  * <ul>
