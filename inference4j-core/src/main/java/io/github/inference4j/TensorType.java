@@ -1,4 +1,4 @@
-package io.github.inference4j.core;
+package io.github.inference4j;
 
 public enum TensorType {
     FLOAT,

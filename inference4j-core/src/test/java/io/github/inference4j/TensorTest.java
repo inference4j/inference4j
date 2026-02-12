@@ -1,6 +1,6 @@
-package io.github.inference4j.core;
+package io.github.inference4j;
 
-import io.github.inference4j.core.exception.TensorConversionException;
+import io.github.inference4j.exception.TensorConversionException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

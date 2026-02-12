@@ -1,4 +1,4 @@
-package io.github.inference4j.models;
+package io.github.inference4j.embedding;
 
 public enum PoolingStrategy {
     MEAN,

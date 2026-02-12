@@ -1,6 +1,5 @@
-package io.github.inference4j.models.nlp;
+package io.github.inference4j.embedding;
 
-import io.github.inference4j.models.PoolingStrategy;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

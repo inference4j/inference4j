@@ -1,6 +1,5 @@
-package io.github.inference4j.preprocessing.tokenizer;
+package io.github.inference4j.tokenizer;
 
-import io.github.inference4j.preprocessing.EncodedInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 

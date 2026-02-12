@@ -1,4 +1,4 @@
-package io.github.inference4j.core.exception;
+package io.github.inference4j.exception;
 
 public class ModelSourceException extends InferenceException {
 

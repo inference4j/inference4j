@@ -1,14 +1,12 @@
-package io.github.inference4j.models.nlp;
+package io.github.inference4j.embedding;
 
-import io.github.inference4j.core.InferenceSession;
-import io.github.inference4j.core.LocalModelSource;
-import io.github.inference4j.core.ModelSource;
-import io.github.inference4j.core.Tensor;
-import io.github.inference4j.core.exception.ModelSourceException;
-import io.github.inference4j.models.PoolingStrategy;
-import io.github.inference4j.preprocessing.EncodedInput;
-import io.github.inference4j.preprocessing.Tokenizer;
-import io.github.inference4j.preprocessing.tokenizer.WordPieceTokenizer;
+import io.github.inference4j.InferenceSession;
+import io.github.inference4j.ModelSource;
+import io.github.inference4j.Tensor;
+import io.github.inference4j.exception.ModelSourceException;
+import io.github.inference4j.tokenizer.EncodedInput;
+import io.github.inference4j.tokenizer.Tokenizer;
+import io.github.inference4j.tokenizer.WordPieceTokenizer;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -142,9 +140,13 @@ public class BertEmbeddings implements AutoCloseable {
         }
 
         InferenceSession session = InferenceSession.create(modelPath);
-        Tokenizer tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
-
-        return new BertEmbeddings(session, tokenizer, PoolingStrategy.MEAN, 512);
+        try {
+            Tokenizer tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
+            return new BertEmbeddings(session, tokenizer, PoolingStrategy.MEAN, 512);
+        } catch (Exception e) {
+            session.close();
+            throw e;
+        }
     }
 
     public static class Builder {

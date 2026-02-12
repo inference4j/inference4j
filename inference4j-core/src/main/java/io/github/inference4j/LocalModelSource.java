@@ -1,6 +1,6 @@
-package io.github.inference4j.core;
+package io.github.inference4j;
 
-import io.github.inference4j.core.exception.ModelSourceException;
+import io.github.inference4j.exception.ModelSourceException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 

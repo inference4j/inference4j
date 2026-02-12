@@ -1,8 +1,6 @@
-package io.github.inference4j.preprocessing.tokenizer;
+package io.github.inference4j.tokenizer;
 
-import io.github.inference4j.core.exception.ModelSourceException;
-import io.github.inference4j.preprocessing.EncodedInput;
-import io.github.inference4j.preprocessing.Tokenizer;
+import io.github.inference4j.exception.ModelSourceException;
 
 import java.io.IOException;
 import java.nio.file.Files;

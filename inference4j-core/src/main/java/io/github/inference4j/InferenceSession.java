@@ -1,9 +1,9 @@
-package io.github.inference4j.core;
+package io.github.inference4j;
 
 import ai.onnxruntime.*;
-import io.github.inference4j.core.exception.InferenceException;
-import io.github.inference4j.core.exception.ModelLoadException;
-import io.github.inference4j.core.exception.TensorConversionException;
+import io.github.inference4j.exception.InferenceException;
+import io.github.inference4j.exception.ModelLoadException;
+import io.github.inference4j.exception.TensorConversionException;
 
 import java.nio.FloatBuffer;
 import java.nio.LongBuffer;
@@ -29,9 +29,10 @@ public class InferenceSession implements AutoCloseable {
     public static InferenceSession create(Path modelPath, SessionOptions options) {
         try {
             OrtEnvironment env = OrtEnvironment.getEnvironment();
-            OrtSession.SessionOptions ortOptions = options.toOrtOptions();
-            OrtSession session = env.createSession(modelPath.toString(), ortOptions);
-            return new InferenceSession(env, session);
+            try (OrtSession.SessionOptions ortOptions = options.toOrtOptions()) {
+                OrtSession session = env.createSession(modelPath.toString(), ortOptions);
+                return new InferenceSession(env, session);
+            }
         } catch (OrtException e) {
             throw new ModelLoadException(
                     "Failed to load model from " + modelPath + ": " + e.getMessage(), e);

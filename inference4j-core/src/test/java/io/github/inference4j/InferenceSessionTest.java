@@ -1,6 +1,6 @@
-package io.github.inference4j.core;
+package io.github.inference4j;
 
-import io.github.inference4j.core.exception.ModelLoadException;
+import io.github.inference4j.exception.ModelLoadException;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
