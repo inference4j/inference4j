@@ -1,6 +1,12 @@
 package io.github.inference4j;
 
-import ai.onnxruntime.*;
+import ai.onnxruntime.NodeInfo;
+import ai.onnxruntime.OnnxTensor;
+import ai.onnxruntime.OnnxValue;
+import ai.onnxruntime.OrtEnvironment;
+import ai.onnxruntime.OrtException;
+import ai.onnxruntime.OrtSession;
+import ai.onnxruntime.TensorInfo;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.exception.TensorConversionException;
@@ -13,6 +19,28 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Manages an ONNX Runtime session for running model inference.
+ *
+ * <p>This is the primary entry point for loading an ONNX model and executing
+ * inference. It wraps the ONNX Runtime C++ API, converting between
+ * inference4j {@link Tensor} objects and native ONNX tensors.
+ *
+ * <p>Sessions are expensive to create (they load and optimize the model graph)
+ * but cheap to call repeatedly. Create one session and reuse it across requests.
+ *
+ * <p>Example usage:
+ * <pre>{@code
+ * try (InferenceSession session = InferenceSession.create(Path.of("model.onnx"))) {
+ *     Map<String, Tensor> inputs = Map.of("input", Tensor.fromFloats(data, shape));
+ *     Map<String, Tensor> outputs = session.run(inputs);
+ *     float[] result = outputs.get("output").toFloats();
+ * }
+ * }</pre>
+ *
+ * @see Tensor
+ * @see SessionOptions
+ */
 public class InferenceSession implements AutoCloseable {
 
     private final OrtEnvironment environment;
@@ -23,10 +51,25 @@ public class InferenceSession implements AutoCloseable {
         this.session = session;
     }
 
+    /**
+     * Creates a session from an ONNX model file with default options.
+     *
+     * @param modelPath path to the {@code .onnx} model file
+     * @return a new session ready for inference
+     * @throws io.github.inference4j.exception.ModelLoadException if the model cannot be loaded
+     */
     public static InferenceSession create(Path modelPath) {
         return create(modelPath, SessionOptions.defaults());
     }
 
+    /**
+     * Creates a session from an ONNX model file with custom options.
+     *
+     * @param modelPath path to the {@code .onnx} model file
+     * @param options   session configuration (thread counts, optimization level)
+     * @return a new session ready for inference
+     * @throws io.github.inference4j.exception.ModelLoadException if the model cannot be loaded
+     */
     public static InferenceSession create(Path modelPath, SessionOptions options) {
         try {
             OrtEnvironment env = OrtEnvironment.getEnvironment();
@@ -40,10 +83,44 @@ public class InferenceSession implements AutoCloseable {
         }
     }
 
+    /**
+     * Returns the names of all input tensors expected by the model.
+     *
+     * @return set of input tensor names
+     */
     public Set<String> inputNames() {
         return session.getInputNames();
     }
 
+    /**
+     * Returns the shape of the named input tensor as defined in the model.
+     *
+     * <p>Dynamic dimensions are represented as {@code -1}.
+     *
+     * @param name the input tensor name
+     * @return the tensor shape (e.g., {@code [1, 3, 224, 224]} for a batch-1 RGB image)
+     * @throws InferenceException if the input name is not found
+     */
+    public long[] inputShape(String name) {
+        try {
+            NodeInfo info = session.getInputInfo().get(name);
+            if (info == null) {
+                throw new InferenceException("Unknown input: " + name);
+            }
+            return ((TensorInfo) info.getInfo()).getShape();
+        } catch (OrtException e) {
+            throw new InferenceException("Failed to get input shape: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Runs inference with the given input tensors and returns the model outputs.
+     *
+     * @param inputs map of input name to tensor (must match the model's expected inputs)
+     * @return map of output name to tensor, in model-defined order
+     * @throws InferenceException if inference fails
+     * @throws io.github.inference4j.exception.TensorConversionException if a tensor type is unsupported
+     */
     public Map<String, Tensor> run(Map<String, Tensor> inputs) {
         Map<String, OnnxTensor> onnxInputs = new HashMap<>();
         try {
