@@ -21,18 +21,24 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * YOLO object detection model wrapper.
+ * YOLOv8 object detection model wrapper.
+ *
+ * <p>This wrapper is specific to the
+ * <a href="https://docs.ultralytics.com/models/yolov8/">YOLOv8</a> output layout.
+ * Other YOLO versions (v5, v9, v10, v11) have different output topologies and
+ * require their own wrappers.
  *
  * <h2>Tested model</h2>
- * <p>This wrapper is tested against
+ * <p>Tested against
  * <a href="https://huggingface.co/Kalray/yolov8">YOLOv8n</a> (Ultralytics architecture).
  * That model outputs shape {@code [1, 84, 8400]} — 4 box coordinates
  * ({@code cx, cy, w, h}) plus 80 COCO class scores for 8400 candidate detections.
  * Class scores have sigmoid already applied (no additional activation needed).
  *
- * <p><strong>Other YOLO versions may differ.</strong> YOLOv5 outputs
- * {@code [1, 25200, 85]} (transposed, with an objectness score column).
- * This wrapper assumes the YOLOv8 output layout.
+ * <h2>Output layout (YOLOv8 vs v5)</h2>
+ * <p>YOLOv8 outputs {@code [1, 4+numClasses, numCandidates]} — no objectness score,
+ * class scores are the final confidence. YOLOv5 outputs {@code [1, numCandidates, 5+numClasses]}
+ * with a separate objectness column. <strong>Do not use this wrapper with YOLOv5 models.</strong>
  *
  * <h2>Preprocessing</h2>
  * <ul>
@@ -43,7 +49,7 @@ import java.util.Map;
  *
  * <h2>Quick start</h2>
  * <pre>{@code
- * try (Yolo yolo = Yolo.fromPretrained("models/yolov8n")) {
+ * try (YoloV8 yolo = YoloV8.fromPretrained("models/yolov8n")) {
  *     List<Detection> detections = yolo.detect(Path.of("street.jpg"));
  *     for (Detection d : detections) {
  *         System.out.printf("%s (%.2f) at [%.0f, %.0f, %.0f, %.0f]%n",
@@ -55,7 +61,7 @@ import java.util.Map;
  *
  * <h2>Custom configuration</h2>
  * <pre>{@code
- * try (Yolo yolo = Yolo.builder()
+ * try (YoloV8 yolo = YoloV8.builder()
  *         .session(InferenceSession.create(modelPath))
  *         .labels(Labels.fromFile(Path.of("custom-labels.txt")))
  *         .inputSize(640)
@@ -69,7 +75,7 @@ import java.util.Map;
  * @see Detection
  * @see BoundingBox
  */
-public class Yolo implements ObjectDetectionModel {
+public class YoloV8 implements ObjectDetectionModel {
 
     private static final float LETTERBOX_PAD_VALUE = 114f / 255f;
 
@@ -80,7 +86,7 @@ public class Yolo implements ObjectDetectionModel {
     private final float defaultConfidenceThreshold;
     private final float defaultIouThreshold;
 
-    private Yolo(InferenceSession session, Labels labels, String inputName,
+    private YoloV8(InferenceSession session, Labels labels, String inputName,
                  int inputSize, float defaultConfidenceThreshold, float defaultIouThreshold) {
         this.session = session;
         this.labels = labels;
@@ -90,12 +96,12 @@ public class Yolo implements ObjectDetectionModel {
         this.defaultIouThreshold = defaultIouThreshold;
     }
 
-    public static Yolo fromPretrained(String modelPath) {
+    public static YoloV8 fromPretrained(String modelPath) {
         Path dir = Path.of(modelPath);
         return fromModelDirectory(dir);
     }
 
-    public static Yolo fromPretrained(String modelId, ModelSource source) {
+    public static YoloV8 fromPretrained(String modelId, ModelSource source) {
         Path dir = source.resolve(modelId);
         return fromModelDirectory(dir);
     }
@@ -310,7 +316,7 @@ public class Yolo implements ObjectDetectionModel {
         }
     }
 
-    private static Yolo fromModelDirectory(Path dir) {
+    private static YoloV8 fromModelDirectory(Path dir) {
         if (!Files.isDirectory(dir)) {
             throw new ModelSourceException("Model directory not found: " + dir);
         }
@@ -331,7 +337,7 @@ public class Yolo implements ObjectDetectionModel {
             ImageLayout layout = ImageLayout.detect(inputShape);
             int inputSize = layout.imageSize(inputShape);
 
-            return new Yolo(session, labels, inputName, inputSize, 0.25f, 0.45f);
+            return new YoloV8(session, labels, inputName, inputSize, 0.25f, 0.45f);
         } catch (Exception e) {
             session.close();
             throw e;
@@ -376,14 +382,14 @@ public class Yolo implements ObjectDetectionModel {
             return this;
         }
 
-        public Yolo build() {
+        public YoloV8 build() {
             if (session == null) {
                 throw new IllegalStateException("InferenceSession is required");
             }
             if (inputName == null) {
                 inputName = session.inputNames().iterator().next();
             }
-            return new Yolo(session, labels, inputName, inputSize,
+            return new YoloV8(session, labels, inputName, inputSize,
                     confidenceThreshold, iouThreshold);
         }
     }

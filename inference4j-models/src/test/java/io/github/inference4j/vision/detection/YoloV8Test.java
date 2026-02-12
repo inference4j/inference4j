@@ -7,9 +7,9 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class YoloTest {
+class YoloV8Test {
 
-    // Simulates YOLOv8 output shape [1, numOutputs, numCandidates]
+    // YOLOv8 output shape [1, numOutputs, numCandidates]
     // where numOutputs = 4 (box) + numClasses
     private static final int NUM_CLASSES = 5;
     private static final int NUM_OUTPUTS = 4 + NUM_CLASSES;
@@ -54,7 +54,7 @@ class YoloTest {
                 new float[]{100, 100, 50, 50, 0.1f, 0.05f, 0.0f, 0.0f, 0.0f}    // low conf
         );
 
-        List<Detection> results = Yolo.postProcess(output, shape(2),
+        List<Detection> results = YoloV8.postProcess(output, shape(2),
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 
@@ -69,7 +69,7 @@ class YoloTest {
                 new float[]{320, 240, 200, 100, 0.8f, 0.0f, 0.0f, 0.0f, 0.0f}
         );
 
-        List<Detection> results = Yolo.postProcess(output, shape(1),
+        List<Detection> results = YoloV8.postProcess(output, shape(1),
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 
@@ -97,7 +97,7 @@ class YoloTest {
                 new float[]{320, 320, 100, 60, 0.0f, 0.0f, 0.9f, 0.0f, 0.0f}
         );
 
-        List<Detection> results = Yolo.postProcess(output, shape(1),
+        List<Detection> results = YoloV8.postProcess(output, shape(1),
                 TEST_LABELS, 0.25f, 0.45f,
                 scale, padX, padY, origW, origH);
 
@@ -122,7 +122,7 @@ class YoloTest {
                 new float[]{325, 325, 100, 100, 0.7f, 0.0f, 0.0f, 0.0f, 0.0f}
         );
 
-        List<Detection> results = Yolo.postProcess(output, shape(2),
+        List<Detection> results = YoloV8.postProcess(output, shape(2),
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 
@@ -139,7 +139,7 @@ class YoloTest {
                 new float[]{500, 500, 50, 50, 0.7f, 0.0f, 0.0f, 0.0f, 0.0f}
         );
 
-        List<Detection> results = Yolo.postProcess(output, shape(3),
+        List<Detection> results = YoloV8.postProcess(output, shape(3),
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 
@@ -156,7 +156,7 @@ class YoloTest {
                 new float[]{100, 100, 50, 50, 0.08f, 0.1f, 0.0f, 0.0f, 0.0f}
         );
 
-        List<Detection> results = Yolo.postProcess(output, shape(2),
+        List<Detection> results = YoloV8.postProcess(output, shape(2),
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 
@@ -170,7 +170,7 @@ class YoloTest {
                 new float[]{320, 320, 100, 100, 0.1f, 0.2f, 0.3f, 0.8f, 0.1f}
         );
 
-        List<Detection> results = Yolo.postProcess(output, shape(1),
+        List<Detection> results = YoloV8.postProcess(output, shape(1),
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 
@@ -187,7 +187,7 @@ class YoloTest {
                 new float[]{10, 10, 100, 100, 0.9f, 0.0f, 0.0f, 0.0f, 0.0f}
         );
 
-        List<Detection> results = Yolo.postProcess(output, shape(1),
+        List<Detection> results = YoloV8.postProcess(output, shape(1),
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 

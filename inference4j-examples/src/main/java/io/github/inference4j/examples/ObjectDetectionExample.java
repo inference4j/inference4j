@@ -1,7 +1,7 @@
 package io.github.inference4j.examples;
 
 import io.github.inference4j.vision.detection.Detection;
-import io.github.inference4j.vision.detection.Yolo;
+import io.github.inference4j.vision.detection.YoloV8;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -20,7 +20,7 @@ public class ObjectDetectionExample {
 
         // --- Default thresholds (confidence=0.25, IoU=0.45) ---
         System.out.println("=== YOLOv8n Object Detection ===");
-        try (Yolo yolo = Yolo.fromPretrained("inference4j-examples/models/yolov8n")) {
+        try (YoloV8 yolo = YoloV8.fromPretrained("inference4j-examples/models/yolov8n")) {
             System.out.println("YOLOv8n loaded successfully.");
             System.out.println();
 
