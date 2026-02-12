@@ -160,6 +160,100 @@ class MathOpsTest {
     }
 
     @Test
+    void nms_suppressesOverlappingBoxes() {
+        // Two boxes with high overlap, different scores
+        float[] boxes = {
+                0f, 0f, 10f, 10f,  // box 0
+                1f, 1f, 11f, 11f,  // box 1 (high overlap with box 0)
+        };
+        float[] scores = {0.9f, 0.8f};
+
+        int[] kept = MathOps.nms(boxes, scores, 0.5f);
+
+        assertEquals(1, kept.length);
+        assertEquals(0, kept[0]); // higher score wins
+    }
+
+    @Test
+    void nms_keepsNonOverlappingBoxes() {
+        float[] boxes = {
+                0f, 0f, 10f, 10f,    // box 0
+                50f, 50f, 60f, 60f,  // box 1 (no overlap)
+        };
+        float[] scores = {0.9f, 0.8f};
+
+        int[] kept = MathOps.nms(boxes, scores, 0.5f);
+
+        assertEquals(2, kept.length);
+        assertEquals(0, kept[0]);
+        assertEquals(1, kept[1]);
+    }
+
+    @Test
+    void nms_sortsByScoreDescending() {
+        float[] boxes = {
+                0f, 0f, 10f, 10f,
+                50f, 50f, 60f, 60f,
+                100f, 100f, 110f, 110f,
+        };
+        float[] scores = {0.5f, 0.9f, 0.7f};
+
+        int[] kept = MathOps.nms(boxes, scores, 0.5f);
+
+        assertEquals(3, kept.length);
+        assertEquals(1, kept[0]); // 0.9
+        assertEquals(2, kept[1]); // 0.7
+        assertEquals(0, kept[2]); // 0.5
+    }
+
+    @Test
+    void nms_emptyInput_returnsEmpty() {
+        int[] kept = MathOps.nms(new float[0], new float[0], 0.5f);
+        assertEquals(0, kept.length);
+    }
+
+    @Test
+    void nms_singleBox_returnsThatBox() {
+        float[] boxes = {0f, 0f, 10f, 10f};
+        float[] scores = {0.95f};
+
+        int[] kept = MathOps.nms(boxes, scores, 0.5f);
+
+        assertEquals(1, kept.length);
+        assertEquals(0, kept[0]);
+    }
+
+    @Test
+    void nms_partialOverlapBelowThreshold_keepsBoth() {
+        // Two boxes with partial overlap (~18% IoU)
+        float[] boxes = {
+                0f, 0f, 10f, 10f,   // area = 100
+                7f, 7f, 17f, 17f,   // area = 100, intersection = 3*3 = 9, IoU = 9/191 ≈ 0.047
+        };
+        float[] scores = {0.9f, 0.8f};
+
+        int[] kept = MathOps.nms(boxes, scores, 0.5f);
+
+        assertEquals(2, kept.length);
+    }
+
+    @Test
+    void nms_chainedSuppression_onlyKeepsHighest() {
+        // Three nearly identical boxes — box 0 suppresses both 1 and 2
+        float[] boxes = {
+                0f, 0f, 10f, 10f,
+                0f, 0f, 10f, 10f,
+                0f, 0f, 10f, 10f,
+        };
+        float[] scores = {0.9f, 0.8f, 0.7f};
+
+        int[] kept = MathOps.nms(boxes, scores, 0.5f);
+
+        assertEquals(1, kept.length);
+        assertEquals(0, kept[0]);
+    }
+
+    @Test
     void topK_returnsIndicesOfLargestValues() {
         float[] values = {0.1f, 0.9f, 0.3f, 0.7f, 0.5f};
         int[] top3 = MathOps.topK(values, 3);

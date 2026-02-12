@@ -74,6 +74,76 @@ public final class MathOps {
     }
 
     /**
+     * Applies non-maximum suppression (NMS) to a set of bounding boxes.
+     *
+     * <p>Greedily selects high-confidence boxes and removes overlapping boxes
+     * whose IoU (Intersection over Union) exceeds the threshold. Boxes are
+     * represented as {@code [x1, y1, x2, y2]} (top-left and bottom-right corners).
+     *
+     * @param boxes  array of length {@code N*4}, where each group of 4 floats is
+     *               {@code [x1, y1, x2, y2]}
+     * @param scores confidence score for each box (length {@code N})
+     * @param iouThreshold boxes with IoU above this value are suppressed
+     * @return indices of the kept boxes, sorted by descending score
+     */
+    public static int[] nms(float[] boxes, float[] scores, float iouThreshold) {
+        int n = scores.length;
+        if (n == 0) {
+            return new int[0];
+        }
+
+        // Sort indices by score descending
+        int[] order = topK(scores, n);
+
+        boolean[] suppressed = new boolean[n];
+        int kept = 0;
+        int[] keepBuffer = new int[n];
+
+        for (int i = 0; i < n; i++) {
+            int idx = order[i];
+            if (suppressed[idx]) {
+                continue;
+            }
+            keepBuffer[kept++] = idx;
+
+            float x1i = boxes[idx * 4];
+            float y1i = boxes[idx * 4 + 1];
+            float x2i = boxes[idx * 4 + 2];
+            float y2i = boxes[idx * 4 + 3];
+            float areaI = (x2i - x1i) * (y2i - y1i);
+
+            for (int j = i + 1; j < n; j++) {
+                int jdx = order[j];
+                if (suppressed[jdx]) {
+                    continue;
+                }
+
+                float x1j = boxes[jdx * 4];
+                float y1j = boxes[jdx * 4 + 1];
+                float x2j = boxes[jdx * 4 + 2];
+                float y2j = boxes[jdx * 4 + 3];
+
+                float interX1 = Math.max(x1i, x1j);
+                float interY1 = Math.max(y1i, y1j);
+                float interX2 = Math.min(x2i, x2j);
+                float interY2 = Math.min(y2i, y2j);
+
+                float interArea = Math.max(0f, interX2 - interX1) * Math.max(0f, interY2 - interY1);
+                float areaJ = (x2j - x1j) * (y2j - y1j);
+                float iou = interArea / (areaI + areaJ - interArea);
+
+                if (iou > iouThreshold) {
+                    suppressed[jdx] = true;
+                }
+            }
+        }
+
+        int[] result = new int[kept];
+        System.arraycopy(keepBuffer, 0, result, 0, kept);
+        return result;
+    }
+
+    /**
      * Returns the indices of the top-K largest values, sorted descending by value.
      * Uses partial selection sort — O(n*k), efficient for small k on large arrays.
      */
