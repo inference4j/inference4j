@@ -19,3 +19,14 @@ gradle-app.setting
 .project
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
+
+# IDE
+.idea/
+*.iml
+
+# Downloaded models
+**/models/
+
+# Private project docs
+docs/
+CLAUDE.md

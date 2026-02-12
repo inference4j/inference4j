@@ -1,0 +1,6 @@
+rootProject.name = 'inference4j'
+
+include 'inference4j-core'
+include 'inference4j-models'
+include 'inference4j-preprocessing'
+include 'inference4j-examples'

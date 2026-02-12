@@ -1,0 +1,5 @@
+description = 'Tokenizers and data processors for inference4j'
+
+dependencies {
+    api project(':inference4j-core')
+}

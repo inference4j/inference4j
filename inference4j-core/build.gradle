@@ -1,0 +1,5 @@
+description = 'Low-level ONNX Runtime abstractions for inference4j'
+
+dependencies {
+    api 'com.microsoft.onnxruntime:onnxruntime:1.23.2'
+}
