@@ -144,6 +144,32 @@ public final class MathOps {
     }
 
     /**
+     * Converts bounding boxes from center format {@code [cx, cy, w, h]} to corner
+     * format {@code [x1, y1, x2, y2]}.
+     *
+     * <p>The input array is a flat sequence of box coordinates:
+     * {@code [cx0, cy0, w0, h0, cx1, cy1, w1, h1, ...]}. The returned array has
+     * the same length with each group of four values converted.
+     *
+     * @param boxes flat array of length {@code N*4} in {@code [cx, cy, w, h]} format
+     * @return flat array of length {@code N*4} in {@code [x1, y1, x2, y2]} format
+     */
+    public static float[] cxcywh2xyxy(float[] boxes) {
+        float[] result = new float[boxes.length];
+        for (int i = 0; i < boxes.length; i += 4) {
+            float cx = boxes[i];
+            float cy = boxes[i + 1];
+            float halfW = boxes[i + 2] / 2f;
+            float halfH = boxes[i + 3] / 2f;
+            result[i]     = cx - halfW;  // x1
+            result[i + 1] = cy - halfH;  // y1
+            result[i + 2] = cx + halfW;  // x2
+            result[i + 3] = cy + halfH;  // y2
+        }
+        return result;
+    }
+
+    /**
      * Returns the indices of the top-K largest values, sorted descending by value.
      * Uses partial selection sort — O(n*k), efficient for small k on large arrays.
      */

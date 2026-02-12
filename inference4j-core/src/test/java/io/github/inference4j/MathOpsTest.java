@@ -301,4 +301,54 @@ class MathOpsTest {
 
         assertEquals(0, top.length);
     }
+
+    @Test
+    void cxcywh2xyxy_basicConversion() {
+        // center=(50,50), size=20x30 → x1=40, y1=35, x2=60, y2=65
+        float[] boxes = {50f, 50f, 20f, 30f};
+        float[] result = MathOps.cxcywh2xyxy(boxes);
+
+        assertEquals(40f, result[0], 1e-5f);
+        assertEquals(35f, result[1], 1e-5f);
+        assertEquals(60f, result[2], 1e-5f);
+        assertEquals(65f, result[3], 1e-5f);
+    }
+
+    @Test
+    void cxcywh2xyxy_multipleBoxes() {
+        float[] boxes = {
+                10f, 10f, 4f, 6f,   // → 8,7,12,13
+                50f, 50f, 20f, 20f,  // → 40,40,60,60
+        };
+        float[] result = MathOps.cxcywh2xyxy(boxes);
+
+        assertEquals(8, result.length);
+        // box 0
+        assertEquals(8f, result[0], 1e-5f);
+        assertEquals(7f, result[1], 1e-5f);
+        assertEquals(12f, result[2], 1e-5f);
+        assertEquals(13f, result[3], 1e-5f);
+        // box 1
+        assertEquals(40f, result[4], 1e-5f);
+        assertEquals(40f, result[5], 1e-5f);
+        assertEquals(60f, result[6], 1e-5f);
+        assertEquals(60f, result[7], 1e-5f);
+    }
+
+    @Test
+    void cxcywh2xyxy_emptyInput() {
+        float[] result = MathOps.cxcywh2xyxy(new float[0]);
+        assertEquals(0, result.length);
+    }
+
+    @Test
+    void cxcywh2xyxy_zeroSizeBox() {
+        float[] boxes = {100f, 200f, 0f, 0f};
+        float[] result = MathOps.cxcywh2xyxy(boxes);
+
+        assertEquals(100f, result[0], 1e-5f);
+        assertEquals(200f, result[1], 1e-5f);
+        assertEquals(100f, result[2], 1e-5f);
+        assertEquals(200f, result[3], 1e-5f);
+    }
 }

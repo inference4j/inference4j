@@ -10,6 +10,8 @@ Text examples use [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformer
 
 The image classification example uses [ResNet-50](https://huggingface.co/onnxmodelzoo/resnet50-v1-7) ONNX (~98 MB) and [EfficientNet-Lite4](https://huggingface.co/onnx/EfficientNet-Lite4) ONNX (~49 MB), plus a sample image.
 
+The object detection example uses [YOLOv8n](https://huggingface.co/Kalray/yolov8) ONNX (~13 MB) and [YOLO26n](https://huggingface.co/onnx-community/yolo26n-ONNX) ONNX (~18 MB), and reuses the sample image above.
+
 ```bash
 # From the project root:
 
@@ -48,6 +50,16 @@ curl -L -o inference4j-examples/models/efficientnet-lite4/model.onnx \
 mkdir -p inference4j-examples/images
 curl -L -o inference4j-examples/images/sample.jpg \
   https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Cat03.jpg/1200px-Cat03.jpg
+
+# YOLOv8n (required by ObjectDetectionExample)
+mkdir -p inference4j-examples/models/yolov8n
+curl -L -o inference4j-examples/models/yolov8n/model.onnx \
+  "https://huggingface.co/Kalray/yolov8/resolve/main/yolov8n.onnx?download=true"
+
+# YOLO26n (required by ObjectDetectionExample)
+mkdir -p inference4j-examples/models/yolo26n
+curl -L -o inference4j-examples/models/yolo26n/model.onnx \
+  "https://huggingface.co/onnx-community/yolo26n-ONNX/resolve/main/onnx/model.onnx?download=true"
 ```
 
 ### 2. Run an example
@@ -67,6 +79,9 @@ curl -L -o inference4j-examples/images/sample.jpg \
 
 # Image classification — classify an image with ResNet-50
 ./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.ImageClassificationExample
+
+# Object detection — detect objects with YOLOv8n
+./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.ObjectDetectionExample
 ```
 
 ## Examples
@@ -78,3 +93,4 @@ curl -L -o inference4j-examples/images/sample.jpg \
 | `ModelRouterExample` | A/B tests MiniLM-L6 vs L12 with round-robin routing and per-request metrics |
 | `ModelComparisonExample` | Runs semantic search with two models and compares their rankings side by side |
 | `ImageClassificationExample` | Classifies an image with ResNet-50 and EfficientNet-B0, printing top-5 predictions |
+| `ObjectDetectionExample` | Detects objects in an image with YOLOv8n and YOLO26n, printing bounding boxes and labels |
