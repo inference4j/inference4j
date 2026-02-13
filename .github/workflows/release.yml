@@ -22,7 +22,7 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Set release version
         run: sed -i "s/version = .*/version = '${{ github.event.inputs.version }}'/" build.gradle
