@@ -101,7 +101,9 @@ try (Craft craft = Craft.fromPretrained("models/craft")) {
 | **Vision** | YOLO26 | `Yolo26` | NMS-free object detection |
 | **Audio** | Wav2Vec2-CTC | `Wav2Vec2` | Speech-to-text (single-pass, non-autoregressive) |
 | **Audio** | Silero VAD | `SileroVAD` | Voice activity detection |
-| **Text** | CRAFT | `Craft` | Text detection — locates text regions in images |
+| **Vision** | CRAFT | `Craft` | Text detection — locates text regions in images |
+
+> **CRAFT ONNX model:** We converted CRAFT from the [original PyTorch weights](https://github.com/clovaai/CRAFT-pytorch) (`craft_mlt_25k.pth`) to ONNX and host it at [`inference4j/craft-mlt-25k`](https://huggingface.co/inference4j/craft-mlt-25k). The conversion script is included in the repo for reproducibility.
 
 ## Vision
 

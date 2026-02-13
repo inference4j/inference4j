@@ -20,7 +20,7 @@ The speech-to-text example uses [wav2vec2-base-960h](https://huggingface.co/Xeno
 
 The voice activity detection example uses [Silero VAD](https://github.com/snakers4/silero-vad) ONNX (~2 MB), and reuses the sample audio from above.
 
-The text detection example uses [CRAFT](https://huggingface.co/amitesh863/craft) ONNX (~83 MB). The PyTorch weights must be converted to ONNX format (see download instructions below).
+The text detection example uses [CRAFT](https://huggingface.co/inference4j/craft-mlt-25k) ONNX (~83 MB), converted from the original PyTorch weights and hosted by inference4j.
 
 ```bash
 # From the project root:
