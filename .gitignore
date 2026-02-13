@@ -24,8 +24,12 @@ gradle-app.setting
 .idea/
 *.iml
 
-# Downloaded models
+# Downloaded models and audio samples
 **/models/
+**/audio/
+
+# macOS
+.DS_Store
 
 # Private project docs
 docs/
