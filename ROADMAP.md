@@ -24,6 +24,10 @@
 - [ ] Silero VAD wrapper — voice activity detection
 - [ ] Benchmarks — latency and throughput measurements
 
+## Phase 3.5: NLP — Planned
+- [ ] Cross-encoder reranker wrapper — query + document pair relevance scoring (e.g., `ms-marco-MiniLM`). Completes the search/RAG pipeline alongside `SentenceTransformer`.
+- [ ] Text classification wrapper — sequence classification for sentiment, moderation, intent detection (e.g., DistilBERT SST-2). Same tokenizer infrastructure as `SentenceTransformer`.
+
 ## Phase 4: Pipelines
 - [ ] Pipeline API — `Pipeline.builder().stage("name", model).build()`
 - [ ] OCR Pipeline — CRAFT text detection + TrOCR recognition + embedding-based correction
@@ -43,6 +47,8 @@
 | Domain | Model | Status |
 |--------|-------|--------|
 | Text | SentenceTransformer (all-MiniLM, all-mpnet, BERT) | Done |
+| Text | Cross-encoder reranker (ms-marco-MiniLM) | Planned (Phase 3.5) |
+| Text | Text classification (DistilBERT, sentiment, moderation) | Planned (Phase 3.5) |
 | Text | CRAFT (text detection) | Planned (Phase 4) |
 | Text | TrOCR/EasyOCR (text recognition) | Planned (Phase 4) |
 | Vision | ResNet | Done |

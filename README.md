@@ -81,11 +81,14 @@ inference4j follows a three-tier API strategy:
 
 On our roadmap:
 
+- **Cross-encoder reranker** — query + document relevance scoring, completing the search/RAG pipeline alongside `SentenceTransformer`
+- **Text classification** — sentiment analysis, content moderation, intent detection
+- **Silero VAD** — voice activity detection, pairs with Wav2Vec2 for speech pipelines
+- **CLIP** — image-text similarity for visual search and zero-shot classification
 - **OCR Pipeline** — text detection (CRAFT) + recognition (TrOCR) + embedding-based error correction against domain dictionaries
 - **Pipeline API** — compose models into multi-stage workflows with per-stage timing and intermediate hooks
 - **Spring Boot Starter** — auto-configuration, health indicators, Micrometer metrics
 - **HuggingFace integration** — `ModelSource` that downloads and caches models from the Hub
-- **More models** — Silero VAD, CLIP, MobileNet, and whatever the community asks for
 
 See the [Roadmap](ROADMAP.md) for details.
 
