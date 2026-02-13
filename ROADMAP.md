@@ -24,9 +24,12 @@
 - [ ] Silero VAD wrapper — voice activity detection
 - [ ] Benchmarks — latency and throughput measurements
 
-## Phase 3.5: NLP — Planned
-- [ ] Cross-encoder reranker wrapper — query + document pair relevance scoring (e.g., `ms-marco-MiniLM`). Completes the search/RAG pipeline alongside `SentenceTransformer`.
-- [ ] Text classification wrapper — sequence classification for sentiment, moderation, intent detection (e.g., DistilBERT SST-2). Same tokenizer infrastructure as `SentenceTransformer`.
+## Phase 3.5: NLP — Done
+- [x] `DistilBertClassifier` wrapper — text classification (sentiment, moderation, intent detection) with auto-detection of softmax/sigmoid from `config.json`
+- [x] `MiniLMReranker` wrapper — cross-encoder query-document relevance scoring, completes the search/RAG pipeline alongside `SentenceTransformer`
+- [x] `TextClassificationModel` and `CrossEncoderModel` interfaces, `TextClassification` result type
+- [x] `ModelConfig` — parses HuggingFace `config.json` for `id2label` and `problem_type` (via Jackson)
+- [x] Sentence pair encoding in `Tokenizer`/`WordPieceTokenizer` — `[CLS] textA [SEP] textB [SEP]` with segment IDs
 
 ## Phase 4: Pipelines
 - [ ] Pipeline API — `Pipeline.builder().stage("name", model).build()`
@@ -47,8 +50,8 @@
 | Domain | Model | Status |
 |--------|-------|--------|
 | Text | SentenceTransformer (all-MiniLM, all-mpnet, BERT) | Done |
-| Text | Cross-encoder reranker (ms-marco-MiniLM) | Planned (Phase 3.5) |
-| Text | Text classification (DistilBERT, sentiment, moderation) | Planned (Phase 3.5) |
+| Text | Cross-encoder reranker (ms-marco-MiniLM) | Done |
+| Text | Text classification (DistilBERT, sentiment, moderation) | Done |
 | Text | CRAFT (text detection) | Planned (Phase 4) |
 | Text | TrOCR/EasyOCR (text recognition) | Planned (Phase 4) |
 | Vision | ResNet | Done |
