@@ -16,8 +16,50 @@
 
 package io.github.inference4j.tokenizer;
 
+/**
+ * Converts raw text into the numerical representation expected by transformer models.
+ *
+ * <p>Transformer architectures do not operate on strings directly — they require
+ * sequences of integer token IDs, each mapped from a fixed vocabulary learned during
+ * pre-training. A tokenizer bridges this gap: it splits text into tokens, maps each
+ * token to its vocabulary index, and wraps the result with the special tokens and
+ * metadata tensors ({@code attention_mask}, {@code token_type_ids}) that the model
+ * expects as input.
+ *
+ * <p>Different model families use different tokenization algorithms:
+ * <ul>
+ *   <li><b>WordPiece</b> (BERT, DistilBERT) — greedy longest-match subword splitting
+ *       with a {@code ##} continuation prefix. See {@link WordPieceTokenizer}.</li>
+ *   <li><b>Byte-Pair Encoding (BPE)</b> (RoBERTa, GPT-2) — iteratively merges the
+ *       most frequent character pairs into subwords.</li>
+ *   <li><b>SentencePiece</b> (DeBERTa v3, T5) — a language-independent subword
+ *       segmenter that operates on raw Unicode without pre-tokenization.</li>
+ * </ul>
+ *
+ * <p>This interface abstracts over the algorithm so that model wrappers can accept
+ * any compatible tokenizer. A model wrapper calls {@link #encode(String, int)} and
+ * feeds the resulting {@link EncodedInput} tensors directly into an
+ * {@link io.github.inference4j.InferenceSession}.
+ *
+ * @see EncodedInput
+ * @see WordPieceTokenizer
+ */
 public interface Tokenizer {
+    /**
+     * Encodes text using the tokenizer's default maximum sequence length.
+     *
+     * @param text the input text
+     * @return the encoded input tensors
+     */
     EncodedInput encode(String text);
+
+    /**
+     * Encodes text, truncating to the specified maximum sequence length.
+     *
+     * @param text      the input text
+     * @param maxLength maximum total sequence length (including special tokens)
+     * @return the encoded input tensors
+     */
     EncodedInput encode(String text, int maxLength);
 
     /**

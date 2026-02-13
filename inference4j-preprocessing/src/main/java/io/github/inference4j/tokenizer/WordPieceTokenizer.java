@@ -27,6 +27,62 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Tokenizer implementing the WordPiece algorithm used by BERT and DistilBERT.
+ *
+ * <p>WordPiece was introduced in the Japanese/Korean segmentation work by
+ * <a href="https://arxiv.org/abs/1609.08144">Schuster &amp; Nakajima (2012)</a> and
+ * later adopted by BERT
+ * (<a href="https://arxiv.org/abs/1810.04805">Devlin et al., 2019</a>) as its
+ * subword tokenization strategy. It solves the core vocabulary problem in NLP:
+ * a word-level vocabulary either explodes in size or maps rare words to a single
+ * {@code [UNK]} token, losing all semantic information. WordPiece finds a middle
+ * ground by breaking unknown words into known subword units — for example,
+ * {@code "unbelievable"} becomes {@code ["un", "##believ", "##able"]}, preserving
+ * morphological structure even for out-of-vocabulary words.
+ *
+ * <h2>Algorithm</h2>
+ * <p>Tokenization proceeds in two stages:
+ * <ol>
+ *   <li><b>Basic tokenization</b> — the input is lowercased, stripped, and split on
+ *       whitespace and Unicode punctuation. Each punctuation character becomes its own
+ *       token.</li>
+ *   <li><b>WordPiece tokenization</b> — each basic token is segmented into subwords
+ *       via greedy longest-match-first against the vocabulary. Non-initial subwords
+ *       are prefixed with {@code ##} to distinguish them from whole-word tokens.
+ *       If no match is found at all, the entire token maps to {@code [UNK]}.</li>
+ * </ol>
+ *
+ * <p>The final sequence is wrapped with BERT's special tokens:
+ * <ul>
+ *   <li>Single text: {@code [CLS] tokens [SEP]}</li>
+ *   <li>Sentence pair: {@code [CLS] tokensA [SEP] tokensB [SEP]} with
+ *       {@code tokenTypeIds} distinguishing the two segments</li>
+ * </ul>
+ *
+ * <h2>Vocabulary format</h2>
+ * <p>Expects a plain-text {@code vocab.txt} file with one token per line, where the
+ * line number (0-indexed) is the token's integer ID. This is the standard format
+ * used by HuggingFace BERT checkpoints.
+ *
+ * <h2>Limitations</h2>
+ * <p>This tokenizer applies unconditional lowercasing, matching the behavior of
+ * {@code bert-base-uncased} and {@code distilbert-base-uncased}. It is not suitable
+ * for cased models without modification. Models that use BPE (RoBERTa, GPT-2) or
+ * SentencePiece (DeBERTa v3) require different tokenizer implementations.
+ *
+ * <h2>Usage</h2>
+ * <pre>{@code
+ * Tokenizer tokenizer = WordPieceTokenizer.fromVocabFile(Path.of("vocab.txt"));
+ * EncodedInput encoded = tokenizer.encode("Hello world!", 128);
+ * // encoded.inputIds()    → [101, 7592, 2088, 999, 102]
+ * // encoded.attentionMask() → [1, 1, 1, 1, 1]
+ * // encoded.tokenTypeIds()  → [0, 0, 0, 0, 0]
+ * }</pre>
+ *
+ * @see Tokenizer
+ * @see EncodedInput
+ */
 public class WordPieceTokenizer implements Tokenizer {
 
     private static final String CLS_TOKEN = "[CLS]";
