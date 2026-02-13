@@ -16,11 +16,12 @@
 
 package io.github.inference4j.examples;
 
+import io.github.inference4j.vision.ImageAnnotator;
+import io.github.inference4j.vision.detection.BoundingBox;
 import io.github.inference4j.vision.detection.Craft;
 import io.github.inference4j.vision.detection.TextRegion;
 
 import javax.imageio.ImageIO;
-import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -51,34 +52,15 @@ public class CraftTextDetectionExample {
             System.out.println("Detected text regions (textThreshold=0.4, lowTextThreshold=0.3):");
             printRegions(regions);
 
-            // --- Save annotated image ---
+            // --- Save annotated image using ImageAnnotator ---
             Path annotatedPath = annotatedPath(imagePath);
-            saveAnnotatedImage(imagePath, regions, annotatedPath);
+            BufferedImage image = ImageIO.read(imagePath.toFile());
+            List<BoundingBox> boxes = regions.stream().map(TextRegion::box).toList();
+            BufferedImage annotated = ImageAnnotator.annotate(image, boxes);
+            ImageAnnotator.save(annotated, annotatedPath);
             System.out.println();
             System.out.printf("Annotated image saved to %s%n", annotatedPath);
         }
-    }
-
-    private static void saveAnnotatedImage(Path imagePath, List<TextRegion> regions,
-                                           Path outputPath) throws IOException {
-        BufferedImage image = ImageIO.read(imagePath.toFile());
-        Graphics2D g = image.createGraphics();
-
-        g.setColor(Color.GREEN);
-        g.setStroke(new BasicStroke(2));
-
-        for (TextRegion r : regions) {
-            int x = Math.round(r.box().x1());
-            int y = Math.round(r.box().y1());
-            int w = Math.round(r.box().width());
-            int h = Math.round(r.box().height());
-            g.drawRect(x, y, w, h);
-        }
-
-        g.dispose();
-
-        String formatName = outputPath.toString().endsWith(".png") ? "png" : "jpg";
-        ImageIO.write(image, formatName, outputPath.toFile());
     }
 
     private static Path annotatedPath(Path original) {
