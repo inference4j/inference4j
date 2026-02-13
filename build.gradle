@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'com.vanniktech.maven.publish' version '0.30.0' apply false
 }
 
 allprojects {
@@ -42,5 +43,58 @@ subprojects {
         testImplementation 'org.junit.jupiter:junit-jupiter'
         testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
         testRuntimeOnly 'org.slf4j:slf4j-simple:2.0.16'
+    }
+}
+
+// Publishing configuration for library modules only
+def publishedModules = [
+    'inference4j-core',
+    'inference4j-preprocessing',
+    'inference4j-models',
+    'inference4j-runtime',
+]
+
+configure(subprojects.findAll { it.name in publishedModules }) {
+    apply plugin: 'com.vanniktech.maven.publish'
+
+    mavenPublishing {
+        publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
+        signAllPublications()
+
+        coordinates(project.group.toString(), project.name, project.version.toString())
+
+        pom {
+            name = project.name
+            description = project.description
+            url = 'https://github.com/inference4j/inference4j'
+            inceptionYear = '2025'
+
+            licenses {
+                license {
+                    name = 'The Apache License, Version 2.0'
+                    url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                    distribution = 'repo'
+                }
+            }
+
+            developers {
+                developer {
+                    id = 'viniciusccarvalho'
+                    name = 'Vinicius Carvalho'
+                    url = 'https://github.com/viniciusccarvalho'
+                }
+                developer {
+                    id = 'ArthurCRodrigues'
+                    name = 'Arthur Rodrigues'
+                    url = 'https://github.com/ArthurCRodrigues'
+                }
+            }
+
+            scm {
+                connection = 'scm:git:git://github.com/inference4j/inference4j.git'
+                developerConnection = 'scm:git:ssh://github.com:inference4j/inference4j.git'
+                url = 'https://github.com/inference4j/inference4j'
+            }
+        }
     }
 }
