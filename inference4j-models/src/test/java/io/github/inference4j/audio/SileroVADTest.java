@@ -313,9 +313,9 @@ class SileroVADTest {
         java.lang.reflect.Constructor<SileroVAD> constructor =
                 SileroVAD.class.getDeclaredConstructor(
                         io.github.inference4j.InferenceSession.class,
-                        int.class, int.class, float.class, float.class, float.class);
+                        int.class, int.class, int.class, float.class, float.class, float.class);
         constructor.setAccessible(true);
-        return constructor.newInstance(null, SAMPLE_RATE, WINDOW_SIZE,
+        return constructor.newInstance(null, SAMPLE_RATE, WINDOW_SIZE, 64,
                 THRESHOLD, MIN_SPEECH_DURATION, MIN_SILENCE_DURATION);
     }
 
