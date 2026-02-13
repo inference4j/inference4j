@@ -32,8 +32,9 @@
 - [x] Sentence pair encoding in `Tokenizer`/`WordPieceTokenizer` — `[CLS] textA [SEP] textB [SEP]` with segment IDs
 
 ## Phase 4: Pipelines
+- [x] CRAFT text detection wrapper — `TextDetectionModel` interface, `TextRegion`, `Craft` wrapper
 - [ ] Pipeline API — `Pipeline.builder().stage("name", model).build()`
-- [ ] OCR Pipeline — CRAFT text detection + TrOCR recognition + embedding-based correction
+- [ ] OCR Pipeline — TrOCR recognition + embedding-based correction (CRAFT detection done)
 - [ ] Vision Pipeline — detect + classify composition
 
 ## Phase 5: Ecosystem
@@ -52,7 +53,7 @@
 | Text | SentenceTransformer (all-MiniLM, all-mpnet, BERT) | Done |
 | Text | Cross-encoder reranker (ms-marco-MiniLM) | Done |
 | Text | Text classification (DistilBERT, sentiment, moderation) | Done |
-| Text | CRAFT (text detection) | Planned (Phase 4) |
+| Text | CRAFT (text detection) | Done |
 | Text | TrOCR/EasyOCR (text recognition) | Planned (Phase 4) |
 | Vision | ResNet | Done |
 | Vision | EfficientNet | Done |

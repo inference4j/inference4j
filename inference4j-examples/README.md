@@ -20,6 +20,8 @@ The speech-to-text example uses [wav2vec2-base-960h](https://huggingface.co/Xeno
 
 The voice activity detection example uses [Silero VAD](https://github.com/snakers4/silero-vad) ONNX (~2 MB), and reuses the sample audio from above.
 
+The text detection example uses [CRAFT](https://huggingface.co/inference4j/craft-mlt-25k) ONNX (~83 MB), converted from the original PyTorch weights and hosted by inference4j.
+
 ```bash
 # From the project root:
 
@@ -101,6 +103,17 @@ curl -L -o assets/audio/sample.wav \
 mkdir -p assets/models/silero-vad
 curl -L -o assets/models/silero-vad/model.onnx \
   "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx"
+
+# CRAFT (required by CraftTextDetectionExample)
+mkdir -p assets/models/craft
+curl -L -o assets/models/craft/model.onnx \
+  "https://huggingface.co/inference4j/craft-mlt-25k/resolve/main/model.onnx"
+curl -L -o assets/models/craft/model.onnx.data \
+  "https://huggingface.co/inference4j/craft-mlt-25k/resolve/main/model.onnx.data"
+
+# Sample image for text detection
+curl -L -o assets/images/text-sample.jpg \
+  https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Rotunda_of_Mosta_04.jpg/800px-Rotunda_of_Mosta_04.jpg
 ```
 
 ### 2. Run an example
@@ -135,6 +148,9 @@ curl -L -o assets/models/silero-vad/model.onnx \
 
 # Voice activity detection — detect speech segments with Silero VAD
 ./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.VoiceActivityDetectionExample
+
+# Text detection — detect text regions with CRAFT
+./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.CraftTextDetectionExample
 ```
 
 ## Examples
@@ -151,3 +167,4 @@ curl -L -o assets/models/silero-vad/model.onnx \
 | `CrossEncoderRerankerExample` | Reranks search result candidates using ms-marco-MiniLM cross-encoder |
 | `SpeechToTextExample` | Transcribes a WAV audio file to text using Wav2Vec2-CTC |
 | `VoiceActivityDetectionExample` | Detects speech segments in audio using Silero VAD |
+| `CraftTextDetectionExample` | Detects text regions in an image using CRAFT |

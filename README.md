@@ -77,6 +77,15 @@ try (SileroVAD vad = SileroVAD.fromPretrained("models/silero-vad")) {
         System.out.printf("Speech: %.2fs - %.2fs%n", segment.start(), segment.end());
     }
 }
+
+// Text detection
+try (Craft craft = Craft.fromPretrained("models/craft")) {
+    List<TextRegion> regions = craft.detect(Path.of("document.jpg"));
+    for (TextRegion r : regions) {
+        System.out.printf("Text at [%.0f, %.0f, %.0f, %.0f]%n",
+            r.box().x1(), r.box().y1(), r.box().x2(), r.box().y2());
+    }
+}
 ```
 
 ## Supported Models
@@ -92,6 +101,9 @@ try (SileroVAD vad = SileroVAD.fromPretrained("models/silero-vad")) {
 | **Vision** | YOLO26 | `Yolo26` | NMS-free object detection |
 | **Audio** | Wav2Vec2-CTC | `Wav2Vec2` | Speech-to-text (single-pass, non-autoregressive) |
 | **Audio** | Silero VAD | `SileroVAD` | Voice activity detection |
+| **Vision** | CRAFT | `Craft` | Text detection — locates text regions in images |
+
+> **CRAFT ONNX model:** We converted CRAFT from the [original PyTorch weights](https://github.com/clovaai/CRAFT-pytorch) (`craft_mlt_25k.pth`) to ONNX and host it at [`inference4j/craft-mlt-25k`](https://huggingface.co/inference4j/craft-mlt-25k). The conversion script is included in the repo for reproducibility.
 
 ## Vision
 
@@ -103,9 +115,8 @@ inference4j follows a three-tier API strategy:
 
 On our roadmap:
 
-- **Silero VAD** — voice activity detection, pairs with Wav2Vec2 for speech pipelines
 - **CLIP** — image-text similarity for visual search and zero-shot classification
-- **OCR Pipeline** — text detection (CRAFT) + recognition (TrOCR) + embedding-based error correction against domain dictionaries
+- **OCR Pipeline** — text recognition (TrOCR) + embedding-based error correction against domain dictionaries (CRAFT text detection is already available)
 - **Pipeline API** — compose models into multi-stage workflows with per-stage timing and intermediate hooks
 - **Spring Boot Starter** — auto-configuration, health indicators, Micrometer metrics
 - **HuggingFace integration** — `ModelSource` that downloads and caches models from the Hub
