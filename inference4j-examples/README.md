@@ -18,6 +18,8 @@ The cross-encoder reranker example uses [ms-marco-MiniLM-L-6-v2](https://hugging
 
 The speech-to-text example uses [wav2vec2-base-960h](https://huggingface.co/Xenova/wav2vec2-base-960h) ONNX (~360 MB) and a sample WAV file (16kHz mono).
 
+The voice activity detection example uses [Silero VAD](https://github.com/snakers4/silero-vad) ONNX (~2 MB), and reuses the sample audio from above.
+
 ```bash
 # From the project root:
 
@@ -94,6 +96,11 @@ curl -L -o assets/models/wav2vec2-base-960h/vocab.json \
 mkdir -p assets/audio
 curl -L -o assets/audio/sample.wav \
   "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav?download=true"
+
+# Silero VAD (required by VoiceActivityDetectionExample)
+mkdir -p assets/models/silero-vad
+curl -L -o assets/models/silero-vad/model.onnx \
+  "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx"
 ```
 
 ### 2. Run an example
@@ -125,6 +132,9 @@ curl -L -o assets/audio/sample.wav \
 
 # Speech-to-text — transcribe audio with Wav2Vec2
 ./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.SpeechToTextExample
+
+# Voice activity detection — detect speech segments with Silero VAD
+./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.VoiceActivityDetectionExample
 ```
 
 ## Examples
@@ -140,3 +150,4 @@ curl -L -o assets/audio/sample.wav \
 | `TextClassificationExample` | Classifies text sentiment with DistilBERT fine-tuned on SST-2 |
 | `CrossEncoderRerankerExample` | Reranks search result candidates using ms-marco-MiniLM cross-encoder |
 | `SpeechToTextExample` | Transcribes a WAV audio file to text using Wav2Vec2-CTC |
+| `VoiceActivityDetectionExample` | Detects speech segments in audio using Silero VAD |

@@ -21,7 +21,7 @@
 - [x] Audio preprocessing — `AudioLoader` (WAV loading), `AudioProcessor` (resample, normalize), `Vocabulary` (vocab.json)
 - [x] `MathOps.ctcGreedyDecode()` — CTC greedy decoding
 - [x] `SpeechToTextModel` interface, `Transcription` result type
-- [ ] Silero VAD wrapper — voice activity detection
+- [x] Silero VAD wrapper — voice activity detection
 - [ ] Benchmarks — latency and throughput measurements
 
 ## Phase 3.5: NLP — Done
@@ -61,5 +61,5 @@
 | Vision | CLIP (visual search) | Planned (Phase 5) |
 | Vision | MobileNet | Planned |
 | Audio | Wav2Vec2-CTC (speech-to-text) | Done |
-| Audio | Silero VAD (voice activity detection) | Planned (Phase 3) |
+| Audio | Silero VAD (voice activity detection) | Done |
 | Audio | Whisper (autoregressive speech-to-text) | Future |
