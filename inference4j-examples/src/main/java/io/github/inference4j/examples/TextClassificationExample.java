@@ -32,7 +32,7 @@ import java.util.List;
 public class TextClassificationExample {
 
     public static void main(String[] args) {
-        String modelDir = "inference4j-examples/models/distilbert-sst2";
+        String modelDir = "assets/models/distilbert-sst2";
 
         String[] texts = {
                 "This movie was absolutely fantastic! I loved every minute of it.",

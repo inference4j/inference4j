@@ -16,13 +16,21 @@
 
 package io.github.inference4j.text;
 
+import io.github.inference4j.InferenceSession;
 import io.github.inference4j.OutputOperator;
+import io.github.inference4j.Tensor;
+import io.github.inference4j.tokenizer.EncodedInput;
+import io.github.inference4j.tokenizer.Tokenizer;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class DistilBertClassifierTest {
 
@@ -141,5 +149,112 @@ class DistilBertClassifierTest {
             assertTrue(results.get(i - 1).confidence() >= results.get(i).confidence(),
                     "Results not sorted descending at index " + i);
         }
+    }
+
+    // --- Builder validation ---
+
+    @Test
+    void builder_missingSession_throws() {
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        assertThrows(IllegalStateException.class, () ->
+                DistilBertClassifier.builder()
+                        .tokenizer(tokenizer)
+                        .config(SENTIMENT_CONFIG)
+                        .build());
+    }
+
+    @Test
+    void builder_missingTokenizer_throws() {
+        InferenceSession session = mock(InferenceSession.class);
+        assertThrows(IllegalStateException.class, () ->
+                DistilBertClassifier.builder()
+                        .session(session)
+                        .config(SENTIMENT_CONFIG)
+                        .build());
+    }
+
+    @Test
+    void builder_missingConfig_throws() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        assertThrows(IllegalStateException.class, () ->
+                DistilBertClassifier.builder()
+                        .session(session)
+                        .tokenizer(tokenizer)
+                        .build());
+    }
+
+    // --- Inference flow ---
+
+    @Test
+    void classify_withTokenTypeIds_includesInInputs() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask", "token_type_ids"));
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
+        when(session.run(any())).thenReturn(
+                Map.of("logits", Tensor.fromFloats(new float[]{-2.0f, 3.0f}, new long[]{1, 2})));
+
+        DistilBertClassifier model = DistilBertClassifier.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .config(SENTIMENT_CONFIG)
+                .build();
+
+        List<TextClassification> results = model.classify("great movie");
+
+        assertEquals(2, results.size());
+        assertEquals("POSITIVE", results.get(0).label());
+        assertTrue(results.get(0).confidence() > 0.99f);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(session).run(captor.capture());
+        assertTrue(captor.getValue().containsKey("token_type_ids"));
+    }
+
+    @Test
+    void classify_withoutTokenTypeIds_excludesFromInputs() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
+        when(session.run(any())).thenReturn(
+                Map.of("logits", Tensor.fromFloats(new float[]{-2.0f, 3.0f}, new long[]{1, 2})));
+
+        DistilBertClassifier model = DistilBertClassifier.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .config(SENTIMENT_CONFIG)
+                .build();
+
+        model.classify("great movie");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(session).run(captor.capture());
+        assertFalse(captor.getValue().containsKey("token_type_ids"));
+    }
+
+    // --- Close delegation ---
+
+    @Test
+    void close_delegatesToSession() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        DistilBertClassifier model = DistilBertClassifier.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .config(SENTIMENT_CONFIG)
+                .build();
+
+        model.close();
+
+        verify(session).close();
     }
 }

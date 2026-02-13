@@ -33,11 +33,11 @@ import java.util.List;
 public class ObjectDetectionExample {
 
     public static void main(String[] args) {
-        String imagePath = "inference4j-examples/images/sample.jpg";
+        String imagePath = "assets/images/sample.jpg";
 
         // --- YOLOv8n (NMS-based) ---
         System.out.println("=== YOLOv8n Object Detection ===");
-        try (YoloV8 yolo = YoloV8.fromPretrained("inference4j-examples/models/yolov8n")) {
+        try (YoloV8 yolo = YoloV8.fromPretrained("assets/models/yolov8n")) {
             System.out.println("YOLOv8n loaded successfully.");
             System.out.println();
 
@@ -58,7 +58,7 @@ public class ObjectDetectionExample {
 
         // --- YOLO26n (NMS-free) ---
         System.out.println("=== YOLO26n Object Detection (NMS-free) ===");
-        try (Yolo26 yolo = Yolo26.fromPretrained("inference4j-examples/models/yolo26n")) {
+        try (Yolo26 yolo = Yolo26.fromPretrained("assets/models/yolo26n")) {
             System.out.println("YOLO26n loaded successfully.");
             System.out.println();
 

@@ -36,8 +36,8 @@ import java.util.List;
 public class ModelComparisonExample {
 
     public static void main(String[] args) {
-        String miniLmDir = "inference4j-examples/models/all-MiniLM-L6-v2";
-        String mpnetDir = "inference4j-examples/models/all-mpnet-base-v2";
+        String miniLmDir = "assets/models/all-MiniLM-L6-v2";
+        String mpnetDir = "assets/models/all-mpnet-base-v2";
 
         List<String> corpus = List.of(
                 "Java is a statically typed, object-oriented programming language.",
