@@ -39,8 +39,8 @@ import java.util.List;
 public class VoiceActivityDetectionExample {
 
     public static void main(String[] args) {
-        String modelDir = "inference4j-examples/models/silero-vad";
-        String audioPath = "inference4j-examples/audio/sample.wav";
+        String modelDir = "assets/models/silero-vad";
+        String audioPath = "assets/audio/sample.wav";
 
         System.out.println("=== Silero Voice Activity Detection ===");
         System.out.println();
