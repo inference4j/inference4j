@@ -1,5 +1,9 @@
 # inference4j
 
+[![CI](https://github.com/inference4j/inference4j/actions/workflows/ci.yml/badge.svg)](https://github.com/inference4j/inference4j/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/inference4j/inference4j/graph/badge.svg)](https://codecov.io/gh/inference4j/inference4j)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+
 **Inference-only AI for Java. Simple APIs, standard types, no PhD required.**
 
 > **Note:** inference4j is under active development. APIs may change as we stabilize. A full user guide and wiki will follow — for now, this README and the [examples](inference4j-examples/README.md) are the best way to get started.
@@ -49,6 +53,17 @@ try (YoloV8 model = YoloV8.fromPretrained("models/yolov8n")) {
     List<Detection> detections = model.detect(Path.of("street.jpg"));
 }
 
+// Text classification (sentiment analysis)
+try (DistilBertClassifier model = DistilBertClassifier.fromPretrained("models/distilbert-sst2")) {
+    List<TextClassification> results = model.classify("This movie was fantastic!");
+    System.out.println(results.get(0).label()); // "POSITIVE"
+}
+
+// Cross-encoder reranking
+try (MiniLMReranker reranker = MiniLMReranker.fromPretrained("models/ms-marco-MiniLM")) {
+    float score = reranker.score("What is Java?", "Java is a programming language.");
+}
+
 // Speech-to-text
 try (Wav2Vec2 model = Wav2Vec2.fromPretrained("models/wav2vec2-base-960h")) {
     Transcription result = model.transcribe(Path.of("audio.wav"));
@@ -69,6 +84,8 @@ try (SileroVAD vad = SileroVAD.fromPretrained("models/silero-vad")) {
 | Domain | Model | Wrapper | Description |
 |--------|-------|---------|-------------|
 | **Text** | all-MiniLM, all-mpnet, BERT | `SentenceTransformer` | Sentence embeddings with configurable pooling |
+| **Text** | DistilBERT, BERT (classification) | `DistilBertClassifier` | Text classification — sentiment, moderation, intent detection |
+| **Text** | ms-marco-MiniLM (cross-encoder) | `MiniLMReranker` | Query-document relevance scoring for search reranking |
 | **Vision** | ResNet | `ResNet` | Image classification (ImageNet) |
 | **Vision** | EfficientNet | `EfficientNet` | Image classification (ImageNet) |
 | **Vision** | YOLOv8, YOLO11 | `YoloV8` | Object detection with NMS |
@@ -86,11 +103,12 @@ inference4j follows a three-tier API strategy:
 
 On our roadmap:
 
+- **Silero VAD** — voice activity detection, pairs with Wav2Vec2 for speech pipelines
+- **CLIP** — image-text similarity for visual search and zero-shot classification
 - **OCR Pipeline** — text detection (CRAFT) + recognition (TrOCR) + embedding-based error correction against domain dictionaries
 - **Pipeline API** — compose models into multi-stage workflows with per-stage timing and intermediate hooks
 - **Spring Boot Starter** — auto-configuration, health indicators, Micrometer metrics
 - **HuggingFace integration** — `ModelSource` that downloads and caches models from the Hub
-- **More models** — CLIP, MobileNet, Whisper, and whatever the community asks for
 
 See the [Roadmap](ROADMAP.md) for details.
 
