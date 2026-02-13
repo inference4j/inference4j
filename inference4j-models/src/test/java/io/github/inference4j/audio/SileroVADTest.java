@@ -16,12 +16,17 @@
 
 package io.github.inference4j.audio;
 
+import io.github.inference4j.InferenceSession;
+import io.github.inference4j.Tensor;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class SileroVADTest {
 
@@ -203,6 +208,104 @@ class SileroVADTest {
         assertThrows(IllegalStateException.class, builder::build);
     }
 
+    // --- Inference flow ---
+
+    @Test
+    void detect_audioData_returnsSegments() {
+        InferenceSession session = mock(InferenceSession.class);
+
+        // Mock model to return high speech probability for all frames
+        // Shape [1] for output, shape [2, 1, 128] for state
+        float[] outputProbs = {0.9f};
+        float[] stateN = new float[2 * 1 * 128]; // State tensor dimensions
+        when(session.run(any())).thenReturn(Map.of(
+                "output", Tensor.fromFloats(outputProbs, new long[]{1}),
+                "stateN", Tensor.fromFloats(stateN, new long[]{2, 1, 128})
+        ));
+
+        SileroVAD vad = SileroVAD.builder()
+                .session(session)
+                .threshold(0.5f)
+                .minSpeechDuration(0.1f)
+                .minSilenceDuration(0.1f)
+                .build();
+
+        // Provide enough samples to generate multiple frames (512 samples per frame at 16kHz)
+        float[] audioData = new float[2048]; // ~128ms = 4 frames
+        List<VoiceSegment> segments = vad.detect(audioData, 16000);
+
+        // Should detect speech since all frames return 0.9 probability
+        assertFalse(segments.isEmpty());
+        verify(session, atLeastOnce()).run(any());
+    }
+
+    @Test
+    void detect_noSpeech_returnsEmptySegments() {
+        InferenceSession session = mock(InferenceSession.class);
+
+        // Mock model to return low speech probability for all frames
+        float[] outputProbs = {0.1f};
+        float[] stateN = new float[2 * 1 * 128];
+        when(session.run(any())).thenReturn(Map.of(
+                "output", Tensor.fromFloats(outputProbs, new long[]{1}),
+                "stateN", Tensor.fromFloats(stateN, new long[]{2, 1, 128})
+        ));
+
+        SileroVAD vad = SileroVAD.builder()
+                .session(session)
+                .threshold(0.5f)
+                .minSpeechDuration(0.1f)
+                .minSilenceDuration(0.1f)
+                .build();
+
+        float[] audioData = new float[2048];
+        List<VoiceSegment> segments = vad.detect(audioData, 16000);
+
+        // Should not detect speech since all frames are below threshold
+        assertTrue(segments.isEmpty());
+    }
+
+    @Test
+    void probabilities_returnsPerFrameProbabilities() {
+        InferenceSession session = mock(InferenceSession.class);
+
+        // Return different probabilities per frame
+        float[] stateN = new float[2 * 1 * 128];
+        when(session.run(any()))
+                .thenReturn(Map.of(
+                        "output", Tensor.fromFloats(new float[]{0.3f}, new long[]{1}),
+                        "stateN", Tensor.fromFloats(stateN, new long[]{2, 1, 128})))
+                .thenReturn(Map.of(
+                        "output", Tensor.fromFloats(new float[]{0.8f}, new long[]{1}),
+                        "stateN", Tensor.fromFloats(stateN, new long[]{2, 1, 128})));
+
+        SileroVAD vad = SileroVAD.builder()
+                .session(session)
+                .build();
+
+        float[] audioData = new float[1024]; // 2 frames at 512 samples per frame
+        float[] probs = vad.probabilities(audioData, 16000);
+
+        assertEquals(2, probs.length);
+        assertEquals(0.3f, probs[0], 0.001f);
+        assertEquals(0.8f, probs[1], 0.001f);
+    }
+
+    // --- Close delegation ---
+
+    @Test
+    void close_delegatesToSession() {
+        InferenceSession session = mock(InferenceSession.class);
+
+        SileroVAD vad = SileroVAD.builder()
+                .session(session)
+                .build();
+
+        vad.close();
+
+        verify(session).close();
+    }
+
     /**
      * Creates a test VAD instance with reflection to bypass session requirement.
      */
@@ -210,10 +313,9 @@ class SileroVADTest {
         java.lang.reflect.Constructor<SileroVAD> constructor =
                 SileroVAD.class.getDeclaredConstructor(
                         io.github.inference4j.InferenceSession.class,
-                        int.class, int.class, int.class, float.class, float.class, float.class);
+                        int.class, int.class, float.class, float.class, float.class);
         constructor.setAccessible(true);
-        int contextSize = 64; // Default context size for 16kHz
-        return constructor.newInstance(null, SAMPLE_RATE, WINDOW_SIZE, contextSize,
+        return constructor.newInstance(null, SAMPLE_RATE, WINDOW_SIZE,
                 THRESHOLD, MIN_SPEECH_DURATION, MIN_SILENCE_DURATION);
     }
 
@@ -229,4 +331,5 @@ class SileroVADTest {
         return result;
     }
 }
+
 
