@@ -103,7 +103,7 @@ try (Craft craft = Craft.fromPretrained("models/craft")) {
 | **Audio** | Silero VAD | `SileroVAD` | Voice activity detection |
 | **Vision** | CRAFT | `Craft` | Text detection — locates text regions in images |
 
-> **CRAFT ONNX model:** We converted CRAFT from the [original PyTorch weights](https://github.com/clovaai/CRAFT-pytorch) (`craft_mlt_25k.pth`) to ONNX and host it at [`inference4j/craft-mlt-25k`](https://huggingface.co/inference4j/craft-mlt-25k). The conversion script is included in the repo for reproducibility.
+> **Model hosting:** All supported models are mirrored under the [`inference4j`](https://huggingface.co/inference4j) HuggingFace organization with standardized filenames (`model.onnx`) and model cards crediting original sources. See the [examples README](inference4j-examples/README.md) for download commands.
 
 ## Vision
 
