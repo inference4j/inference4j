@@ -54,6 +54,14 @@ try (Wav2Vec2 model = Wav2Vec2.fromPretrained("models/wav2vec2-base-960h")) {
     Transcription result = model.transcribe(Path.of("audio.wav"));
     System.out.println(result.text());
 }
+
+// Voice activity detection
+try (SileroVAD vad = SileroVAD.fromPretrained("models/silero-vad")) {
+    List<VoiceSegment> segments = vad.detect(Path.of("meeting.wav"));
+    for (VoiceSegment segment : segments) {
+        System.out.printf("Speech: %.2fs - %.2fs%n", segment.start(), segment.end());
+    }
+}
 ```
 
 ## Supported Models
@@ -66,6 +74,7 @@ try (Wav2Vec2 model = Wav2Vec2.fromPretrained("models/wav2vec2-base-960h")) {
 | **Vision** | YOLOv8, YOLO11 | `YoloV8` | Object detection with NMS |
 | **Vision** | YOLO26 | `Yolo26` | NMS-free object detection |
 | **Audio** | Wav2Vec2-CTC | `Wav2Vec2` | Speech-to-text (single-pass, non-autoregressive) |
+| **Audio** | Silero VAD | `SileroVAD` | Voice activity detection |
 
 ## Vision
 
@@ -81,7 +90,7 @@ On our roadmap:
 - **Pipeline API** — compose models into multi-stage workflows with per-stage timing and intermediate hooks
 - **Spring Boot Starter** — auto-configuration, health indicators, Micrometer metrics
 - **HuggingFace integration** — `ModelSource` that downloads and caches models from the Hub
-- **More models** — Silero VAD, CLIP, MobileNet, and whatever the community asks for
+- **More models** — CLIP, MobileNet, Whisper, and whatever the community asks for
 
 See the [Roadmap](ROADMAP.md) for details.
 
