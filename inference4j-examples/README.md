@@ -98,8 +98,8 @@ curl -L -o assets/audio/sample.wav \
   "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav?download=true"
 
 # Silero VAD (required by VoiceActivityDetectionExample)
-mkdir -p inference4j-examples/models/silero-vad
-curl -L -o inference4j-examples/models/silero-vad/model.onnx \
+mkdir -p assets/models/silero-vad
+curl -L -o assets/models/silero-vad/model.onnx \
   "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx"
 ```
 
