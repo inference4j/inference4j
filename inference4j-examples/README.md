@@ -12,6 +12,10 @@ The image classification example uses [ResNet-50](https://huggingface.co/onnxmod
 
 The object detection example uses [YOLOv8n](https://huggingface.co/Kalray/yolov8) ONNX (~13 MB) and [YOLO26n](https://huggingface.co/onnx-community/yolo26n-ONNX) ONNX (~18 MB), and reuses the sample image above.
 
+The text classification example uses [distilbert-base-uncased-finetuned-sst-2-english](https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english) ONNX (~268 MB).
+
+The cross-encoder reranker example uses [ms-marco-MiniLM-L-6-v2](https://huggingface.co/Xenova/ms-marco-MiniLM-L-6-v2) ONNX (~91 MB).
+
 The speech-to-text example uses [wav2vec2-base-960h](https://huggingface.co/Xenova/wav2vec2-base-960h) ONNX (~360 MB) and a sample WAV file (16kHz mono).
 
 ```bash
@@ -63,6 +67,22 @@ mkdir -p inference4j-examples/models/yolo26n
 curl -L -o inference4j-examples/models/yolo26n/model.onnx \
   "https://huggingface.co/onnx-community/yolo26n-ONNX/resolve/main/onnx/model.onnx?download=true"
 
+# distilbert-base-uncased-finetuned-sst-2-english (required by TextClassificationExample)
+mkdir -p inference4j-examples/models/distilbert-sst2
+curl -L -o inference4j-examples/models/distilbert-sst2/model.onnx \
+  "https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english/resolve/main/onnx/model.onnx"
+curl -L -o inference4j-examples/models/distilbert-sst2/vocab.txt \
+  "https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english/resolve/main/vocab.txt"
+curl -L -o inference4j-examples/models/distilbert-sst2/config.json \
+  "https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english/resolve/main/config.json"
+
+# ms-marco-MiniLM-L-6-v2 (required by CrossEncoderRerankerExample)
+mkdir -p inference4j-examples/models/ms-marco-MiniLM-L-6-v2
+curl -L -o inference4j-examples/models/ms-marco-MiniLM-L-6-v2/model.onnx \
+  "https://huggingface.co/Xenova/ms-marco-MiniLM-L-6-v2/resolve/main/onnx/model.onnx"
+curl -L -o inference4j-examples/models/ms-marco-MiniLM-L-6-v2/vocab.txt \
+  "https://huggingface.co/Xenova/ms-marco-MiniLM-L-6-v2/resolve/main/vocab.txt"
+
 # wav2vec2-base-960h (required by SpeechToTextExample)
 mkdir -p inference4j-examples/models/wav2vec2-base-960h
 curl -L -o inference4j-examples/models/wav2vec2-base-960h/model.onnx \
@@ -97,6 +117,12 @@ curl -L -o inference4j-examples/audio/sample.wav \
 # Object detection — detect objects with YOLOv8n
 ./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.ObjectDetectionExample
 
+# Text classification — sentiment analysis with DistilBERT
+./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.TextClassificationExample
+
+# Cross-encoder reranking — rerank search results with MiniLM
+./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.CrossEncoderRerankerExample
+
 # Speech-to-text — transcribe audio with Wav2Vec2
 ./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.SpeechToTextExample
 ```
@@ -111,4 +137,6 @@ curl -L -o inference4j-examples/audio/sample.wav \
 | `ModelComparisonExample` | Runs semantic search with two models and compares their rankings side by side |
 | `ImageClassificationExample` | Classifies an image with ResNet-50 and EfficientNet-B0, printing top-5 predictions |
 | `ObjectDetectionExample` | Detects objects in an image with YOLOv8n and YOLO26n, printing bounding boxes and labels |
+| `TextClassificationExample` | Classifies text sentiment with DistilBERT fine-tuned on SST-2 |
+| `CrossEncoderRerankerExample` | Reranks search result candidates using ms-marco-MiniLM cross-encoder |
 | `SpeechToTextExample` | Transcribes a WAV audio file to text using Wav2Vec2-CTC |
