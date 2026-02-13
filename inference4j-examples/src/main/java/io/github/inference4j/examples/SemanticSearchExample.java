@@ -32,7 +32,7 @@ import java.util.List;
 public class SemanticSearchExample {
 
     public static void main(String[] args) {
-        String modelDir = "inference4j-examples/models/all-MiniLM-L6-v2";
+        String modelDir = "assets/models/all-MiniLM-L6-v2";
 
         List<String> corpus = List.of(
                 "Java is a statically typed, object-oriented programming language.",

@@ -36,7 +36,7 @@ import java.util.List;
 public class CrossEncoderRerankerExample {
 
     public static void main(String[] args) {
-        String modelDir = "inference4j-examples/models/ms-marco-MiniLM-L-6-v2";
+        String modelDir = "assets/models/ms-marco-MiniLM-L-6-v2";
 
         String query = "What is the capital of France?";
 

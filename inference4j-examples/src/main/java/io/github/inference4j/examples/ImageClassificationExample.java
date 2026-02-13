@@ -33,11 +33,11 @@ import java.util.List;
 public class ImageClassificationExample {
 
     public static void main(String[] args) {
-        String imagePath = "inference4j-examples/images/sample.jpg";
+        String imagePath = "assets/images/sample.jpg";
 
         // --- ResNet-50 ---
         System.out.println("=== ResNet-50 ===");
-        try (ResNet resnet = ResNet.fromPretrained("inference4j-examples/models/resnet50")) {
+        try (ResNet resnet = ResNet.fromPretrained("assets/models/resnet50")) {
             System.out.println("ResNet-50 loaded successfully.");
             System.out.println();
 
@@ -51,7 +51,7 @@ public class ImageClassificationExample {
 
         // --- EfficientNet-Lite4 ---
         System.out.println("=== EfficientNet-Lite4 ===");
-        try (EfficientNet efficientnet = EfficientNet.fromPretrained("inference4j-examples/models/efficientnet-lite4")) {
+        try (EfficientNet efficientnet = EfficientNet.fromPretrained("assets/models/efficientnet-lite4")) {
             System.out.println("EfficientNet-Lite4 loaded successfully.");
             System.out.println();
 

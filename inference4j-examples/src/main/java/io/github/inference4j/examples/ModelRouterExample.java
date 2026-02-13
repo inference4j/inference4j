@@ -42,8 +42,8 @@ import java.util.List;
 public class ModelRouterExample {
 
     public static void main(String[] args) {
-        String l6Dir = "inference4j-examples/models/all-MiniLM-L6-v2";
-        String l12Dir = "inference4j-examples/models/all-MiniLM-L12-v2";
+        String l6Dir = "assets/models/all-MiniLM-L6-v2";
+        String l12Dir = "assets/models/all-MiniLM-L12-v2";
 
         SentenceTransformer l6 = SentenceTransformer.fromPretrained(l6Dir);
         SentenceTransformer l12 = SentenceTransformer.fromPretrained(l12Dir);

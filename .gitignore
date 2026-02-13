@@ -24,9 +24,10 @@ gradle-app.setting
 .idea/
 *.iml
 
-# Downloaded models and audio samples
-**/models/
-**/audio/
+# Downloaded assets (models, audio, images) for examples
+/assets/models/
+/assets/audio/
+/assets/images/
 
 # macOS
 .DS_Store
