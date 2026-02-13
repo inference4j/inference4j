@@ -14,6 +14,8 @@ The object detection example uses [YOLOv8n](https://huggingface.co/Kalray/yolov8
 
 The speech-to-text example uses [wav2vec2-base-960h](https://huggingface.co/Xenova/wav2vec2-base-960h) ONNX (~360 MB) and a sample WAV file (16kHz mono).
 
+The voice activity detection example uses [Silero VAD](https://github.com/snakers4/silero-vad) ONNX (~2 MB), and reuses the sample audio from above.
+
 ```bash
 # From the project root:
 
@@ -74,6 +76,11 @@ curl -L -o inference4j-examples/models/wav2vec2-base-960h/vocab.json \
 mkdir -p inference4j-examples/audio
 curl -L -o inference4j-examples/audio/sample.wav \
   "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav?download=true"
+
+# Silero VAD (required by VoiceActivityDetectionExample)
+mkdir -p inference4j-examples/models/silero-vad
+curl -L -o inference4j-examples/models/silero-vad/model.onnx \
+  "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx"
 ```
 
 ### 2. Run an example
@@ -99,6 +106,9 @@ curl -L -o inference4j-examples/audio/sample.wav \
 
 # Speech-to-text — transcribe audio with Wav2Vec2
 ./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.SpeechToTextExample
+
+# Voice activity detection — detect speech segments with Silero VAD
+./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.VoiceActivityDetectionExample
 ```
 
 ## Examples
@@ -112,3 +122,4 @@ curl -L -o inference4j-examples/audio/sample.wav \
 | `ImageClassificationExample` | Classifies an image with ResNet-50 and EfficientNet-B0, printing top-5 predictions |
 | `ObjectDetectionExample` | Detects objects in an image with YOLOv8n and YOLO26n, printing bounding boxes and labels |
 | `SpeechToTextExample` | Transcribes a WAV audio file to text using Wav2Vec2-CTC |
+| `VoiceActivityDetectionExample` | Detects speech segments in audio using Silero VAD |
