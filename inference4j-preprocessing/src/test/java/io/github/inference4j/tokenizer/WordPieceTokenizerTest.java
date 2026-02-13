@@ -116,4 +116,52 @@ class WordPieceTokenizerTest {
         // [CLS]=2, [SEP]=3
         assertArrayEquals(new long[]{2, 3}, result.inputIds());
     }
+
+    @Test
+    void encodePair_basicSentencePair() {
+        EncodedInput result = tokenizer.encode("hello", "world", 512);
+        // [CLS]=2, hello=5, [SEP]=3, world=6, [SEP]=3
+        assertArrayEquals(new long[]{2, 5, 3, 6, 3}, result.inputIds());
+    }
+
+    @Test
+    void encodePair_tokenTypeIds() {
+        EncodedInput result = tokenizer.encode("hello", "world", 512);
+        // Segment A: [CLS](0) hello(0) [SEP](0), Segment B: world(1) [SEP](1)
+        assertArrayEquals(new long[]{0, 0, 0, 1, 1}, result.tokenTypeIds());
+    }
+
+    @Test
+    void encodePair_attentionMaskAllOnes() {
+        EncodedInput result = tokenizer.encode("hello", "world", 512);
+        assertArrayEquals(new long[]{1, 1, 1, 1, 1}, result.attentionMask());
+    }
+
+    @Test
+    void encodePair_multipleTokens() {
+        EncodedInput result = tokenizer.encode("hello world", "good morning", 512);
+        // [CLS]=2, hello=5, world=6, [SEP]=3, good=11, morning=12, [SEP]=3
+        assertArrayEquals(new long[]{2, 5, 6, 3, 11, 12, 3}, result.inputIds());
+        assertArrayEquals(new long[]{0, 0, 0, 0, 1, 1, 1}, result.tokenTypeIds());
+    }
+
+    @Test
+    void encodePair_truncation() {
+        // "hello world" + "good morning" = 4 tokens + 3 special = 7
+        // maxLength=6 should truncate to fit
+        EncodedInput result = tokenizer.encode("hello world", "good morning", 6);
+        assertEquals(6, result.inputIds().length);
+        // Should start with [CLS] and end with [SEP]
+        assertEquals(2, result.inputIds()[0]);  // [CLS]
+        assertEquals(3, result.inputIds()[result.inputIds().length - 1]);  // [SEP]
+    }
+
+    @Test
+    void encodePair_truncatesLongerSequenceFirst() {
+        // textA = "hello" (1 token), textB = "hello world good" (3 tokens)
+        // maxLength = 6, available = 3, lenA=1, lenB=3 -> truncate B to 2
+        EncodedInput result = tokenizer.encode("hello", "hello world good", 6);
+        // [CLS]=2, hello=5, [SEP]=3, hello=5, world=6, [SEP]=3
+        assertArrayEquals(new long[]{2, 5, 3, 5, 6, 3}, result.inputIds());
+    }
 }

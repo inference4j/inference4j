@@ -53,6 +53,17 @@ try (YoloV8 model = YoloV8.fromPretrained("models/yolov8n")) {
     List<Detection> detections = model.detect(Path.of("street.jpg"));
 }
 
+// Text classification (sentiment analysis)
+try (DistilBertClassifier model = DistilBertClassifier.fromPretrained("models/distilbert-sst2")) {
+    List<TextClassification> results = model.classify("This movie was fantastic!");
+    System.out.println(results.get(0).label()); // "POSITIVE"
+}
+
+// Cross-encoder reranking
+try (MiniLMReranker reranker = MiniLMReranker.fromPretrained("models/ms-marco-MiniLM")) {
+    float score = reranker.score("What is Java?", "Java is a programming language.");
+}
+
 // Speech-to-text
 try (Wav2Vec2 model = Wav2Vec2.fromPretrained("models/wav2vec2-base-960h")) {
     Transcription result = model.transcribe(Path.of("audio.wav"));
@@ -65,6 +76,8 @@ try (Wav2Vec2 model = Wav2Vec2.fromPretrained("models/wav2vec2-base-960h")) {
 | Domain | Model | Wrapper | Description |
 |--------|-------|---------|-------------|
 | **Text** | all-MiniLM, all-mpnet, BERT | `SentenceTransformer` | Sentence embeddings with configurable pooling |
+| **Text** | DistilBERT, BERT (classification) | `DistilBertClassifier` | Text classification — sentiment, moderation, intent detection |
+| **Text** | ms-marco-MiniLM (cross-encoder) | `MiniLMReranker` | Query-document relevance scoring for search reranking |
 | **Vision** | ResNet | `ResNet` | Image classification (ImageNet) |
 | **Vision** | EfficientNet | `EfficientNet` | Image classification (ImageNet) |
 | **Vision** | YOLOv8, YOLO11 | `YoloV8` | Object detection with NMS |
@@ -81,8 +94,6 @@ inference4j follows a three-tier API strategy:
 
 On our roadmap:
 
-- **Cross-encoder reranker** — query + document relevance scoring, completing the search/RAG pipeline alongside `SentenceTransformer`
-- **Text classification** — sentiment analysis, content moderation, intent detection
 - **Silero VAD** — voice activity detection, pairs with Wav2Vec2 for speech pipelines
 - **CLIP** — image-text similarity for visual search and zero-shot classification
 - **OCR Pipeline** — text detection (CRAFT) + recognition (TrOCR) + embedding-based error correction against domain dictionaries

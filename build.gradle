@@ -48,11 +48,20 @@ subprojects {
     }
 }
 
-// Aggregate coverage report across all subprojects
-tasks.register('jacocoMergedReport', JacocoReport) {
-    dependsOn subprojects.collect { it.tasks.withType(Test) }
+// Library modules included in coverage and publishing
+def publishedModules = [
+    'inference4j-core',
+    'inference4j-preprocessing',
+    'inference4j-models',
+    'inference4j-runtime',
+]
 
-    subprojects.each { subproject ->
+// Aggregate coverage report across library modules only
+tasks.register('jacocoMergedReport', JacocoReport) {
+    def coveredProjects = subprojects.findAll { it.name in publishedModules }
+    dependsOn coveredProjects.collect { it.tasks.withType(Test) }
+
+    coveredProjects.each { subproject ->
         subproject.plugins.withType(JacocoPlugin) {
             executionData.from subproject.tasks.withType(Test)
                     .collect { it.extensions.getByType(JacocoTaskExtension) }
@@ -66,14 +75,6 @@ tasks.register('jacocoMergedReport', JacocoReport) {
         xml.required = true
     }
 }
-
-// Publishing configuration for library modules only
-def publishedModules = [
-    'inference4j-core',
-    'inference4j-preprocessing',
-    'inference4j-models',
-    'inference4j-runtime',
-]
 
 configure(subprojects.findAll { it.name in publishedModules }) {
     apply plugin: 'com.vanniktech.maven.publish'
