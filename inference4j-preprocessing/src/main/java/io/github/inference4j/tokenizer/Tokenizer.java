@@ -19,4 +19,21 @@ package io.github.inference4j.tokenizer;
 public interface Tokenizer {
     EncodedInput encode(String text);
     EncodedInput encode(String text, int maxLength);
+
+    /**
+     * Encodes a sentence pair with segment separation.
+     *
+     * <p>Used by cross-encoder models that take two text inputs (e.g., query + document).
+     * The encoding format is {@code [CLS] textA [SEP] textB [SEP]} with
+     * {@code tokenTypeIds} set to 0 for textA tokens and 1 for textB tokens.
+     *
+     * @param textA     the first sentence
+     * @param textB     the second sentence
+     * @param maxLength maximum total sequence length (including special tokens)
+     * @return the encoded input with proper segment ids
+     * @throws UnsupportedOperationException if this tokenizer does not support sentence pairs
+     */
+    default EncodedInput encode(String textA, String textB, int maxLength) {
+        throw new UnsupportedOperationException("Sentence pair encoding not supported by this tokenizer");
+    }
 }

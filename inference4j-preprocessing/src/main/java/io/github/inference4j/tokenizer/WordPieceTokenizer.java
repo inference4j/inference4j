@@ -96,6 +96,61 @@ public class WordPieceTokenizer implements Tokenizer {
         return new EncodedInput(inputIds, attentionMask, tokenTypeIds);
     }
 
+    @Override
+    public EncodedInput encode(String textA, String textB, int maxLength) {
+        List<Integer> idsA = tokenizeToIds(textA);
+        List<Integer> idsB = tokenizeToIds(textB);
+
+        // [CLS] textA [SEP] textB [SEP] = idsA.size + idsB.size + 3
+        int specialTokens = 3;
+        int available = maxLength - specialTokens;
+        if (available < 0) {
+            available = 0;
+        }
+
+        // Truncate the longer sequence first (textB first, as is convention)
+        int lenA = idsA.size();
+        int lenB = idsB.size();
+        while (lenA + lenB > available) {
+            if (lenB > lenA) {
+                lenB--;
+            } else {
+                lenA--;
+            }
+        }
+
+        List<Integer> tokenIds = new ArrayList<>(lenA + lenB + specialTokens);
+        tokenIds.add(clsId);
+        tokenIds.addAll(idsA.subList(0, lenA));
+        tokenIds.add(sepId);
+        tokenIds.addAll(idsB.subList(0, lenB));
+        tokenIds.add(sepId);
+
+        int length = tokenIds.size();
+        long[] inputIds = tokenIds.stream().mapToLong(Integer::longValue).toArray();
+        long[] attentionMask = new long[length];
+        Arrays.fill(attentionMask, 1);
+
+        // Segment A: [CLS] + idsA + [SEP] = 1 + lenA + 1
+        // Segment B: idsB + [SEP] = lenB + 1
+        long[] tokenTypeIds = new long[length];
+        int segmentBStart = 1 + lenA + 1; // after [CLS] + textA tokens + [SEP]
+        for (int i = segmentBStart; i < length; i++) {
+            tokenTypeIds[i] = 1;
+        }
+
+        return new EncodedInput(inputIds, attentionMask, tokenTypeIds);
+    }
+
+    private List<Integer> tokenizeToIds(String text) {
+        List<String> basicTokens = basicTokenize(text);
+        List<Integer> ids = new ArrayList<>();
+        for (String token : basicTokens) {
+            ids.addAll(wordPieceTokenize(token));
+        }
+        return ids;
+    }
+
     private List<String> basicTokenize(String text) {
         text = text.toLowerCase().strip();
         List<String> tokens = new ArrayList<>();
