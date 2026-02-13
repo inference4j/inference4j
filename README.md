@@ -2,6 +2,8 @@
 
 **Inference-only AI for Java. Simple APIs, standard types, no PhD required.**
 
+> **Note:** inference4j is under active development. APIs may change as we stabilize. A full user guide and wiki will follow — for now, this README and the [examples](inference4j-examples/README.md) are the best way to get started.
+
 inference4j gives Java developers ergonomic, type-safe wrappers for running AI models on the ONNX Runtime. Pass in a `String`, a `BufferedImage`, or a `Path` to a WAV file — get back embeddings, classifications, detections, or transcriptions. No tensor juggling, no JNI plumbing, no Python sidecar.
 
 ```java
