@@ -12,6 +12,8 @@ The image classification example uses [ResNet-50](https://huggingface.co/onnxmod
 
 The object detection example uses [YOLOv8n](https://huggingface.co/Kalray/yolov8) ONNX (~13 MB) and [YOLO26n](https://huggingface.co/onnx-community/yolo26n-ONNX) ONNX (~18 MB), and reuses the sample image above.
 
+The speech-to-text example uses [wav2vec2-base-960h](https://huggingface.co/Xenova/wav2vec2-base-960h) ONNX (~360 MB) and a sample WAV file (16kHz mono).
+
 ```bash
 # From the project root:
 
@@ -60,6 +62,18 @@ curl -L -o inference4j-examples/models/yolov8n/model.onnx \
 mkdir -p inference4j-examples/models/yolo26n
 curl -L -o inference4j-examples/models/yolo26n/model.onnx \
   "https://huggingface.co/onnx-community/yolo26n-ONNX/resolve/main/onnx/model.onnx?download=true"
+
+# wav2vec2-base-960h (required by SpeechToTextExample)
+mkdir -p inference4j-examples/models/wav2vec2-base-960h
+curl -L -o inference4j-examples/models/wav2vec2-base-960h/model.onnx \
+  "https://huggingface.co/Xenova/wav2vec2-base-960h/resolve/main/onnx/model.onnx?download=true"
+curl -L -o inference4j-examples/models/wav2vec2-base-960h/vocab.json \
+  "https://huggingface.co/Xenova/wav2vec2-base-960h/resolve/main/vocab.json?download=true"
+
+# Sample audio for speech-to-text (LibriSpeech sample, 16kHz mono WAV)
+mkdir -p inference4j-examples/audio
+curl -L -o inference4j-examples/audio/sample.wav \
+  "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav?download=true"
 ```
 
 ### 2. Run an example
@@ -82,6 +96,9 @@ curl -L -o inference4j-examples/models/yolo26n/model.onnx \
 
 # Object detection — detect objects with YOLOv8n
 ./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.ObjectDetectionExample
+
+# Speech-to-text — transcribe audio with Wav2Vec2
+./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.SpeechToTextExample
 ```
 
 ## Examples
@@ -94,3 +111,4 @@ curl -L -o inference4j-examples/models/yolo26n/model.onnx \
 | `ModelComparisonExample` | Runs semantic search with two models and compares their rankings side by side |
 | `ImageClassificationExample` | Classifies an image with ResNet-50 and EfficientNet-B0, printing top-5 predictions |
 | `ObjectDetectionExample` | Detects objects in an image with YOLOv8n and YOLO26n, printing bounding boxes and labels |
+| `SpeechToTextExample` | Transcribes a WAV audio file to text using Wav2Vec2-CTC |

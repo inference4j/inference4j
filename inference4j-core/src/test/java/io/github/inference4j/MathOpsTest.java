@@ -303,6 +303,73 @@ class MathOpsTest {
     }
 
     @Test
+    void ctcGreedyDecode_collapsesRepeatsAndRemovesBlanks() {
+        // Vocab: 0=blank, 1=H, 2=E, 3=L, 4=O
+        // Input sequence: H,H,_,E,E,L,L,L,O → H,E,L,O
+        int vocabSize = 5;
+        float[] logits = buildCtcLogits(vocabSize,
+                1, 1, 0, 2, 2, 3, 3, 3, 4);
+
+        int[] result = MathOps.ctcGreedyDecode(logits, 9, vocabSize, 0);
+
+        assertArrayEquals(new int[]{1, 2, 3, 4}, result);
+    }
+
+    @Test
+    void ctcGreedyDecode_allBlanks_returnsEmpty() {
+        int vocabSize = 5;
+        float[] logits = buildCtcLogits(vocabSize, 0, 0, 0);
+
+        int[] result = MathOps.ctcGreedyDecode(logits, 3, vocabSize, 0);
+
+        assertEquals(0, result.length);
+    }
+
+    @Test
+    void ctcGreedyDecode_sameTokenSeparatedByBlank_keepsBoth() {
+        // L, blank, L → L, L
+        int vocabSize = 5;
+        float[] logits = buildCtcLogits(vocabSize, 3, 0, 3);
+
+        int[] result = MathOps.ctcGreedyDecode(logits, 3, vocabSize, 0);
+
+        assertArrayEquals(new int[]{3, 3}, result);
+    }
+
+    @Test
+    void ctcGreedyDecode_singleTimestep_blank() {
+        int vocabSize = 3;
+        float[] logits = buildCtcLogits(vocabSize, 0);
+
+        int[] result = MathOps.ctcGreedyDecode(logits, 1, vocabSize, 0);
+
+        assertEquals(0, result.length);
+    }
+
+    @Test
+    void ctcGreedyDecode_singleTimestep_nonBlank() {
+        int vocabSize = 3;
+        float[] logits = buildCtcLogits(vocabSize, 2);
+
+        int[] result = MathOps.ctcGreedyDecode(logits, 1, vocabSize, 0);
+
+        assertArrayEquals(new int[]{2}, result);
+    }
+
+    /**
+     * Builds synthetic CTC logits where the argmax at each timestep is the given token index.
+     * Sets the target token to 10.0 and all others to -10.0.
+     */
+    private static float[] buildCtcLogits(int vocabSize, int... tokens) {
+        float[] logits = new float[tokens.length * vocabSize];
+        java.util.Arrays.fill(logits, -10.0f);
+        for (int t = 0; t < tokens.length; t++) {
+            logits[t * vocabSize + tokens[t]] = 10.0f;
+        }
+        return logits;
+    }
+
+    @Test
     void cxcywh2xyxy_basicConversion() {
         // center=(50,50), size=20x30 → x1=40, y1=35, x2=60, y2=65
         float[] boxes = {50f, 50f, 20f, 30f};

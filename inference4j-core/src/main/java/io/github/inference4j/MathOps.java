@@ -170,6 +170,53 @@ public final class MathOps {
     }
 
     /**
+     * Performs CTC greedy decoding on logits.
+     *
+     * <p>For each timestep, takes the argmax over the vocabulary dimension,
+     * then collapses consecutive repeated tokens and removes blank tokens.
+     *
+     * @param logits     flat logit array of shape {@code [timeSteps, vocabSize]}
+     * @param timeSteps  number of timesteps
+     * @param vocabSize  vocabulary size
+     * @param blankIndex index of the CTC blank token
+     * @return decoded token indices (repeats collapsed, blanks removed)
+     */
+    public static int[] ctcGreedyDecode(float[] logits, int timeSteps, int vocabSize, int blankIndex) {
+        // Step 1: argmax per timestep
+        int[] argmax = new int[timeSteps];
+        for (int t = 0; t < timeSteps; t++) {
+            int bestIdx = 0;
+            float bestVal = logits[t * vocabSize];
+            for (int v = 1; v < vocabSize; v++) {
+                float val = logits[t * vocabSize + v];
+                if (val > bestVal) {
+                    bestVal = val;
+                    bestIdx = v;
+                }
+            }
+            argmax[t] = bestIdx;
+        }
+
+        // Step 2: collapse consecutive repeats and remove blanks
+        int[] buffer = new int[timeSteps];
+        int count = 0;
+        int prev = -1;
+        for (int t = 0; t < timeSteps; t++) {
+            int token = argmax[t];
+            if (token != prev) {
+                if (token != blankIndex) {
+                    buffer[count++] = token;
+                }
+                prev = token;
+            }
+        }
+
+        int[] result = new int[count];
+        System.arraycopy(buffer, 0, result, 0, count);
+        return result;
+    }
+
+    /**
      * Returns the indices of the top-K largest values, sorted descending by value.
      * Uses partial selection sort — O(n*k), efficient for small k on large arrays.
      */
