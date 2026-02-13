@@ -16,12 +16,17 @@
 
 package io.github.inference4j.audio;
 
+import io.github.inference4j.InferenceSession;
+import io.github.inference4j.Tensor;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class Wav2Vec2Test {
 
@@ -101,6 +106,78 @@ class Wav2Vec2Test {
                 VOCAB, BLANK, WORD_DELIM);
 
         assertEquals("ab", result.text());
+    }
+
+    // --- Builder validation ---
+
+    @Test
+    void builder_missingSession_throws() {
+        assertThrows(IllegalStateException.class, () ->
+                Wav2Vec2.builder()
+                        .vocabulary(VOCAB)
+                        .build());
+    }
+
+    @Test
+    void builder_missingVocabulary_throws() {
+        InferenceSession session = mock(InferenceSession.class);
+        assertThrows(IllegalStateException.class, () ->
+                Wav2Vec2.builder()
+                        .session(session)
+                        .build());
+    }
+
+    @Test
+    void builder_inputNameDefaultsFromSession() {
+        InferenceSession session = mock(InferenceSession.class);
+        when(session.inputNames()).thenReturn(Set.of("input_values"));
+
+        Wav2Vec2 model = Wav2Vec2.builder()
+                .session(session)
+                .vocabulary(VOCAB)
+                .build();
+
+        assertNotNull(model);
+        verify(session).inputNames();
+    }
+
+    // --- Inference flow ---
+
+    @Test
+    void transcribe_audioData_returnsTranscription() {
+        InferenceSession session = mock(InferenceSession.class);
+        when(session.inputNames()).thenReturn(Set.of("input"));
+
+        // CTC output: timesteps produce tokens [a, _, b, _, c] → "abc"
+        float[] logits = buildLogits(1, 0, 2, 0, 3);
+        when(session.run(any())).thenReturn(
+                Map.of("logits", Tensor.fromFloats(logits, new long[]{1, 5, VOCAB_SIZE})));
+
+        Wav2Vec2 model = Wav2Vec2.builder()
+                .session(session)
+                .vocabulary(VOCAB)
+                .build();
+
+        Transcription result = model.transcribe(new float[]{0.1f, 0.2f, 0.3f}, 16000);
+
+        assertEquals("abc", result.text());
+    }
+
+    // --- Close delegation ---
+
+    @Test
+    void close_delegatesToSession() {
+        InferenceSession session = mock(InferenceSession.class);
+        when(session.inputNames()).thenReturn(Set.of("input"));
+
+        Wav2Vec2 model = Wav2Vec2.builder()
+                .session(session)
+                .vocabulary(VOCAB)
+                .build();
+
+        model.close();
+
+        verify(session).close();
     }
 
     /**

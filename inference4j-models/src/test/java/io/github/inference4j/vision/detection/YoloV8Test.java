@@ -16,12 +16,19 @@
 
 package io.github.inference4j.vision.detection;
 
+import io.github.inference4j.InferenceSession;
+import io.github.inference4j.Tensor;
 import io.github.inference4j.image.Labels;
 import org.junit.jupiter.api.Test;
 
+import java.awt.image.BufferedImage;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class YoloV8Test {
 
@@ -213,5 +220,72 @@ class YoloV8Test {
         assertTrue(box.y1() >= 0, "y1 should be >= 0, was " + box.y1());
         assertTrue(box.x2() <= ORIG_W, "x2 should be <= " + ORIG_W + ", was " + box.x2());
         assertTrue(box.y2() <= ORIG_H, "y2 should be <= " + ORIG_H + ", was " + box.y2());
+    }
+
+    // --- Builder validation ---
+
+    @Test
+    void builder_missingSession_throws() {
+        assertThrows(IllegalStateException.class, () ->
+                YoloV8.builder()
+                        .inputName("images")
+                        .build());
+    }
+
+    @Test
+    void builder_inputNameDefaultsFromSession() {
+        InferenceSession session = mock(InferenceSession.class);
+        when(session.inputNames()).thenReturn(Set.of("images"));
+
+        YoloV8 model = YoloV8.builder()
+                .session(session)
+                .build();
+
+        assertNotNull(model);
+        verify(session).inputNames();
+    }
+
+    // --- Inference flow ---
+
+    @Test
+    void detect_bufferedImage_returnsCorrectResults() {
+        InferenceSession session = mock(InferenceSession.class);
+
+        // Single candidate: person at center of 32x32 input space
+        float[] output = createOutput(
+                new float[]{16, 16, 20, 20, 0.9f, 0.1f, 0.0f, 0.0f, 0.0f}
+        );
+        when(session.run(any())).thenReturn(
+                Map.of("output", Tensor.fromFloats(output, shape(1))));
+
+        YoloV8 model = YoloV8.builder()
+                .session(session)
+                .labels(TEST_LABELS)
+                .inputName("images")
+                .inputSize(32)
+                .build();
+
+        BufferedImage image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB);
+        List<Detection> results = model.detect(image);
+
+        assertEquals(1, results.size());
+        assertEquals("person", results.get(0).label());
+        assertEquals(0.9f, results.get(0).confidence(), 1e-5f);
+    }
+
+    // --- Close delegation ---
+
+    @Test
+    void close_delegatesToSession() {
+        InferenceSession session = mock(InferenceSession.class);
+
+        YoloV8 model = YoloV8.builder()
+                .session(session)
+                .inputName("images")
+                .build();
+
+        model.close();
+
+        verify(session).close();
     }
 }

@@ -16,9 +16,20 @@
 
 package io.github.inference4j.text;
 
+import io.github.inference4j.InferenceSession;
+import io.github.inference4j.Tensor;
+import io.github.inference4j.tokenizer.EncodedInput;
+import io.github.inference4j.tokenizer.Tokenizer;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class MiniLMRerankerTest {
 
@@ -66,5 +77,128 @@ class MiniLMRerankerTest {
         float scorePlus = MiniLMReranker.toScore(3.0f);
         float scoreMinus = MiniLMReranker.toScore(-3.0f);
         assertEquals(1.0f, scorePlus + scoreMinus, 1e-5f);
+    }
+
+    // --- Builder validation ---
+
+    @Test
+    void builder_missingSession_throws() {
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        assertThrows(IllegalStateException.class, () ->
+                MiniLMReranker.builder()
+                        .tokenizer(tokenizer)
+                        .build());
+    }
+
+    @Test
+    void builder_missingTokenizer_throws() {
+        InferenceSession session = mock(InferenceSession.class);
+        assertThrows(IllegalStateException.class, () ->
+                MiniLMReranker.builder()
+                        .session(session)
+                        .build());
+    }
+
+    // --- Inference flow ---
+
+    @Test
+    void score_withTokenTypeIds_returnsCorrectScore() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask", "token_type_ids"));
+        when(tokenizer.encode(anyString(), anyString(), anyInt())).thenReturn(
+                new EncodedInput(
+                        new long[]{101, 2023, 102, 2003, 102},
+                        new long[]{1, 1, 1, 1, 1},
+                        new long[]{0, 0, 0, 1, 1}));
+        when(session.run(any())).thenReturn(
+                Map.of("logits", Tensor.fromFloats(new float[]{2.5f}, new long[]{1, 1})));
+
+        MiniLMReranker model = MiniLMReranker.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .build();
+
+        float score = model.score("query", "document");
+
+        float expectedScore = (float) (1.0 / (1.0 + Math.exp(-2.5)));
+        assertEquals(expectedScore, score, 1e-5f);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(session).run(captor.capture());
+        assertTrue(captor.getValue().containsKey("token_type_ids"));
+    }
+
+    @Test
+    void score_withoutTokenTypeIds_excludesFromInputs() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(tokenizer.encode(anyString(), anyString(), anyInt())).thenReturn(
+                new EncodedInput(
+                        new long[]{101, 2023, 102, 2003, 102},
+                        new long[]{1, 1, 1, 1, 1},
+                        new long[]{0, 0, 0, 1, 1}));
+        when(session.run(any())).thenReturn(
+                Map.of("logits", Tensor.fromFloats(new float[]{-1.0f}, new long[]{1, 1})));
+
+        MiniLMReranker model = MiniLMReranker.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .build();
+
+        model.score("query", "document");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(session).run(captor.capture());
+        assertFalse(captor.getValue().containsKey("token_type_ids"));
+    }
+
+    @Test
+    void scoreBatch_returnsScoresForAllDocuments() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(tokenizer.encode(anyString(), anyString(), anyInt())).thenReturn(
+                new EncodedInput(
+                        new long[]{101, 2023, 102, 2003, 102},
+                        new long[]{1, 1, 1, 1, 1},
+                        new long[]{0, 0, 0, 1, 1}));
+        when(session.run(any()))
+                .thenReturn(Map.of("logits", Tensor.fromFloats(new float[]{2.5f}, new long[]{1, 1})))
+                .thenReturn(Map.of("logits", Tensor.fromFloats(new float[]{-1.0f}, new long[]{1, 1})));
+
+        MiniLMReranker model = MiniLMReranker.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .build();
+
+        float[] scores = model.scoreBatch("query", List.of("doc1", "doc2"));
+
+        assertEquals(2, scores.length);
+        assertTrue(scores[0] > 0.5f);
+        assertTrue(scores[1] < 0.5f);
+    }
+
+    // --- Close delegation ---
+
+    @Test
+    void close_delegatesToSession() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        MiniLMReranker model = MiniLMReranker.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .build();
+
+        model.close();
+
+        verify(session).close();
     }
 }
