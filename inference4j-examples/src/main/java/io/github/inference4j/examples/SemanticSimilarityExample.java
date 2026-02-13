@@ -28,7 +28,7 @@ import io.github.inference4j.embedding.SentenceTransformer;
 public class SemanticSimilarityExample {
 
     public static void main(String[] args) {
-        String modelDir = "inference4j-examples/models/all-MiniLM-L6-v2";
+        String modelDir = "assets/models/all-MiniLM-L6-v2";
 
         String[][] pairs = {
                 {"The cat sat on the mat", "A kitten was resting on the rug"},

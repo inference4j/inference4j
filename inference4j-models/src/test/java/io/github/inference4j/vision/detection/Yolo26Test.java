@@ -16,12 +16,20 @@
 
 package io.github.inference4j.vision.detection;
 
+import io.github.inference4j.InferenceSession;
+import io.github.inference4j.Tensor;
 import io.github.inference4j.image.Labels;
 import org.junit.jupiter.api.Test;
 
+import java.awt.image.BufferedImage;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class Yolo26Test {
 
@@ -219,5 +227,75 @@ class Yolo26Test {
         assertTrue(box.y1() >= 0, "y1 should be >= 0, was " + box.y1());
         assertTrue(box.x2() <= ORIG_W, "x2 should be <= " + ORIG_W + ", was " + box.x2());
         assertTrue(box.y2() <= ORIG_H, "y2 should be <= " + ORIG_H + ", was " + box.y2());
+    }
+
+    // --- Builder validation ---
+
+    @Test
+    void builder_missingSession_throws() {
+        assertThrows(IllegalStateException.class, () ->
+                Yolo26.builder()
+                        .inputName("images")
+                        .build());
+    }
+
+    @Test
+    void builder_inputNameDefaultsFromSession() {
+        InferenceSession session = mock(InferenceSession.class);
+        when(session.inputNames()).thenReturn(Set.of("images"));
+
+        Yolo26 model = Yolo26.builder()
+                .session(session)
+                .build();
+
+        assertNotNull(model);
+        verify(session).inputNames();
+    }
+
+    // --- Inference flow ---
+
+    @Test
+    void detect_bufferedImage_returnsCorrectResults() {
+        InferenceSession session = mock(InferenceSession.class);
+
+        // Single proposal: person with logit=3 (sigmoid≈0.95), centered box
+        float[] logits = new float[]{3.0f, -5f, -5f, -5f, -5f};
+        float[] boxes = new float[]{0.5f, 0.5f, 0.25f, 0.25f};
+
+        Map<String, Tensor> outputs = new LinkedHashMap<>();
+        outputs.put("logits", Tensor.fromFloats(logits, new long[]{1, 1, NUM_CLASSES}));
+        outputs.put("pred_boxes", Tensor.fromFloats(boxes, new long[]{1, 1, 4}));
+        when(session.run(any())).thenReturn(outputs);
+
+        Yolo26 model = Yolo26.builder()
+                .session(session)
+                .labels(TEST_LABELS)
+                .inputName("images")
+                .inputSize(32)
+                .confidenceThreshold(0.5f)
+                .build();
+
+        BufferedImage image = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        List<Detection> results = model.detect(image);
+
+        assertEquals(1, results.size());
+        assertEquals("person", results.get(0).label());
+        assertTrue(results.get(0).confidence() > 0.9f);
+    }
+
+    // --- Close delegation ---
+
+    @Test
+    void close_delegatesToSession() {
+        InferenceSession session = mock(InferenceSession.class);
+
+        Yolo26 model = Yolo26.builder()
+                .session(session)
+                .inputName("images")
+                .build();
+
+        model.close();
+
+        verify(session).close();
     }
 }

@@ -24,77 +24,77 @@ The voice activity detection example uses [Silero VAD](https://github.com/snaker
 # From the project root:
 
 # all-MiniLM-L6-v2 (required by all examples)
-mkdir -p inference4j-examples/models/all-MiniLM-L6-v2
-curl -L -o inference4j-examples/models/all-MiniLM-L6-v2/model.onnx \
+mkdir -p assets/models/all-MiniLM-L6-v2
+curl -L -o assets/models/all-MiniLM-L6-v2/model.onnx \
   https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx
-curl -L -o inference4j-examples/models/all-MiniLM-L6-v2/vocab.txt \
+curl -L -o assets/models/all-MiniLM-L6-v2/vocab.txt \
   https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/vocab.txt
 
 # all-MiniLM-L12-v2 (required by ModelRouterExample)
-mkdir -p inference4j-examples/models/all-MiniLM-L12-v2
-curl -L -o inference4j-examples/models/all-MiniLM-L12-v2/model.onnx \
+mkdir -p assets/models/all-MiniLM-L12-v2
+curl -L -o assets/models/all-MiniLM-L12-v2/model.onnx \
   https://huggingface.co/sentence-transformers/all-MiniLM-L12-v2/resolve/main/onnx/model.onnx
-curl -L -o inference4j-examples/models/all-MiniLM-L12-v2/vocab.txt \
+curl -L -o assets/models/all-MiniLM-L12-v2/vocab.txt \
   https://huggingface.co/sentence-transformers/all-MiniLM-L12-v2/resolve/main/vocab.txt
 
 # all-mpnet-base-v2 (required by ModelComparisonExample)
-mkdir -p inference4j-examples/models/all-mpnet-base-v2
-curl -L -o inference4j-examples/models/all-mpnet-base-v2/model.onnx \
+mkdir -p assets/models/all-mpnet-base-v2
+curl -L -o assets/models/all-mpnet-base-v2/model.onnx \
   https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/onnx/model.onnx
-curl -L -o inference4j-examples/models/all-mpnet-base-v2/vocab.txt \
+curl -L -o assets/models/all-mpnet-base-v2/vocab.txt \
   https://huggingface.co/sentence-transformers/all-mpnet-base-v2/resolve/main/vocab.txt
 
 # ResNet-50 (required by ImageClassificationExample)
-mkdir -p inference4j-examples/models/resnet50
-curl -L -o inference4j-examples/models/resnet50/model.onnx \
+mkdir -p assets/models/resnet50
+curl -L -o assets/models/resnet50/model.onnx \
   "https://huggingface.co/onnxmodelzoo/resnet50-v1-7/resolve/main/resnet50-v1-7.onnx?download=true"
 
 # EfficientNet-Lite4 (required by ImageClassificationExample)
-mkdir -p inference4j-examples/models/efficientnet-lite4
-curl -L -o inference4j-examples/models/efficientnet-lite4/model.onnx \
+mkdir -p assets/models/efficientnet-lite4
+curl -L -o assets/models/efficientnet-lite4/model.onnx \
   "https://huggingface.co/onnx/EfficientNet-Lite4/resolve/main/efficientnet-lite4-11.onnx?download=true"
 
 # Sample image for classification
-mkdir -p inference4j-examples/images
-curl -L -o inference4j-examples/images/sample.jpg \
+mkdir -p assets/images
+curl -L -o assets/images/sample.jpg \
   https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Cat03.jpg/1200px-Cat03.jpg
 
 # YOLOv8n (required by ObjectDetectionExample)
-mkdir -p inference4j-examples/models/yolov8n
-curl -L -o inference4j-examples/models/yolov8n/model.onnx \
+mkdir -p assets/models/yolov8n
+curl -L -o assets/models/yolov8n/model.onnx \
   "https://huggingface.co/Kalray/yolov8/resolve/main/yolov8n.onnx?download=true"
 
 # YOLO26n (required by ObjectDetectionExample)
-mkdir -p inference4j-examples/models/yolo26n
-curl -L -o inference4j-examples/models/yolo26n/model.onnx \
+mkdir -p assets/models/yolo26n
+curl -L -o assets/models/yolo26n/model.onnx \
   "https://huggingface.co/onnx-community/yolo26n-ONNX/resolve/main/onnx/model.onnx?download=true"
 
 # distilbert-base-uncased-finetuned-sst-2-english (required by TextClassificationExample)
-mkdir -p inference4j-examples/models/distilbert-sst2
-curl -L -o inference4j-examples/models/distilbert-sst2/model.onnx \
+mkdir -p assets/models/distilbert-sst2
+curl -L -o assets/models/distilbert-sst2/model.onnx \
   "https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english/resolve/main/onnx/model.onnx"
-curl -L -o inference4j-examples/models/distilbert-sst2/vocab.txt \
+curl -L -o assets/models/distilbert-sst2/vocab.txt \
   "https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english/resolve/main/vocab.txt"
-curl -L -o inference4j-examples/models/distilbert-sst2/config.json \
+curl -L -o assets/models/distilbert-sst2/config.json \
   "https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english/resolve/main/config.json"
 
 # ms-marco-MiniLM-L-6-v2 (required by CrossEncoderRerankerExample)
-mkdir -p inference4j-examples/models/ms-marco-MiniLM-L-6-v2
-curl -L -o inference4j-examples/models/ms-marco-MiniLM-L-6-v2/model.onnx \
+mkdir -p assets/models/ms-marco-MiniLM-L-6-v2
+curl -L -o assets/models/ms-marco-MiniLM-L-6-v2/model.onnx \
   "https://huggingface.co/Xenova/ms-marco-MiniLM-L-6-v2/resolve/main/onnx/model.onnx"
-curl -L -o inference4j-examples/models/ms-marco-MiniLM-L-6-v2/vocab.txt \
+curl -L -o assets/models/ms-marco-MiniLM-L-6-v2/vocab.txt \
   "https://huggingface.co/Xenova/ms-marco-MiniLM-L-6-v2/resolve/main/vocab.txt"
 
 # wav2vec2-base-960h (required by SpeechToTextExample)
-mkdir -p inference4j-examples/models/wav2vec2-base-960h
-curl -L -o inference4j-examples/models/wav2vec2-base-960h/model.onnx \
+mkdir -p assets/models/wav2vec2-base-960h
+curl -L -o assets/models/wav2vec2-base-960h/model.onnx \
   "https://huggingface.co/Xenova/wav2vec2-base-960h/resolve/main/onnx/model.onnx?download=true"
-curl -L -o inference4j-examples/models/wav2vec2-base-960h/vocab.json \
+curl -L -o assets/models/wav2vec2-base-960h/vocab.json \
   "https://huggingface.co/Xenova/wav2vec2-base-960h/resolve/main/vocab.json?download=true"
 
 # Sample audio for speech-to-text (LibriSpeech sample, 16kHz mono WAV)
-mkdir -p inference4j-examples/audio
-curl -L -o inference4j-examples/audio/sample.wav \
+mkdir -p assets/audio
+curl -L -o assets/audio/sample.wav \
   "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav?download=true"
 
 # Silero VAD (required by VoiceActivityDetectionExample)

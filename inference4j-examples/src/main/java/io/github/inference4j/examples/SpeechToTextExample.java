@@ -31,8 +31,8 @@ import java.nio.file.Path;
 public class SpeechToTextExample {
 
     public static void main(String[] args) {
-        String modelDir = "inference4j-examples/models/wav2vec2-base-960h";
-        String audioPath = "inference4j-examples/audio/sample.wav";
+        String modelDir = "assets/models/wav2vec2-base-960h";
+        String audioPath = "assets/audio/sample.wav";
 
         System.out.println("=== Wav2Vec2 Speech-to-Text ===");
         try (Wav2Vec2 model = Wav2Vec2.fromPretrained(modelDir)) {
