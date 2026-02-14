@@ -17,11 +17,14 @@
 package io.github.inference4j.vision.detection;
 
 import io.github.inference4j.InferenceSession;
+import io.github.inference4j.ModelSource;
 import io.github.inference4j.Tensor;
+import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.image.Labels;
 import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -232,10 +235,12 @@ class Yolo26Test {
     // --- Builder validation ---
 
     @Test
-    void builder_missingSession_throws() {
-        assertThrows(IllegalStateException.class, () ->
+    void builder_invalidModelSource_throws() {
+        ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
+        assertThrows(ModelSourceException.class, () ->
                 Yolo26.builder()
                         .inputName("images")
+                        .modelSource(badSource)
                         .build());
     }
 

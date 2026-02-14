@@ -17,12 +17,16 @@
 package io.github.inference4j.text;
 
 import io.github.inference4j.InferenceSession;
+import io.github.inference4j.ModelSource;
 import io.github.inference4j.OutputOperator;
 import io.github.inference4j.Tensor;
+import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.Tokenizer;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+
+import java.nio.file.Path;
 
 import java.util.List;
 import java.util.Map;
@@ -154,12 +158,14 @@ class DistilBertClassifierTest {
     // --- Builder validation ---
 
     @Test
-    void builder_missingSession_throws() {
+    void builder_invalidModelSource_throws() {
+        ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
         Tokenizer tokenizer = mock(Tokenizer.class);
-        assertThrows(IllegalStateException.class, () ->
+        assertThrows(ModelSourceException.class, () ->
                 DistilBertClassifier.builder()
                         .tokenizer(tokenizer)
                         .config(SENTIMENT_CONFIG)
+                        .modelSource(badSource)
                         .build());
     }
 

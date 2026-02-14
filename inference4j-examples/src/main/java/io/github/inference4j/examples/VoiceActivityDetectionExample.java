@@ -39,7 +39,6 @@ import java.util.List;
 public class VoiceActivityDetectionExample {
 
     public static void main(String[] args) {
-        String modelDir = "assets/models/silero-vad";
         String audioPath = "assets/audio/sample.wav";
 
         System.out.println("=== Silero Voice Activity Detection ===");
@@ -58,7 +57,7 @@ public class VoiceActivityDetectionExample {
         }
         System.out.println();
 
-        try (SileroVAD vad = SileroVAD.fromPretrained(modelDir)) {
+        try (SileroVAD vad = SileroVAD.builder().build()) {
             System.out.println("Silero VAD loaded successfully.");
             System.out.println();
 
@@ -99,7 +98,6 @@ public class VoiceActivityDetectionExample {
 
         // Example with custom configuration
         try (SileroVAD vad = SileroVAD.builder()
-                .session(io.github.inference4j.InferenceSession.create(Path.of(modelDir, "model.onnx")))
                 .threshold(0.7f)           // Higher threshold = more conservative detection
                 .minSpeechDuration(0.3f)   // Ignore very short utterances
                 .minSilenceDuration(0.15f) // Require more silence to end a segment
@@ -119,7 +117,7 @@ public class VoiceActivityDetectionExample {
         System.out.println();
 
         // Get raw probabilities for visualization
-        try (SileroVAD vad = SileroVAD.fromPretrained(modelDir)) {
+        try (SileroVAD vad = SileroVAD.builder().build()) {
             float[] probabilities = vad.probabilities(Path.of(audioPath));
 
             System.out.printf("Total frames analyzed: %d%n", probabilities.length);

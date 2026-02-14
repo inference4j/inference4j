@@ -17,10 +17,13 @@
 package io.github.inference4j.audio;
 
 import io.github.inference4j.InferenceSession;
+import io.github.inference4j.ModelSource;
 import io.github.inference4j.Tensor;
+import io.github.inference4j.exception.ModelSourceException;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -187,25 +190,27 @@ class SileroVADTest {
     }
 
     @Test
-    void builder_requiresSession() {
-        SileroVAD.Builder builder = SileroVAD.builder();
-
-        IllegalStateException ex = assertThrows(IllegalStateException.class, builder::build);
-        assertEquals("InferenceSession is required", ex.getMessage());
+    void builder_invalidModelSource_throws() {
+        ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
+        assertThrows(ModelSourceException.class, () ->
+                SileroVAD.builder()
+                        .modelSource(badSource)
+                        .build());
     }
 
     @Test
-    void builder_customThreshold() {
-        // This test validates builder pattern works - actual session would fail
-        SileroVAD.Builder builder = SileroVAD.builder()
-                .threshold(0.7f)
-                .minSpeechDuration(0.5f)
-                .minSilenceDuration(0.2f)
-                .sampleRate(8000)
-                .windowSizeSamples(256);
-
-        // We can't build without a session, but the builder accepts all values
-        assertThrows(IllegalStateException.class, builder::build);
+    void builder_customThreshold_acceptsValues() {
+        // Validates builder pattern accepts all values without error
+        ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
+        assertThrows(ModelSourceException.class, () ->
+                SileroVAD.builder()
+                        .threshold(0.7f)
+                        .minSpeechDuration(0.5f)
+                        .minSilenceDuration(0.2f)
+                        .sampleRate(8000)
+                        .windowSizeSamples(256)
+                        .modelSource(badSource)
+                        .build());
     }
 
     // --- Inference flow ---

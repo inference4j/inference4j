@@ -16,6 +16,7 @@
 
 package io.github.inference4j.embedding;
 
+import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
 import io.github.inference4j.Tensor;
@@ -46,16 +47,6 @@ public class SentenceTransformer implements EmbeddingModel {
         this.tokenizer = tokenizer;
         this.poolingStrategy = poolingStrategy;
         this.maxLength = maxLength;
-    }
-
-    public static SentenceTransformer fromPretrained(String modelPath) {
-        Path dir = Path.of(modelPath);
-        return fromModelDirectory(dir);
-    }
-
-    public static SentenceTransformer fromPretrained(String modelId, ModelSource source) {
-        Path dir = source.resolve(modelId);
-        return fromModelDirectory(dir);
     }
 
     public static Builder builder() {
@@ -146,39 +137,26 @@ public class SentenceTransformer implements EmbeddingModel {
         session.close();
     }
 
-    private static SentenceTransformer fromModelDirectory(Path dir) {
-        if (!Files.isDirectory(dir)) {
-            throw new ModelSourceException("Model directory not found: " + dir);
-        }
-
-        Path modelPath = dir.resolve("model.onnx");
-        Path vocabPath = dir.resolve("vocab.txt");
-
-        if (!Files.exists(modelPath)) {
-            throw new ModelSourceException("Model file not found: " + modelPath);
-        }
-        if (!Files.exists(vocabPath)) {
-            throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
-        }
-
-        InferenceSession session = InferenceSession.create(modelPath);
-        try {
-            Tokenizer tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
-            return new SentenceTransformer(session, tokenizer, PoolingStrategy.MEAN, 512);
-        } catch (Exception e) {
-            session.close();
-            throw e;
-        }
-    }
-
     public static class Builder {
         private InferenceSession session;
+        private ModelSource modelSource;
+        private String modelId;
         private Tokenizer tokenizer;
         private PoolingStrategy poolingStrategy = PoolingStrategy.MEAN;
         private int maxLength = 512;
 
         public Builder session(InferenceSession session) {
             this.session = session;
+            return this;
+        }
+
+        public Builder modelSource(ModelSource modelSource) {
+            this.modelSource = modelSource;
+            return this;
+        }
+
+        public Builder modelId(String modelId) {
+            this.modelId = modelId;
             return this;
         }
 
@@ -199,12 +177,46 @@ public class SentenceTransformer implements EmbeddingModel {
 
         public SentenceTransformer build() {
             if (session == null) {
-                throw new IllegalStateException("InferenceSession is required");
+                if (modelId == null) {
+                    throw new IllegalStateException(
+                            "modelId is required (e.g., \"inference4j/all-MiniLM-L6-v2\")");
+                }
+                ModelSource source = modelSource != null
+                        ? modelSource : HuggingFaceModelSource.defaultInstance();
+                Path dir = source.resolve(modelId);
+                loadFromDirectory(dir);
             }
             if (tokenizer == null) {
                 throw new IllegalStateException("Tokenizer is required");
             }
             return new SentenceTransformer(session, tokenizer, poolingStrategy, maxLength);
+        }
+
+        private void loadFromDirectory(Path dir) {
+            if (!Files.isDirectory(dir)) {
+                throw new ModelSourceException("Model directory not found: " + dir);
+            }
+
+            Path modelPath = dir.resolve("model.onnx");
+            Path vocabPath = dir.resolve("vocab.txt");
+
+            if (!Files.exists(modelPath)) {
+                throw new ModelSourceException("Model file not found: " + modelPath);
+            }
+            if (!Files.exists(vocabPath)) {
+                throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
+            }
+
+            this.session = InferenceSession.create(modelPath);
+            try {
+                if (this.tokenizer == null) {
+                    this.tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
+                }
+            } catch (Exception e) {
+                this.session.close();
+                this.session = null;
+                throw e;
+            }
         }
     }
 }

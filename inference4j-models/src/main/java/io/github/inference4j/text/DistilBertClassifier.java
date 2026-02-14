@@ -16,6 +16,7 @@
 
 package io.github.inference4j.text;
 
+import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
 import io.github.inference4j.ModelSource;
@@ -51,7 +52,7 @@ import java.util.Set;
  *
  * <h2>Quick start</h2>
  * <pre>{@code
- * try (DistilBertClassifier model = DistilBertClassifier.fromPretrained("models/distilbert-sst2")) {
+ * try (DistilBertClassifier model = DistilBertClassifier.builder().build()) {
  *     List<TextClassification> results = model.classify("This movie was great!");
  *     System.out.println(results.get(0).label()); // "POSITIVE"
  * }
@@ -73,6 +74,7 @@ import java.util.Set;
  */
 public class DistilBertClassifier implements TextClassificationModel {
 
+    private static final String DEFAULT_MODEL_ID = "inference4j/distilbert-base-uncased-finetuned-sst-2-english";
     private static final int DEFAULT_MAX_LENGTH = 512;
 
     private final InferenceSession session;
@@ -89,16 +91,6 @@ public class DistilBertClassifier implements TextClassificationModel {
         this.config = config;
         this.outputOperator = outputOperator;
         this.maxLength = maxLength;
-    }
-
-    public static DistilBertClassifier fromPretrained(String modelPath) {
-        Path dir = Path.of(modelPath);
-        return fromModelDirectory(dir);
-    }
-
-    public static DistilBertClassifier fromPretrained(String modelId, ModelSource source) {
-        Path dir = source.resolve(modelId);
-        return fromModelDirectory(dir);
     }
 
     public static Builder builder() {
@@ -153,41 +145,10 @@ public class DistilBertClassifier implements TextClassificationModel {
         return results;
     }
 
-    private static DistilBertClassifier fromModelDirectory(Path dir) {
-        if (!Files.isDirectory(dir)) {
-            throw new ModelSourceException("Model directory not found: " + dir);
-        }
-
-        Path modelPath = dir.resolve("model.onnx");
-        Path vocabPath = dir.resolve("vocab.txt");
-        Path configPath = dir.resolve("config.json");
-
-        if (!Files.exists(modelPath)) {
-            throw new ModelSourceException("Model file not found: " + modelPath);
-        }
-        if (!Files.exists(vocabPath)) {
-            throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
-        }
-        if (!Files.exists(configPath)) {
-            throw new ModelSourceException("Config file not found: " + configPath);
-        }
-
-        InferenceSession session = InferenceSession.create(modelPath);
-        try {
-            Tokenizer tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
-            ModelConfig config = ModelConfig.fromFile(configPath);
-            OutputOperator operator = config.isMultiLabel()
-                    ? OutputOperator.sigmoid()
-                    : OutputOperator.softmax();
-            return new DistilBertClassifier(session, tokenizer, config, operator, DEFAULT_MAX_LENGTH);
-        } catch (Exception e) {
-            session.close();
-            throw e;
-        }
-    }
-
     public static class Builder {
         private InferenceSession session;
+        private ModelSource modelSource;
+        private String modelId;
         private Tokenizer tokenizer;
         private ModelConfig config;
         private OutputOperator outputOperator;
@@ -195,6 +156,16 @@ public class DistilBertClassifier implements TextClassificationModel {
 
         public Builder session(InferenceSession session) {
             this.session = session;
+            return this;
+        }
+
+        public Builder modelSource(ModelSource modelSource) {
+            this.modelSource = modelSource;
+            return this;
+        }
+
+        public Builder modelId(String modelId) {
+            this.modelId = modelId;
             return this;
         }
 
@@ -220,7 +191,11 @@ public class DistilBertClassifier implements TextClassificationModel {
 
         public DistilBertClassifier build() {
             if (session == null) {
-                throw new IllegalStateException("InferenceSession is required");
+                ModelSource source = modelSource != null
+                        ? modelSource : HuggingFaceModelSource.defaultInstance();
+                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
+                Path dir = source.resolve(id);
+                loadFromDirectory(dir);
             }
             if (tokenizer == null) {
                 throw new IllegalStateException("Tokenizer is required");
@@ -234,6 +209,40 @@ public class DistilBertClassifier implements TextClassificationModel {
                         : OutputOperator.softmax();
             }
             return new DistilBertClassifier(session, tokenizer, config, outputOperator, maxLength);
+        }
+
+        private void loadFromDirectory(Path dir) {
+            if (!Files.isDirectory(dir)) {
+                throw new ModelSourceException("Model directory not found: " + dir);
+            }
+
+            Path modelPath = dir.resolve("model.onnx");
+            Path vocabPath = dir.resolve("vocab.txt");
+            Path configPath = dir.resolve("config.json");
+
+            if (!Files.exists(modelPath)) {
+                throw new ModelSourceException("Model file not found: " + modelPath);
+            }
+            if (!Files.exists(vocabPath)) {
+                throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
+            }
+            if (!Files.exists(configPath)) {
+                throw new ModelSourceException("Config file not found: " + configPath);
+            }
+
+            this.session = InferenceSession.create(modelPath);
+            try {
+                if (this.tokenizer == null) {
+                    this.tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
+                }
+                if (this.config == null) {
+                    this.config = ModelConfig.fromFile(configPath);
+                }
+            } catch (Exception e) {
+                this.session.close();
+                this.session = null;
+                throw e;
+            }
         }
     }
 }

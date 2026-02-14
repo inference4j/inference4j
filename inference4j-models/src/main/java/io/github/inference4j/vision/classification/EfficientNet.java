@@ -16,6 +16,7 @@
 
 package io.github.inference4j.vision.classification;
 
+import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
 import io.github.inference4j.OutputOperator;
@@ -51,7 +52,7 @@ import java.nio.file.Path;
  *
  * <h2>Quick start</h2>
  * <pre>{@code
- * try (EfficientNet model = EfficientNet.fromPretrained("models/efficientnet-lite4")) {
+ * try (EfficientNet model = EfficientNet.builder().build()) {
  *     List<Classification> results = model.classify(Path.of("cat.jpg"));
  * }
  * }</pre>
@@ -73,20 +74,12 @@ import java.nio.file.Path;
  */
 public class EfficientNet extends AbstractImageClassificationModel {
 
+    private static final String DEFAULT_MODEL_ID = "inference4j/efficientnet-lite4";
+
     private EfficientNet(InferenceSession session, ImageTransformPipeline pipeline,
                          Labels labels, String inputName, int defaultTopK,
                          OutputOperator outputOperator) {
         super(session, pipeline, labels, inputName, defaultTopK, outputOperator);
-    }
-
-    public static EfficientNet fromPretrained(String modelPath) {
-        Path dir = Path.of(modelPath);
-        return fromModelDirectory(dir);
-    }
-
-    public static EfficientNet fromPretrained(String modelId, ModelSource source) {
-        Path dir = source.resolve(modelId);
-        return fromModelDirectory(dir);
     }
 
     public static Builder builder() {
@@ -96,33 +89,6 @@ public class EfficientNet extends AbstractImageClassificationModel {
     private static final float[] EFFICIENTNET_MEAN = {127f / 255f, 127f / 255f, 127f / 255f};
     private static final float[] EFFICIENTNET_STD = {128f / 255f, 128f / 255f, 128f / 255f};
 
-    private static EfficientNet fromModelDirectory(Path dir) {
-        if (!Files.isDirectory(dir)) {
-            throw new ModelSourceException("Model directory not found: " + dir);
-        }
-
-        Path modelPath = dir.resolve("model.onnx");
-        if (!Files.exists(modelPath)) {
-            throw new ModelSourceException("Model file not found: " + modelPath);
-        }
-
-        InferenceSession session = InferenceSession.create(modelPath);
-        try {
-            String inputName = session.inputNames().iterator().next();
-
-            Path labelsPath = dir.resolve("labels.txt");
-            Labels labels = Files.exists(labelsPath) ? Labels.fromFile(labelsPath) : Labels.imagenet();
-
-            ImageTransformPipeline pipeline = detectPipeline(session, inputName,
-                    EFFICIENTNET_MEAN, EFFICIENTNET_STD);
-
-            return new EfficientNet(session, pipeline, labels, inputName, 5, OutputOperator.identity());
-        } catch (Exception e) {
-            session.close();
-            throw e;
-        }
-    }
-
     public static class Builder extends AbstractBuilder<Builder> {
 
         @Override
@@ -131,8 +97,46 @@ public class EfficientNet extends AbstractImageClassificationModel {
         }
 
         public EfficientNet build() {
+            if (session == null) {
+                ModelSource source = modelSource != null
+                        ? modelSource : HuggingFaceModelSource.defaultInstance();
+                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
+                Path dir = source.resolve(id);
+                loadFromDirectory(dir);
+            }
             validate();
             return new EfficientNet(session, pipeline, labels, inputName, defaultTopK, outputOperator);
+        }
+
+        private void loadFromDirectory(Path dir) {
+            if (!Files.isDirectory(dir)) {
+                throw new ModelSourceException("Model directory not found: " + dir);
+            }
+
+            Path modelPath = dir.resolve("model.onnx");
+            if (!Files.exists(modelPath)) {
+                throw new ModelSourceException("Model file not found: " + modelPath);
+            }
+
+            this.session = InferenceSession.create(modelPath);
+            try {
+                if (this.inputName == null) {
+                    this.inputName = session.inputNames().iterator().next();
+                }
+
+                Path labelsPath = dir.resolve("labels.txt");
+                if (Files.exists(labelsPath)) {
+                    this.labels = Labels.fromFile(labelsPath);
+                }
+
+                this.pipeline = detectPipeline(session, this.inputName,
+                        EFFICIENTNET_MEAN, EFFICIENTNET_STD);
+                this.outputOperator = OutputOperator.identity();
+            } catch (Exception e) {
+                this.session.close();
+                this.session = null;
+                throw e;
+            }
         }
     }
 }

@@ -17,11 +17,15 @@
 package io.github.inference4j.vision.classification;
 
 import io.github.inference4j.InferenceSession;
+import io.github.inference4j.ModelSource;
 import io.github.inference4j.OutputOperator;
 import io.github.inference4j.Tensor;
+import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.image.ImageTransformPipeline;
 import io.github.inference4j.image.Labels;
 import org.junit.jupiter.api.Test;
+
+import java.nio.file.Path;
 
 import java.awt.image.BufferedImage;
 import java.util.List;
@@ -128,10 +132,12 @@ class ResNetTest {
     // --- Builder validation ---
 
     @Test
-    void builder_missingSession_throws() {
-        assertThrows(IllegalStateException.class, () ->
+    void builder_invalidModelSource_throws() {
+        ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
+        assertThrows(ModelSourceException.class, () ->
                 ResNet.builder()
                         .inputName("input")
+                        .modelSource(badSource)
                         .build());
     }
 

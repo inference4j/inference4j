@@ -16,6 +16,7 @@
 
 package io.github.inference4j.audio;
 
+import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
 import io.github.inference4j.Tensor;
@@ -42,7 +43,7 @@ import java.util.Map;
  *
  * <h2>Quick start</h2>
  * <pre>{@code
- * try (SileroVAD vad = SileroVAD.fromPretrained("models/silero-vad")) {
+ * try (SileroVAD vad = SileroVAD.builder().build()) {
  *     List<VoiceSegment> segments = vad.detect(Path.of("audio.wav"));
  *     for (VoiceSegment segment : segments) {
  *         System.out.printf("Speech: %.2fs - %.2fs (confidence: %.2f)%n",
@@ -67,6 +68,7 @@ import java.util.Map;
  */
 public class SileroVAD implements AutoCloseable {
 
+    private static final String DEFAULT_MODEL_ID = "inference4j/silero-vad";
     private static final int DEFAULT_SAMPLE_RATE = 16000;
     private static final int DEFAULT_WINDOW_SIZE_SAMPLES = 512; // 32ms at 16kHz
     private static final float DEFAULT_THRESHOLD = 0.5f;
@@ -98,29 +100,6 @@ public class SileroVAD implements AutoCloseable {
         this.threshold = threshold;
         this.minSpeechDuration = minSpeechDuration;
         this.minSilenceDuration = minSilenceDuration;
-    }
-
-    /**
-     * Loads a SileroVAD model from a directory containing model.onnx.
-     *
-     * @param modelPath path to the model directory
-     * @return a configured SileroVAD instance
-     */
-    public static SileroVAD fromPretrained(String modelPath) {
-        Path dir = Path.of(modelPath);
-        return fromModelDirectory(dir);
-    }
-
-    /**
-     * Loads a SileroVAD model using a model source.
-     *
-     * @param modelId model identifier
-     * @param source  model source to resolve the path
-     * @return a configured SileroVAD instance
-     */
-    public static SileroVAD fromPretrained(String modelId, ModelSource source) {
-        Path dir = source.resolve(modelId);
-        return fromModelDirectory(dir);
     }
 
     /**
@@ -313,30 +292,13 @@ public class SileroVAD implements AutoCloseable {
         return (float) (frame * windowSizeSamples) / targetSampleRate;
     }
 
-    private static SileroVAD fromModelDirectory(Path dir) {
-        if (!Files.isDirectory(dir)) {
-            throw new ModelSourceException("Model directory not found: " + dir);
-        }
-
-        Path modelPath = dir.resolve("model.onnx");
-        if (!Files.exists(modelPath)) {
-            // Try alternate name
-            modelPath = dir.resolve("silero_vad.onnx");
-        }
-        if (!Files.exists(modelPath)) {
-            throw new ModelSourceException("Model file not found in: " + dir);
-        }
-
-        InferenceSession session = InferenceSession.create(modelPath);
-        return new SileroVAD(session, DEFAULT_SAMPLE_RATE, DEFAULT_WINDOW_SIZE_SAMPLES,
-                CONTEXT_SIZE_16K, DEFAULT_THRESHOLD, DEFAULT_MIN_SPEECH_DURATION, DEFAULT_MIN_SILENCE_DURATION);
-    }
-
     /**
      * Builder for configuring SileroVAD instances.
      */
     public static class Builder {
         private InferenceSession session;
+        private ModelSource modelSource;
+        private String modelId;
         private int sampleRate = DEFAULT_SAMPLE_RATE;
         private int windowSizeSamples = DEFAULT_WINDOW_SIZE_SAMPLES;
         private float threshold = DEFAULT_THRESHOLD;
@@ -344,10 +306,33 @@ public class SileroVAD implements AutoCloseable {
         private float minSilenceDuration = DEFAULT_MIN_SILENCE_DURATION;
 
         /**
-         * Sets the inference session (required).
+         * Sets the inference session.
+         *
+         * <p>When not set, the builder auto-loads the model from the configured
+         * {@link #modelSource(ModelSource)} and {@link #modelId(String)}.
          */
         public Builder session(InferenceSession session) {
             this.session = session;
+            return this;
+        }
+
+        /**
+         * Sets the model source for auto-loading.
+         *
+         * <p>Defaults to {@link HuggingFaceModelSource#defaultInstance()} when not set.
+         */
+        public Builder modelSource(ModelSource modelSource) {
+            this.modelSource = modelSource;
+            return this;
+        }
+
+        /**
+         * Sets the model identifier for auto-loading.
+         *
+         * <p>Defaults to {@code "inference4j/silero-vad"} when not set.
+         */
+        public Builder modelId(String modelId) {
+            this.modelId = modelId;
             return this;
         }
 
@@ -398,17 +383,39 @@ public class SileroVAD implements AutoCloseable {
         /**
          * Builds the SileroVAD instance.
          *
+         * <p>When no session is provided, auto-loads the model using the configured
+         * model source and model ID (or their defaults).
+         *
          * @return configured SileroVAD
-         * @throws IllegalStateException if session is not set
          */
         public SileroVAD build() {
             if (session == null) {
-                throw new IllegalStateException("InferenceSession is required");
+                ModelSource source = modelSource != null
+                        ? modelSource : HuggingFaceModelSource.defaultInstance();
+                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
+                Path dir = source.resolve(id);
+                loadFromDirectory(dir);
             }
             // Context size depends on sample rate: 64 for 16kHz, 32 for 8kHz
             int contextSize = (sampleRate == 16000) ? 64 : 32;
             return new SileroVAD(session, sampleRate, windowSizeSamples,
                     contextSize, threshold, minSpeechDuration, minSilenceDuration);
+        }
+
+        private void loadFromDirectory(Path dir) {
+            if (!Files.isDirectory(dir)) {
+                throw new ModelSourceException("Model directory not found: " + dir);
+            }
+
+            Path modelPath = dir.resolve("model.onnx");
+            if (!Files.exists(modelPath)) {
+                modelPath = dir.resolve("silero_vad.onnx");
+            }
+            if (!Files.exists(modelPath)) {
+                throw new ModelSourceException("Model file not found in: " + dir);
+            }
+
+            this.session = InferenceSession.create(modelPath);
         }
     }
 }

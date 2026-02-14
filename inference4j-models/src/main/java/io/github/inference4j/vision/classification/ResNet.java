@@ -16,6 +16,7 @@
 
 package io.github.inference4j.vision.classification;
 
+import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
 import io.github.inference4j.OutputOperator;
@@ -51,7 +52,7 @@ import java.nio.file.Path;
  *
  * <h2>Quick start</h2>
  * <pre>{@code
- * try (ResNet model = ResNet.fromPretrained("models/resnet50")) {
+ * try (ResNet model = ResNet.builder().build()) {
  *     List<Classification> results = model.classify(Path.of("cat.jpg"));
  * }
  * }</pre>
@@ -73,20 +74,12 @@ import java.nio.file.Path;
  */
 public class ResNet extends AbstractImageClassificationModel {
 
+    private static final String DEFAULT_MODEL_ID = "inference4j/resnet50-v1-7";
+
     private ResNet(InferenceSession session, ImageTransformPipeline pipeline,
                    Labels labels, String inputName, int defaultTopK,
                    OutputOperator outputOperator) {
         super(session, pipeline, labels, inputName, defaultTopK, outputOperator);
-    }
-
-    public static ResNet fromPretrained(String modelPath) {
-        Path dir = Path.of(modelPath);
-        return fromModelDirectory(dir);
-    }
-
-    public static ResNet fromPretrained(String modelId, ModelSource source) {
-        Path dir = source.resolve(modelId);
-        return fromModelDirectory(dir);
     }
 
     public static Builder builder() {
@@ -96,33 +89,6 @@ public class ResNet extends AbstractImageClassificationModel {
     private static final float[] IMAGENET_MEAN = {0.485f, 0.456f, 0.406f};
     private static final float[] IMAGENET_STD = {0.229f, 0.224f, 0.225f};
 
-    private static ResNet fromModelDirectory(Path dir) {
-        if (!Files.isDirectory(dir)) {
-            throw new ModelSourceException("Model directory not found: " + dir);
-        }
-
-        Path modelPath = dir.resolve("model.onnx");
-        if (!Files.exists(modelPath)) {
-            throw new ModelSourceException("Model file not found: " + modelPath);
-        }
-
-        InferenceSession session = InferenceSession.create(modelPath);
-        try {
-            String inputName = session.inputNames().iterator().next();
-
-            Path labelsPath = dir.resolve("labels.txt");
-            Labels labels = Files.exists(labelsPath) ? Labels.fromFile(labelsPath) : Labels.imagenet();
-
-            ImageTransformPipeline pipeline = detectPipeline(session, inputName,
-                    IMAGENET_MEAN, IMAGENET_STD);
-
-            return new ResNet(session, pipeline, labels, inputName, 5, OutputOperator.softmax());
-        } catch (Exception e) {
-            session.close();
-            throw e;
-        }
-    }
-
     public static class Builder extends AbstractBuilder<Builder> {
 
         @Override
@@ -131,8 +97,46 @@ public class ResNet extends AbstractImageClassificationModel {
         }
 
         public ResNet build() {
+            if (session == null) {
+                ModelSource source = modelSource != null
+                        ? modelSource : HuggingFaceModelSource.defaultInstance();
+                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
+                Path dir = source.resolve(id);
+                loadFromDirectory(dir);
+            }
             validate();
             return new ResNet(session, pipeline, labels, inputName, defaultTopK, outputOperator);
+        }
+
+        private void loadFromDirectory(Path dir) {
+            if (!Files.isDirectory(dir)) {
+                throw new ModelSourceException("Model directory not found: " + dir);
+            }
+
+            Path modelPath = dir.resolve("model.onnx");
+            if (!Files.exists(modelPath)) {
+                throw new ModelSourceException("Model file not found: " + modelPath);
+            }
+
+            this.session = InferenceSession.create(modelPath);
+            try {
+                if (this.inputName == null) {
+                    this.inputName = session.inputNames().iterator().next();
+                }
+
+                Path labelsPath = dir.resolve("labels.txt");
+                if (Files.exists(labelsPath)) {
+                    this.labels = Labels.fromFile(labelsPath);
+                }
+
+                this.pipeline = detectPipeline(session, this.inputName,
+                        IMAGENET_MEAN, IMAGENET_STD);
+                this.outputOperator = OutputOperator.softmax();
+            } catch (Exception e) {
+                this.session.close();
+                this.session = null;
+                throw e;
+            }
         }
     }
 }

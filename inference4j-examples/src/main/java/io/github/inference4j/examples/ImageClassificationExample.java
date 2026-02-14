@@ -37,7 +37,7 @@ public class ImageClassificationExample {
 
         // --- ResNet-50 ---
         System.out.println("=== ResNet-50 ===");
-        try (ResNet resnet = ResNet.fromPretrained("assets/models/resnet50")) {
+        try (ResNet resnet = ResNet.builder().build()) {
             System.out.println("ResNet-50 loaded successfully.");
             System.out.println();
 
@@ -51,7 +51,7 @@ public class ImageClassificationExample {
 
         // --- EfficientNet-Lite4 ---
         System.out.println("=== EfficientNet-Lite4 ===");
-        try (EfficientNet efficientnet = EfficientNet.fromPretrained("assets/models/efficientnet-lite4")) {
+        try (EfficientNet efficientnet = EfficientNet.builder().build()) {
             System.out.println("EfficientNet-Lite4 loaded successfully.");
             System.out.println();
 

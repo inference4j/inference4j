@@ -16,6 +16,7 @@
 
 package io.github.inference4j.vision.detection;
 
+import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
 import io.github.inference4j.ModelSource;
@@ -70,7 +71,7 @@ import java.util.Map;
  *
  * <h2>Quick start</h2>
  * <pre>{@code
- * try (Yolo26 yolo = Yolo26.fromPretrained("models/yolo26n")) {
+ * try (Yolo26 yolo = Yolo26.builder().build()) {
  *     List<Detection> detections = yolo.detect(Path.of("street.jpg"));
  *     for (Detection d : detections) {
  *         System.out.printf("%s (%.2f) at [%.0f, %.0f, %.0f, %.0f]%n",
@@ -98,6 +99,8 @@ import java.util.Map;
  */
 public class Yolo26 implements ObjectDetectionModel {
 
+    private static final String DEFAULT_MODEL_ID = "inference4j/yolo26n";
+
     private final InferenceSession session;
     private final Labels labels;
     private final String inputName;
@@ -111,16 +114,6 @@ public class Yolo26 implements ObjectDetectionModel {
         this.inputName = inputName;
         this.inputSize = inputSize;
         this.defaultConfidenceThreshold = defaultConfidenceThreshold;
-    }
-
-    public static Yolo26 fromPretrained(String modelPath) {
-        Path dir = Path.of(modelPath);
-        return fromModelDirectory(dir);
-    }
-
-    public static Yolo26 fromPretrained(String modelId, ModelSource source) {
-        Path dir = source.resolve(modelId);
-        return fromModelDirectory(dir);
     }
 
     public static Builder builder() {
@@ -318,36 +311,10 @@ public class Yolo26 implements ObjectDetectionModel {
         }
     }
 
-    private static Yolo26 fromModelDirectory(Path dir) {
-        if (!Files.isDirectory(dir)) {
-            throw new ModelSourceException("Model directory not found: " + dir);
-        }
-
-        Path modelPath = dir.resolve("model.onnx");
-        if (!Files.exists(modelPath)) {
-            throw new ModelSourceException("Model file not found: " + modelPath);
-        }
-
-        InferenceSession session = InferenceSession.create(modelPath);
-        try {
-            String inputName = session.inputNames().iterator().next();
-
-            Path labelsPath = dir.resolve("labels.txt");
-            Labels labels = Files.exists(labelsPath) ? Labels.fromFile(labelsPath) : Labels.coco();
-
-            long[] inputShape = session.inputShape(inputName);
-            ImageLayout layout = ImageLayout.detect(inputShape);
-            int inputSize = layout.imageSize(inputShape);
-
-            return new Yolo26(session, labels, inputName, inputSize, 0.5f);
-        } catch (Exception e) {
-            session.close();
-            throw e;
-        }
-    }
-
     public static class Builder {
         private InferenceSession session;
+        private ModelSource modelSource;
+        private String modelId;
         private Labels labels = Labels.coco();
         private String inputName;
         private int inputSize = 640;
@@ -355,6 +322,16 @@ public class Yolo26 implements ObjectDetectionModel {
 
         public Builder session(InferenceSession session) {
             this.session = session;
+            return this;
+        }
+
+        public Builder modelSource(ModelSource modelSource) {
+            this.modelSource = modelSource;
+            return this;
+        }
+
+        public Builder modelId(String modelId) {
+            this.modelId = modelId;
             return this;
         }
 
@@ -389,12 +366,47 @@ public class Yolo26 implements ObjectDetectionModel {
 
         public Yolo26 build() {
             if (session == null) {
-                throw new IllegalStateException("InferenceSession is required");
+                ModelSource source = modelSource != null
+                        ? modelSource : HuggingFaceModelSource.defaultInstance();
+                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
+                Path dir = source.resolve(id);
+                loadFromDirectory(dir);
             }
             if (inputName == null) {
                 inputName = session.inputNames().iterator().next();
             }
             return new Yolo26(session, labels, inputName, inputSize, confidenceThreshold);
+        }
+
+        private void loadFromDirectory(Path dir) {
+            if (!Files.isDirectory(dir)) {
+                throw new ModelSourceException("Model directory not found: " + dir);
+            }
+
+            Path modelPath = dir.resolve("model.onnx");
+            if (!Files.exists(modelPath)) {
+                throw new ModelSourceException("Model file not found: " + modelPath);
+            }
+
+            this.session = InferenceSession.create(modelPath);
+            try {
+                if (this.inputName == null) {
+                    this.inputName = session.inputNames().iterator().next();
+                }
+
+                Path labelsPath = dir.resolve("labels.txt");
+                if (Files.exists(labelsPath)) {
+                    this.labels = Labels.fromFile(labelsPath);
+                }
+
+                long[] inputShape = session.inputShape(this.inputName);
+                ImageLayout layout = ImageLayout.detect(inputShape);
+                this.inputSize = layout.imageSize(inputShape);
+            } catch (Exception e) {
+                this.session.close();
+                this.session = null;
+                throw e;
+            }
         }
     }
 }
