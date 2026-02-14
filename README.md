@@ -4,19 +4,147 @@
 [![codecov](https://codecov.io/gh/inference4j/inference4j/graph/badge.svg)](https://codecov.io/gh/inference4j/inference4j)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-**Inference-only AI for Java. Simple APIs, standard types, no PhD required.**
+**Run AI models in Java. Three lines of code, zero setup.**
 
-> **Note:** inference4j is under active development. APIs may change as we stabilize. A full user guide and wiki will follow — for now, this README and the [examples](inference4j-examples/README.md) are the best way to get started.
+> **Note:** inference4j is under active development (0.x). APIs may change. A full user guide and wiki will follow — for now, this README and the [examples](inference4j-examples/README.md) are the best way to get started.
 
-inference4j gives Java developers ergonomic, type-safe wrappers for running AI models on the ONNX Runtime. Pass in a `String`, a `BufferedImage`, or a `Path` to a WAV file — get back embeddings, classifications, detections, or transcriptions. No tensor juggling, no JNI plumbing, no Python sidecar.
+## What can you do with inference4j?
+
+### Sentiment Analysis
 
 ```java
-// Zero setup — auto-downloads from HuggingFace, caches locally
-try (Wav2Vec2 model = Wav2Vec2.builder().build()) {
-    Transcription result = model.transcribe(Path.of("meeting.wav"));
-    System.out.println(result.text());
+try (var model = DistilBertClassifier.builder().build()) {
+    System.out.println(model.classify("This movie was fantastic!"));
+    // [TextClassification[label=POSITIVE, confidence=0.9998]]
 }
 ```
+
+### Text Embeddings & Semantic Search
+
+```java
+try (var model = SentenceTransformer.builder()
+        .modelId("inference4j/all-MiniLM-L6-v2").build()) {
+    float[] embedding = model.encode("Hello, world!");
+}
+```
+
+### Image Classification
+
+```java
+try (var model = ResNet.builder().build()) {
+    List<Classification> results = model.classify(Path.of("cat.jpg"));
+    // [Classification[label=tabby cat, confidence=0.87], ...]
+}
+```
+
+### Object Detection
+
+```java
+try (var model = YoloV8.builder().build()) {
+    List<Detection> detections = model.detect(Path.of("street.jpg"));
+    // [Detection[label=car, confidence=0.94, box=BoundingBox[...]], ...]
+}
+```
+
+### Speech-to-Text
+
+```java
+try (var model = Wav2Vec2.builder().build()) {
+    System.out.println(model.transcribe(Path.of("audio.wav")).text());
+}
+```
+
+### Voice Activity Detection
+
+```java
+try (var vad = SileroVAD.builder().build()) {
+    List<VoiceSegment> segments = vad.detect(Path.of("meeting.wav"));
+    // [VoiceSegment[start=0.50, end=3.20], VoiceSegment[start=5.10, end=8.75]]
+}
+```
+
+### Text Detection
+
+```java
+try (var craft = Craft.builder().build()) {
+    List<TextRegion> regions = craft.detect(Path.of("document.jpg"));
+}
+```
+
+### Search Reranking
+
+```java
+try (var reranker = MiniLMReranker.builder().build()) {
+    float score = reranker.score("What is Java?", "Java is a programming language.");
+}
+```
+
+## What you don't have to do
+
+- **No tokenization** — WordPiece tokenizers are built in and handled automatically
+- **No tensor handling** — pass a `String`, `BufferedImage`, or `Path`; get Java objects back
+- **No ONNX session setup** — `builder().build()` handles everything
+- **No model downloads** — auto-downloaded from HuggingFace and cached on first use
+- **No Python sidecar** — pure Java, runs anywhere Java runs
+
+## vs raw ONNX Runtime
+
+<table>
+<tr>
+<th>Without inference4j</th>
+<th>With inference4j</th>
+</tr>
+<tr>
+<td>
+
+```java
+OrtEnvironment env = OrtEnvironment.getEnvironment();
+OrtSession session = env.createSession("resnet50.onnx");
+
+BufferedImage img = ImageIO.read(new File("cat.jpg"));
+BufferedImage resized = resize(img, 224, 224);
+float[] pixels = new float[3 * 224 * 224];
+for (int c = 0; c < 3; c++)
+  for (int y = 0; y < 224; y++)
+    for (int x = 0; x < 224; x++) {
+      int rgb = resized.getRGB(x, y);
+      float val = ((rgb >> (16 - c * 8)) & 0xFF) / 255f;
+      pixels[c * 224 * 224 + y * 224 + x] =
+        (val - MEAN[c]) / STD[c];
+    }
+
+OnnxTensor tensor = OnnxTensor.createTensor(env,
+    FloatBuffer.wrap(pixels), new long[]{1, 3, 224, 224});
+OrtSession.Result result = session.run(
+    Map.of("data", tensor));
+float[] logits = ((float[][]) result.get(0)
+    .getValue())[0];
+float[] probs = softmax(logits);
+int bestIdx = argmax(probs);
+String label = LABELS[bestIdx];
+// ~30 lines, manual everything
+```
+
+</td>
+<td>
+
+```java
+try (var model = ResNet.builder().build()) {
+    var results = model.classify(
+        Path.of("cat.jpg")
+    );
+    // done.
+}
+
+// 3 lines.
+// Auto-downloads model.
+// Handles preprocessing.
+// Returns Java objects.
+```
+
+</td>
+</tr>
+</table>
 
 ## Why inference4j?
 
@@ -36,91 +164,26 @@ inference4j sits in the sweet spot:
 
 We believe the Java AI ecosystem is stronger when tools do one thing well. inference4j does local model inference, and tries to do it really well.
 
-## Quick Start
+## Supported Tasks
 
-```java
-// Text embeddings (multi-variant — specify modelId)
-try (SentenceTransformer model = SentenceTransformer.builder()
-        .modelId("inference4j/all-MiniLM-L6-v2")
-        .build()) {
-    float[] embedding = model.encode("Hello, world!");
-}
-
-// Image classification (zero config — auto-downloads default model)
-try (ResNet model = ResNet.builder().build()) {
-    List<Classification> results = model.classify(Path.of("cat.jpg"));
-}
-
-// Object detection
-try (YoloV8 model = YoloV8.builder().build()) {
-    List<Detection> detections = model.detect(Path.of("street.jpg"));
-}
-
-// Text classification (sentiment analysis)
-try (DistilBertClassifier model = DistilBertClassifier.builder().build()) {
-    List<TextClassification> results = model.classify("This movie was fantastic!");
-    System.out.println(results.get(0).label()); // "POSITIVE"
-}
-
-// Cross-encoder reranking
-try (MiniLMReranker reranker = MiniLMReranker.builder().build()) {
-    float score = reranker.score("What is Java?", "Java is a programming language.");
-}
-
-// Speech-to-text
-try (Wav2Vec2 model = Wav2Vec2.builder().build()) {
-    Transcription result = model.transcribe(Path.of("audio.wav"));
-    System.out.println(result.text());
-}
-
-// Voice activity detection
-try (SileroVAD vad = SileroVAD.builder().build()) {
-    List<VoiceSegment> segments = vad.detect(Path.of("meeting.wav"));
-    for (VoiceSegment segment : segments) {
-        System.out.printf("Speech: %.2fs - %.2fs%n", segment.start(), segment.end());
-    }
-}
-
-// Text detection
-try (Craft craft = Craft.builder().build()) {
-    List<TextRegion> regions = craft.detect(Path.of("document.jpg"));
-    for (TextRegion r : regions) {
-        System.out.printf("Text at [%.0f, %.0f, %.0f, %.0f]%n",
-            r.box().x1(), r.box().y1(), r.box().x2(), r.box().y2());
-    }
-}
-```
-
-## Supported Models
-
-| Domain | Model | Wrapper | Description |
-|--------|-------|---------|-------------|
-| **Text** | all-MiniLM, all-mpnet, BERT | `SentenceTransformer` | Sentence embeddings with configurable pooling |
-| **Text** | DistilBERT, BERT (classification) | `DistilBertClassifier` | Text classification — sentiment, moderation, intent detection |
-| **Text** | ms-marco-MiniLM (cross-encoder) | `MiniLMReranker` | Query-document relevance scoring for search reranking |
-| **Vision** | ResNet | `ResNet` | Image classification (ImageNet) |
-| **Vision** | EfficientNet | `EfficientNet` | Image classification (ImageNet) |
-| **Vision** | YOLOv8, YOLO11 | `YoloV8` | Object detection with NMS |
-| **Vision** | YOLO26 | `Yolo26` | NMS-free object detection |
-| **Audio** | Wav2Vec2-CTC | `Wav2Vec2` | Speech-to-text (single-pass, non-autoregressive) |
-| **Audio** | Silero VAD | `SileroVAD` | Voice activity detection |
-| **Vision** | CRAFT | `Craft` | Text detection — locates text regions in images |
+| Task | Models | Wrapper |
+|------|--------|---------|
+| **Sentiment Analysis** | DistilBERT, BERT | `DistilBertClassifier` |
+| **Text Embeddings** | all-MiniLM, all-mpnet, BERT | `SentenceTransformer` |
+| **Search Reranking** | ms-marco-MiniLM | `MiniLMReranker` |
+| **Image Classification** | ResNet, EfficientNet | `ResNet`, `EfficientNet` |
+| **Object Detection** | YOLOv8, YOLO11, YOLO26 | `YoloV8`, `Yolo26` |
+| **Text Detection** | CRAFT | `Craft` |
+| **Speech-to-Text** | Wav2Vec2-CTC | `Wav2Vec2` |
+| **Voice Activity Detection** | Silero VAD | `SileroVAD` |
 
 > **Auto-download:** All supported models are hosted under the [`inference4j`](https://huggingface.co/inference4j) HuggingFace organization. Models are automatically downloaded and cached on first use — no manual setup required. Cache location defaults to `~/.cache/inference4j/` and can be customized via `INFERENCE4J_CACHE_DIR` or `-Dinference4j.cache.dir`.
 
-## Vision
+## Roadmap
 
-inference4j follows a three-tier API strategy:
-
-1. **Handcrafted wrappers** — curated, ergonomic APIs for the most popular models (what you see above)
-2. **Code-generated wrappers** — a Gradle plugin that reads `.onnx` files and generates type-safe Java classes for any model
-3. **Low-level core** — direct `InferenceSession` and `Tensor` access when you need full control
-
-On our roadmap:
-
-- **CLIP** — image-text similarity for visual search and zero-shot classification
-- **OCR Pipeline** — text recognition (TrOCR) + embedding-based error correction against domain dictionaries (CRAFT text detection is already available)
+- **OCR Pipeline** — CRAFT text detection + TrOCR recognition + embedding-based error correction against domain dictionaries
 - **Pipeline API** — compose models into multi-stage workflows with per-stage timing and intermediate hooks
+- **CLIP** — image-text similarity for visual search and zero-shot classification
 - **Spring Boot Starter** — auto-configuration, health indicators, Micrometer metrics
 
 See the [Roadmap](ROADMAP.md) for details.
