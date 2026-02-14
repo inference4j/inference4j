@@ -66,7 +66,7 @@ public class HuggingFaceModelSource implements ModelSource {
     private static final String HF_BASE_URL = "https://huggingface.co";
 
     private static final List<String> DEFAULT_FILES = List.of(
-            "model.onnx", "model.onnx.data", "vocab.txt", "vocab.json",
+            "model.onnx", "vocab.txt", "vocab.json",
             "config.json", "labels.txt", "silero_vad.onnx"
     );
 

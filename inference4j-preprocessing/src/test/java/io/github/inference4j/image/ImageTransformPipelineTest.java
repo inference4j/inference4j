@@ -181,8 +181,14 @@ class ImageTransformPipelineTest {
     }
 
     @Test
-    void efficientnetPreset_producesNHWCShape() {
-        ImageTransformPipeline pipeline = ImageTransformPipeline.efficientnet(224);
+    void nhwcPipeline_producesCorrectShape() {
+        ImageTransformPipeline pipeline = ImageTransformPipeline.builder()
+                .resize(224, 224)
+                .centerCrop(224, 224)
+                .mean(new float[]{127f / 255f, 127f / 255f, 127f / 255f})
+                .std(new float[]{128f / 255f, 128f / 255f, 128f / 255f})
+                .layout(ImageLayout.NHWC)
+                .build();
         BufferedImage image = createTestImage(300, 400);
 
         Tensor tensor = pipeline.transform(image);
@@ -192,9 +198,9 @@ class ImageTransformPipelineTest {
     }
 
     @Test
-    void efficientnetPreset_appliesCorrectNormalization() {
+    void nhwcPipeline_appliesCorrectNormalization() {
         // White image: all channels = 255 → scaled = 1.0
-        // EfficientNet: (pixel - 127) / 128 = (255 - 127) / 128 = 1.0
+        // (pixel - 127) / 128 = (255 - 127) / 128 = 1.0
         // In mean/std terms: (1.0 - 127/255) / (128/255)
         BufferedImage image = new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB);
         for (int y = 0; y < 224; y++) {
@@ -203,7 +209,11 @@ class ImageTransformPipelineTest {
             }
         }
 
-        ImageTransformPipeline pipeline = ImageTransformPipeline.efficientnet(224);
+        ImageTransformPipeline pipeline = ImageTransformPipeline.builder()
+                .mean(new float[]{127f / 255f, 127f / 255f, 127f / 255f})
+                .std(new float[]{128f / 255f, 128f / 255f, 128f / 255f})
+                .layout(ImageLayout.NHWC)
+                .build();
         Tensor tensor = pipeline.transform(image);
         float[] data = tensor.toFloats();
 

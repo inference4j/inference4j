@@ -246,14 +246,14 @@ try (var classifier = ResNetClassifier.builder()
 
 The `.sessionOptions()` API is available on every model wrapper.
 
-### Benchmark: ResNet-50 on Apple Silicon (M-series)
+### Benchmarks on Apple Silicon (M-series)
 
-| Provider | Avg Inference | Speedup |
-|----------|--------------|---------|
-| CPU      | 37 ms        | —       |
-| CoreML   | 10 ms        | **3.7x** |
+| Model | Task | CPU | CoreML | Speedup |
+|-------|------|-----|--------|---------|
+| ResNet-50 | Image Classification | 37 ms | 10 ms | **3.7x** |
+| CRAFT | Text Detection | 831 ms | 153 ms | **5.4x** |
 
-> Measured with 3 warmup runs + 10 timed runs. See [`ResNetAccelerationBenchmarkExample`](inference4j-examples/src/main/java/io/github/inference4j/examples/ResNetAccelerationBenchmarkExample.java) for the full benchmark.
+> Measured with 3 warmup runs + 10 timed runs. See the benchmark examples for [ResNet](inference4j-examples/src/main/java/io/github/inference4j/examples/ResNetAccelerationBenchmarkExample.java) and [CRAFT](inference4j-examples/src/main/java/io/github/inference4j/examples/CraftAccelerationBenchmarkExample.java).
 
 ## Roadmap
 
