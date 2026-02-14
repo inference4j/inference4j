@@ -1,0 +1,18 @@
+description = 'Spring Boot starter for inference4j'
+
+ext {
+    springBootVersion = '3.4.2'
+}
+
+dependencies {
+    api project(':inference4j-tasks')
+
+    compileOnly "org.springframework.boot:spring-boot-autoconfigure:${springBootVersion}"
+    compileOnly "org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}"
+
+    annotationProcessor "org.springframework.boot:spring-boot-configuration-processor:${springBootVersion}"
+
+    testImplementation "org.springframework.boot:spring-boot-starter-test:${springBootVersion}"
+    testImplementation "org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}"
+    testImplementation project(':inference4j-tasks')
+}

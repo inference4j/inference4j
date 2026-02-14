@@ -90,7 +90,7 @@ try (var reranker = MiniLMSearchReranker.builder().build()) {
 **Gradle**
 
 ```groovy
-implementation 'io.github.inference4j:inference4j-tasks:0.1.0-SNAPSHOT'
+implementation 'io.github.inference4j:inference4j-tasks:${inference4jVersion}'
 ```
 
 **Maven**
@@ -99,7 +99,7 @@ implementation 'io.github.inference4j:inference4j-tasks:0.1.0-SNAPSHOT'
 <dependency>
     <groupId>io.github.inference4j</groupId>
     <artifactId>inference4j-tasks</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>${inference4jVersion}</version>
 </dependency>
 ```
 
@@ -255,11 +255,43 @@ The `.sessionOptions()` API is available on every model wrapper.
 
 > Measured with 3 warmup runs + 10 timed runs. See the benchmark examples for [ResNet](inference4j-examples/src/main/java/io/github/inference4j/examples/ResNetAccelerationBenchmarkExample.java) and [CRAFT](inference4j-examples/src/main/java/io/github/inference4j/examples/CraftAccelerationBenchmarkExample.java).
 
+## Spring Boot
+
+Add the starter and enable the tasks you need:
+
+```groovy
+implementation 'io.github.inference4j:inference4j-spring-boot-starter:${inference4jVersion}'
+```
+
+```yaml
+inference4j:
+  nlp:
+    text-classifier:
+      enabled: true
+```
+
+```java
+@RestController
+public class SentimentController {
+    private final TextClassifier classifier;
+
+    public SentimentController(TextClassifier classifier) {
+        this.classifier = classifier;
+    }
+
+    @PostMapping("/analyze")
+    public List<TextClassification> analyze(@RequestBody String text) {
+        return classifier.classify(text);
+    }
+}
+```
+
+Every task is opt-in — no models are downloaded until you set `enabled: true`. Beans are interface-typed, so you can swap implementations with `@ConditionalOnMissingBean`. An actuator health indicator is included out of the box. See the [full documentation](https://github.com/inference4j/inference4j/wiki) for all available properties.
+
 ## Roadmap
 
 - **OCR Pipeline** — CRAFT text detection + TrOCR recognition + embedding-based error correction against domain dictionaries
 - **CLIP** — image-text similarity for visual search and zero-shot classification
-- **Spring Boot Starter** — auto-configuration, health indicators, Micrometer metrics
 - **Documentation site** — full user guide and API reference
 
 See the [Roadmap](ROADMAP.md) for details.
@@ -272,6 +304,7 @@ See the [Roadmap](ROADMAP.md) for details.
 | `inference4j-preprocessing` | Tokenizers, image transforms, audio processing |
 | `inference4j-tasks` | Task-oriented inference wrappers with domain-specific APIs |
 | `inference4j-runtime` | Operational layer — model routing, A/B testing, Micrometer metrics |
+| `inference4j-spring-boot-starter` | Spring Boot auto-configuration, health indicators |
 | `inference4j-examples` | Runnable examples ([see README](inference4j-examples/README.md)) |
 
 ## Build
