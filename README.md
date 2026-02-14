@@ -207,18 +207,30 @@ inference4j sits in the sweet spot:
 
 We believe the Java AI ecosystem is stronger when tools do one thing well. inference4j does local model inference, and tries to do it really well.
 
-## Supported Tasks
+## Supported Models
 
-| Task | Models | Wrapper |
-|------|--------|---------|
-| **Sentiment Analysis** | DistilBERT, BERT | `DistilBertTextClassifier` |
-| **Text Embeddings** | all-MiniLM, all-mpnet, BERT | `SentenceTransformerEmbedder` |
-| **Search Reranking** | ms-marco-MiniLM | `MiniLMSearchReranker` |
-| **Image Classification** | ResNet, EfficientNet | `ResNetClassifier`, `EfficientNetClassifier` |
-| **Object Detection** | YOLOv8, YOLO11, YOLO26 | `YoloV8Detector`, `Yolo26Detector` |
-| **Text Detection** | CRAFT | `CraftTextDetector` |
-| **Speech-to-Text** | Wav2Vec2-CTC | `Wav2Vec2Recognizer` |
-| **Voice Activity Detection** | Silero VAD | `SileroVadDetector` |
+### NLP
+
+| Capability | Models | API |
+|---|---|---|
+| Classification | DistilBERT, BERT | `TextClassifier` |
+| Embeddings | all-MiniLM, all-mpnet | `TextEmbedder` |
+| Reranking | ms-marco-MiniLM | `SearchReranker` |
+
+### Vision
+
+| Capability | Models | API |
+|---|---|---|
+| Classification | ResNet, EfficientNet | `ImageClassifier` |
+| Object Detection | YOLOv8, YOLO11, YOLO26 | `ObjectDetector` |
+| Text Detection | CRAFT | `TextDetector` |
+
+### Audio
+
+| Capability | Models | API |
+|---|---|---|
+| Recognition | Wav2Vec2 | `SpeechRecognizer` |
+| Voice Activity Detection | Silero VAD | `VoiceActivityDetector` |
 
 > **Auto-download:** All supported models are hosted under the [`inference4j`](https://huggingface.co/inference4j) HuggingFace organization. Models are automatically downloaded and cached on first use — no manual setup required. Cache location defaults to `~/.cache/inference4j/` and can be customized via `INFERENCE4J_CACHE_DIR` or `-Dinference4j.cache.dir`.
 
@@ -248,7 +260,7 @@ The `.sessionOptions()` API is available on every model wrapper.
 
 ### Benchmarks on Apple Silicon (M-series)
 
-| Model | Task | CPU | CoreML | Speedup |
+| Model | Capability | CPU | CoreML | Speedup |
 |-------|------|-----|--------|---------|
 | ResNet-50 | Image Classification | 37 ms | 10 ms | **3.7x** |
 | CRAFT | Text Detection | 831 ms | 153 ms | **5.4x** |
@@ -257,7 +269,7 @@ The `.sessionOptions()` API is available on every model wrapper.
 
 ## Spring Boot
 
-Add the starter and enable the tasks you need:
+Add the starter and enable the models you need:
 
 ```groovy
 implementation 'io.github.inference4j:inference4j-spring-boot-starter:${inference4jVersion}'
@@ -286,7 +298,7 @@ public class SentimentController {
 }
 ```
 
-Every task is opt-in — no models are downloaded until you set `enabled: true`. Beans are interface-typed, so you can swap implementations with `@ConditionalOnMissingBean`. An actuator health indicator is included out of the box. See the [full documentation](https://github.com/inference4j/inference4j/wiki) for all available properties.
+Every model is opt-in — nothing is downloaded until you set `enabled: true`. Beans are interface-typed, so you can swap implementations with `@ConditionalOnMissingBean`. An actuator health indicator is included out of the box. See the [full documentation](https://github.com/inference4j/inference4j/wiki) for all available properties.
 
 ## Roadmap
 
@@ -302,7 +314,7 @@ See the [Roadmap](ROADMAP.md) for details.
 |--------|-------------|
 | `inference4j-core` | Low-level ONNX Runtime abstractions — `InferenceSession`, `Tensor`, `ModelSource`, `MathOps` |
 | `inference4j-preprocessing` | Tokenizers, image transforms, audio processing |
-| `inference4j-tasks` | Task-oriented inference wrappers with domain-specific APIs |
+| `inference4j-tasks` | Model wrappers with domain-specific APIs |
 | `inference4j-runtime` | Operational layer — model routing, A/B testing, Micrometer metrics |
 | `inference4j-spring-boot-starter` | Spring Boot auto-configuration, health indicators |
 | `inference4j-examples` | Runnable examples ([see README](inference4j-examples/README.md)) |
