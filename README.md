@@ -179,6 +179,39 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 
 > **Auto-download:** All supported models are hosted under the [`inference4j`](https://huggingface.co/inference4j) HuggingFace organization. Models are automatically downloaded and cached on first use — no manual setup required. Cache location defaults to `~/.cache/inference4j/` and can be customized via `INFERENCE4J_CACHE_DIR` or `-Dinference4j.cache.dir`.
 
+## Hardware Acceleration
+
+inference4j supports GPU and hardware acceleration out of the box via ONNX Runtime execution providers. On macOS, CoreML is bundled in the standard dependency — just add one line:
+
+```java
+try (var classifier = ResNetClassifier.builder()
+        .sessionOptions(opts -> opts.addCoreML())
+        .build()) {
+    classifier.classify(Path.of("cat.jpg"));
+}
+```
+
+For CUDA (Linux/Windows), swap the Maven dependency from `onnxruntime` to `onnxruntime_gpu`:
+
+```java
+try (var classifier = ResNetClassifier.builder()
+        .sessionOptions(opts -> opts.addCUDA(0))
+        .build()) {
+    classifier.classify(Path.of("cat.jpg"));
+}
+```
+
+The `.sessionOptions()` API is available on every model wrapper.
+
+### Benchmark: ResNet-50 on Apple Silicon (M-series)
+
+| Provider | Avg Inference | Speedup |
+|----------|--------------|---------|
+| CPU      | 37 ms        | —       |
+| CoreML   | 10 ms        | **3.7x** |
+
+> Measured with 3 warmup runs + 10 timed runs. See [`ResNetAccelerationBenchmarkExample`](inference4j-examples/src/main/java/io/github/inference4j/examples/ResNetAccelerationBenchmarkExample.java) for the full benchmark.
+
 ## Roadmap
 
 - **OCR Pipeline** — CRAFT text detection + TrOCR recognition + embedding-based error correction against domain dictionaries
