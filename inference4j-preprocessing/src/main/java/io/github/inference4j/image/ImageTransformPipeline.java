@@ -76,22 +76,6 @@ public class ImageTransformPipeline implements Preprocessor<BufferedImage, Tenso
                 .build();
     }
 
-    /**
-     * EfficientNet preprocessing: resize → centerCrop → normalize((pixel-127)/128).
-     * Outputs NHWC layout.
-     */
-    public static ImageTransformPipeline efficientnet(int size) {
-        float m = 127f / 255f;
-        float s = 128f / 255f;
-        return builder()
-                .resize(size, size)
-                .centerCrop(size, size)
-                .mean(new float[]{m, m, m})
-                .std(new float[]{s, s, s})
-                .layout(ImageLayout.NHWC)
-                .build();
-    }
-
     public static Builder builder() {
         return new Builder();
     }
