@@ -36,8 +36,6 @@ import java.util.List;
 public class CrossEncoderRerankerExample {
 
     public static void main(String[] args) {
-        String modelDir = "assets/models/ms-marco-MiniLM-L-6-v2";
-
         String query = "What is the capital of France?";
 
         // Simulated first-stage retrieval results (e.g., from BM25 or bi-encoder)
@@ -52,7 +50,7 @@ public class CrossEncoderRerankerExample {
                 "Paris was founded in the 3rd century BC."
         );
 
-        try (MiniLMReranker reranker = MiniLMReranker.fromPretrained(modelDir)) {
+        try (MiniLMReranker reranker = MiniLMReranker.builder().build()) {
             System.out.println("MiniLM reranker loaded successfully.");
             System.out.println();
 

@@ -4,121 +4,35 @@ Runnable examples demonstrating inference4j capabilities.
 
 ## Setup
 
-### 1. Download the model
+### Models
 
-All models are hosted under the [`inference4j`](https://huggingface.co/inference4j) HuggingFace organization, mirrored from their original sources for convenience.
+**Models are auto-downloaded.** When you run an example, inference4j automatically downloads the required model from [HuggingFace](https://huggingface.co/inference4j) and caches it in `~/.cache/inference4j/`. No manual setup required — just run the example.
 
-Text examples use [all-MiniLM-L6-v2](https://huggingface.co/inference4j/all-MiniLM-L6-v2) (~90 MB, originally by sentence-transformers). The router example also uses [all-MiniLM-L12-v2](https://huggingface.co/inference4j/all-MiniLM-L12-v2) (~120 MB), and the comparison example uses [all-mpnet-base-v2](https://huggingface.co/inference4j/all-mpnet-base-v2) (~420 MB).
+Cache location can be customized via:
+- System property: `-Dinference4j.cache.dir=/path/to/cache`
+- Environment variable: `INFERENCE4J_CACHE_DIR=/path/to/cache`
 
-The image classification example uses [ResNet-50](https://huggingface.co/inference4j/resnet50-v1-7) ONNX (~98 MB) and [EfficientNet-Lite4](https://huggingface.co/inference4j/efficientnet-lite4) ONNX (~49 MB), plus a sample image.
+### Sample files
 
-The object detection example uses [YOLOv8n](https://huggingface.co/inference4j/yolov8n) ONNX (~13 MB) and [YOLO26n](https://huggingface.co/inference4j/yolo26n) ONNX (~18 MB), and reuses the sample image above.
-
-The text classification example uses [distilbert-base-uncased-finetuned-sst-2-english](https://huggingface.co/inference4j/distilbert-base-uncased-finetuned-sst-2-english) ONNX (~268 MB).
-
-The cross-encoder reranker example uses [ms-marco-MiniLM-L-6-v2](https://huggingface.co/inference4j/ms-marco-MiniLM-L-6-v2) ONNX (~91 MB).
-
-The speech-to-text example uses [wav2vec2-base-960h](https://huggingface.co/inference4j/wav2vec2-base-960h) ONNX (~360 MB) and a sample WAV file (16kHz mono).
-
-The voice activity detection example uses [Silero VAD](https://huggingface.co/inference4j/silero-vad) ONNX (~2 MB), and reuses the sample audio from above.
-
-The text detection example uses [CRAFT](https://huggingface.co/inference4j/craft-mlt-25k) ONNX (~83 MB), converted from the original PyTorch weights.
+Some examples require sample images or audio files:
 
 ```bash
-# From the project root:
-
-# all-MiniLM-L6-v2 (required by all examples)
-mkdir -p assets/models/all-MiniLM-L6-v2
-curl -L -o assets/models/all-MiniLM-L6-v2/model.onnx \
-  https://huggingface.co/inference4j/all-MiniLM-L6-v2/resolve/main/model.onnx
-curl -L -o assets/models/all-MiniLM-L6-v2/vocab.txt \
-  https://huggingface.co/inference4j/all-MiniLM-L6-v2/resolve/main/vocab.txt
-
-# all-MiniLM-L12-v2 (required by ModelRouterExample)
-mkdir -p assets/models/all-MiniLM-L12-v2
-curl -L -o assets/models/all-MiniLM-L12-v2/model.onnx \
-  https://huggingface.co/inference4j/all-MiniLM-L12-v2/resolve/main/model.onnx
-curl -L -o assets/models/all-MiniLM-L12-v2/vocab.txt \
-  https://huggingface.co/inference4j/all-MiniLM-L12-v2/resolve/main/vocab.txt
-
-# all-mpnet-base-v2 (required by ModelComparisonExample)
-mkdir -p assets/models/all-mpnet-base-v2
-curl -L -o assets/models/all-mpnet-base-v2/model.onnx \
-  https://huggingface.co/inference4j/all-mpnet-base-v2/resolve/main/model.onnx
-curl -L -o assets/models/all-mpnet-base-v2/vocab.txt \
-  https://huggingface.co/inference4j/all-mpnet-base-v2/resolve/main/vocab.txt
-
-# ResNet-50 (required by ImageClassificationExample)
-mkdir -p assets/models/resnet50
-curl -L -o assets/models/resnet50/model.onnx \
-  https://huggingface.co/inference4j/resnet50-v1-7/resolve/main/model.onnx
-
-# EfficientNet-Lite4 (required by ImageClassificationExample)
-mkdir -p assets/models/efficientnet-lite4
-curl -L -o assets/models/efficientnet-lite4/model.onnx \
-  https://huggingface.co/inference4j/efficientnet-lite4/resolve/main/model.onnx
-
-# Sample image for classification
+# Sample image for classification/detection
 mkdir -p assets/images
 curl -L -o assets/images/sample.jpg \
   https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Cat03.jpg/1200px-Cat03.jpg
 
-# YOLOv8n (required by ObjectDetectionExample)
-mkdir -p assets/models/yolov8n
-curl -L -o assets/models/yolov8n/model.onnx \
-  https://huggingface.co/inference4j/yolov8n/resolve/main/model.onnx
-
-# YOLO26n (required by ObjectDetectionExample)
-mkdir -p assets/models/yolo26n
-curl -L -o assets/models/yolo26n/model.onnx \
-  https://huggingface.co/inference4j/yolo26n/resolve/main/model.onnx
-
-# distilbert-base-uncased-finetuned-sst-2-english (required by TextClassificationExample)
-mkdir -p assets/models/distilbert-sst2
-curl -L -o assets/models/distilbert-sst2/model.onnx \
-  https://huggingface.co/inference4j/distilbert-base-uncased-finetuned-sst-2-english/resolve/main/model.onnx
-curl -L -o assets/models/distilbert-sst2/vocab.txt \
-  https://huggingface.co/inference4j/distilbert-base-uncased-finetuned-sst-2-english/resolve/main/vocab.txt
-curl -L -o assets/models/distilbert-sst2/config.json \
-  https://huggingface.co/inference4j/distilbert-base-uncased-finetuned-sst-2-english/resolve/main/config.json
-
-# ms-marco-MiniLM-L-6-v2 (required by CrossEncoderRerankerExample)
-mkdir -p assets/models/ms-marco-MiniLM-L-6-v2
-curl -L -o assets/models/ms-marco-MiniLM-L-6-v2/model.onnx \
-  https://huggingface.co/inference4j/ms-marco-MiniLM-L-6-v2/resolve/main/model.onnx
-curl -L -o assets/models/ms-marco-MiniLM-L-6-v2/vocab.txt \
-  https://huggingface.co/inference4j/ms-marco-MiniLM-L-6-v2/resolve/main/vocab.txt
-
-# wav2vec2-base-960h (required by SpeechToTextExample)
-mkdir -p assets/models/wav2vec2-base-960h
-curl -L -o assets/models/wav2vec2-base-960h/model.onnx \
-  https://huggingface.co/inference4j/wav2vec2-base-960h/resolve/main/model.onnx
-curl -L -o assets/models/wav2vec2-base-960h/vocab.json \
-  https://huggingface.co/inference4j/wav2vec2-base-960h/resolve/main/vocab.json
-
-# Sample audio for speech-to-text (LibriSpeech sample, 16kHz mono WAV)
+# Sample audio for speech-to-text and VAD (LibriSpeech sample, 16kHz mono WAV)
 mkdir -p assets/audio
 curl -L -o assets/audio/sample.wav \
   "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav?download=true"
-
-# Silero VAD (required by VoiceActivityDetectionExample)
-mkdir -p assets/models/silero-vad
-curl -L -o assets/models/silero-vad/model.onnx \
-  https://huggingface.co/inference4j/silero-vad/resolve/main/model.onnx
-
-# CRAFT (required by CraftTextDetectionExample)
-mkdir -p assets/models/craft
-curl -L -o assets/models/craft/model.onnx \
-  "https://huggingface.co/inference4j/craft-mlt-25k/resolve/main/model.onnx"
-curl -L -o assets/models/craft/model.onnx.data \
-  "https://huggingface.co/inference4j/craft-mlt-25k/resolve/main/model.onnx.data"
 
 # Sample image for text detection
 curl -L -o assets/images/text-sample.jpg \
   https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Rotunda_of_Mosta_04.jpg/800px-Rotunda_of_Mosta_04.jpg
 ```
 
-### 2. Run an example
+### Run an example
 
 ```bash
 # Semantic similarity — compare sentence pairs

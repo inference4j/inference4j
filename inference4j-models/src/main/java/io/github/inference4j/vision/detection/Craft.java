@@ -16,6 +16,7 @@
 
 package io.github.inference4j.vision.detection;
 
+import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
 import io.github.inference4j.Tensor;
@@ -66,7 +67,7 @@ import java.util.Map;
  *
  * <h2>Quick start</h2>
  * <pre>{@code
- * try (Craft craft = Craft.fromPretrained("models/craft")) {
+ * try (Craft craft = Craft.builder().build()) {
  *     List<TextRegion> regions = craft.detect(Path.of("document.jpg"));
  *     for (TextRegion r : regions) {
  *         System.out.printf("Text at [%.0f, %.0f, %.0f, %.0f] (confidence=%.2f)%n",
@@ -81,6 +82,7 @@ import java.util.Map;
  */
 public class Craft implements TextDetectionModel {
 
+    private static final String DEFAULT_MODEL_ID = "inference4j/craft-mlt-25k";
     private static final float[] IMAGENET_MEAN = {0.485f, 0.456f, 0.406f};
     private static final float[] IMAGENET_STD = {0.229f, 0.224f, 0.225f};
 
@@ -100,29 +102,6 @@ public class Craft implements TextDetectionModel {
         this.defaultTextThreshold = defaultTextThreshold;
         this.defaultLowTextThreshold = defaultLowTextThreshold;
         this.minComponentArea = minComponentArea;
-    }
-
-    /**
-     * Loads a CRAFT model from a local directory.
-     *
-     * <p>Expects a directory containing {@code model.onnx}.
-     *
-     * @param modelPath path to the model directory
-     * @return a new CRAFT wrapper
-     */
-    public static Craft fromPretrained(String modelPath) {
-        return fromModelDirectory(Path.of(modelPath));
-    }
-
-    /**
-     * Loads a CRAFT model via a {@link ModelSource}.
-     *
-     * @param modelId identifier to resolve
-     * @param source  model source strategy
-     * @return a new CRAFT wrapper
-     */
-    public static Craft fromPretrained(String modelId, ModelSource source) {
-        return fromModelDirectory(source.resolve(modelId));
     }
 
     /**
@@ -457,31 +436,13 @@ public class Craft implements TextDetectionModel {
         }
     }
 
-    private static Craft fromModelDirectory(Path dir) {
-        if (!Files.isDirectory(dir)) {
-            throw new ModelSourceException("Model directory not found: " + dir);
-        }
-
-        Path modelPath = dir.resolve("model.onnx");
-        if (!Files.exists(modelPath)) {
-            throw new ModelSourceException("Model file not found: " + modelPath);
-        }
-
-        InferenceSession session = InferenceSession.create(modelPath);
-        try {
-            String inputName = session.inputNames().iterator().next();
-            return new Craft(session, inputName, 1280, 0.7f, 0.4f, 10);
-        } catch (Exception e) {
-            session.close();
-            throw e;
-        }
-    }
-
     /**
      * Builder for custom CRAFT configuration.
      */
     public static class Builder {
         private InferenceSession session;
+        private ModelSource modelSource;
+        private String modelId;
         private String inputName;
         private int targetSize = 1280;
         private float textThreshold = 0.7f;
@@ -490,6 +451,16 @@ public class Craft implements TextDetectionModel {
 
         public Builder session(InferenceSession session) {
             this.session = session;
+            return this;
+        }
+
+        public Builder modelSource(ModelSource modelSource) {
+            this.modelSource = modelSource;
+            return this;
+        }
+
+        public Builder modelId(String modelId) {
+            this.modelId = modelId;
             return this;
         }
 
@@ -520,13 +491,30 @@ public class Craft implements TextDetectionModel {
 
         public Craft build() {
             if (session == null) {
-                throw new IllegalStateException("InferenceSession is required");
+                ModelSource source = modelSource != null
+                        ? modelSource : HuggingFaceModelSource.defaultInstance();
+                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
+                Path dir = source.resolve(id);
+                loadFromDirectory(dir);
             }
             if (inputName == null) {
                 inputName = session.inputNames().iterator().next();
             }
             return new Craft(session, inputName, targetSize,
                     textThreshold, lowTextThreshold, minComponentArea);
+        }
+
+        private void loadFromDirectory(Path dir) {
+            if (!Files.isDirectory(dir)) {
+                throw new ModelSourceException("Model directory not found: " + dir);
+            }
+
+            Path modelPath = dir.resolve("model.onnx");
+            if (!Files.exists(modelPath)) {
+                throw new ModelSourceException("Model file not found: " + modelPath);
+            }
+
+            this.session = InferenceSession.create(modelPath);
         }
     }
 }

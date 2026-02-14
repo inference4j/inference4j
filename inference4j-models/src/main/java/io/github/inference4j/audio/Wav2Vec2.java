@@ -16,6 +16,7 @@
 
 package io.github.inference4j.audio;
 
+import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
 import io.github.inference4j.ModelSource;
@@ -41,7 +42,7 @@ import java.util.Map;
  *
  * <h2>Quick start</h2>
  * <pre>{@code
- * try (Wav2Vec2 model = Wav2Vec2.fromPretrained("models/wav2vec2-base-960h")) {
+ * try (Wav2Vec2 model = Wav2Vec2.builder().build()) {
  *     Transcription result = model.transcribe(Path.of("audio.wav"));
  *     System.out.println(result.text());
  * }
@@ -62,6 +63,7 @@ import java.util.Map;
  */
 public class Wav2Vec2 implements SpeechToTextModel {
 
+    private static final String DEFAULT_MODEL_ID = "inference4j/wav2vec2-base-960h";
     private static final int DEFAULT_SAMPLE_RATE = 16000;
     private static final int DEFAULT_BLANK_INDEX = 0;
     private static final String DEFAULT_WORD_DELIMITER = "|";
@@ -81,16 +83,6 @@ public class Wav2Vec2 implements SpeechToTextModel {
         this.targetSampleRate = targetSampleRate;
         this.blankIndex = blankIndex;
         this.wordDelimiter = wordDelimiter;
-    }
-
-    public static Wav2Vec2 fromPretrained(String modelPath) {
-        Path dir = Path.of(modelPath);
-        return fromModelDirectory(dir);
-    }
-
-    public static Wav2Vec2 fromPretrained(String modelId, ModelSource source) {
-        Path dir = source.resolve(modelId);
-        return fromModelDirectory(dir);
     }
 
     public static Builder builder() {
@@ -160,35 +152,10 @@ public class Wav2Vec2 implements SpeechToTextModel {
         return new Transcription(sb.toString().strip());
     }
 
-    private static Wav2Vec2 fromModelDirectory(Path dir) {
-        if (!Files.isDirectory(dir)) {
-            throw new ModelSourceException("Model directory not found: " + dir);
-        }
-
-        Path modelPath = dir.resolve("model.onnx");
-        if (!Files.exists(modelPath)) {
-            throw new ModelSourceException("Model file not found: " + modelPath);
-        }
-
-        Path vocabPath = dir.resolve("vocab.json");
-        if (!Files.exists(vocabPath)) {
-            throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
-        }
-
-        InferenceSession session = InferenceSession.create(modelPath);
-        try {
-            String inputName = session.inputNames().iterator().next();
-            Vocabulary vocabulary = Vocabulary.fromFile(vocabPath);
-            return new Wav2Vec2(session, vocabulary, inputName,
-                    DEFAULT_SAMPLE_RATE, DEFAULT_BLANK_INDEX, DEFAULT_WORD_DELIMITER);
-        } catch (Exception e) {
-            session.close();
-            throw e;
-        }
-    }
-
     public static class Builder {
         private InferenceSession session;
+        private ModelSource modelSource;
+        private String modelId;
         private Vocabulary vocabulary;
         private String inputName;
         private int sampleRate = DEFAULT_SAMPLE_RATE;
@@ -197,6 +164,16 @@ public class Wav2Vec2 implements SpeechToTextModel {
 
         public Builder session(InferenceSession session) {
             this.session = session;
+            return this;
+        }
+
+        public Builder modelSource(ModelSource modelSource) {
+            this.modelSource = modelSource;
+            return this;
+        }
+
+        public Builder modelId(String modelId) {
+            this.modelId = modelId;
             return this;
         }
 
@@ -227,7 +204,11 @@ public class Wav2Vec2 implements SpeechToTextModel {
 
         public Wav2Vec2 build() {
             if (session == null) {
-                throw new IllegalStateException("InferenceSession is required");
+                ModelSource source = modelSource != null
+                        ? modelSource : HuggingFaceModelSource.defaultInstance();
+                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
+                Path dir = source.resolve(id);
+                loadFromDirectory(dir);
             }
             if (vocabulary == null) {
                 throw new IllegalStateException("Vocabulary is required");
@@ -237,6 +218,33 @@ public class Wav2Vec2 implements SpeechToTextModel {
             }
             return new Wav2Vec2(session, vocabulary, inputName,
                     sampleRate, blankIndex, wordDelimiter);
+        }
+
+        private void loadFromDirectory(Path dir) {
+            if (!Files.isDirectory(dir)) {
+                throw new ModelSourceException("Model directory not found: " + dir);
+            }
+
+            Path modelPath = dir.resolve("model.onnx");
+            if (!Files.exists(modelPath)) {
+                throw new ModelSourceException("Model file not found: " + modelPath);
+            }
+
+            Path vocabPath = dir.resolve("vocab.json");
+            if (!Files.exists(vocabPath)) {
+                throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
+            }
+
+            this.session = InferenceSession.create(modelPath);
+            try {
+                if (this.vocabulary == null) {
+                    this.vocabulary = Vocabulary.fromFile(vocabPath);
+                }
+            } catch (Exception e) {
+                this.session.close();
+                this.session = null;
+                throw e;
+            }
         }
     }
 }

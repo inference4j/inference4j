@@ -17,9 +17,12 @@
 package io.github.inference4j.audio;
 
 import io.github.inference4j.InferenceSession;
+import io.github.inference4j.ModelSource;
 import io.github.inference4j.Tensor;
+import io.github.inference4j.exception.ModelSourceException;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
@@ -111,10 +114,12 @@ class Wav2Vec2Test {
     // --- Builder validation ---
 
     @Test
-    void builder_missingSession_throws() {
-        assertThrows(IllegalStateException.class, () ->
+    void builder_invalidModelSource_throws() {
+        ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
+        assertThrows(ModelSourceException.class, () ->
                 Wav2Vec2.builder()
                         .vocabulary(VOCAB)
+                        .modelSource(badSource)
                         .build());
     }
 

@@ -18,6 +18,7 @@ package io.github.inference4j.vision.classification;
 
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
+import io.github.inference4j.ModelSource;
 import io.github.inference4j.OutputOperator;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
@@ -39,8 +40,7 @@ import java.util.Map;
  *
  * <p>Provides shared inference logic: image loading, preprocessing via
  * {@link ImageTransformPipeline}, ONNX inference, and softmax post-processing.
- * Subclasses supply static factory methods ({@code fromPretrained}, {@code builder})
- * with model-specific defaults.
+ * Subclasses supply a {@code builder()} factory method with model-specific defaults.
  */
 public abstract class AbstractImageClassificationModel implements ImageClassificationModel {
 
@@ -143,6 +143,8 @@ public abstract class AbstractImageClassificationModel implements ImageClassific
      */
     protected abstract static class AbstractBuilder<B extends AbstractBuilder<B>> {
         protected InferenceSession session;
+        protected ModelSource modelSource;
+        protected String modelId;
         protected ImageTransformPipeline pipeline = ImageTransformPipeline.imagenet(224);
         protected Labels labels = Labels.imagenet();
         protected String inputName;
@@ -156,6 +158,16 @@ public abstract class AbstractImageClassificationModel implements ImageClassific
 
         public B session(InferenceSession session) {
             this.session = session;
+            return self();
+        }
+
+        public B modelSource(ModelSource modelSource) {
+            this.modelSource = modelSource;
+            return self();
+        }
+
+        public B modelId(String modelId) {
+            this.modelId = modelId;
             return self();
         }
 

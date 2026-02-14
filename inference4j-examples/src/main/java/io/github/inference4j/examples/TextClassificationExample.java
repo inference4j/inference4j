@@ -32,8 +32,6 @@ import java.util.List;
 public class TextClassificationExample {
 
     public static void main(String[] args) {
-        String modelDir = "assets/models/distilbert-sst2";
-
         String[] texts = {
                 "This movie was absolutely fantastic! I loved every minute of it.",
                 "Terrible experience. The food was cold and the service was awful.",
@@ -43,7 +41,7 @@ public class TextClassificationExample {
                 "The plot was predictable but the acting was superb.",
         };
 
-        try (DistilBertClassifier model = DistilBertClassifier.fromPretrained(modelDir)) {
+        try (DistilBertClassifier model = DistilBertClassifier.builder().build()) {
             System.out.println("DistilBERT-SST2 loaded successfully.");
             System.out.println();
 

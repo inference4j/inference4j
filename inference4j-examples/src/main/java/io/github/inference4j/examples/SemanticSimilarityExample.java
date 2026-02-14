@@ -28,8 +28,6 @@ import io.github.inference4j.embedding.SentenceTransformer;
 public class SemanticSimilarityExample {
 
     public static void main(String[] args) {
-        String modelDir = "assets/models/all-MiniLM-L6-v2";
-
         String[][] pairs = {
                 {"The cat sat on the mat", "A kitten was resting on the rug"},
                 {"The cat sat on the mat", "The stock market crashed yesterday"},
@@ -39,7 +37,9 @@ public class SemanticSimilarityExample {
                 {"Java is a programming language", "The restaurant serves excellent pasta"},
         };
 
-        try (SentenceTransformer model = SentenceTransformer.fromPretrained(modelDir)) {
+        try (SentenceTransformer model = SentenceTransformer.builder()
+                .modelId("inference4j/all-MiniLM-L6-v2")
+                .build()) {
             System.out.println("Model loaded successfully.");
             System.out.println("Embedding dimension: " + model.encode("test").length);
             System.out.println();

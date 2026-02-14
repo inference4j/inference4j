@@ -25,12 +25,33 @@ import java.nio.file.Path;
  * (local filesystem, HuggingFace Hub, S3, etc.). The resolved directory is
  * expected to contain at least a {@code model.onnx} file.
  *
- * <p>Example implementation for a local cache:
+ * <p>Built-in implementations:
+ * <ul>
+ *   <li>{@link HuggingFaceModelSource} — downloads and caches models from
+ *       HuggingFace Hub (used by default when no source is specified)</li>
+ *   <li>{@link LocalModelSource} — resolves from a local base directory</li>
+ * </ul>
+ *
+ * <p>Example usage with a model builder:
  * <pre>{@code
- * ModelSource local = modelId -> Path.of("/models", modelId);
- * ResNet model = ResNet.fromPretrained("resnet50", local);
+ * // Auto-download from HuggingFace (default)
+ * ResNet model = ResNet.builder().build();
+ *
+ * // Custom local source
+ * ResNet model = ResNet.builder()
+ *     .modelSource(new LocalModelSource(Path.of("/models")))
+ *     .modelId("resnet50")
+ *     .build();
+ *
+ * // Lambda shorthand
+ * ResNet model = ResNet.builder()
+ *     .modelSource(id -> Path.of("/models", id))
+ *     .modelId("resnet50")
+ *     .build();
  * }</pre>
  *
+ * @see HuggingFaceModelSource
+ * @see LocalModelSource
  * @see InferenceSession#create(Path)
  */
 @FunctionalInterface

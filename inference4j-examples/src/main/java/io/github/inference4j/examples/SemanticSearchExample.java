@@ -32,8 +32,6 @@ import java.util.List;
 public class SemanticSearchExample {
 
     public static void main(String[] args) {
-        String modelDir = "assets/models/all-MiniLM-L6-v2";
-
         List<String> corpus = List.of(
                 "Java is a statically typed, object-oriented programming language.",
                 "Python is popular for machine learning and data science.",
@@ -53,7 +51,9 @@ public class SemanticSearchExample {
                 "What are good databases for web apps?"
         };
 
-        try (SentenceTransformer model = SentenceTransformer.fromPretrained(modelDir)) {
+        try (SentenceTransformer model = SentenceTransformer.builder()
+                .modelId("inference4j/all-MiniLM-L6-v2")
+                .build()) {
             System.out.println("Model loaded. Encoding corpus...");
 
             // Encode entire corpus upfront

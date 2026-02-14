@@ -16,6 +16,7 @@
 
 package io.github.inference4j.text;
 
+import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
 import io.github.inference4j.Tensor;
@@ -47,7 +48,7 @@ import java.util.Set;
  *
  * <h2>Quick start</h2>
  * <pre>{@code
- * try (MiniLMReranker reranker = MiniLMReranker.fromPretrained("models/ms-marco-MiniLM")) {
+ * try (MiniLMReranker reranker = MiniLMReranker.builder().build()) {
  *     float score = reranker.score("What is Java?", "Java is a programming language.");
  *
  *     // Re-rank multiple documents
@@ -63,6 +64,8 @@ import java.util.Set;
  */
 public class MiniLMReranker implements CrossEncoderModel {
 
+    private static final String DEFAULT_MODEL_ID = "inference4j/ms-marco-MiniLM-L-6-v2";
+
     private static final int DEFAULT_MAX_LENGTH = 512;
 
     private final InferenceSession session;
@@ -73,16 +76,6 @@ public class MiniLMReranker implements CrossEncoderModel {
         this.session = session;
         this.tokenizer = tokenizer;
         this.maxLength = maxLength;
-    }
-
-    public static MiniLMReranker fromPretrained(String modelPath) {
-        Path dir = Path.of(modelPath);
-        return fromModelDirectory(dir);
-    }
-
-    public static MiniLMReranker fromPretrained(String modelId, ModelSource source) {
-        Path dir = source.resolve(modelId);
-        return fromModelDirectory(dir);
     }
 
     public static Builder builder() {
@@ -133,38 +126,25 @@ public class MiniLMReranker implements CrossEncoderModel {
         return (float) (1.0 / (1.0 + Math.exp(-logit)));
     }
 
-    private static MiniLMReranker fromModelDirectory(Path dir) {
-        if (!Files.isDirectory(dir)) {
-            throw new ModelSourceException("Model directory not found: " + dir);
-        }
-
-        Path modelPath = dir.resolve("model.onnx");
-        Path vocabPath = dir.resolve("vocab.txt");
-
-        if (!Files.exists(modelPath)) {
-            throw new ModelSourceException("Model file not found: " + modelPath);
-        }
-        if (!Files.exists(vocabPath)) {
-            throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
-        }
-
-        InferenceSession session = InferenceSession.create(modelPath);
-        try {
-            Tokenizer tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
-            return new MiniLMReranker(session, tokenizer, DEFAULT_MAX_LENGTH);
-        } catch (Exception e) {
-            session.close();
-            throw e;
-        }
-    }
-
     public static class Builder {
         private InferenceSession session;
+        private ModelSource modelSource;
+        private String modelId;
         private Tokenizer tokenizer;
         private int maxLength = DEFAULT_MAX_LENGTH;
 
         public Builder session(InferenceSession session) {
             this.session = session;
+            return this;
+        }
+
+        public Builder modelSource(ModelSource modelSource) {
+            this.modelSource = modelSource;
+            return this;
+        }
+
+        public Builder modelId(String modelId) {
+            this.modelId = modelId;
             return this;
         }
 
@@ -180,12 +160,43 @@ public class MiniLMReranker implements CrossEncoderModel {
 
         public MiniLMReranker build() {
             if (session == null) {
-                throw new IllegalStateException("InferenceSession is required");
+                ModelSource source = modelSource != null
+                        ? modelSource : HuggingFaceModelSource.defaultInstance();
+                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
+                Path dir = source.resolve(id);
+                loadFromDirectory(dir);
             }
             if (tokenizer == null) {
                 throw new IllegalStateException("Tokenizer is required");
             }
             return new MiniLMReranker(session, tokenizer, maxLength);
+        }
+
+        private void loadFromDirectory(Path dir) {
+            if (!Files.isDirectory(dir)) {
+                throw new ModelSourceException("Model directory not found: " + dir);
+            }
+
+            Path modelPath = dir.resolve("model.onnx");
+            Path vocabPath = dir.resolve("vocab.txt");
+
+            if (!Files.exists(modelPath)) {
+                throw new ModelSourceException("Model file not found: " + modelPath);
+            }
+            if (!Files.exists(vocabPath)) {
+                throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
+            }
+
+            this.session = InferenceSession.create(modelPath);
+            try {
+                if (this.tokenizer == null) {
+                    this.tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
+                }
+            } catch (Exception e) {
+                this.session.close();
+                this.session = null;
+                throw e;
+            }
         }
     }
 }

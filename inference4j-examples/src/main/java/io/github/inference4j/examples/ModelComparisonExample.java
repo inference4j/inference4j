@@ -36,9 +36,6 @@ import java.util.List;
 public class ModelComparisonExample {
 
     public static void main(String[] args) {
-        String miniLmDir = "assets/models/all-MiniLM-L6-v2";
-        String mpnetDir = "assets/models/all-mpnet-base-v2";
-
         List<String> corpus = List.of(
                 "Java is a statically typed, object-oriented programming language.",
                 "Python is popular for machine learning and data science.",
@@ -58,8 +55,12 @@ public class ModelComparisonExample {
                 "What are good databases for web apps?"
         };
 
-        try (EmbeddingModel miniLm = SentenceTransformer.fromPretrained(miniLmDir);
-             EmbeddingModel mpnet = SentenceTransformer.fromPretrained(mpnetDir)) {
+        try (EmbeddingModel miniLm = SentenceTransformer.builder()
+                     .modelId("inference4j/all-MiniLM-L6-v2")
+                     .build();
+             EmbeddingModel mpnet = SentenceTransformer.builder()
+                     .modelId("inference4j/all-mpnet-base-v2")
+                     .build()) {
 
             System.out.println("Models loaded:");
             System.out.println("  A: all-MiniLM-L6-v2 (384 dimensions)");

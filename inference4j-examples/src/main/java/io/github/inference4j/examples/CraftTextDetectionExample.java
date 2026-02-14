@@ -40,7 +40,7 @@ public class CraftTextDetectionExample {
         Path imagePath = Path.of("assets/images/product_placement.jpg");
 
         System.out.println("=== CRAFT Text Detection ===");
-        try (Craft craft = Craft.fromPretrained("assets/models/craft")) {
+        try (Craft craft = Craft.builder().build()) {
             System.out.println("CRAFT model loaded successfully.");
             System.out.println();
 
