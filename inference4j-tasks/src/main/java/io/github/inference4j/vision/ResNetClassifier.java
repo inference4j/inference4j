@@ -20,10 +20,12 @@ import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
 import io.github.inference4j.OutputOperator;
+import io.github.inference4j.Preprocessor;
+import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.image.ImageTransformPipeline;
 import io.github.inference4j.image.Labels;
 
+import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -77,10 +79,11 @@ public class ResNetClassifier extends AbstractImageClassifier {
 
     private static final String DEFAULT_MODEL_ID = "inference4j/resnet50-v1-7";
 
-    private ResNetClassifier(InferenceSession session, ImageTransformPipeline pipeline,
+    private ResNetClassifier(InferenceSession session,
+                             Preprocessor<BufferedImage, Tensor> preprocessor,
                              Labels labels, String inputName, int defaultTopK,
                              OutputOperator outputOperator) {
-        super(session, pipeline, labels, inputName, defaultTopK, outputOperator);
+        super(session, preprocessor, labels, inputName, defaultTopK, outputOperator);
     }
 
     public static Builder builder() {
@@ -106,7 +109,7 @@ public class ResNetClassifier extends AbstractImageClassifier {
                 loadFromDirectory(dir);
             }
             validate();
-            return new ResNetClassifier(session, pipeline, labels, inputName, defaultTopK, outputOperator);
+            return new ResNetClassifier(session, preprocessor, labels, inputName, defaultTopK, outputOperator);
         }
 
         private void loadFromDirectory(Path dir) {
@@ -132,7 +135,7 @@ public class ResNetClassifier extends AbstractImageClassifier {
                     this.labels = Labels.fromFile(labelsPath);
                 }
 
-                this.pipeline = detectPipeline(session, this.inputName,
+                this.preprocessor = detectPipeline(session, this.inputName,
                         IMAGENET_MEAN, IMAGENET_STD);
                 this.outputOperator = OutputOperator.softmax();
             } catch (Exception e) {

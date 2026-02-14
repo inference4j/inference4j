@@ -19,9 +19,9 @@ package io.github.inference4j.vision;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
 import io.github.inference4j.OutputOperator;
+import io.github.inference4j.Preprocessor;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.image.ImageTransformPipeline;
 import io.github.inference4j.image.Labels;
 import org.junit.jupiter.api.Test;
 
@@ -155,10 +155,11 @@ class EfficientNetClassifierTest {
     @Test
     void classify_bufferedImage_returnsCorrectResults() {
         InferenceSession session = mock(InferenceSession.class);
-        ImageTransformPipeline pipeline = mock(ImageTransformPipeline.class);
+        @SuppressWarnings("unchecked")
+        Preprocessor<BufferedImage, Tensor> preprocessor = mock(Preprocessor.class);
 
         Tensor inputTensor = Tensor.fromFloats(new float[]{0.5f}, new long[]{1});
-        when(pipeline.transform(any(BufferedImage.class))).thenReturn(inputTensor);
+        when(preprocessor.process(any(BufferedImage.class))).thenReturn(inputTensor);
 
         Tensor outputTensor = Tensor.fromFloats(
                 new float[]{0.05f, 0.50f, 0.20f, 0.05f, 0.20f}, new long[]{1, 5});
@@ -166,7 +167,7 @@ class EfficientNetClassifierTest {
 
         EfficientNetClassifier model = EfficientNetClassifier.builder()
                 .session(session)
-                .pipeline(pipeline)
+                .preprocessor(preprocessor)
                 .labels(TEST_LABELS)
                 .inputName("images:0")
                 .outputOperator(OutputOperator.identity())

@@ -16,6 +16,7 @@
 
 package io.github.inference4j.image;
 
+import io.github.inference4j.Preprocessor;
 import io.github.inference4j.Tensor;
 
 import java.awt.image.BufferedImage;
@@ -44,7 +45,7 @@ import java.util.List;
  *     .build();
  * }</pre>
  */
-public class ImageTransformPipeline {
+public class ImageTransformPipeline implements Preprocessor<BufferedImage, Tensor> {
 
     private static final float[] IMAGENET_MEAN = {0.485f, 0.456f, 0.406f};
     private static final float[] IMAGENET_STD = {0.229f, 0.224f, 0.225f};
@@ -105,6 +106,11 @@ public class ImageTransformPipeline {
             image = t.apply(image);
         }
         return toTensor(image);
+    }
+
+    @Override
+    public Tensor process(BufferedImage input) {
+        return transform(input);
     }
 
     private Tensor toTensor(BufferedImage image) {

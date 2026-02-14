@@ -20,10 +20,12 @@ import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
 import io.github.inference4j.OutputOperator;
+import io.github.inference4j.Preprocessor;
+import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.image.ImageTransformPipeline;
 import io.github.inference4j.image.Labels;
 
+import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -77,10 +79,11 @@ public class EfficientNetClassifier extends AbstractImageClassifier {
 
     private static final String DEFAULT_MODEL_ID = "inference4j/efficientnet-lite4";
 
-    private EfficientNetClassifier(InferenceSession session, ImageTransformPipeline pipeline,
+    private EfficientNetClassifier(InferenceSession session,
+                                   Preprocessor<BufferedImage, Tensor> preprocessor,
                                    Labels labels, String inputName, int defaultTopK,
                                    OutputOperator outputOperator) {
-        super(session, pipeline, labels, inputName, defaultTopK, outputOperator);
+        super(session, preprocessor, labels, inputName, defaultTopK, outputOperator);
     }
 
     public static Builder builder() {
@@ -106,7 +109,7 @@ public class EfficientNetClassifier extends AbstractImageClassifier {
                 loadFromDirectory(dir);
             }
             validate();
-            return new EfficientNetClassifier(session, pipeline, labels, inputName, defaultTopK, outputOperator);
+            return new EfficientNetClassifier(session, preprocessor, labels, inputName, defaultTopK, outputOperator);
         }
 
         private void loadFromDirectory(Path dir) {
@@ -132,7 +135,7 @@ public class EfficientNetClassifier extends AbstractImageClassifier {
                     this.labels = Labels.fromFile(labelsPath);
                 }
 
-                this.pipeline = detectPipeline(session, this.inputName,
+                this.preprocessor = detectPipeline(session, this.inputName,
                         EFFICIENTNET_MEAN, EFFICIENTNET_STD);
                 this.outputOperator = OutputOperator.identity();
             } catch (Exception e) {

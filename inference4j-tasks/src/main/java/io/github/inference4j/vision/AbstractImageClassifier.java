@@ -20,6 +20,8 @@ import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
 import io.github.inference4j.ModelSource;
 import io.github.inference4j.OutputOperator;
+import io.github.inference4j.Postprocessor;
+import io.github.inference4j.Preprocessor;
 import io.github.inference4j.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
@@ -46,17 +48,18 @@ import java.util.Map;
 public abstract class AbstractImageClassifier implements ImageClassifier {
 
     protected final InferenceSession session;
-    protected final ImageTransformPipeline pipeline;
+    protected final Preprocessor<BufferedImage, Tensor> preprocessor;
     protected final Labels labels;
     protected final String inputName;
     protected final int defaultTopK;
     protected final OutputOperator outputOperator;
 
-    protected AbstractImageClassifier(InferenceSession session, ImageTransformPipeline pipeline,
+    protected AbstractImageClassifier(InferenceSession session,
+                                      Preprocessor<BufferedImage, Tensor> preprocessor,
                                       Labels labels, String inputName, int defaultTopK,
                                       OutputOperator outputOperator) {
         this.session = session;
-        this.pipeline = pipeline;
+        this.preprocessor = preprocessor;
         this.labels = labels;
         this.inputName = inputName;
         this.defaultTopK = defaultTopK;
@@ -70,7 +73,7 @@ public abstract class AbstractImageClassifier implements ImageClassifier {
 
     @Override
     public List<Classification> classify(BufferedImage image, int topK) {
-        Tensor inputTensor = pipeline.transform(image);
+        Tensor inputTensor = preprocessor.process(image);
 
         Map<String, Tensor> inputs = new LinkedHashMap<>();
         inputs.put(inputName, inputTensor);
@@ -98,16 +101,23 @@ public abstract class AbstractImageClassifier implements ImageClassifier {
         session.close();
     }
 
+    static Postprocessor<float[], List<Classification>> classificationPostprocessor(
+            Labels labels, int topK, OutputOperator outputOperator) {
+        return logits -> {
+            float[] probabilities = outputOperator.apply(logits);
+            int[] topIndices = MathOps.topK(probabilities, topK);
+
+            List<Classification> results = new ArrayList<>(topIndices.length);
+            for (int idx : topIndices) {
+                results.add(new Classification(labels.get(idx), idx, probabilities[idx]));
+            }
+            return results;
+        };
+    }
+
     static List<Classification> postProcess(float[] logits, Labels labels, int topK,
                                               OutputOperator outputOperator) {
-        float[] probabilities = outputOperator.apply(logits);
-        int[] topIndices = MathOps.topK(probabilities, topK);
-
-        List<Classification> results = new ArrayList<>(topIndices.length);
-        for (int idx : topIndices) {
-            results.add(new Classification(labels.get(idx), idx, probabilities[idx]));
-        }
-        return results;
+        return classificationPostprocessor(labels, topK, outputOperator).process(logits);
     }
 
     protected static BufferedImage loadImage(Path path) {
@@ -147,7 +157,7 @@ public abstract class AbstractImageClassifier implements ImageClassifier {
         protected ModelSource modelSource;
         protected String modelId;
         protected SessionConfigurer sessionConfigurer;
-        protected ImageTransformPipeline pipeline = ImageTransformPipeline.imagenet(224);
+        protected Preprocessor<BufferedImage, Tensor> preprocessor = ImageTransformPipeline.imagenet(224);
         protected Labels labels = Labels.imagenet();
         protected String inputName;
         protected int defaultTopK = 5;
@@ -178,8 +188,8 @@ public abstract class AbstractImageClassifier implements ImageClassifier {
             return self();
         }
 
-        public B pipeline(ImageTransformPipeline pipeline) {
-            this.pipeline = pipeline;
+        public B preprocessor(Preprocessor<BufferedImage, Tensor> preprocessor) {
+            this.preprocessor = preprocessor;
             return self();
         }
 
