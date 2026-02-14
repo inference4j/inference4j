@@ -258,9 +258,9 @@ The `.sessionOptions()` API is available on every model wrapper.
 ## Roadmap
 
 - **OCR Pipeline** — CRAFT text detection + TrOCR recognition + embedding-based error correction against domain dictionaries
-- **Pipeline API** — compose models into multi-stage workflows with per-stage timing and intermediate hooks
 - **CLIP** — image-text similarity for visual search and zero-shot classification
 - **Spring Boot Starter** — auto-configuration, health indicators, Micrometer metrics
+- **Documentation site** — full user guide and API reference
 
 See the [Roadmap](ROADMAP.md) for details.
 
