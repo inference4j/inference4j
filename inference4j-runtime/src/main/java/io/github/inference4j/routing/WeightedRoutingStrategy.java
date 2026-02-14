@@ -43,6 +43,6 @@ public final class WeightedRoutingStrategy implements RoutingStrategy {
         }
 
         // Should never happen if weights are positive
-        return routes.getLast();
+        return routes.get(routes.size() - 1);
     }
 }
