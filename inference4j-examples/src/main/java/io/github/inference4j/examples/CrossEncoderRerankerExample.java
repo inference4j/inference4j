@@ -16,7 +16,7 @@
 
 package io.github.inference4j.examples;
 
-import io.github.inference4j.text.MiniLMReranker;
+import io.github.inference4j.nlp.MiniLMSearchReranker;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -50,7 +50,7 @@ public class CrossEncoderRerankerExample {
                 "Paris was founded in the 3rd century BC."
         );
 
-        try (MiniLMReranker reranker = MiniLMReranker.builder().build()) {
+        try (MiniLMSearchReranker reranker = MiniLMSearchReranker.builder().build()) {
             System.out.println("MiniLM reranker loaded successfully.");
             System.out.println();
 

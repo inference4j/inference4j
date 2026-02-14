@@ -16,7 +16,7 @@
 
 package io.github.inference4j.examples;
 
-import io.github.inference4j.audio.SileroVAD;
+import io.github.inference4j.audio.SileroVadDetector;
 import io.github.inference4j.audio.VoiceSegment;
 
 import java.nio.file.Path;
@@ -57,7 +57,7 @@ public class VoiceActivityDetectionExample {
         }
         System.out.println();
 
-        try (SileroVAD vad = SileroVAD.builder().build()) {
+        try (SileroVadDetector vad = SileroVadDetector.builder().build()) {
             System.out.println("Silero VAD loaded successfully.");
             System.out.println();
 
@@ -97,7 +97,7 @@ public class VoiceActivityDetectionExample {
         System.out.println();
 
         // Example with custom configuration
-        try (SileroVAD vad = SileroVAD.builder()
+        try (SileroVadDetector vad = SileroVadDetector.builder()
                 .threshold(0.7f)           // Higher threshold = more conservative detection
                 .minSpeechDuration(0.3f)   // Ignore very short utterances
                 .minSilenceDuration(0.15f) // Require more silence to end a segment
@@ -117,7 +117,7 @@ public class VoiceActivityDetectionExample {
         System.out.println();
 
         // Get raw probabilities for visualization
-        try (SileroVAD vad = SileroVAD.builder().build()) {
+        try (SileroVadDetector vad = SileroVadDetector.builder().build()) {
             float[] probabilities = vad.probabilities(Path.of(audioPath));
 
             System.out.printf("Total frames analyzed: %d%n", probabilities.length);

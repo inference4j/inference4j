@@ -14,7 +14,7 @@ tasks.named('run') {
 }
 
 dependencies {
-    implementation project(':inference4j-models')
+    implementation project(':inference4j-tasks')
     implementation project(':inference4j-runtime')
     runtimeOnly 'org.slf4j:slf4j-simple:2.0.16'
 }

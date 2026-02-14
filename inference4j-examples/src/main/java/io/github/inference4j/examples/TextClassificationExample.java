@@ -16,8 +16,8 @@
 
 package io.github.inference4j.examples;
 
-import io.github.inference4j.text.DistilBertClassifier;
-import io.github.inference4j.text.TextClassification;
+import io.github.inference4j.nlp.DistilBertTextClassifier;
+import io.github.inference4j.nlp.TextClassification;
 
 import java.util.List;
 
@@ -41,7 +41,7 @@ public class TextClassificationExample {
                 "The plot was predictable but the acting was superb.",
         };
 
-        try (DistilBertClassifier model = DistilBertClassifier.builder().build()) {
+        try (DistilBertTextClassifier model = DistilBertTextClassifier.builder().build()) {
             System.out.println("DistilBERT-SST2 loaded successfully.");
             System.out.println();
 

@@ -16,9 +16,9 @@
 
 package io.github.inference4j.examples;
 
-import io.github.inference4j.vision.classification.Classification;
-import io.github.inference4j.vision.classification.EfficientNet;
-import io.github.inference4j.vision.classification.ResNet;
+import io.github.inference4j.vision.Classification;
+import io.github.inference4j.vision.EfficientNetClassifier;
+import io.github.inference4j.vision.ResNetClassifier;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -37,7 +37,7 @@ public class ImageClassificationExample {
 
         // --- ResNet-50 ---
         System.out.println("=== ResNet-50 ===");
-        try (ResNet resnet = ResNet.builder().build()) {
+        try (ResNetClassifier resnet = ResNetClassifier.builder().build()) {
             System.out.println("ResNet-50 loaded successfully.");
             System.out.println();
 
@@ -51,7 +51,7 @@ public class ImageClassificationExample {
 
         // --- EfficientNet-Lite4 ---
         System.out.println("=== EfficientNet-Lite4 ===");
-        try (EfficientNet efficientnet = EfficientNet.builder().build()) {
+        try (EfficientNetClassifier efficientnet = EfficientNetClassifier.builder().build()) {
             System.out.println("EfficientNet-Lite4 loaded successfully.");
             System.out.println();
 

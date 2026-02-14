@@ -16,9 +16,9 @@
 
 package io.github.inference4j.examples;
 
-import io.github.inference4j.embedding.EmbeddingModel;
-import io.github.inference4j.embedding.EmbeddingModelRouter;
-import io.github.inference4j.embedding.SentenceTransformer;
+import io.github.inference4j.nlp.SentenceTransformerEmbedder;
+import io.github.inference4j.nlp.TextEmbedder;
+import io.github.inference4j.nlp.TextEmbedderRouter;
 import io.github.inference4j.metrics.RouterMetrics;
 import io.github.inference4j.routing.RoundRobinRoutingStrategy;
 
@@ -42,10 +42,10 @@ import java.util.List;
 public class ModelRouterExample {
 
     public static void main(String[] args) {
-        SentenceTransformer l6 = SentenceTransformer.builder()
+        SentenceTransformerEmbedder l6 = SentenceTransformerEmbedder.builder()
                 .modelId("inference4j/all-MiniLM-L6-v2")
                 .build();
-        SentenceTransformer l12 = SentenceTransformer.builder()
+        SentenceTransformerEmbedder l12 = SentenceTransformerEmbedder.builder()
                 .modelId("inference4j/all-MiniLM-L12-v2")
                 .build();
 
@@ -68,7 +68,7 @@ public class ModelRouterExample {
             public void recordShadow(String routerName, String routeName, long durationNanos, boolean success) {}
         };
 
-        try (EmbeddingModel router = EmbeddingModelRouter.builder()
+        try (TextEmbedder router = TextEmbedderRouter.builder()
                 .name("embedding-ab-test")
                 .route("L6", l6, 1)
                 .route("L12", l12, 1)
