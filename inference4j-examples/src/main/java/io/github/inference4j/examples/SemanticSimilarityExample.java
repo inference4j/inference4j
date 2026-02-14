@@ -16,7 +16,7 @@
 
 package io.github.inference4j.examples;
 
-import io.github.inference4j.embedding.SentenceTransformer;
+import io.github.inference4j.nlp.SentenceTransformerEmbedder;
 
 /**
  * Demonstrates computing semantic similarity between sentence pairs.
@@ -37,7 +37,7 @@ public class SemanticSimilarityExample {
                 {"Java is a programming language", "The restaurant serves excellent pasta"},
         };
 
-        try (SentenceTransformer model = SentenceTransformer.builder()
+        try (SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
                 .modelId("inference4j/all-MiniLM-L6-v2")
                 .build()) {
             System.out.println("Model loaded successfully.");

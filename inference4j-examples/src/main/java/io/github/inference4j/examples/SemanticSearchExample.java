@@ -16,7 +16,7 @@
 
 package io.github.inference4j.examples;
 
-import io.github.inference4j.embedding.SentenceTransformer;
+import io.github.inference4j.nlp.SentenceTransformerEmbedder;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -51,7 +51,7 @@ public class SemanticSearchExample {
                 "What are good databases for web apps?"
         };
 
-        try (SentenceTransformer model = SentenceTransformer.builder()
+        try (SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
                 .modelId("inference4j/all-MiniLM-L6-v2")
                 .build()) {
             System.out.println("Model loaded. Encoding corpus...");

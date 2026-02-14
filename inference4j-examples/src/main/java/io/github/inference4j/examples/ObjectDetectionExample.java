@@ -16,9 +16,9 @@
 
 package io.github.inference4j.examples;
 
-import io.github.inference4j.vision.detection.Detection;
-import io.github.inference4j.vision.detection.Yolo26;
-import io.github.inference4j.vision.detection.YoloV8;
+import io.github.inference4j.vision.Detection;
+import io.github.inference4j.vision.Yolo26Detector;
+import io.github.inference4j.vision.YoloV8Detector;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -37,7 +37,7 @@ public class ObjectDetectionExample {
 
         // --- YOLOv8n (NMS-based) ---
         System.out.println("=== YOLOv8n Object Detection ===");
-        try (YoloV8 yolo = YoloV8.builder().build()) {
+        try (YoloV8Detector yolo = YoloV8Detector.builder().build()) {
             System.out.println("YOLOv8n loaded successfully.");
             System.out.println();
 
@@ -58,7 +58,7 @@ public class ObjectDetectionExample {
 
         // --- YOLO26n (NMS-free) ---
         System.out.println("=== YOLO26n Object Detection (NMS-free) ===");
-        try (Yolo26 yolo = Yolo26.builder().build()) {
+        try (Yolo26Detector yolo = Yolo26Detector.builder().build()) {
             System.out.println("YOLO26n loaded successfully.");
             System.out.println();
 

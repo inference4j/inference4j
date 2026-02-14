@@ -13,8 +13,8 @@
 ### Sentiment Analysis
 
 ```java
-try (var model = DistilBertClassifier.builder().build()) {
-    System.out.println(model.classify("This movie was fantastic!"));
+try (var classifier = DistilBertTextClassifier.builder().build()) {
+    System.out.println(classifier.classify("This movie was fantastic!"));
     // [TextClassification[label=POSITIVE, confidence=0.9998]]
 }
 ```
@@ -22,17 +22,17 @@ try (var model = DistilBertClassifier.builder().build()) {
 ### Text Embeddings & Semantic Search
 
 ```java
-try (var model = SentenceTransformer.builder()
+try (var embedder = SentenceTransformerEmbedder.builder()
         .modelId("inference4j/all-MiniLM-L6-v2").build()) {
-    float[] embedding = model.encode("Hello, world!");
+    float[] embedding = embedder.encode("Hello, world!");
 }
 ```
 
 ### Image Classification
 
 ```java
-try (var model = ResNet.builder().build()) {
-    List<Classification> results = model.classify(Path.of("cat.jpg"));
+try (var classifier = ResNetClassifier.builder().build()) {
+    List<Classification> results = classifier.classify(Path.of("cat.jpg"));
     // [Classification[label=tabby cat, confidence=0.87], ...]
 }
 ```
@@ -40,8 +40,8 @@ try (var model = ResNet.builder().build()) {
 ### Object Detection
 
 ```java
-try (var model = YoloV8.builder().build()) {
-    List<Detection> detections = model.detect(Path.of("street.jpg"));
+try (var detector = YoloV8Detector.builder().build()) {
+    List<Detection> detections = detector.detect(Path.of("street.jpg"));
     // [Detection[label=car, confidence=0.94, box=BoundingBox[...]], ...]
 }
 ```
@@ -49,15 +49,15 @@ try (var model = YoloV8.builder().build()) {
 ### Speech-to-Text
 
 ```java
-try (var model = Wav2Vec2.builder().build()) {
-    System.out.println(model.transcribe(Path.of("audio.wav")).text());
+try (var recognizer = Wav2Vec2Recognizer.builder().build()) {
+    System.out.println(recognizer.transcribe(Path.of("audio.wav")).text());
 }
 ```
 
 ### Voice Activity Detection
 
 ```java
-try (var vad = SileroVAD.builder().build()) {
+try (var vad = SileroVadDetector.builder().build()) {
     List<VoiceSegment> segments = vad.detect(Path.of("meeting.wav"));
     // [VoiceSegment[start=0.50, end=3.20], VoiceSegment[start=5.10, end=8.75]]
 }
@@ -66,18 +66,61 @@ try (var vad = SileroVAD.builder().build()) {
 ### Text Detection
 
 ```java
-try (var craft = Craft.builder().build()) {
-    List<TextRegion> regions = craft.detect(Path.of("document.jpg"));
+try (var detector = CraftTextDetector.builder().build()) {
+    List<TextRegion> regions = detector.detect(Path.of("document.jpg"));
 }
 ```
 
 ### Search Reranking
 
 ```java
-try (var reranker = MiniLMReranker.builder().build()) {
+try (var reranker = MiniLMSearchReranker.builder().build()) {
     float score = reranker.score("What is Java?", "Java is a programming language.");
 }
 ```
+
+## Getting Started
+
+**Requirements:** Java 17+
+
+### Add the dependency
+
+`inference4j-tasks` is the only dependency you need — it transitively includes core, preprocessing, and runtime.
+
+**Gradle**
+
+```groovy
+implementation 'io.github.inference4j:inference4j-tasks:0.1.0-SNAPSHOT'
+```
+
+**Maven**
+
+```xml
+<dependency>
+    <groupId>io.github.inference4j</groupId>
+    <artifactId>inference4j-tasks</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+> **JVM flag:** ONNX Runtime requires native access. Add `--enable-native-access=ALL-UNNAMED` to your JVM arguments, or use `--enable-native-access=com.microsoft.onnxruntime` if you're on the module path.
+
+### Run your first model
+
+```java
+import io.github.inference4j.nlp.DistilBertTextClassifier;
+
+public class QuickStart {
+    public static void main(String[] args) {
+        try (var classifier = DistilBertTextClassifier.builder().build()) {
+            System.out.println(classifier.classify("inference4j makes AI in Java easy!"));
+            // [TextClassification[label=POSITIVE, confidence=0.9998]]
+        }
+    }
+}
+```
+
+That's it. The model downloads automatically on first run (~260MB, cached in `~/.cache/inference4j/`). No Python, no manual downloads, no tensor wrangling.
 
 ## What you don't have to do
 
@@ -129,8 +172,8 @@ String label = LABELS[bestIdx];
 <td>
 
 ```java
-try (var model = ResNet.builder().build()) {
-    var results = model.classify(
+try (var classifier = ResNetClassifier.builder().build()) {
+    var results = classifier.classify(
         Path.of("cat.jpg")
     );
     // done.
@@ -168,16 +211,49 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 
 | Task | Models | Wrapper |
 |------|--------|---------|
-| **Sentiment Analysis** | DistilBERT, BERT | `DistilBertClassifier` |
-| **Text Embeddings** | all-MiniLM, all-mpnet, BERT | `SentenceTransformer` |
-| **Search Reranking** | ms-marco-MiniLM | `MiniLMReranker` |
-| **Image Classification** | ResNet, EfficientNet | `ResNet`, `EfficientNet` |
-| **Object Detection** | YOLOv8, YOLO11, YOLO26 | `YoloV8`, `Yolo26` |
-| **Text Detection** | CRAFT | `Craft` |
-| **Speech-to-Text** | Wav2Vec2-CTC | `Wav2Vec2` |
-| **Voice Activity Detection** | Silero VAD | `SileroVAD` |
+| **Sentiment Analysis** | DistilBERT, BERT | `DistilBertTextClassifier` |
+| **Text Embeddings** | all-MiniLM, all-mpnet, BERT | `SentenceTransformerEmbedder` |
+| **Search Reranking** | ms-marco-MiniLM | `MiniLMSearchReranker` |
+| **Image Classification** | ResNet, EfficientNet | `ResNetClassifier`, `EfficientNetClassifier` |
+| **Object Detection** | YOLOv8, YOLO11, YOLO26 | `YoloV8Detector`, `Yolo26Detector` |
+| **Text Detection** | CRAFT | `CraftTextDetector` |
+| **Speech-to-Text** | Wav2Vec2-CTC | `Wav2Vec2Recognizer` |
+| **Voice Activity Detection** | Silero VAD | `SileroVadDetector` |
 
 > **Auto-download:** All supported models are hosted under the [`inference4j`](https://huggingface.co/inference4j) HuggingFace organization. Models are automatically downloaded and cached on first use — no manual setup required. Cache location defaults to `~/.cache/inference4j/` and can be customized via `INFERENCE4J_CACHE_DIR` or `-Dinference4j.cache.dir`.
+
+## Hardware Acceleration
+
+inference4j supports GPU and hardware acceleration out of the box via ONNX Runtime execution providers. On macOS, CoreML is bundled in the standard dependency — just add one line:
+
+```java
+try (var classifier = ResNetClassifier.builder()
+        .sessionOptions(opts -> opts.addCoreML())
+        .build()) {
+    classifier.classify(Path.of("cat.jpg"));
+}
+```
+
+For CUDA (Linux/Windows), swap the Maven dependency from `onnxruntime` to `onnxruntime_gpu`:
+
+```java
+try (var classifier = ResNetClassifier.builder()
+        .sessionOptions(opts -> opts.addCUDA(0))
+        .build()) {
+    classifier.classify(Path.of("cat.jpg"));
+}
+```
+
+The `.sessionOptions()` API is available on every model wrapper.
+
+### Benchmark: ResNet-50 on Apple Silicon (M-series)
+
+| Provider | Avg Inference | Speedup |
+|----------|--------------|---------|
+| CPU      | 37 ms        | —       |
+| CoreML   | 10 ms        | **3.7x** |
+
+> Measured with 3 warmup runs + 10 timed runs. See [`ResNetAccelerationBenchmarkExample`](inference4j-examples/src/main/java/io/github/inference4j/examples/ResNetAccelerationBenchmarkExample.java) for the full benchmark.
 
 ## Roadmap
 
@@ -194,13 +270,13 @@ See the [Roadmap](ROADMAP.md) for details.
 |--------|-------------|
 | `inference4j-core` | Low-level ONNX Runtime abstractions — `InferenceSession`, `Tensor`, `ModelSource`, `MathOps` |
 | `inference4j-preprocessing` | Tokenizers, image transforms, audio processing |
-| `inference4j-models` | Handcrafted model wrappers with domain-specific APIs |
+| `inference4j-tasks` | Task-oriented inference wrappers with domain-specific APIs |
 | `inference4j-runtime` | Operational layer — model routing, A/B testing, Micrometer metrics |
 | `inference4j-examples` | Runnable examples ([see README](inference4j-examples/README.md)) |
 
 ## Build
 
-Requires **Java 21**.
+Requires **Java 17**.
 
 ```bash
 ./gradlew build          # Build all modules and run tests

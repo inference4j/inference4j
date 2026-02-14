@@ -13,8 +13,16 @@ tasks.named('run') {
     workingDir = rootProject.projectDir
 }
 
+tasks.register('runAllExamples', JavaExec) {
+    description = 'Runs all inference4j examples sequentially'
+    group = 'application'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'io.github.inference4j.examples.AllExamplesRunner'
+    workingDir = rootProject.projectDir
+}
+
 dependencies {
-    implementation project(':inference4j-models')
+    implementation project(':inference4j-tasks')
     implementation project(':inference4j-runtime')
     runtimeOnly 'org.slf4j:slf4j-simple:2.0.16'
 }

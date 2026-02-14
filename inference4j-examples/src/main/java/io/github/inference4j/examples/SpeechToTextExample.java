@@ -17,7 +17,7 @@
 package io.github.inference4j.examples;
 
 import io.github.inference4j.audio.Transcription;
-import io.github.inference4j.audio.Wav2Vec2;
+import io.github.inference4j.audio.Wav2Vec2Recognizer;
 
 import java.nio.file.Path;
 
@@ -34,7 +34,7 @@ public class SpeechToTextExample {
         String audioPath = "assets/audio/sample.wav";
 
         System.out.println("=== Wav2Vec2 Speech-to-Text ===");
-        try (Wav2Vec2 model = Wav2Vec2.builder().build()) {
+        try (Wav2Vec2Recognizer model = Wav2Vec2Recognizer.builder().build()) {
             System.out.println("Wav2Vec2 loaded successfully.");
             System.out.println();
 

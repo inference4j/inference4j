@@ -54,7 +54,7 @@ subprojects {
 def publishedModules = [
     'inference4j-core',
     'inference4j-preprocessing',
-    'inference4j-models',
+    'inference4j-tasks',
     'inference4j-runtime',
 ]
 

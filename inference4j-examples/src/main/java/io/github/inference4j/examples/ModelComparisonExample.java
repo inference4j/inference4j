@@ -16,8 +16,8 @@
 
 package io.github.inference4j.examples;
 
-import io.github.inference4j.embedding.EmbeddingModel;
-import io.github.inference4j.embedding.SentenceTransformer;
+import io.github.inference4j.nlp.SentenceTransformerEmbedder;
+import io.github.inference4j.nlp.TextEmbedder;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -55,10 +55,10 @@ public class ModelComparisonExample {
                 "What are good databases for web apps?"
         };
 
-        try (EmbeddingModel miniLm = SentenceTransformer.builder()
+        try (TextEmbedder miniLm = SentenceTransformerEmbedder.builder()
                      .modelId("inference4j/all-MiniLM-L6-v2")
                      .build();
-             EmbeddingModel mpnet = SentenceTransformer.builder()
+             TextEmbedder mpnet = SentenceTransformerEmbedder.builder()
                      .modelId("inference4j/all-mpnet-base-v2")
                      .build()) {
 
@@ -90,7 +90,7 @@ public class ModelComparisonExample {
     }
 
     private static List<ScoredDocument> rank(String query, List<String> corpus,
-                                             List<float[]> corpusEmbeddings, EmbeddingModel model) {
+                                             List<float[]> corpusEmbeddings, TextEmbedder model) {
         float[] queryEmbedding = model.encode(query);
         List<ScoredDocument> ranked = new ArrayList<>();
         for (int i = 0; i < corpus.size(); i++) {

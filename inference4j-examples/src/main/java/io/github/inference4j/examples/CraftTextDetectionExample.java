@@ -17,9 +17,9 @@
 package io.github.inference4j.examples;
 
 import io.github.inference4j.vision.ImageAnnotator;
-import io.github.inference4j.vision.detection.BoundingBox;
-import io.github.inference4j.vision.detection.Craft;
-import io.github.inference4j.vision.detection.TextRegion;
+import io.github.inference4j.vision.BoundingBox;
+import io.github.inference4j.vision.CraftTextDetector;
+import io.github.inference4j.vision.TextRegion;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -40,7 +40,7 @@ public class CraftTextDetectionExample {
         Path imagePath = Path.of("assets/images/product_placement.jpg");
 
         System.out.println("=== CRAFT Text Detection ===");
-        try (Craft craft = Craft.builder().build()) {
+        try (CraftTextDetector craft = CraftTextDetector.builder().build()) {
             System.out.println("CRAFT model loaded successfully.");
             System.out.println();
 

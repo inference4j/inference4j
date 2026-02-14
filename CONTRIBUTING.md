@@ -4,7 +4,7 @@ Thanks for your interest in contributing! This project is in its early stages, s
 
 ## Getting Started
 
-**Requirements:** Java 21, Gradle 9.2.1 (use the included wrapper).
+**Requirements:** Java 17, Gradle 9.2.1 (use the included wrapper).
 
 ```bash
 ./gradlew build    # Build all modules and run tests
@@ -22,7 +22,7 @@ For larger changes (new model wrappers, new modules, API changes), please open a
 
 ## Code Conventions
 
-- **Java 21** — records, pattern matching, and sealed types are encouraged
+- **Java 17** — records and pattern matching are encouraged
 - **Apache 2.0 license header** — every Java file must start with the license header before the `package` declaration:
   ```java
   /*
@@ -41,7 +41,7 @@ For larger changes (new model wrappers, new modules, API changes), please open a
    * limitations under the License.
    */
   ```
-- **Packages by domain** — packages are organized by feature (`io.github.inference4j.embedding`, `io.github.inference4j.audio`), not by module name
+- **Packages by domain** — packages are organized by feature (`io.github.inference4j.vision`, `io.github.inference4j.nlp`, `io.github.inference4j.audio`), not by module name
 - **Tests** — JUnit 5, test post-processing logic with synthetic data (no ONNX model files in tests)
 - **No unnecessary dependencies** — prefer JDK built-ins when possible
 
@@ -51,7 +51,7 @@ For larger changes (new model wrappers, new modules, API changes), please open a
 |--------|---------|
 | `inference4j-core` | Low-level ONNX Runtime abstractions (`InferenceSession`, `Tensor`, `MathOps`) |
 | `inference4j-preprocessing` | Tokenizers, image transforms, audio processing |
-| `inference4j-models` | Handcrafted model wrappers with domain-specific APIs |
+| `inference4j-tasks` | Task-oriented inference wrappers with domain-specific APIs |
 | `inference4j-runtime` | Operational layer — routing, metrics |
 | `inference4j-examples` | Runnable examples |
 
