@@ -19,6 +19,7 @@ package io.github.inference4j.nlp;
 import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
+import io.github.inference4j.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.tokenizer.EncodedInput;
@@ -141,12 +142,18 @@ public class SentenceTransformerEmbedder implements TextEmbedder {
         private InferenceSession session;
         private ModelSource modelSource;
         private String modelId;
+        private SessionConfigurer sessionConfigurer;
         private Tokenizer tokenizer;
         private PoolingStrategy poolingStrategy = PoolingStrategy.MEAN;
         private int maxLength = 512;
 
-        public Builder session(InferenceSession session) {
+        Builder session(InferenceSession session) {
             this.session = session;
+            return this;
+        }
+
+        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
+            this.sessionConfigurer = sessionConfigurer;
             return this;
         }
 
@@ -207,7 +214,9 @@ public class SentenceTransformerEmbedder implements TextEmbedder {
                 throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
             }
 
-            this.session = InferenceSession.create(modelPath);
+            this.session = sessionConfigurer != null
+                    ? InferenceSession.create(modelPath, sessionConfigurer)
+                    : InferenceSession.create(modelPath);
             try {
                 if (this.tokenizer == null) {
                     this.tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);

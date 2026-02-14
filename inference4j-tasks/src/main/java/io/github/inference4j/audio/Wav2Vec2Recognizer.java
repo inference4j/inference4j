@@ -20,6 +20,7 @@ import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
 import io.github.inference4j.ModelSource;
+import io.github.inference4j.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 
@@ -51,7 +52,9 @@ import java.util.Map;
  * <h2>Custom configuration</h2>
  * <pre>{@code
  * try (Wav2Vec2Recognizer recognizer = Wav2Vec2Recognizer.builder()
- *         .session(InferenceSession.create(modelPath))
+ *         .modelId("my-org/my-wav2vec2")
+ *         .modelSource(ModelSource.fromPath(localDir))
+ *         .sessionOptions(opts -> opts.addCUDA(0))
  *         .vocabulary(Vocabulary.fromFile(vocabPath))
  *         .build()) {
  *     Transcription result = recognizer.transcribe(audioSamples, 16000);
@@ -142,14 +145,20 @@ public class Wav2Vec2Recognizer implements SpeechRecognizer {
         private InferenceSession session;
         private ModelSource modelSource;
         private String modelId;
+        private SessionConfigurer sessionConfigurer;
         private Vocabulary vocabulary;
         private String inputName;
         private int sampleRate = DEFAULT_SAMPLE_RATE;
         private int blankIndex = DEFAULT_BLANK_INDEX;
         private String wordDelimiter = DEFAULT_WORD_DELIMITER;
 
-        public Builder session(InferenceSession session) {
+        Builder session(InferenceSession session) {
             this.session = session;
+            return this;
+        }
+
+        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
+            this.sessionConfigurer = sessionConfigurer;
             return this;
         }
 
@@ -221,7 +230,9 @@ public class Wav2Vec2Recognizer implements SpeechRecognizer {
                 throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
             }
 
-            this.session = InferenceSession.create(modelPath);
+            this.session = sessionConfigurer != null
+                    ? InferenceSession.create(modelPath, sessionConfigurer)
+                    : InferenceSession.create(modelPath);
             try {
                 if (this.vocabulary == null) {
                     this.vocabulary = Vocabulary.fromFile(vocabPath);

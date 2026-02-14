@@ -19,6 +19,7 @@ package io.github.inference4j.vision;
 import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
+import io.github.inference4j.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
@@ -379,14 +380,20 @@ public class CraftTextDetector implements TextDetector {
         private InferenceSession session;
         private ModelSource modelSource;
         private String modelId;
+        private SessionConfigurer sessionConfigurer;
         private String inputName;
         private int targetSize = 1280;
         private float textThreshold = 0.7f;
         private float lowTextThreshold = 0.4f;
         private int minComponentArea = 10;
 
-        public Builder session(InferenceSession session) {
+        Builder session(InferenceSession session) {
             this.session = session;
+            return this;
+        }
+
+        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
+            this.sessionConfigurer = sessionConfigurer;
             return this;
         }
 
@@ -450,7 +457,9 @@ public class CraftTextDetector implements TextDetector {
                 throw new ModelSourceException("Model file not found: " + modelPath);
             }
 
-            this.session = InferenceSession.create(modelPath);
+            this.session = sessionConfigurer != null
+                    ? InferenceSession.create(modelPath, sessionConfigurer)
+                    : InferenceSession.create(modelPath);
         }
     }
 }

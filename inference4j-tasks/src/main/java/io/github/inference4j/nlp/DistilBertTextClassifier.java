@@ -21,6 +21,7 @@ import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
 import io.github.inference4j.ModelSource;
 import io.github.inference4j.OutputOperator;
+import io.github.inference4j.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.text.ModelConfig;
@@ -62,7 +63,9 @@ import java.util.Set;
  * <h2>Custom configuration</h2>
  * <pre>{@code
  * try (DistilBertTextClassifier classifier = DistilBertTextClassifier.builder()
- *         .session(InferenceSession.create(modelPath))
+ *         .modelId("my-org/my-distilbert")
+ *         .modelSource(ModelSource.fromPath(localDir))
+ *         .sessionOptions(opts -> opts.addCUDA(0))
  *         .tokenizer(WordPieceTokenizer.fromVocabFile(vocabPath))
  *         .config(ModelConfig.fromFile(configPath))
  *         .build()) {
@@ -145,13 +148,19 @@ public class DistilBertTextClassifier implements TextClassifier {
         private InferenceSession session;
         private ModelSource modelSource;
         private String modelId;
+        private SessionConfigurer sessionConfigurer;
         private Tokenizer tokenizer;
         private ModelConfig config;
         private OutputOperator outputOperator;
         private int maxLength = DEFAULT_MAX_LENGTH;
 
-        public Builder session(InferenceSession session) {
+        Builder session(InferenceSession session) {
             this.session = session;
+            return this;
+        }
+
+        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
+            this.sessionConfigurer = sessionConfigurer;
             return this;
         }
 
@@ -226,7 +235,9 @@ public class DistilBertTextClassifier implements TextClassifier {
                 throw new ModelSourceException("Config file not found: " + configPath);
             }
 
-            this.session = InferenceSession.create(modelPath);
+            this.session = sessionConfigurer != null
+                    ? InferenceSession.create(modelPath, sessionConfigurer)
+                    : InferenceSession.create(modelPath);
             try {
                 if (this.tokenizer == null) {
                     this.tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);

@@ -60,8 +60,9 @@ import java.nio.file.Path;
  * <h2>Larger variants via builder</h2>
  * <pre>{@code
  * try (EfficientNetClassifier classifier = EfficientNetClassifier.builder()
- *         .session(InferenceSession.create(modelPath))
- *         .pipeline(ImageTransformPipeline.imagenet(260))
+ *         .modelId("my-org/my-efficientnet")
+ *         .modelSource(ModelSource.fromPath(localDir))
+ *         .sessionOptions(opts -> opts.addCUDA(0))
  *         .labels(Labels.fromFile(Path.of("my-labels.txt")))
  *         .outputOperator(OutputOperator.softmax()) // if model outputs raw logits
  *         .defaultTopK(10)
@@ -118,7 +119,9 @@ public class EfficientNetClassifier extends AbstractImageClassifier {
                 throw new ModelSourceException("Model file not found: " + modelPath);
             }
 
-            this.session = InferenceSession.create(modelPath);
+            this.session = sessionConfigurer != null
+                    ? InferenceSession.create(modelPath, sessionConfigurer)
+                    : InferenceSession.create(modelPath);
             try {
                 if (this.inputName == null) {
                     this.inputName = session.inputNames().iterator().next();

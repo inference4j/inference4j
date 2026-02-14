@@ -19,6 +19,7 @@ package io.github.inference4j.audio;
 import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
+import io.github.inference4j.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 
@@ -55,7 +56,9 @@ import java.util.Map;
  * <h2>Custom configuration</h2>
  * <pre>{@code
  * try (SileroVadDetector vad = SileroVadDetector.builder()
- *         .session(InferenceSession.create(modelPath))
+ *         .modelId("my-org/my-silero-vad")
+ *         .modelSource(ModelSource.fromPath(localDir))
+ *         .sessionOptions(opts -> opts.addCUDA(0))
  *         .threshold(0.6f)        // Speech probability threshold
  *         .minSpeechDuration(0.25f)  // Minimum speech segment duration
  *         .minSilenceDuration(0.1f)  // Minimum silence between segments
@@ -282,14 +285,20 @@ public class SileroVadDetector implements VoiceActivityDetector {
         private InferenceSession session;
         private ModelSource modelSource;
         private String modelId;
+        private SessionConfigurer sessionConfigurer;
         private int sampleRate = DEFAULT_SAMPLE_RATE;
         private int windowSizeSamples = DEFAULT_WINDOW_SIZE_SAMPLES;
         private float threshold = DEFAULT_THRESHOLD;
         private float minSpeechDuration = DEFAULT_MIN_SPEECH_DURATION;
         private float minSilenceDuration = DEFAULT_MIN_SILENCE_DURATION;
 
-        public Builder session(InferenceSession session) {
+        Builder session(InferenceSession session) {
             this.session = session;
+            return this;
+        }
+
+        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
+            this.sessionConfigurer = sessionConfigurer;
             return this;
         }
 
@@ -354,7 +363,9 @@ public class SileroVadDetector implements VoiceActivityDetector {
                 throw new ModelSourceException("Model file not found in: " + dir);
             }
 
-            this.session = InferenceSession.create(modelPath);
+            this.session = sessionConfigurer != null
+                    ? InferenceSession.create(modelPath, sessionConfigurer)
+                    : InferenceSession.create(modelPath);
         }
     }
 }

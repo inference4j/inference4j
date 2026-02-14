@@ -20,6 +20,7 @@ import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
 import io.github.inference4j.ModelSource;
 import io.github.inference4j.OutputOperator;
+import io.github.inference4j.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.image.ImageLayout;
@@ -145,6 +146,7 @@ public abstract class AbstractImageClassifier implements ImageClassifier {
         protected InferenceSession session;
         protected ModelSource modelSource;
         protected String modelId;
+        protected SessionConfigurer sessionConfigurer;
         protected ImageTransformPipeline pipeline = ImageTransformPipeline.imagenet(224);
         protected Labels labels = Labels.imagenet();
         protected String inputName;
@@ -156,8 +158,13 @@ public abstract class AbstractImageClassifier implements ImageClassifier {
             return (B) this;
         }
 
-        public B session(InferenceSession session) {
+        B session(InferenceSession session) {
             this.session = session;
+            return self();
+        }
+
+        public B sessionOptions(SessionConfigurer sessionConfigurer) {
+            this.sessionConfigurer = sessionConfigurer;
             return self();
         }
 

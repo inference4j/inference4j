@@ -79,6 +79,36 @@ public class InferenceSession implements AutoCloseable {
     }
 
     /**
+     * Creates a session from an ONNX model file with a configurer for custom options.
+     *
+     * <p>Applies default options (thread counts, optimization level) first, then
+     * invokes the configurer to customize further (e.g., add GPU execution providers).
+     *
+     * @param modelPath  path to the {@code .onnx} model file
+     * @param configurer callback to customize session options
+     * @return a new session ready for inference
+     * @throws io.github.inference4j.exception.ModelLoadException if the model cannot be loaded
+     * @see SessionConfigurer
+     */
+    public static InferenceSession create(Path modelPath, SessionConfigurer configurer) {
+        try {
+            OrtEnvironment env = OrtEnvironment.getEnvironment();
+            try (OrtSession.SessionOptions opts = new OrtSession.SessionOptions()) {
+                int cpus = Runtime.getRuntime().availableProcessors();
+                opts.setIntraOpNumThreads(cpus);
+                opts.setInterOpNumThreads(cpus);
+                opts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
+                configurer.configure(opts);
+                OrtSession session = env.createSession(modelPath.toString(), opts);
+                return new InferenceSession(env, session);
+            }
+        } catch (OrtException e) {
+            throw new ModelLoadException(
+                    "Failed to load model from " + modelPath + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Creates a session from an ONNX model file with custom options.
      *
      * @param modelPath path to the {@code .onnx} model file

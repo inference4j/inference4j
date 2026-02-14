@@ -20,6 +20,7 @@ import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
 import io.github.inference4j.ModelSource;
+import io.github.inference4j.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
@@ -88,9 +89,10 @@ import java.util.Map;
  * <h2>Custom configuration</h2>
  * <pre>{@code
  * try (YoloV8Detector detector = YoloV8Detector.builder()
- *         .session(InferenceSession.create(modelPath))
+ *         .modelId("my-org/my-yolov8")
+ *         .modelSource(ModelSource.fromPath(localDir))
+ *         .sessionOptions(opts -> opts.addCUDA(0))
  *         .labels(Labels.fromFile(Path.of("custom-labels.txt")))
- *         .inputSize(640)
  *         .confidenceThreshold(0.5f)
  *         .iouThreshold(0.4f)
  *         .build()) {
@@ -312,14 +314,20 @@ public class YoloV8Detector implements ObjectDetector {
         private InferenceSession session;
         private ModelSource modelSource;
         private String modelId;
+        private SessionConfigurer sessionConfigurer;
         private Labels labels = Labels.coco();
         private String inputName;
         private int inputSize = 640;
         private float confidenceThreshold = 0.25f;
         private float iouThreshold = 0.45f;
 
-        public Builder session(InferenceSession session) {
+        Builder session(InferenceSession session) {
             this.session = session;
+            return this;
+        }
+
+        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
+            this.sessionConfigurer = sessionConfigurer;
             return this;
         }
 
@@ -383,7 +391,9 @@ public class YoloV8Detector implements ObjectDetector {
                 throw new ModelSourceException("Model file not found: " + modelPath);
             }
 
-            this.session = InferenceSession.create(modelPath);
+            this.session = sessionConfigurer != null
+                    ? InferenceSession.create(modelPath, sessionConfigurer)
+                    : InferenceSession.create(modelPath);
             try {
                 if (this.inputName == null) {
                     this.inputName = session.inputNames().iterator().next();
