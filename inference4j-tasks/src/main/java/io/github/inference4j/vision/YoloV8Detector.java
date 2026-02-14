@@ -16,7 +16,9 @@
 
 package io.github.inference4j.vision;
 
+import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.HuggingFaceModelSource;
+import io.github.inference4j.InferenceContext;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
 import io.github.inference4j.ModelSource;
@@ -34,7 +36,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -104,12 +105,13 @@ import java.util.Map;
  * @see BoundingBox
  * @see Yolo26Detector
  */
-public class YoloV8Detector implements ObjectDetector {
+public class YoloV8Detector
+        extends AbstractInferenceTask<BufferedImage, List<Detection>>
+        implements ObjectDetector {
 
     private static final String DEFAULT_MODEL_ID = "inference4j/yolov8n";
     private static final float LETTERBOX_PAD_VALUE = 114f / 255f;
 
-    private final InferenceSession session;
     private final Labels labels;
     private final String inputName;
     private final int inputSize;
@@ -118,7 +120,11 @@ public class YoloV8Detector implements ObjectDetector {
 
     private YoloV8Detector(InferenceSession session, Labels labels, String inputName,
                            int inputSize, float defaultConfidenceThreshold, float defaultIouThreshold) {
-        this.session = session;
+        super(session,
+                createPreprocessor(inputName, inputSize),
+                ctx -> decodeDetections(ctx.outputs(), labels,
+                        defaultConfidenceThreshold, defaultIouThreshold,
+                        inputSize, ctx.input().getWidth(), ctx.input().getHeight()));
         this.labels = labels;
         this.inputName = inputName;
         this.inputSize = inputSize;
@@ -132,26 +138,15 @@ public class YoloV8Detector implements ObjectDetector {
 
     @Override
     public List<Detection> detect(BufferedImage image) {
-        return detect(image, defaultConfidenceThreshold, defaultIouThreshold);
+        return run(image);
     }
 
     @Override
     public List<Detection> detect(BufferedImage image, float confidenceThreshold, float iouThreshold) {
-        int origW = image.getWidth();
-        int origH = image.getHeight();
-
-        LetterboxResult lb = letterbox(image, inputSize);
-        Tensor inputTensor = imageToTensor(lb.image);
-
-        Map<String, Tensor> inputs = new LinkedHashMap<>();
-        inputs.put(inputName, inputTensor);
-
+        Map<String, Tensor> inputs = preprocessor.process(image);
         Map<String, Tensor> outputs = session.run(inputs);
-        Tensor outputTensor = outputs.values().iterator().next();
-
-        return postProcess(outputTensor.toFloats(), outputTensor.shape(),
-                labels, confidenceThreshold, iouThreshold,
-                lb.scale, lb.padX, lb.padY, origW, origH);
+        return decodeDetections(outputs, labels, confidenceThreshold, iouThreshold,
+                inputSize, image.getWidth(), image.getHeight());
     }
 
     @Override
@@ -164,12 +159,16 @@ public class YoloV8Detector implements ObjectDetector {
         return detect(loadImage(imagePath), confidenceThreshold, iouThreshold);
     }
 
-    @Override
-    public void close() {
-        session.close();
-    }
-
     // --- Preprocessing ---
+
+    private static io.github.inference4j.Preprocessor<BufferedImage, Map<String, Tensor>> createPreprocessor(
+            String inputName, int inputSize) {
+        return image -> {
+            LetterboxResult lb = letterbox(image, inputSize);
+            Tensor tensor = imageToTensor(lb.image);
+            return Map.of(inputName, tensor);
+        };
+    }
 
     record LetterboxResult(BufferedImage image, float scale, float padX, float padY) {
     }
@@ -223,6 +222,24 @@ public class YoloV8Detector implements ObjectDetector {
     }
 
     // --- Post-processing ---
+
+    private static List<Detection> decodeDetections(Map<String, Tensor> outputs,
+                                                     Labels labels,
+                                                     float confThreshold, float iouThreshold,
+                                                     int inputSize,
+                                                     int origWidth, int origHeight) {
+        Tensor outputTensor = outputs.values().iterator().next();
+
+        float scale = Math.min((float) inputSize / origWidth, (float) inputSize / origHeight);
+        int scaledW = Math.round(origWidth * scale);
+        int scaledH = Math.round(origHeight * scale);
+        float padX = (inputSize - scaledW) / 2f;
+        float padY = (inputSize - scaledH) / 2f;
+
+        return postProcess(outputTensor.toFloats(), outputTensor.shape(),
+                labels, confThreshold, iouThreshold,
+                scale, padX, padY, origWidth, origHeight);
+    }
 
     static List<Detection> postProcess(float[] rawOutput, long[] outputShape,
                                        Labels labels,

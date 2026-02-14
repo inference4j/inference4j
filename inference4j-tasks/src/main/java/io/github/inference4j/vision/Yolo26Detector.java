@@ -16,6 +16,7 @@
 
 package io.github.inference4j.vision;
 
+import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
@@ -34,7 +35,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -99,11 +99,12 @@ import java.util.Map;
  * @see BoundingBox
  * @see YoloV8Detector
  */
-public class Yolo26Detector implements ObjectDetector {
+public class Yolo26Detector
+        extends AbstractInferenceTask<BufferedImage, List<Detection>>
+        implements ObjectDetector {
 
     private static final String DEFAULT_MODEL_ID = "inference4j/yolo26n";
 
-    private final InferenceSession session;
     private final Labels labels;
     private final String inputName;
     private final int inputSize;
@@ -111,7 +112,10 @@ public class Yolo26Detector implements ObjectDetector {
 
     private Yolo26Detector(InferenceSession session, Labels labels, String inputName,
                            int inputSize, float defaultConfidenceThreshold) {
-        this.session = session;
+        super(session,
+                createPreprocessor(inputName, inputSize),
+                ctx -> decodeDetections(ctx.outputs(), labels, defaultConfidenceThreshold,
+                        ctx.input().getWidth(), ctx.input().getHeight()));
         this.labels = labels;
         this.inputName = inputName;
         this.inputSize = inputSize;
@@ -124,7 +128,7 @@ public class Yolo26Detector implements ObjectDetector {
 
     @Override
     public List<Detection> detect(BufferedImage image) {
-        return detect(image, defaultConfidenceThreshold, 0f);
+        return run(image);
     }
 
     /**
@@ -136,40 +140,10 @@ public class Yolo26Detector implements ObjectDetector {
      */
     @Override
     public List<Detection> detect(BufferedImage image, float confidenceThreshold, float iouThreshold) {
-        int origW = image.getWidth();
-        int origH = image.getHeight();
-
-        BufferedImage resized = resize(image, inputSize);
-        Tensor inputTensor = imageToTensor(resized);
-
-        Map<String, Tensor> inputs = new LinkedHashMap<>();
-        inputs.put(inputName, inputTensor);
-
+        Map<String, Tensor> inputs = preprocessor.process(image);
         Map<String, Tensor> outputs = session.run(inputs);
-
-        // Identify outputs by shape: last dim 4 = boxes, other = logits
-        float[] logitsData = null;
-        long[] logitsShape = null;
-        float[] boxesData = null;
-        long[] boxesShape = null;
-
-        for (Tensor tensor : outputs.values()) {
-            long[] shape = tensor.shape();
-            if (shape.length >= 2 && shape[shape.length - 1] == 4) {
-                boxesData = tensor.toFloats();
-                boxesShape = shape;
-            } else {
-                logitsData = tensor.toFloats();
-                logitsShape = shape;
-            }
-        }
-
-        if (logitsData == null || boxesData == null) {
-            throw new InferenceException("Expected two output tensors (logits and boxes), got: " + outputs.size());
-        }
-
-        return postProcess(logitsData, logitsShape, boxesData, boxesShape,
-                labels, confidenceThreshold, origW, origH);
+        return decodeDetections(outputs, labels, confidenceThreshold,
+                image.getWidth(), image.getHeight());
     }
 
     @Override
@@ -188,12 +162,16 @@ public class Yolo26Detector implements ObjectDetector {
         return detect(loadImage(imagePath), confidenceThreshold, iouThreshold);
     }
 
-    @Override
-    public void close() {
-        session.close();
-    }
-
     // --- Preprocessing ---
+
+    private static io.github.inference4j.Preprocessor<BufferedImage, Map<String, Tensor>> createPreprocessor(
+            String inputName, int inputSize) {
+        return image -> {
+            BufferedImage resized = resize(image, inputSize);
+            Tensor tensor = imageToTensor(resized);
+            return Map.of(inputName, tensor);
+        };
+    }
 
     static BufferedImage resize(BufferedImage image, int targetSize) {
         BufferedImage result = new BufferedImage(targetSize, targetSize, BufferedImage.TYPE_INT_RGB);
@@ -227,6 +205,34 @@ public class Yolo26Detector implements ObjectDetector {
     }
 
     // --- Post-processing ---
+
+    private static List<Detection> decodeDetections(Map<String, Tensor> outputs,
+                                                     Labels labels, float confThreshold,
+                                                     int origWidth, int origHeight) {
+        float[] logitsData = null;
+        long[] logitsShape = null;
+        float[] boxesData = null;
+        long[] boxesShape = null;
+
+        for (Tensor tensor : outputs.values()) {
+            long[] shape = tensor.shape();
+            if (shape.length >= 2 && shape[shape.length - 1] == 4) {
+                boxesData = tensor.toFloats();
+                boxesShape = shape;
+            } else {
+                logitsData = tensor.toFloats();
+                logitsShape = shape;
+            }
+        }
+
+        if (logitsData == null || boxesData == null) {
+            throw new InferenceException(
+                    "Expected two output tensors (logits and boxes), got: " + outputs.size());
+        }
+
+        return postProcess(logitsData, logitsShape, boxesData, boxesShape,
+                labels, confThreshold, origWidth, origHeight);
+    }
 
     static List<Detection> postProcess(float[] logitsData, long[] logitsShape,
                                        float[] boxesData, long[] boxesShape,

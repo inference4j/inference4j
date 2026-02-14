@@ -16,6 +16,7 @@
 
 package io.github.inference4j.nlp;
 
+import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
@@ -76,12 +77,13 @@ import java.util.Set;
  * @see TextClassifier
  * @see TextClassification
  */
-public class DistilBertTextClassifier implements TextClassifier {
+public class DistilBertTextClassifier
+        extends AbstractInferenceTask<String, List<TextClassification>>
+        implements TextClassifier {
 
     private static final String DEFAULT_MODEL_ID = "inference4j/distilbert-base-uncased-finetuned-sst-2-english";
     private static final int DEFAULT_MAX_LENGTH = 512;
 
-    private final InferenceSession session;
     private final Tokenizer tokenizer;
     private final ModelConfig config;
     private final OutputOperator outputOperator;
@@ -90,7 +92,13 @@ public class DistilBertTextClassifier implements TextClassifier {
     private DistilBertTextClassifier(InferenceSession session, Tokenizer tokenizer,
                                      ModelConfig config, OutputOperator outputOperator,
                                      int maxLength) {
-        this.session = session;
+        super(session,
+                createPreprocessor(tokenizer, maxLength, session.inputNames()),
+                ctx -> {
+                    Tensor outputTensor = ctx.outputs().values().iterator().next();
+                    float[] logits = outputTensor.toFloats();
+                    return postProcess(logits, config, config.numLabels(), outputOperator);
+                });
         this.tokenizer = tokenizer;
         this.config = config;
         this.outputOperator = outputOperator;
@@ -103,33 +111,16 @@ public class DistilBertTextClassifier implements TextClassifier {
 
     @Override
     public List<TextClassification> classify(String text) {
-        return classify(text, config.numLabels());
+        return run(text);
     }
 
     @Override
     public List<TextClassification> classify(String text, int topK) {
-        EncodedInput encoded = tokenizer.encode(text, maxLength);
-
-        long[] shape = {1, encoded.inputIds().length};
-        Set<String> expectedInputs = session.inputNames();
-
-        Map<String, Tensor> inputs = new LinkedHashMap<>();
-        inputs.put("input_ids", Tensor.fromLongs(encoded.inputIds(), shape));
-        inputs.put("attention_mask", Tensor.fromLongs(encoded.attentionMask(), shape));
-        if (expectedInputs.contains("token_type_ids")) {
-            inputs.put("token_type_ids", Tensor.fromLongs(encoded.tokenTypeIds(), shape));
-        }
-
+        Map<String, Tensor> inputs = preprocessor.process(text);
         Map<String, Tensor> outputs = session.run(inputs);
         Tensor outputTensor = outputs.values().iterator().next();
         float[] logits = outputTensor.toFloats();
-
         return postProcess(logits, config, topK, outputOperator);
-    }
-
-    @Override
-    public void close() {
-        session.close();
     }
 
     static List<TextClassification> postProcess(float[] logits, ModelConfig config,
@@ -142,6 +133,21 @@ public class DistilBertTextClassifier implements TextClassifier {
             results.add(new TextClassification(config.label(idx), idx, probabilities[idx]));
         }
         return results;
+    }
+
+    private static io.github.inference4j.Preprocessor<String, Map<String, Tensor>> createPreprocessor(
+            Tokenizer tokenizer, int maxLength, Set<String> expectedInputs) {
+        return text -> {
+            EncodedInput encoded = tokenizer.encode(text, maxLength);
+            long[] shape = {1, encoded.inputIds().length};
+            Map<String, Tensor> inputs = new LinkedHashMap<>();
+            inputs.put("input_ids", Tensor.fromLongs(encoded.inputIds(), shape));
+            inputs.put("attention_mask", Tensor.fromLongs(encoded.attentionMask(), shape));
+            if (expectedInputs.contains("token_type_ids")) {
+                inputs.put("token_type_ids", Tensor.fromLongs(encoded.tokenTypeIds(), shape));
+            }
+            return inputs;
+        };
     }
 
     public static class Builder {

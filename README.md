@@ -79,6 +79,49 @@ try (var reranker = MiniLMSearchReranker.builder().build()) {
 }
 ```
 
+## Getting Started
+
+**Requirements:** Java 17+
+
+### Add the dependency
+
+`inference4j-tasks` is the only dependency you need — it transitively includes core, preprocessing, and runtime.
+
+**Gradle**
+
+```groovy
+implementation 'io.github.inference4j:inference4j-tasks:0.1.0-SNAPSHOT'
+```
+
+**Maven**
+
+```xml
+<dependency>
+    <groupId>io.github.inference4j</groupId>
+    <artifactId>inference4j-tasks</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+> **JVM flag:** ONNX Runtime requires native access. Add `--enable-native-access=ALL-UNNAMED` to your JVM arguments, or use `--enable-native-access=com.microsoft.onnxruntime` if you're on the module path.
+
+### Run your first model
+
+```java
+import io.github.inference4j.nlp.DistilBertTextClassifier;
+
+public class QuickStart {
+    public static void main(String[] args) {
+        try (var classifier = DistilBertTextClassifier.builder().build()) {
+            System.out.println(classifier.classify("inference4j makes AI in Java easy!"));
+            // [TextClassification[label=POSITIVE, confidence=0.9998]]
+        }
+    }
+}
+```
+
+That's it. The model downloads automatically on first run (~260MB, cached in `~/.cache/inference4j/`). No Python, no manual downloads, no tensor wrangling.
+
 ## What you don't have to do
 
 - **No tokenization** — WordPiece tokenizers are built in and handled automatically

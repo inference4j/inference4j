@@ -16,6 +16,7 @@
 
 package io.github.inference4j.nlp;
 
+import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
@@ -35,16 +36,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class SentenceTransformerEmbedder implements TextEmbedder {
+public class SentenceTransformerEmbedder
+        extends AbstractInferenceTask<String, float[]>
+        implements TextEmbedder {
 
-    private final InferenceSession session;
     private final Tokenizer tokenizer;
     private final PoolingStrategy poolingStrategy;
     private final int maxLength;
 
     private SentenceTransformerEmbedder(InferenceSession session, Tokenizer tokenizer,
                                         PoolingStrategy poolingStrategy, int maxLength) {
-        this.session = session;
+        super(session,
+                createPreprocessor(tokenizer, maxLength, session.inputNames()),
+                ctx -> {
+                    Tensor outputTensor = ctx.outputs().values().iterator().next();
+                    Tensor attentionMaskTensor = ctx.preprocessed().get("attention_mask");
+                    long[] attentionMask = attentionMaskTensor.toLongs();
+                    return applyPooling(outputTensor.toFloats(), outputTensor.shape(),
+                            attentionMask, poolingStrategy);
+                });
         this.tokenizer = tokenizer;
         this.poolingStrategy = poolingStrategy;
         this.maxLength = maxLength;
@@ -56,23 +66,7 @@ public class SentenceTransformerEmbedder implements TextEmbedder {
 
     @Override
     public float[] encode(String text) {
-        EncodedInput encoded = tokenizer.encode(text, maxLength);
-
-        long[] shape = {1, encoded.inputIds().length};
-        Set<String> expectedInputs = session.inputNames();
-
-        Map<String, Tensor> inputs = new LinkedHashMap<>();
-        inputs.put("input_ids", Tensor.fromLongs(encoded.inputIds(), shape));
-        inputs.put("attention_mask", Tensor.fromLongs(encoded.attentionMask(), shape));
-        if (expectedInputs.contains("token_type_ids")) {
-            inputs.put("token_type_ids", Tensor.fromLongs(encoded.tokenTypeIds(), shape));
-        }
-
-        Map<String, Tensor> outputs = session.run(inputs);
-
-        Tensor outputTensor = outputs.values().iterator().next();
-        return applyPooling(outputTensor.toFloats(), outputTensor.shape(),
-                encoded.attentionMask(), poolingStrategy);
+        return run(text);
     }
 
     @Override
@@ -133,9 +127,19 @@ public class SentenceTransformerEmbedder implements TextEmbedder {
         };
     }
 
-    @Override
-    public void close() {
-        session.close();
+    private static io.github.inference4j.Preprocessor<String, Map<String, Tensor>> createPreprocessor(
+            Tokenizer tokenizer, int maxLength, Set<String> expectedInputs) {
+        return text -> {
+            EncodedInput encoded = tokenizer.encode(text, maxLength);
+            long[] shape = {1, encoded.inputIds().length};
+            Map<String, Tensor> inputs = new LinkedHashMap<>();
+            inputs.put("input_ids", Tensor.fromLongs(encoded.inputIds(), shape));
+            inputs.put("attention_mask", Tensor.fromLongs(encoded.attentionMask(), shape));
+            if (expectedInputs.contains("token_type_ids")) {
+                inputs.put("token_type_ids", Tensor.fromLongs(encoded.tokenTypeIds(), shape));
+            }
+            return inputs;
+        };
     }
 
     public static class Builder {

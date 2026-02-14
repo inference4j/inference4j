@@ -16,6 +16,7 @@
 
 package io.github.inference4j.audio;
 
+import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
@@ -26,7 +27,6 @@ import io.github.inference4j.exception.ModelSourceException;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -64,14 +64,15 @@ import java.util.Map;
  * @see SpeechRecognizer
  * @see Transcription
  */
-public class Wav2Vec2Recognizer implements SpeechRecognizer {
+public class Wav2Vec2Recognizer
+        extends AbstractInferenceTask<Path, Transcription>
+        implements SpeechRecognizer {
 
     private static final String DEFAULT_MODEL_ID = "inference4j/wav2vec2-base-960h";
     private static final int DEFAULT_SAMPLE_RATE = 16000;
     private static final int DEFAULT_BLANK_INDEX = 0;
     private static final String DEFAULT_WORD_DELIMITER = "|";
 
-    private final InferenceSession session;
     private final Vocabulary vocabulary;
     private final String inputName;
     private final int targetSampleRate;
@@ -80,7 +81,16 @@ public class Wav2Vec2Recognizer implements SpeechRecognizer {
 
     private Wav2Vec2Recognizer(InferenceSession session, Vocabulary vocabulary, String inputName,
                                int targetSampleRate, int blankIndex, String wordDelimiter) {
-        this.session = session;
+        super(session,
+                createPreprocessor(inputName, targetSampleRate),
+                ctx -> {
+                    Tensor outputTensor = ctx.outputs().values().iterator().next();
+                    long[] shape = outputTensor.shape();
+                    int timeSteps = (int) shape[1];
+                    int vocabSize = (int) shape[2];
+                    return postProcess(outputTensor.toFloats(), timeSteps, vocabSize,
+                            vocabulary, blankIndex, wordDelimiter);
+                });
         this.vocabulary = vocabulary;
         this.inputName = inputName;
         this.targetSampleRate = targetSampleRate;
@@ -94,34 +104,33 @@ public class Wav2Vec2Recognizer implements SpeechRecognizer {
 
     @Override
     public Transcription transcribe(Path audioPath) {
-        AudioData audio = AudioLoader.load(audioPath);
-        return transcribe(audio.samples(), audio.sampleRate());
+        return run(audioPath);
     }
 
     @Override
     public Transcription transcribe(float[] audioData, int sampleRate) {
         float[] resampled = AudioProcessor.resample(audioData, sampleRate, targetSampleRate);
         float[] normalized = AudioProcessor.normalize(resampled);
-
         Tensor inputTensor = Tensor.fromFloats(normalized, new long[]{1, normalized.length});
-
-        Map<String, Tensor> inputs = new LinkedHashMap<>();
-        inputs.put(inputName, inputTensor);
-
+        Map<String, Tensor> inputs = Map.of(inputName, inputTensor);
         Map<String, Tensor> outputs = session.run(inputs);
         Tensor outputTensor = outputs.values().iterator().next();
-
         long[] shape = outputTensor.shape();
         int timeSteps = (int) shape[1];
         int vocabSize = (int) shape[2];
-
         return postProcess(outputTensor.toFloats(), timeSteps, vocabSize,
                 vocabulary, blankIndex, wordDelimiter);
     }
 
-    @Override
-    public void close() {
-        session.close();
+    private static io.github.inference4j.Preprocessor<Path, Map<String, Tensor>> createPreprocessor(
+            String inputName, int targetSampleRate) {
+        return audioPath -> {
+            AudioData audio = AudioLoader.load(audioPath);
+            float[] resampled = AudioProcessor.resample(audio.samples(), audio.sampleRate(), targetSampleRate);
+            float[] normalized = AudioProcessor.normalize(resampled);
+            Tensor inputTensor = Tensor.fromFloats(normalized, new long[]{1, normalized.length});
+            return Map.of(inputName, inputTensor);
+        };
     }
 
     static Transcription postProcess(float[] logits, int timeSteps, int vocabSize,

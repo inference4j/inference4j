@@ -16,6 +16,7 @@
 
 package io.github.inference4j.vision;
 
+import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.MathOps;
 import io.github.inference4j.ModelSource;
@@ -34,32 +35,41 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Base class for image classification models (ResNet, EfficientNet, etc.).
  *
- * <p>Provides shared inference logic: image loading, preprocessing via
- * {@link ImageTransformPipeline}, ONNX inference, and softmax post-processing.
- * Subclasses supply a {@code builder()} factory method with model-specific defaults.
+ * <p>Extends {@link AbstractInferenceTask} to enforce the preprocess → infer → postprocess
+ * pipeline. The {@link #run(BufferedImage)} method is {@code final} and uses the default
+ * {@code topK}. The parameterized {@link #classify(BufferedImage, int)} overload composes
+ * the same building blocks with a custom {@code topK}.
+ *
+ * <p>Subclasses supply a {@code builder()} factory method with model-specific defaults.
  */
-public abstract class AbstractImageClassifier implements ImageClassifier {
+public abstract class AbstractImageClassifier
+        extends AbstractInferenceTask<BufferedImage, List<Classification>>
+        implements ImageClassifier {
 
-    protected final InferenceSession session;
-    protected final Preprocessor<BufferedImage, Tensor> preprocessor;
+    protected final Preprocessor<BufferedImage, Tensor> imagePreprocessor;
     protected final Labels labels;
     protected final String inputName;
     protected final int defaultTopK;
     protected final OutputOperator outputOperator;
 
     protected AbstractImageClassifier(InferenceSession session,
-                                      Preprocessor<BufferedImage, Tensor> preprocessor,
+                                      Preprocessor<BufferedImage, Tensor> imagePreprocessor,
                                       Labels labels, String inputName, int defaultTopK,
                                       OutputOperator outputOperator) {
-        this.session = session;
-        this.preprocessor = preprocessor;
+        super(session,
+                image -> Map.of(inputName, imagePreprocessor.process(image)),
+                ctx -> {
+                    Tensor outputTensor = ctx.outputs().values().iterator().next();
+                    float[] logits = outputTensor.toFloats();
+                    return postProcess(logits, labels, defaultTopK, outputOperator);
+                });
+        this.imagePreprocessor = imagePreprocessor;
         this.labels = labels;
         this.inputName = inputName;
         this.defaultTopK = defaultTopK;
@@ -68,20 +78,16 @@ public abstract class AbstractImageClassifier implements ImageClassifier {
 
     @Override
     public List<Classification> classify(BufferedImage image) {
-        return classify(image, defaultTopK);
+        return run(image);
     }
 
     @Override
     public List<Classification> classify(BufferedImage image, int topK) {
-        Tensor inputTensor = preprocessor.process(image);
-
-        Map<String, Tensor> inputs = new LinkedHashMap<>();
-        inputs.put(inputName, inputTensor);
-
+        Tensor inputTensor = imagePreprocessor.process(image);
+        Map<String, Tensor> inputs = Map.of(inputName, inputTensor);
         Map<String, Tensor> outputs = session.run(inputs);
         Tensor outputTensor = outputs.values().iterator().next();
         float[] logits = outputTensor.toFloats();
-
         return postProcess(logits, labels, topK, outputOperator);
     }
 
@@ -94,11 +100,6 @@ public abstract class AbstractImageClassifier implements ImageClassifier {
     public List<Classification> classify(Path imagePath, int topK) {
         BufferedImage image = loadImage(imagePath);
         return classify(image, topK);
-    }
-
-    @Override
-    public void close() {
-        session.close();
     }
 
     static Postprocessor<float[], List<Classification>> classificationPostprocessor(

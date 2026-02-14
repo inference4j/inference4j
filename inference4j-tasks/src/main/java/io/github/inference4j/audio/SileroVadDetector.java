@@ -37,6 +37,10 @@ import java.util.Map;
  * speech segments in audio. It runs in real-time and is well-suited for
  * preprocessing audio before transcription or detecting speech boundaries.
  *
+ * <p><strong>Note:</strong> This class does not extend {@link io.github.inference4j.AbstractInferenceTask}
+ * because it is a stateful model that makes multiple {@code session.run()} calls per input
+ * (sliding window with hidden state carried across frames).
+ *
  * <h2>Target model</h2>
  * <p>Designed for <a href="https://github.com/snakers4/silero-vad">Silero VAD</a>
  * ONNX models. The model expects 16kHz mono audio and outputs per-frame speech

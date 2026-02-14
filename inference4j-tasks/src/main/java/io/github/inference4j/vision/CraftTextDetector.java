@@ -16,6 +16,7 @@
 
 package io.github.inference4j.vision;
 
+import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
@@ -32,7 +33,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -81,13 +81,14 @@ import java.util.Map;
  * @see TextRegion
  * @see TextDetector
  */
-public class CraftTextDetector implements TextDetector {
+public class CraftTextDetector
+        extends AbstractInferenceTask<BufferedImage, List<TextRegion>>
+        implements TextDetector {
 
     private static final String DEFAULT_MODEL_ID = "inference4j/craft-mlt-25k";
     private static final float[] IMAGENET_MEAN = {0.485f, 0.456f, 0.406f};
     private static final float[] IMAGENET_STD = {0.229f, 0.224f, 0.225f};
 
-    private final InferenceSession session;
     private final String inputName;
     private final int targetSize;
     private final float defaultTextThreshold;
@@ -97,7 +98,11 @@ public class CraftTextDetector implements TextDetector {
     private CraftTextDetector(InferenceSession session, String inputName, int targetSize,
                               float defaultTextThreshold, float defaultLowTextThreshold,
                               int minComponentArea) {
-        this.session = session;
+        super(session,
+                createPreprocessor(inputName, targetSize),
+                ctx -> decodeTextRegions(ctx.outputs(),
+                        defaultTextThreshold, defaultLowTextThreshold, minComponentArea,
+                        targetSize, ctx.input().getWidth(), ctx.input().getHeight()));
         this.inputName = inputName;
         this.targetSize = targetSize;
         this.defaultTextThreshold = defaultTextThreshold;
@@ -116,41 +121,15 @@ public class CraftTextDetector implements TextDetector {
 
     @Override
     public List<TextRegion> detect(BufferedImage image) {
-        return detect(image, defaultTextThreshold, defaultLowTextThreshold);
+        return run(image);
     }
 
     @Override
     public List<TextRegion> detect(BufferedImage image, float textThreshold, float lowTextThreshold) {
-        int origW = image.getWidth();
-        int origH = image.getHeight();
-
-        ResizeResult resize = resizeForCraft(image, targetSize);
-        Tensor inputTensor = imageToTensor(resize.image);
-
-        Map<String, Tensor> inputs = new LinkedHashMap<>();
-        inputs.put(inputName, inputTensor);
-
+        Map<String, Tensor> inputs = preprocessor.process(image);
         Map<String, Tensor> outputs = session.run(inputs);
-
-        Tensor scoreMap = findScoreMap(outputs);
-        long[] shape = scoreMap.shape();
-        int heatmapH = (int) shape[1];
-        int heatmapW = (int) shape[2];
-        float[] data = scoreMap.toFloats();
-
-        float[] regionScore = new float[heatmapH * heatmapW];
-        float[] affinityScore = new float[heatmapH * heatmapW];
-        for (int y = 0; y < heatmapH; y++) {
-            for (int x = 0; x < heatmapW; x++) {
-                int idx = y * heatmapW * 2 + x * 2;
-                regionScore[y * heatmapW + x] = data[idx];
-                affinityScore[y * heatmapW + x] = data[idx + 1];
-            }
-        }
-
-        return postProcess(regionScore, affinityScore, heatmapH, heatmapW,
-                textThreshold, lowTextThreshold, minComponentArea,
-                resize.scale, origW, origH);
+        return decodeTextRegions(outputs, textThreshold, lowTextThreshold,
+                minComponentArea, targetSize, image.getWidth(), image.getHeight());
     }
 
     @Override
@@ -163,12 +142,16 @@ public class CraftTextDetector implements TextDetector {
         return detect(loadImage(imagePath), textThreshold, lowTextThreshold);
     }
 
-    @Override
-    public void close() {
-        session.close();
-    }
-
     // --- Preprocessing ---
+
+    private static io.github.inference4j.Preprocessor<BufferedImage, Map<String, Tensor>> createPreprocessor(
+            String inputName, int targetSize) {
+        return image -> {
+            ResizeResult resize = resizeForCraft(image, targetSize);
+            Tensor tensor = imageToTensor(resize.image);
+            return Map.of(inputName, tensor);
+        };
+    }
 
     record ResizeResult(BufferedImage image, float scale) {
     }
@@ -220,6 +203,39 @@ public class CraftTextDetector implements TextDetector {
     }
 
     // --- Post-processing ---
+
+    private static List<TextRegion> decodeTextRegions(Map<String, Tensor> outputs,
+                                                       float textThreshold, float lowTextThreshold,
+                                                       int minArea, int targetSize,
+                                                       int origW, int origH) {
+        Tensor scoreMap = findScoreMap(outputs);
+        long[] shape = scoreMap.shape();
+        int heatmapH = (int) shape[1];
+        int heatmapW = (int) shape[2];
+        float[] data = scoreMap.toFloats();
+
+        float[] regionScore = new float[heatmapH * heatmapW];
+        float[] affinityScore = new float[heatmapH * heatmapW];
+        for (int y = 0; y < heatmapH; y++) {
+            for (int x = 0; x < heatmapW; x++) {
+                int idx = y * heatmapW * 2 + x * 2;
+                regionScore[y * heatmapW + x] = data[idx];
+                affinityScore[y * heatmapW + x] = data[idx + 1];
+            }
+        }
+
+        // Recompute scale from original dimensions
+        float rawScale = (float) targetSize / Math.max(origW, origH);
+        int scaledW = roundToMultipleOf32(Math.round(origW * rawScale));
+        int scaledH = roundToMultipleOf32(Math.round(origH * rawScale));
+        float actualScaleX = (float) scaledW / origW;
+        float actualScaleY = (float) scaledH / origH;
+        float scale = Math.min(actualScaleX, actualScaleY);
+
+        return postProcess(regionScore, affinityScore, heatmapH, heatmapW,
+                textThreshold, lowTextThreshold, minArea,
+                scale, origW, origH);
+    }
 
     static List<TextRegion> postProcess(float[] regionScore, float[] affinityScore,
                                         int heatmapH, int heatmapW,

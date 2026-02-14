@@ -16,6 +16,8 @@
 
 package io.github.inference4j.nlp;
 
+import io.github.inference4j.InferenceTask;
+
 import java.util.List;
 
 /**
@@ -30,13 +32,19 @@ import java.util.List;
  * (e.g., BM25 or bi-encoder) to improve precision.
  *
  * @see MiniLMSearchReranker
+ * @see QueryDocumentPair
  */
-public interface SearchReranker extends AutoCloseable {
+public interface SearchReranker extends InferenceTask<QueryDocumentPair, Float> {
 
-    float score(String query, String document);
+    default float score(String query, String document) {
+        return run(new QueryDocumentPair(query, document));
+    }
 
-    float[] scoreBatch(String query, List<String> documents);
-
-    @Override
-    void close();
+    default float[] scoreBatch(String query, List<String> documents) {
+        float[] scores = new float[documents.size()];
+        for (int i = 0; i < documents.size(); i++) {
+            scores[i] = score(query, documents.get(i));
+        }
+        return scores;
+    }
 }

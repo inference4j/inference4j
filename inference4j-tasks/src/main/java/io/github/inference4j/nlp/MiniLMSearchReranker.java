@@ -16,9 +16,11 @@
 
 package io.github.inference4j.nlp;
 
+import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.ModelSource;
+import io.github.inference4j.Preprocessor;
 import io.github.inference4j.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
@@ -29,7 +31,6 @@ import io.github.inference4j.tokenizer.WordPieceTokenizer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -63,63 +64,46 @@ import java.util.Set;
  *
  * @see SearchReranker
  */
-public class MiniLMSearchReranker implements SearchReranker {
+public class MiniLMSearchReranker
+        extends AbstractInferenceTask<QueryDocumentPair, Float>
+        implements SearchReranker {
 
     private static final String DEFAULT_MODEL_ID = "inference4j/ms-marco-MiniLM-L-6-v2";
 
     private static final int DEFAULT_MAX_LENGTH = 512;
 
-    private final InferenceSession session;
-    private final Tokenizer tokenizer;
-    private final int maxLength;
-
     private MiniLMSearchReranker(InferenceSession session, Tokenizer tokenizer, int maxLength) {
-        this.session = session;
-        this.tokenizer = tokenizer;
-        this.maxLength = maxLength;
+        super(session,
+                createPreprocessor(tokenizer, maxLength, session.inputNames()),
+                ctx -> {
+                    Tensor outputTensor = ctx.outputs().values().iterator().next();
+                    float[] logits = outputTensor.toFloats();
+                    return toScore(logits[0]);
+                });
     }
 
     public static Builder builder() {
         return new Builder();
     }
 
-    @Override
-    public float score(String query, String document) {
-        EncodedInput encoded = tokenizer.encode(query, document, maxLength);
-
-        long[] shape = {1, encoded.inputIds().length};
-        Set<String> expectedInputs = session.inputNames();
-
-        Map<String, Tensor> inputs = new LinkedHashMap<>();
-        inputs.put("input_ids", Tensor.fromLongs(encoded.inputIds(), shape));
-        inputs.put("attention_mask", Tensor.fromLongs(encoded.attentionMask(), shape));
-        if (expectedInputs.contains("token_type_ids")) {
-            inputs.put("token_type_ids", Tensor.fromLongs(encoded.tokenTypeIds(), shape));
-        }
-
-        Map<String, Tensor> outputs = session.run(inputs);
-        Tensor outputTensor = outputs.values().iterator().next();
-        float[] logits = outputTensor.toFloats();
-
-        return toScore(logits[0]);
-    }
-
-    @Override
-    public float[] scoreBatch(String query, List<String> documents) {
-        float[] scores = new float[documents.size()];
-        for (int i = 0; i < documents.size(); i++) {
-            scores[i] = score(query, documents.get(i));
-        }
-        return scores;
-    }
-
-    @Override
-    public void close() {
-        session.close();
-    }
-
     static float toScore(float logit) {
         return (float) (1.0 / (1.0 + Math.exp(-logit)));
+    }
+
+    private static Preprocessor<QueryDocumentPair, Map<String, Tensor>> createPreprocessor(
+            Tokenizer tokenizer, int maxLength, Set<String> expectedInputs) {
+        return pair -> {
+            EncodedInput encoded = tokenizer.encode(pair.query(), pair.document(), maxLength);
+            long[] shape = {1, encoded.inputIds().length};
+
+            Map<String, Tensor> inputs = new LinkedHashMap<>();
+            inputs.put("input_ids", Tensor.fromLongs(encoded.inputIds(), shape));
+            inputs.put("attention_mask", Tensor.fromLongs(encoded.attentionMask(), shape));
+            if (expectedInputs.contains("token_type_ids")) {
+                inputs.put("token_type_ids", Tensor.fromLongs(encoded.tokenTypeIds(), shape));
+            }
+            return inputs;
+        };
     }
 
     public static class Builder {

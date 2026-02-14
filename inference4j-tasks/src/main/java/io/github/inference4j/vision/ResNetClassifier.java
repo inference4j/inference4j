@@ -80,10 +80,10 @@ public class ResNetClassifier extends AbstractImageClassifier {
     private static final String DEFAULT_MODEL_ID = "inference4j/resnet50-v1-7";
 
     private ResNetClassifier(InferenceSession session,
-                             Preprocessor<BufferedImage, Tensor> preprocessor,
+                             Preprocessor<BufferedImage, Tensor> imagePreprocessor,
                              Labels labels, String inputName, int defaultTopK,
                              OutputOperator outputOperator) {
-        super(session, preprocessor, labels, inputName, defaultTopK, outputOperator);
+        super(session, imagePreprocessor, labels, inputName, defaultTopK, outputOperator);
     }
 
     public static Builder builder() {
