@@ -1,14 +1,11 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (e.g., 1.0.0)'
-        required: true
+  push:
+    tags: ['v*']
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   release:
@@ -24,8 +21,12 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
       - name: Set release version
-        run: sed -i "s/version = .*/version = '${{ github.event.inputs.version }}'/" build.gradle
+        run: sed -i "s/version = .*/version = '${{ steps.version.outputs.VERSION }}'/" build.gradle
 
       - name: Publish to Maven Central
         run: ./gradlew publishAndReleaseToMavenCentral
@@ -34,3 +35,8 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSPHRASE }}
+
+      - name: Create GitHub Release
+        run: gh release create "${{ github.ref_name }}" --generate-notes --title "${{ github.ref_name }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
