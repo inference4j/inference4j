@@ -74,6 +74,17 @@ try (var detector = CraftTextDetector.builder().build()) {
 }
 ```
 
+### Zero-Shot Image Classification
+
+```java
+try (var classifier = ClipClassifier.builder()
+        .labels("cat", "dog", "bird", "car")
+        .build()) {
+    List<Classification> results = classifier.classify(Path.of("photo.jpg"));
+    // [Classification[label=cat, confidence=0.82], ...]
+}
+```
+
 ### Search Reranking
 
 ```java
@@ -228,6 +239,14 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 | Object Detection | YOLOv8, YOLO11, YOLO26 | `ObjectDetector` |
 | Text Detection | CRAFT | `TextDetector` |
 
+### Multimodal
+
+| Capability | Models | API |
+|---|---|---|
+| Zero-Shot Classification | CLIP | `ImageClassifier` |
+| Image Embeddings | CLIP | `ImageEmbedder` |
+| Text Embeddings | CLIP | `TextEmbedder` |
+
 ### Audio
 
 | Capability | Models | API |
@@ -305,10 +324,7 @@ Every model is opt-in — nothing is downloaded until you set `enabled: true`. B
 
 ## Roadmap
 
-- **CLIP** — image-text similarity for visual search and zero-shot classification
-- **Model test suite** — `./gradlew modelTest` for end-to-end inference verification across all supported models
-
-See the [Roadmap](ROADMAP.md) for details.
+See the [Roadmap](ROADMAP.md) for details and what's coming next.
 
 ## Project Structure
 
