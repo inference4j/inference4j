@@ -1,118 +1,89 @@
 # Visual Search
 
-Encode images and text into a shared vector space for image-text similarity, zero-shot classification, and visual search — powered by [CLIP](https://arxiv.org/abs/2103.00020).
+Classify images using arbitrary text labels — no training required — powered by [CLIP](https://arxiv.org/abs/2103.00020).
 
 ## Quick start
 
-### Image-text similarity
-
 ```java
-try (ClipImageEncoder imageEncoder = ClipImageEncoder.builder().build();
-     ClipTextEncoder textEncoder = ClipTextEncoder.builder().build()) {
-
-    float[] imageEmb = imageEncoder.encode(ImageIO.read(Path.of("photo.jpg").toFile()));
-    float[] textEmb = textEncoder.encode("a photo of a sunset");
-
-    float similarity = dot(imageEmb, textEmb);
-    System.out.println("Similarity: " + similarity);
+try (ClipClassifier classifier = ClipClassifier.builder()
+        .labels("cat", "dog", "bird", "car", "airplane")
+        .build()) {
+    List<Classification> results = classifier.classify(Path.of("photo.jpg"));
+    System.out.println(results.get(0).label());      // "cat"
+    System.out.println(results.get(0).confidence());  // 0.92
 }
 ```
 
-### Zero-shot classification
+## Zero-shot classification
 
-Classify images using arbitrary text labels — no training required:
-
-```java
-try (ClipImageEncoder imageEncoder = ClipImageEncoder.builder().build();
-     ClipTextEncoder textEncoder = ClipTextEncoder.builder().build()) {
-
-    float[] imageEmb = imageEncoder.encode(photo);
-
-    String[] labels = {"cat", "dog", "bird", "car", "airplane"};
-    String bestLabel = null;
-    float bestScore = Float.NEGATIVE_INFINITY;
-
-    for (String label : labels) {
-        float score = dot(imageEmb, textEncoder.encode("a photo of a " + label));
-        if (score > bestScore) {
-            bestScore = score;
-            bestLabel = label;
-        }
-    }
-    System.out.println("Predicted: " + bestLabel);
-}
-```
-
-### Image search
-
-Find the best-matching images for a text query:
+Unlike traditional image classifiers that are trained on a fixed set of labels, CLIP classifies images against **any labels you provide at runtime**. Just pass the labels you need — no retraining, no fine-tuning:
 
 ```java
-// Index: encode all images once
-List<float[]> imageEmbeddings = imageEncoder.encodeBatch(images);
+// Emotion detection
+ClipClassifier emotionClassifier = ClipClassifier.builder()
+        .labels("happy", "sad", "angry", "surprised", "neutral")
+        .promptTemplate("a photo of a {} person")
+        .build();
 
-// Query: encode the search text
-float[] queryEmb = textEncoder.encode("a red sports car");
+// Product categorization
+ClipClassifier productClassifier = ClipClassifier.builder()
+        .labels("electronics", "clothing", "furniture", "food", "sports equipment")
+        .promptTemplate("a product photo of {}")
+        .build();
 
-// Rank by similarity
-int bestIdx = 0;
-float bestScore = Float.NEGATIVE_INFINITY;
-for (int i = 0; i < imageEmbeddings.size(); i++) {
-    float score = dot(queryEmb, imageEmbeddings.get(i));
-    if (score > bestScore) {
-        bestScore = score;
-        bestIdx = i;
-    }
-}
+// Scene classification
+ClipClassifier sceneClassifier = ClipClassifier.builder()
+        .labels("beach", "mountain", "city", "forest", "desert")
+        .promptTemplate("a landscape photo of a {}")
+        .build();
 ```
 
 ## How it works
 
-CLIP uses two separate encoders — one for images, one for text — trained so that matching image-text pairs produce similar embeddings. Both encoders output 512-dimensional L2-normalized vectors. Cosine similarity (equivalent to dot product for normalized vectors) measures how well an image matches a text description.
+CLIP uses two separate encoders — one for images, one for text — trained so that matching image-text pairs produce similar embeddings. `ClipClassifier` wraps both encoders:
+
+1. **At build time**: encodes each label into a text embedding using the prompt template (e.g. "a photo of a cat")
+2. **At classify time**: encodes the image, computes similarity against all label embeddings, and returns ranked results with confidence scores
 
 ```
-Image  → ClipImageEncoder → [512-dim vector] ─┐
-                                                ├─ dot product → similarity score
-Text   → ClipTextEncoder  → [512-dim vector] ─┘
+                                     ┌─ "a photo of a cat"  → [512-dim] ─┐
+Labels (build time) → prompt template├─ "a photo of a dog"  → [512-dim] ─┤
+                                     └─ "a photo of a bird" → [512-dim] ─┤
+                                                                          ├─ similarity → softmax → Classification
+Image (classify time) ────────────────────────────────────── [512-dim] ──┘
 ```
 
 ## Builder options
 
-### ClipImageEncoder
-
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
+| `labels(String...)` | `String[]` | (required) | The classification labels |
+| `labels(List<String>)` | `List<String>` | (required) | The classification labels |
+| `promptTemplate(String)` | `String` | `"a photo of a {}"` | Template for label encoding — `{}` is replaced with each label |
+| `defaultTopK(int)` | `int` | Number of labels | How many results to return by default |
 | `modelId(String)` | `String` | `inference4j/clip-vit-base-patch32` | HuggingFace model ID |
 | `modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Where to load the model from |
 | `sessionOptions(SessionConfigurer)` | `SessionConfigurer` | Default (CPU) | ONNX Runtime session options |
-| `preprocessor(Preprocessor)` | `Preprocessor` | CLIP pipeline (224×224, CLIP normalization) | Custom image preprocessor |
 
-### ClipTextEncoder
+## Prompt template tips
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `modelId(String)` | `String` | `inference4j/clip-vit-base-patch32` | HuggingFace model ID |
-| `modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Where to load the model from |
-| `sessionOptions(SessionConfigurer)` | `SessionConfigurer` | Default (CPU) | ONNX Runtime session options |
-| `tokenizer(Tokenizer)` | `Tokenizer` | Auto-loaded BPE from model directory | Custom tokenizer |
+The prompt template affects classification quality. CLIP was trained on natural language captions, so templates that resemble captions work best:
 
-## Helper: dot product
+| Use case | Good template | Why |
+|----------|---------------|-----|
+| General objects | `"a photo of a {}"` | Default, works well for most cases |
+| Fine-grained | `"a photo of a {}, a type of pet"` | Adds context for disambiguation |
+| Scenes | `"a photo of a {}"` or `"a {} landscape"` | Matches CLIP training data |
+| Actions | `"a photo of a person {}"` | e.g., "running", "swimming" |
+| Styles | `"a {} style painting"` | e.g., "impressionist", "cubist" |
 
-```java
-static float dot(float[] a, float[] b) {
-    float sum = 0f;
-    for (int i = 0; i < a.length; i++) {
-        sum += a[i] * b[i];
-    }
-    return sum;
-}
-```
+## Advanced: direct encoder access
 
-Since both encoders produce L2-normalized vectors, the dot product equals cosine similarity.
+For use cases beyond classification — image search, image-text similarity, or custom pipelines — use `ClipImageEncoder` and `ClipTextEncoder` directly. See the [CLIP Encoders reference](../reference/clip-encoders.md).
 
 ## Alternative models
 
-The default model is `inference4j/clip-vit-base-patch32` (ViT-B/32) — the smallest and fastest variant. You can use other CLIP-compatible models by exporting them to ONNX with the same input/output layout (`vision_model.onnx` + `text_model.onnx` + `vocab.json` + `merges.txt`) and pointing to them via `.modelId()` or `.modelSource()`.
+The default model is `inference4j/clip-vit-base-patch32` (ViT-B/32) — the smallest and fastest variant. You can use other CLIP-compatible models by exporting them to ONNX with the same input/output layout and pointing to them via `.modelId()` or `.modelSource()`.
 
 Possible variants (not yet tested with inference4j):
 

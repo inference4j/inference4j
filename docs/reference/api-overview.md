@@ -27,7 +27,7 @@
 | `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `ImageEmbedder` |
 | `io.github.inference4j.audio` | `Wav2Vec2Recognizer`, `SileroVadDetector` |
 | `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker` |
-| `io.github.inference4j.multimodal` | `ClipImageEncoder`, `ClipTextEncoder` |
+| `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
 
 ### inference4j-runtime
 
@@ -74,7 +74,7 @@ Exceptions: `SileroVadDetector` (stateful hidden state), `MiniLMSearchReranker`,
 
 | Type | Fields | Used by |
 |------|--------|---------|
-| `Classification` | `label()`, `index()`, `confidence()` | `ResNetClassifier`, `EfficientNetClassifier` |
+| `Classification` | `label()`, `index()`, `confidence()` | `ResNetClassifier`, `EfficientNetClassifier`, `ClipClassifier` |
 | `TextClassification` | `label()`, `classIndex()`, `confidence()` | `DistilBertTextClassifier` |
 | `Detection` | `label()`, `classIndex()`, `confidence()`, `box()` | `YoloV8Detector`, `Yolo26Detector` |
 | `TextRegion` | `box()`, `confidence()` | `CraftTextDetector` |

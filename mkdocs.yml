@@ -67,6 +67,7 @@ nav:
     - Supported Models: reference/supported-models.md
     - Configuration: reference/configuration.md
     - API Overview: reference/api-overview.md
+    - CLIP Encoders: reference/clip-encoders.md
   - Contributing:
     - Adding a Wrapper: contributing/adding-a-wrapper.md
   - Roadmap: roadmap.md
