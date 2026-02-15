@@ -5,3 +5,31 @@ dependencies {
     api project(':inference4j-preprocessing')
     api project(':inference4j-runtime')
 }
+
+// Model integration tests — downloads real models and runs actual inference
+sourceSets {
+    modelTest {
+        java.srcDir 'src/modelTest/java'
+        resources.srcDir 'src/modelTest/resources'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+configurations {
+    modelTestImplementation.extendsFrom testImplementation
+    modelTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+tasks.named('processModelTestResources') {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.register('modelTest', Test) {
+    description = 'Runs model integration tests against real ONNX models'
+    group = 'verification'
+    testClassesDirs = sourceSets.modelTest.output.classesDirs
+    classpath = sourceSets.modelTest.runtimeClasspath
+    useJUnitPlatform()
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+}
