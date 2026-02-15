@@ -191,6 +191,85 @@ class DistilBertTextClassifierTest {
                         .build());
     }
 
+    @Test
+    void builder_maxLength_passedToTokenizer() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{101, 102}, new long[]{1, 1}, new long[]{0, 0}));
+        when(session.run(any())).thenReturn(
+                Map.of("logits", Tensor.fromFloats(new float[]{1.0f, -1.0f}, new long[]{1, 2})));
+
+        DistilBertTextClassifier model = DistilBertTextClassifier.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .config(SENTIMENT_CONFIG)
+                .maxLength(128)
+                .build();
+
+        model.classify("test");
+
+        verify(tokenizer).encode("test", 128);
+    }
+
+    @Test
+    void builder_customOutputOperator_applied() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{101, 102}, new long[]{1, 1}, new long[]{0, 0}));
+        when(session.run(any())).thenReturn(
+                Map.of("logits", Tensor.fromFloats(new float[]{3.0f, -3.0f}, new long[]{1, 2})));
+
+        DistilBertTextClassifier model = DistilBertTextClassifier.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .config(SENTIMENT_CONFIG)
+                .outputOperator(OutputOperator.sigmoid())
+                .build();
+
+        List<TextClassification> results = model.classify("test");
+
+        // Sigmoid: each class is independent (doesn't sum to 1)
+        assertEquals(2, results.size());
+        assertTrue(results.get(0).confidence() > 0.9f);
+    }
+
+    @Test
+    void builder_modelIdAndModelSource_accepted() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        DistilBertTextClassifier model = DistilBertTextClassifier.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .config(SENTIMENT_CONFIG)
+                .modelId("custom/model")
+                .modelSource(id -> Path.of("/tmp"))
+                .build();
+
+        assertNotNull(model);
+    }
+
+    @Test
+    void builder_sessionOptions_accepted() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        DistilBertTextClassifier model = DistilBertTextClassifier.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .config(SENTIMENT_CONFIG)
+                .sessionOptions(opts -> { })
+                .build();
+
+        assertNotNull(model);
+    }
+
     // --- Inference flow ---
 
     @Test

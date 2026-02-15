@@ -23,6 +23,7 @@ import io.github.inference4j.tokenizer.Tokenizer;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -201,6 +202,87 @@ class SentenceTransformerEmbedderTest {
         assertEquals(4, results.get(1).length);
         // First result: MEAN of [1,5,9],[2,6,10],[3,7,11],[4,8,12] → [5,6,7,8]
         assertEquals(5f, results.get(0)[0], 0.001f);
+    }
+
+    // --- Builder setters ---
+
+    @Test
+    void builder_poolingStrategy_appliesCLS() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
+
+        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f};
+        when(session.run(any())).thenReturn(
+                Map.of("output", Tensor.fromFloats(output, new long[]{1, 3, 4})));
+
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .poolingStrategy(PoolingStrategy.CLS)
+                .build();
+
+        float[] embedding = model.encode("hello");
+
+        // CLS returns first token: [1, 2, 3, 4]
+        assertArrayEquals(new float[]{1f, 2f, 3f, 4f}, embedding);
+    }
+
+    @Test
+    void builder_maxLength_passedToTokenizer() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{101, 102}, new long[]{1, 1}, new long[]{0, 0}));
+
+        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f};
+        when(session.run(any())).thenReturn(
+                Map.of("output", Tensor.fromFloats(output, new long[]{1, 2, 4})));
+
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .maxLength(64)
+                .build();
+
+        model.encode("hello");
+
+        verify(tokenizer).encode("hello", 64);
+    }
+
+    @Test
+    void builder_modelId_usedWithModelSource() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        // Verify modelId and modelSource setters don't throw
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .modelId("custom/model")
+                .modelSource(id -> Path.of("/tmp"))
+                .build();
+
+        assertNotNull(model);
+    }
+
+    @Test
+    void builder_sessionOptions_accepted() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .sessionOptions(opts -> { })
+                .build();
+
+        assertNotNull(model);
     }
 
     // --- Close delegation ---

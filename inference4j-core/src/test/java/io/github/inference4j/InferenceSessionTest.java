@@ -17,13 +17,20 @@
 package io.github.inference4j;
 
 import io.github.inference4j.exception.ModelLoadException;
+import io.github.inference4j.session.SessionOptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class InferenceSessionTest {
+
+    @TempDir
+    Path tempDir;
 
     @Test
     void create_throwsModelLoadExceptionForNonexistentFile() {
@@ -36,17 +43,83 @@ class InferenceSessionTest {
     }
 
     @Test
-    void create_throwsModelLoadExceptionForInvalidFile() throws Exception {
-        Path tempFile = java.nio.file.Files.createTempFile("not-a-model", ".onnx");
-        try {
-            java.nio.file.Files.writeString(tempFile, "this is not an onnx model");
+    void create_throwsModelLoadExceptionForInvalidFile() throws IOException {
+        Path tempFile = tempDir.resolve("not-a-model.onnx");
+        Files.writeString(tempFile, "this is not an onnx model");
 
-            ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                    InferenceSession.create(tempFile));
+        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
+                InferenceSession.create(tempFile));
 
-            assertTrue(ex.getMessage().contains(tempFile.toString()));
-        } finally {
-            java.nio.file.Files.deleteIfExists(tempFile);
-        }
+        assertTrue(ex.getMessage().contains(tempFile.toString()));
+    }
+
+    @Test
+    void create_withSessionOptions_throwsForNonexistentFile() {
+        Path badPath = Path.of("/nonexistent/model.onnx");
+        SessionOptions options = SessionOptions.defaults();
+
+        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
+                InferenceSession.create(badPath, options));
+
+        assertTrue(ex.getMessage().contains("/nonexistent/model.onnx"));
+    }
+
+    @Test
+    void create_withSessionOptions_throwsForInvalidFile() throws IOException {
+        Path tempFile = tempDir.resolve("bad-model.onnx");
+        Files.writeString(tempFile, "garbage data");
+        SessionOptions options = SessionOptions.defaults();
+
+        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
+                InferenceSession.create(tempFile, options));
+
+        assertTrue(ex.getMessage().contains(tempFile.toString()));
+    }
+
+    @Test
+    void create_withConfigurer_throwsForNonexistentFile() {
+        Path badPath = Path.of("/nonexistent/model.onnx");
+
+        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
+                InferenceSession.create(badPath, opts -> { }));
+
+        assertTrue(ex.getMessage().contains("/nonexistent/model.onnx"));
+    }
+
+    @Test
+    void create_withConfigurer_throwsForInvalidFile() throws IOException {
+        Path tempFile = tempDir.resolve("invalid.onnx");
+        Files.writeString(tempFile, "not valid onnx");
+
+        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
+                InferenceSession.create(tempFile, opts -> { }));
+
+        assertTrue(ex.getMessage().contains(tempFile.toString()));
+    }
+
+    @Test
+    void create_modelLoadExceptionHasCause() {
+        Path badPath = Path.of("/nonexistent/model.onnx");
+
+        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
+                InferenceSession.create(badPath));
+
+        assertNotNull(ex.getCause());
+    }
+
+    @Test
+    void create_withCustomSessionOptions_throwsForInvalidFile() throws IOException {
+        Path tempFile = tempDir.resolve("custom-opts.onnx");
+        Files.writeString(tempFile, "not onnx");
+
+        SessionOptions options = SessionOptions.builder()
+                .intraOpNumThreads(2)
+                .interOpNumThreads(1)
+                .build();
+
+        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
+                InferenceSession.create(tempFile, options));
+
+        assertTrue(ex.getMessage().contains(tempFile.toString()));
     }
 }
