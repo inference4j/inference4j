@@ -34,6 +34,15 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: inference4j/inference4j
 
+      - name: Publish snapshot to Maven Central
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: ./gradlew publishAllPublicationsToMavenCentralRepository
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSPHRASE }}
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
