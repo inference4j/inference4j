@@ -17,11 +17,11 @@
 package io.github.inference4j.audio;
 
 import io.github.inference4j.AbstractInferenceTask;
-import io.github.inference4j.HuggingFaceModelSource;
+import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
-import io.github.inference4j.MathOps;
-import io.github.inference4j.ModelSource;
-import io.github.inference4j.SessionConfigurer;
+import io.github.inference4j.processing.MathOps;
+import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 
@@ -122,7 +122,7 @@ public class Wav2Vec2Recognizer
                 vocabulary, blankIndex, wordDelimiter);
     }
 
-    private static io.github.inference4j.Preprocessor<Path, Map<String, Tensor>> createPreprocessor(
+    private static io.github.inference4j.processing.Preprocessor<Path, Map<String, Tensor>> createPreprocessor(
             String inputName, int targetSampleRate) {
         return audioPath -> {
             AudioData audio = AudioLoader.load(audioPath);

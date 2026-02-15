@@ -17,7 +17,7 @@
 package io.github.inference4j.vision;
 
 import io.github.inference4j.InferenceSession;
-import io.github.inference4j.ModelSource;
+import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import org.junit.jupiter.api.Test;

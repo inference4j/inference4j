@@ -14,24 +14,26 @@
  * limitations under the License.
  */
 
-package io.github.inference4j;
+package io.github.inference4j.model;
 
-/**
- * Transforms raw input into a format suitable for model inference.
- *
- * @param <I> the input type (e.g., {@code BufferedImage}, {@code String})
- * @param <O> the output type (e.g., {@code Tensor})
- */
-@FunctionalInterface
-public interface Preprocessor<I, O> {
+import io.github.inference4j.exception.ModelSourceException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
-    O process(I input);
+public class LocalModelSource implements ModelSource {
 
-    default <R> Preprocessor<I, R> andThen(Preprocessor<O, R> after) {
-        return input -> after.process(this.process(input));
+    private final Path baseDir;
+
+    public LocalModelSource(Path baseDir) {
+        this.baseDir = baseDir;
     }
 
-    static <T> Preprocessor<T, T> identity() {
-        return input -> input;
+    @Override
+    public Path resolve(String modelId) {
+        Path resolved = baseDir.resolve(modelId);
+        if (!Files.isDirectory(resolved)) {
+            throw new ModelSourceException("Model directory not found: " + resolved);
+        }
+        return resolved;
     }
 }

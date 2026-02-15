@@ -16,7 +16,7 @@
 
 package io.github.inference4j.examples;
 
-import io.github.inference4j.SessionConfigurer;
+import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.vision.CraftTextDetector;
 import io.github.inference4j.vision.TextRegion;
 

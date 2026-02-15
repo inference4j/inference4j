@@ -14,26 +14,24 @@
  * limitations under the License.
  */
 
-package io.github.inference4j;
+package io.github.inference4j.processing;
 
-import io.github.inference4j.exception.ModelSourceException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+/**
+ * Transforms raw model output into domain-specific results.
+ *
+ * @param <I> the input type (e.g., {@code float[]})
+ * @param <O> the output type (e.g., {@code List<Classification>})
+ */
+@FunctionalInterface
+public interface Postprocessor<I, O> {
 
-public class LocalModelSource implements ModelSource {
+    O process(I input);
 
-    private final Path baseDir;
-
-    public LocalModelSource(Path baseDir) {
-        this.baseDir = baseDir;
+    default <R> Postprocessor<I, R> andThen(Postprocessor<O, R> after) {
+        return input -> after.process(this.process(input));
     }
 
-    @Override
-    public Path resolve(String modelId) {
-        Path resolved = baseDir.resolve(modelId);
-        if (!Files.isDirectory(resolved)) {
-            throw new ModelSourceException("Model directory not found: " + resolved);
-        }
-        return resolved;
+    static <T> Postprocessor<T, T> identity() {
+        return input -> input;
     }
 }

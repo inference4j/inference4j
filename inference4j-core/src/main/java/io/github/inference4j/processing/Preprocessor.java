@@ -14,24 +14,24 @@
  * limitations under the License.
  */
 
-package io.github.inference4j;
+package io.github.inference4j.processing;
 
 /**
- * Transforms raw model output into domain-specific results.
+ * Transforms raw input into a format suitable for model inference.
  *
- * @param <I> the input type (e.g., {@code float[]})
- * @param <O> the output type (e.g., {@code List<Classification>})
+ * @param <I> the input type (e.g., {@code BufferedImage}, {@code String})
+ * @param <O> the output type (e.g., {@code Tensor})
  */
 @FunctionalInterface
-public interface Postprocessor<I, O> {
+public interface Preprocessor<I, O> {
 
     O process(I input);
 
-    default <R> Postprocessor<I, R> andThen(Postprocessor<O, R> after) {
+    default <R> Preprocessor<I, R> andThen(Preprocessor<O, R> after) {
         return input -> after.process(this.process(input));
     }
 
-    static <T> Postprocessor<T, T> identity() {
+    static <T> Preprocessor<T, T> identity() {
         return input -> input;
     }
 }

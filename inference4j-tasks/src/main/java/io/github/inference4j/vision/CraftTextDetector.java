@@ -17,10 +17,10 @@
 package io.github.inference4j.vision;
 
 import io.github.inference4j.AbstractInferenceTask;
-import io.github.inference4j.HuggingFaceModelSource;
+import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
-import io.github.inference4j.ModelSource;
-import io.github.inference4j.SessionConfigurer;
+import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
@@ -144,7 +144,7 @@ public class CraftTextDetector
 
     // --- Preprocessing ---
 
-    private static io.github.inference4j.Preprocessor<BufferedImage, Map<String, Tensor>> createPreprocessor(
+    private static io.github.inference4j.processing.Preprocessor<BufferedImage, Map<String, Tensor>> createPreprocessor(
             String inputName, int targetSize) {
         return image -> {
             ResizeResult resize = resizeForCraft(image, targetSize);

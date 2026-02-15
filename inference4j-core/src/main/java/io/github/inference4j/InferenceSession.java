@@ -26,6 +26,8 @@ import ai.onnxruntime.TensorInfo;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.exception.TensorConversionException;
+import io.github.inference4j.session.SessionConfigurer;
+import io.github.inference4j.session.SessionOptions;
 
 import java.nio.FloatBuffer;
 import java.nio.LongBuffer;

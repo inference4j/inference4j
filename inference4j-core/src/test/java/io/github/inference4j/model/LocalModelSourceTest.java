@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.github.inference4j;
+package io.github.inference4j.model;
 
 import io.github.inference4j.exception.ModelSourceException;
 import org.junit.jupiter.api.Test;

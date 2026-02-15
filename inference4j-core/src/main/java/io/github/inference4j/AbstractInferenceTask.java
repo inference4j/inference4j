@@ -16,6 +16,9 @@
 
 package io.github.inference4j;
 
+import io.github.inference4j.processing.Postprocessor;
+import io.github.inference4j.processing.Preprocessor;
+
 import java.util.Map;
 
 /**

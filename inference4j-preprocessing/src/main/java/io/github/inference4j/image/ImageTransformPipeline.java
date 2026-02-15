@@ -16,7 +16,7 @@
 
 package io.github.inference4j.image;
 
-import io.github.inference4j.Preprocessor;
+import io.github.inference4j.processing.Preprocessor;
 import io.github.inference4j.Tensor;
 
 import java.awt.image.BufferedImage;
