@@ -137,9 +137,15 @@ public class ImageTransformPipeline implements Preprocessor<BufferedImage, Tenso
         private float[] mean = IMAGENET_MEAN;
         private float[] std = IMAGENET_STD;
         private ImageLayout layout = ImageLayout.NCHW;
+        private Interpolation interpolation = Interpolation.BILINEAR;
 
         public Builder resize(int width, int height) {
-            transforms.add(new ResizeTransform(width, height));
+            transforms.add(new ResizeTransform(width, height, interpolation));
+            return this;
+        }
+
+        public Builder interpolation(Interpolation interpolation) {
+            this.interpolation = interpolation;
             return this;
         }
 

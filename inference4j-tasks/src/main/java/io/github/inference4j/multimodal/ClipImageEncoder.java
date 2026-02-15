@@ -21,6 +21,7 @@ import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.image.ImageTransformPipeline;
+import io.github.inference4j.image.Interpolation;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.processing.MathOps;
@@ -164,6 +165,7 @@ public class ClipImageEncoder
             }
             if (preprocessor == null) {
                 preprocessor = ImageTransformPipeline.builder()
+                        .interpolation(Interpolation.BICUBIC)
                         .resize(224, 224)
                         .centerCrop(224, 224)
                         .mean(CLIP_MEAN)

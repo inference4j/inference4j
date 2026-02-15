@@ -21,16 +21,25 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 
 /**
- * Resizes an image to the specified dimensions using bilinear interpolation.
+ * Resizes an image to the specified dimensions.
+ *
+ * <p>Default interpolation is bilinear. Use {@link Interpolation#BICUBIC} for
+ * models that expect bicubic resizing (e.g. CLIP).
  */
 public class ResizeTransform implements ImageTransform {
 
     private final int width;
     private final int height;
+    private final Interpolation interpolation;
 
     public ResizeTransform(int width, int height) {
+        this(width, height, Interpolation.BILINEAR);
+    }
+
+    public ResizeTransform(int width, int height, Interpolation interpolation) {
         this.width = width;
         this.height = height;
+        this.interpolation = interpolation;
     }
 
     @Override
@@ -38,7 +47,7 @@ public class ResizeTransform implements ImageTransform {
         BufferedImage resized = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = resized.createGraphics();
         try {
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, interpolation.renderingHint());
             g.drawImage(image, 0, 0, width, height, null);
         } finally {
             g.dispose();
