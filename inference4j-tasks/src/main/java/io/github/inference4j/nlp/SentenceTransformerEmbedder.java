@@ -194,7 +194,7 @@ public class SentenceTransformerEmbedder
                 }
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
-                Path dir = source.resolve(modelId);
+                Path dir = source.resolve(modelId, List.of("model.onnx", "vocab.txt"));
                 loadFromDirectory(dir);
             }
             if (tokenizer == null) {

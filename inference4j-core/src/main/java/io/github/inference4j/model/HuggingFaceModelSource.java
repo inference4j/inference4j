@@ -17,6 +17,7 @@
 package io.github.inference4j.model;
 
 import io.github.inference4j.exception.ModelDownloadException;
+import io.github.inference4j.exception.ModelSourceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +29,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -64,12 +66,6 @@ public class HuggingFaceModelSource implements ModelSource {
     private static final Logger logger = LoggerFactory.getLogger(HuggingFaceModelSource.class);
 
     private static final String HF_BASE_URL = "https://huggingface.co";
-
-    private static final List<String> DEFAULT_FILES = List.of(
-            "model.onnx", "vocab.txt", "vocab.json",
-            "config.json", "labels.txt", "silero_vad.onnx",
-            "merges.txt", "text_model.onnx", "vision_model.onnx"
-    );
 
     private static volatile HuggingFaceModelSource instance;
 
@@ -110,14 +106,34 @@ public class HuggingFaceModelSource implements ModelSource {
         return instance;
     }
 
+    /**
+     * Resolves a model by repo ID without a file list.
+     *
+     * <p>This overload exists for backward compatibility with custom {@link ModelSource}
+     * lambdas. Callers that know which files they need should prefer
+     * {@link #resolve(String, List)} instead.
+     *
+     * @throws ModelSourceException if this is called on a repo that has never been
+     *         downloaded — the file list is required for the initial download
+     */
     @Override
     public Path resolve(String repoId) {
         Path repoDir = cacheDir.resolve(repoId);
+        if (Files.isDirectory(repoDir)) {
+            logger.debug("Cache hit for {}", repoId);
+            return repoDir;
+        }
+        throw new ModelSourceException(
+                "No cached model found for '" + repoId + "' and no required files specified. "
+                        + "Use resolve(modelId, requiredFiles) to trigger download.");
+    }
 
-        // Cache hit: if a known model file already exists, return immediately
-        if (Files.exists(repoDir.resolve("model.onnx"))
-                || Files.exists(repoDir.resolve("silero_vad.onnx"))
-                || Files.exists(repoDir.resolve("vision_model.onnx"))) {
+    @Override
+    public Path resolve(String repoId, List<String> requiredFiles) {
+        Path repoDir = cacheDir.resolve(repoId);
+
+        // Cache hit: all required files already exist
+        if (allFilesPresent(repoDir, requiredFiles)) {
             logger.debug("Cache hit for {}", repoId);
             return repoDir;
         }
@@ -127,9 +143,7 @@ public class HuggingFaceModelSource implements ModelSource {
         lock.lock();
         try {
             // Double-check after acquiring lock
-            if (Files.exists(repoDir.resolve("model.onnx"))
-                    || Files.exists(repoDir.resolve("silero_vad.onnx"))
-                    || Files.exists(repoDir.resolve("vision_model.onnx"))) {
+            if (allFilesPresent(repoDir, requiredFiles)) {
                 logger.debug("Cache hit for {} (after lock)", repoId);
                 return repoDir;
             }
@@ -137,7 +151,8 @@ public class HuggingFaceModelSource implements ModelSource {
             Files.createDirectories(repoDir);
             logger.info("Downloading model files for {} to {}", repoId, repoDir);
 
-            for (String filename : DEFAULT_FILES) {
+            List<String> missing = missingFiles(repoDir, requiredFiles);
+            for (String filename : missing) {
                 downloadFile(repoId, filename, repoDir);
             }
 
@@ -149,6 +164,28 @@ public class HuggingFaceModelSource implements ModelSource {
         } finally {
             lock.unlock();
         }
+    }
+
+    private static boolean allFilesPresent(Path dir, List<String> files) {
+        if (!Files.isDirectory(dir)) {
+            return false;
+        }
+        for (String file : files) {
+            if (!Files.exists(dir.resolve(file))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static List<String> missingFiles(Path dir, List<String> files) {
+        List<String> missing = new ArrayList<>();
+        for (String file : files) {
+            if (!Files.exists(dir.resolve(file))) {
+                missing.add(file);
+            }
+        }
+        return missing;
     }
 
     private void downloadFile(String repoId, String filename, Path targetDir) {

@@ -162,7 +162,7 @@ public class ClipTextEncoder implements TextEmbedder {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id);
+                Path dir = source.resolve(id, List.of(TEXT_MODEL_FILE, "vocab.json", "merges.txt"));
                 loadFromDirectory(dir);
             }
             if (tokenizer == null) {

@@ -346,7 +346,7 @@ public class SileroVadDetector implements VoiceActivityDetector {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id);
+                Path dir = source.resolve(id, List.of("model.onnx", "silero_vad.onnx"));
                 loadFromDirectory(dir);
             }
             int contextSize = (sampleRate == 16000) ? 64 : 32;

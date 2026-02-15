@@ -30,6 +30,7 @@ import io.github.inference4j.tokenizer.WordPieceTokenizer;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -149,7 +150,7 @@ public class MiniLMSearchReranker
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id);
+                Path dir = source.resolve(id, List.of("model.onnx", "vocab.txt"));
                 loadFromDirectory(dir);
             }
             if (tokenizer == null) {

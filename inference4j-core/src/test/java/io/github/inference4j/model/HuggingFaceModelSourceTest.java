@@ -16,12 +16,14 @@
 
 package io.github.inference4j.model;
 
+import io.github.inference4j.exception.ModelSourceException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -37,7 +39,32 @@ class HuggingFaceModelSourceTest {
     }
 
     @Test
-    void resolve_returnsCachedPathWhenModelOnnxExists() throws IOException {
+    void resolve_returnsCachedPathWhenAllRequiredFilesExist() throws IOException {
+        Path repoDir = tempDir.resolve("org/model");
+        Files.createDirectories(repoDir);
+        Files.writeString(repoDir.resolve("model.onnx"), "fake model");
+        Files.writeString(repoDir.resolve("vocab.txt"), "fake vocab");
+
+        HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
+        Path resolved = source.resolve("org/model", List.of("model.onnx", "vocab.txt"));
+
+        assertEquals(repoDir, resolved);
+    }
+
+    @Test
+    void resolve_returnsCachedPathForSingleFile() throws IOException {
+        Path repoDir = tempDir.resolve("org/vision");
+        Files.createDirectories(repoDir);
+        Files.writeString(repoDir.resolve("vision_model.onnx"), "fake model");
+
+        HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
+        Path resolved = source.resolve("org/vision", List.of("vision_model.onnx"));
+
+        assertEquals(repoDir, resolved);
+    }
+
+    @Test
+    void resolve_singleArg_returnsCachedPathWhenDirectoryExists() throws IOException {
         Path repoDir = tempDir.resolve("org/model");
         Files.createDirectories(repoDir);
         Files.writeString(repoDir.resolve("model.onnx"), "fake model");
@@ -49,30 +76,38 @@ class HuggingFaceModelSourceTest {
     }
 
     @Test
-    void resolve_returnsCachedPathWhenSileroVadOnnxExists() throws IOException {
-        Path repoDir = tempDir.resolve("org/silero-vad");
-        Files.createDirectories(repoDir);
-        Files.writeString(repoDir.resolve("silero_vad.onnx"), "fake vad model");
-
+    void resolve_singleArg_throwsWhenDirectoryDoesNotExist() {
         HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
-        Path resolved = source.resolve("org/silero-vad");
 
-        assertEquals(repoDir, resolved);
+        assertThrows(ModelSourceException.class, () ->
+                source.resolve("org/nonexistent"));
     }
 
     @Test
-    void resolve_cacheHitAfterLockWhenConcurrentDownload() throws IOException {
-        Path repoDir = tempDir.resolve("org/concurrent-model");
+    void resolve_triggersDownloadWhenFileMissing() {
+        HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
+
+        // Will attempt to download from HuggingFace (no server), but directory gets created
+        try {
+            source.resolve("org/new-model", List.of("model.onnx"));
+        } catch (Exception ignored) {
+            // Expected: network call fails
+        }
+
+        assertTrue(Files.exists(tempDir.resolve("org/new-model")));
+    }
+
+    @Test
+    void resolve_skipsDownloadWhenAllFilesPresent() throws IOException {
+        Path repoDir = tempDir.resolve("org/cached");
         Files.createDirectories(repoDir);
+        Files.writeString(repoDir.resolve("model.onnx"), "fake");
+        Files.writeString(repoDir.resolve("labels.txt"), "cat\ndog");
 
         HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
 
-        // First call will try to download (and fail since no real server),
-        // but if we pre-populate the cache before the second call, it should hit cache.
-        // Simulate: create model.onnx after the directory exists
-        Files.writeString(repoDir.resolve("model.onnx"), "fake model");
-
-        Path resolved = source.resolve("org/concurrent-model");
+        // Should return immediately without any HTTP call
+        Path resolved = source.resolve("org/cached", List.of("model.onnx", "labels.txt"));
         assertEquals(repoDir, resolved);
     }
 
@@ -81,23 +116,5 @@ class HuggingFaceModelSourceTest {
         HuggingFaceModelSource first = HuggingFaceModelSource.defaultInstance();
         HuggingFaceModelSource second = HuggingFaceModelSource.defaultInstance();
         assertSame(first, second);
-    }
-
-    @Test
-    void resolve_createsRepoDirWhenMissing() {
-        Path repoDir = tempDir.resolve("org/new-model");
-        assertFalse(Files.exists(repoDir));
-
-        HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
-
-        // This will attempt to download from HuggingFace, which will fail.
-        // But we can verify the directory was created.
-        try {
-            source.resolve("org/new-model");
-        } catch (Exception ignored) {
-            // Expected: network call fails
-        }
-
-        assertTrue(Files.exists(repoDir));
     }
 }

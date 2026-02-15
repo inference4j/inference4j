@@ -205,7 +205,7 @@ public class DistilBertTextClassifier
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id);
+                Path dir = source.resolve(id, List.of("model.onnx", "vocab.txt", "config.json"));
                 loadFromDirectory(dir);
             }
             if (tokenizer == null) {

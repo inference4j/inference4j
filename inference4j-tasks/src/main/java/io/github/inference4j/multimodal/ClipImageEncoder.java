@@ -157,7 +157,7 @@ public class ClipImageEncoder
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id);
+                Path dir = source.resolve(id, List.of(VISION_MODEL_FILE));
                 loadFromDirectory(dir);
             }
             if (inputName == null) {
