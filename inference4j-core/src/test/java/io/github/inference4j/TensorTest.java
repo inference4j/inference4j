@@ -112,4 +112,45 @@ class TensorTest {
         data[0] = 999f;
         assertArrayEquals(new float[]{1f, 2f, 3f}, tensor.toFloats());
     }
+
+    @Test
+    void fromStrings_createsWithCorrectShapeAndType() {
+        Tensor tensor = Tensor.fromStrings(new String[]{"hello", "world"}, new long[]{1, 2});
+        assertArrayEquals(new long[]{1, 2}, tensor.shape());
+        assertEquals(TensorType.STRING, tensor.type());
+    }
+
+    @Test
+    void fromStrings_throwsOnShapeMismatch() {
+        TensorConversionException ex = assertThrows(TensorConversionException.class, () ->
+                Tensor.fromStrings(new String[]{"a", "b"}, new long[]{1, 3}));
+        assertTrue(ex.getMessage().contains("3"));
+        assertTrue(ex.getMessage().contains("2"));
+    }
+
+    @Test
+    void toStrings_returnsDataCopy() {
+        String[] original = {"hello", "world", "test"};
+        Tensor tensor = Tensor.fromStrings(original, new long[]{3});
+        String[] result = tensor.toStrings();
+        assertArrayEquals(original, result);
+        result[0] = "modified";
+        assertArrayEquals(new String[]{"hello", "world", "test"}, tensor.toStrings(), "should return defensive copy");
+    }
+
+    @Test
+    void toStrings_throwsOnTypeMismatch() {
+        Tensor tensor = Tensor.fromFloats(new float[]{1.0f}, new long[]{1});
+        TensorConversionException ex = assertThrows(TensorConversionException.class, tensor::toStrings);
+        assertTrue(ex.getMessage().contains("FLOAT"));
+        assertTrue(ex.getMessage().contains("STRING"));
+    }
+
+    @Test
+    void fromStrings_makesDefensiveCopyOfInput() {
+        String[] data = {"hello", "world"};
+        Tensor tensor = Tensor.fromStrings(data, new long[]{2});
+        data[0] = "modified";
+        assertArrayEquals(new String[]{"hello", "world"}, tensor.toStrings());
+    }
 }

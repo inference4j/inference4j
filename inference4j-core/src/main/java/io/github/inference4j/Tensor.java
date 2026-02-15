@@ -64,6 +64,19 @@ public class Tensor {
     }
 
     /**
+     * Creates a string tensor with the given data and shape.
+     *
+     * @param data  flat array of string values
+     * @param shape the tensor dimensions (e.g., {@code {1, 3}})
+     * @return a new string tensor
+     * @throws TensorConversionException if data length does not match the shape
+     */
+    public static Tensor fromStrings(String[] data, long[] shape) {
+        validateShape(data.length, shape);
+        return new Tensor(data.clone(), shape, TensorType.STRING);
+    }
+
+    /**
      * Creates a long tensor with the given data and shape.
      *
      * @param data  flat array of long values
@@ -138,6 +151,20 @@ public class Tensor {
             System.arraycopy(flat, i * cols, result[i], 0, cols);
         }
         return result;
+    }
+
+    /**
+     * Returns this tensor's data as a flat string array.
+     *
+     * @return a copy of the underlying string data
+     * @throws TensorConversionException if this is not a {@link TensorType#STRING} tensor
+     */
+    public String[] toStrings() {
+        if (type != TensorType.STRING) {
+            throw new TensorConversionException(
+                    "Cannot convert " + type + " tensor to STRING");
+        }
+        return ((String[]) data).clone();
     }
 
     // Package-private: used by InferenceSession for zero-copy tensor creation

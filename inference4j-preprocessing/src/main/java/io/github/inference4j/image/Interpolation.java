@@ -14,13 +14,28 @@
  * limitations under the License.
  */
 
-package io.github.inference4j;
+package io.github.inference4j.image;
 
-public enum TensorType {
-    FLOAT,
-    DOUBLE,
-    INT,
-    LONG,
-    BYTE,
-    STRING
+import java.awt.RenderingHints;
+
+/**
+ * Interpolation method used when resizing images.
+ *
+ * @see ResizeTransform
+ */
+public enum Interpolation {
+
+    BILINEAR(RenderingHints.VALUE_INTERPOLATION_BILINEAR),
+    BICUBIC(RenderingHints.VALUE_INTERPOLATION_BICUBIC),
+    NEAREST_NEIGHBOR(RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+
+    private final Object hint;
+
+    Interpolation(Object hint) {
+        this.hint = hint;
+    }
+
+    Object renderingHint() {
+        return hint;
+    }
 }

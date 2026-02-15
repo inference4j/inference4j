@@ -19,13 +19,14 @@ package io.github.inference4j.model;
 import io.github.inference4j.InferenceSession;
 
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Strategy for resolving a model identifier to a local directory.
  *
  * <p>Implementations handle model discovery and download from various sources
  * (local filesystem, HuggingFace Hub, S3, etc.). The resolved directory is
- * expected to contain at least a {@code model.onnx} file.
+ * expected to contain the model files required by the task wrapper.
  *
  * <p>Built-in implementations:
  * <ul>
@@ -67,4 +68,21 @@ public interface ModelSource {
      * @throws io.github.inference4j.exception.ModelSourceException if the model cannot be resolved
      */
     Path resolve(String modelId);
+
+    /**
+     * Resolves a model identifier to a local directory, ensuring the specified files
+     * are available.
+     *
+     * <p>For download-based sources like {@link HuggingFaceModelSource}, the file list
+     * controls which files are downloaded and how the cache is validated. For local
+     * sources and lambdas, the file list is ignored since the directory already exists.
+     *
+     * @param modelId       the model identifier
+     * @param requiredFiles the filenames the task wrapper needs (e.g., {@code "model.onnx"}, {@code "vocab.txt"})
+     * @return path to a local directory containing the model files
+     * @throws io.github.inference4j.exception.ModelSourceException if the model cannot be resolved
+     */
+    default Path resolve(String modelId, List<String> requiredFiles) {
+        return resolve(modelId);
+    }
 }

@@ -28,6 +28,7 @@ import io.github.inference4j.image.Labels;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Image classifier for EfficientNet architectures.
@@ -105,7 +106,7 @@ public class EfficientNetClassifier extends AbstractImageClassifier {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id);
+                Path dir = source.resolve(id, List.of("model.onnx"));
                 loadFromDirectory(dir);
             }
             validate();

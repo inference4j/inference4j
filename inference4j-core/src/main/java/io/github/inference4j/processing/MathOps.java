@@ -233,6 +233,25 @@ public final class MathOps {
     }
 
     /**
+     * L2-normalizes a vector so that its Euclidean norm equals 1.
+     * Returns a zero vector if the input norm is zero.
+     */
+    public static float[] l2Normalize(float[] values) {
+        float sumSq = 0f;
+        for (float v : values) {
+            sumSq += v * v;
+        }
+        float norm = (float) Math.sqrt(sumSq);
+        float[] result = new float[values.length];
+        if (norm > 0f) {
+            for (int i = 0; i < values.length; i++) {
+                result[i] = values[i] / norm;
+            }
+        }
+        return result;
+    }
+
+    /**
      * Returns the indices of the top-K largest values, sorted descending by value.
      * Uses partial selection sort — O(n*k), efficient for small k on large arrays.
      */
