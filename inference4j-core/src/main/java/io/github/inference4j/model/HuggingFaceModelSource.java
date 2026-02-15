@@ -67,7 +67,8 @@ public class HuggingFaceModelSource implements ModelSource {
 
     private static final List<String> DEFAULT_FILES = List.of(
             "model.onnx", "vocab.txt", "vocab.json",
-            "config.json", "labels.txt", "silero_vad.onnx"
+            "config.json", "labels.txt", "silero_vad.onnx",
+            "merges.txt", "text_model.onnx", "vision_model.onnx"
     );
 
     private static volatile HuggingFaceModelSource instance;
@@ -113,9 +114,10 @@ public class HuggingFaceModelSource implements ModelSource {
     public Path resolve(String repoId) {
         Path repoDir = cacheDir.resolve(repoId);
 
-        // Cache hit: if model.onnx already exists, return immediately
+        // Cache hit: if a known model file already exists, return immediately
         if (Files.exists(repoDir.resolve("model.onnx"))
-                || Files.exists(repoDir.resolve("silero_vad.onnx"))) {
+                || Files.exists(repoDir.resolve("silero_vad.onnx"))
+                || Files.exists(repoDir.resolve("vision_model.onnx"))) {
             logger.debug("Cache hit for {}", repoId);
             return repoDir;
         }
@@ -126,7 +128,8 @@ public class HuggingFaceModelSource implements ModelSource {
         try {
             // Double-check after acquiring lock
             if (Files.exists(repoDir.resolve("model.onnx"))
-                    || Files.exists(repoDir.resolve("silero_vad.onnx"))) {
+                    || Files.exists(repoDir.resolve("silero_vad.onnx"))
+                    || Files.exists(repoDir.resolve("vision_model.onnx"))) {
                 logger.debug("Cache hit for {} (after lock)", repoId);
                 return repoDir;
             }
