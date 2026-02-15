@@ -110,6 +110,23 @@ static float dot(float[] a, float[] b) {
 
 Since both encoders produce L2-normalized vectors, the dot product equals cosine similarity.
 
+## Alternative models
+
+The default model is `inference4j/clip-vit-base-patch32` (ViT-B/32) — the smallest and fastest variant. You can use other CLIP-compatible models by exporting them to ONNX with the same input/output layout (`vision_model.onnx` + `text_model.onnx` + `vocab.json` + `merges.txt`) and pointing to them via `.modelId()` or `.modelSource()`.
+
+Possible variants (not yet tested with inference4j):
+
+| Model | Source | Embedding dim | Notes |
+|-------|--------|---------------|-------|
+| `openai/clip-vit-base-patch16` | OpenAI | 512 | 16×16 patches — better quality, ~2× slower |
+| `openai/clip-vit-large-patch14` | OpenAI | 768 | Best quality from OpenAI, significantly larger |
+| `laion/CLIP-ViT-B-32-laion2B-s34B-b79K` | OpenCLIP | 512 | Trained on LAION-2B, often outperforms OpenAI's original |
+| `laion/CLIP-ViT-L-14-laion2B-s32B-b82K` | OpenCLIP | 768 | Large variant trained on LAION-2B |
+| `google/siglip-base-patch16-224` | Google | 768 | SigLIP — improved training objective, strong zero-shot performance |
+
+!!! note
+    Models with different embedding dimensions (e.g., 768 instead of 512) will work — the wrappers don't assume a fixed size. However, you must use the same model for both image and text encoding since embeddings are only comparable within the same model's vector space.
+
 ## Model details
 
 | Property | Value |
