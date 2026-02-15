@@ -106,7 +106,7 @@ public class EfficientNetClassifier extends AbstractImageClassifier {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id, List.of("model.onnx", "labels.txt"));
+                Path dir = source.resolve(id, List.of("model.onnx"));
                 loadFromDirectory(dir);
             }
             validate();

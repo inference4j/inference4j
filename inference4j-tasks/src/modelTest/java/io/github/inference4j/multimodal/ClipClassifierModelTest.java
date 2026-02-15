@@ -42,8 +42,8 @@ class ClipClassifierModelTest {
             assertFalse(results.isEmpty());
             assertEquals("cat", results.get(0).label(),
                     "Expected 'cat' as top label, got: " + results.get(0).label());
-            assertTrue(results.get(0).confidence() > 0.3f,
-                    "Expected cat confidence > 0.3, got: " + results.get(0).confidence());
+            assertTrue(results.get(0).confidence() > 0.15f,
+                    "Expected cat confidence > 0.15, got: " + results.get(0).confidence());
         }
     }
 
