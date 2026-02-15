@@ -17,9 +17,9 @@
 package io.github.inference4j.vision;
 
 import io.github.inference4j.InferenceSession;
-import io.github.inference4j.ModelSource;
-import io.github.inference4j.OutputOperator;
-import io.github.inference4j.Preprocessor;
+import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.OutputOperator;
+import io.github.inference4j.processing.Preprocessor;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.image.Labels;

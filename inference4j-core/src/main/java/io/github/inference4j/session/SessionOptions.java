@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.github.inference4j;
+package io.github.inference4j.session;
 
 import ai.onnxruntime.OrtSession;
 
@@ -36,7 +36,7 @@ public class SessionOptions {
         return new Builder();
     }
 
-    OrtSession.SessionOptions toOrtOptions() throws ai.onnxruntime.OrtException {
+    public OrtSession.SessionOptions toOrtOptions() throws ai.onnxruntime.OrtException {
         OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
         opts.setIntraOpNumThreads(intraOpNumThreads);
         opts.setInterOpNumThreads(interOpNumThreads);

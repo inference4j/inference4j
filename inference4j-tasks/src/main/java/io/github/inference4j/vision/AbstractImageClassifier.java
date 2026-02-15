@@ -18,12 +18,12 @@ package io.github.inference4j.vision;
 
 import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.InferenceSession;
-import io.github.inference4j.MathOps;
-import io.github.inference4j.ModelSource;
-import io.github.inference4j.OutputOperator;
-import io.github.inference4j.Postprocessor;
-import io.github.inference4j.Preprocessor;
-import io.github.inference4j.SessionConfigurer;
+import io.github.inference4j.processing.MathOps;
+import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.OutputOperator;
+import io.github.inference4j.processing.Postprocessor;
+import io.github.inference4j.processing.Preprocessor;
+import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.image.ImageLayout;

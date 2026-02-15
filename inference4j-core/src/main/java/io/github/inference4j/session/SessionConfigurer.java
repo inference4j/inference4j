@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package io.github.inference4j;
+package io.github.inference4j.session;
 
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
+import io.github.inference4j.InferenceSession;
 
 /**
  * Configures ONNX Runtime session options before session creation.

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.github.inference4j;
+package io.github.inference4j.processing;
 
 /**
  * Numerical utilities for post-processing model outputs.
