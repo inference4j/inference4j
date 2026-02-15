@@ -16,7 +16,7 @@
 
 | Package | Contents |
 |---------|----------|
-| `io.github.inference4j.tokenizer` | `Tokenizer`, `EncodedInput`, `WordPieceTokenizer` |
+| `io.github.inference4j.tokenizer` | `Tokenizer`, `EncodedInput`, `WordPieceTokenizer`, `BpeTokenizer` |
 | `io.github.inference4j.text` | `ModelConfig` (HuggingFace config.json parser) |
 | `io.github.inference4j.image` | Image transforms pipeline |
 
@@ -24,9 +24,10 @@
 
 | Package | Contents |
 |---------|----------|
-| `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector` |
+| `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `ImageEmbedder` |
 | `io.github.inference4j.audio` | `Wav2Vec2Recognizer`, `SileroVadDetector` |
 | `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker` |
+| `io.github.inference4j.multimodal` | `ClipImageEncoder`, `ClipTextEncoder` |
 
 ### inference4j-runtime
 
@@ -52,6 +53,7 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 │   ├── TextDetector                    // detect(BufferedImage/Path) → List<TextRegion>
 │   └── VoiceActivityDetector           // detect(Path/float[]) → List<VoiceSegment>
 ├── TextEmbedder                        // encode(String) → float[]
+├── ImageEmbedder                       // encode(BufferedImage/Path) → float[]
 ├── SearchReranker                      // score(String, String) → float
 └── SpeechRecognizer                    // transcribe(Path) → Transcription
 ```
@@ -66,7 +68,7 @@ Most task wrappers extend `AbstractInferenceTask<I, O>`, which enforces a `final
 
 `InferenceContext<I>` carries data across stages — the original input, preprocessed tensors, and output tensors.
 
-Exceptions: `SileroVadDetector` (stateful hidden state) and `MiniLMSearchReranker` do not extend `AbstractInferenceTask`.
+Exceptions: `SileroVadDetector` (stateful hidden state), `MiniLMSearchReranker`, and `ClipTextEncoder` do not extend `AbstractInferenceTask`.
 
 ## Result types
 

@@ -20,6 +20,13 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Object Detection | `Yolo26Detector` | `inference4j/yolo26n` | ~25 MB | `ObjectDetector` |
 | Text Detection | `CraftTextDetector` | `inference4j/craft-mlt-25k` | ~80 MB | `TextDetector` |
 
+## Multimodal
+
+| Capability | Wrapper | Default Model ID | Size | API |
+|------------|---------|-------------------|------|-----|
+| Image Embeddings | `ClipImageEncoder` | `inference4j/clip-vit-base-patch32` | ~340 MB | `ImageEmbedder` |
+| Text Embeddings (CLIP) | `ClipTextEncoder` | `inference4j/clip-vit-base-patch32` | ~255 MB | `TextEmbedder` |
+
 ## Audio
 
 | Capability | Wrapper | Default Model ID | Size | API |
@@ -55,7 +62,6 @@ See [Configuration](configuration.md) for all options.
 | Domain | Model | Status |
 |--------|-------|--------|
 | Text | TrOCR (text recognition) | Planned |
-| Vision | CLIP (visual search) | Planned |
 | Audio | Whisper (autoregressive STT) | Future |
 
 See the [Roadmap](../roadmap.md) for details.
