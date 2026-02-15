@@ -202,11 +202,6 @@ public class HuggingFaceModelSource implements ModelSource {
                     HttpResponse.BodyHandlers.ofFile(tmpFile));
 
             int status = response.statusCode();
-            if (status == 404) {
-                // Silently skip — not all repos have all files
-                Files.deleteIfExists(tmpFile);
-                return;
-            }
             if (status < 200 || status >= 300) {
                 Files.deleteIfExists(tmpFile);
                 throw new ModelDownloadException(
