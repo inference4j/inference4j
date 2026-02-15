@@ -2,7 +2,7 @@
 
 **Run AI models in Java. Three lines of code, zero setup.**
 
-inference4j is an inference-only AI library for Java built on ONNX Runtime. It provides ergonomic, type-safe APIs for running model inference — pass a `String`, `BufferedImage`, or `Path`, get Java objects back.
+inference4j is an inference-only AI library for Java built on ONNX Runtime. It provides ergonomic, type-safe APIs for running model inference **locally** — no API keys, no network calls, no third-party services. Pass a `String`, `BufferedImage`, or `Path`, get Java objects back.
 
 ## What can you do with inference4j?
 
