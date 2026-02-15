@@ -198,6 +198,8 @@ public class InferenceSession implements AutoCloseable {
                     FloatBuffer.wrap((float[]) tensor.rawData()), tensor.shape());
             case LONG -> OnnxTensor.createTensor(environment,
                     LongBuffer.wrap((long[]) tensor.rawData()), tensor.shape());
+            case STRING -> OnnxTensor.createTensor(environment,
+                    (String[]) tensor.rawData(), tensor.shape());
             default -> throw new TensorConversionException(
                     "Unsupported tensor type for ONNX conversion: " + tensor.type());
         };
@@ -219,6 +221,15 @@ public class InferenceSession implements AutoCloseable {
                 long[] data = new long[buffer.remaining()];
                 buffer.get(data);
                 yield Tensor.fromLongs(data, shape);
+            }
+            case STRING -> {
+                try {
+                    String[] data = (String[]) onnxTensor.getValue();
+                    yield Tensor.fromStrings(data, shape);
+                } catch (OrtException e) {
+                    throw new TensorConversionException(
+                            "Failed to read STRING tensor: " + e.getMessage(), e);
+                }
             }
             default -> throw new TensorConversionException(
                     "Unsupported ONNX tensor type: " + info.type);
