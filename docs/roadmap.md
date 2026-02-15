@@ -47,21 +47,46 @@
 - [x] Builder API — `.session()` package-private, public API uses `modelId` + `modelSource` + `sessionOptions(SessionConfigurer)`
 - [x] Spring Boot starter — auto-configuration, health indicators
 - [x] Documentation site (MkDocs Material)
-
-## In Progress
-
-### Phase 4: OCR
-
 - [x] CRAFT text detection wrapper — `TextDetector` interface, `TextRegion`, `CraftTextDetector`
-- [ ] TrOCR text recognition wrapper — `TextRecognizer` interface
-- [ ] `OcrPipeline` — curated pipeline: CRAFT detection → TrOCR recognition → embedding-based correction against domain dictionaries
 
-## Planned
+## Next Up
 
-### Phase 5: Ecosystem
+### CLIP — Visual Search & Zero-Shot Classification
 
-- [ ] CLIP visual search wrapper
-- [ ] MobileNet image classifier
+[CLIP](https://openai.com/research/clip) (Contrastive Language–Image Pre-training) maps images and text into a shared embedding space. This unlocks two high-value use cases:
+
+- **Visual search** — find images that match a text query, or find text that matches an image
+- **Zero-shot classification** — classify images against arbitrary text labels without any training
+
+CLIP is a single-pass model (no autoregressive decoding), so it fits naturally into inference4j's existing architecture.
+
+- [ ] CLIP image encoder
+- [ ] CLIP text encoder
+- [ ] Combined `ClipModel` with `similarity(image, texts)` API
+- [ ] Runnable example in `inference4j-examples`
+
+### Model Test Suite
+
+Integration tests that download real models and verify inference output end-to-end. Separate from unit tests so `./gradlew test` stays fast and offline.
+
+- [ ] `./gradlew modelTest` Gradle task
+- [ ] Coverage across all supported model wrappers
+- [ ] CI integration on a schedule (not on every PR)
+
+## Parked
+
+### Autoregressive Generation
+
+TrOCR, Whisper, and any decoder-based model require an autoregressive generate loop — token-by-token decoding with KV cache management. This is fundamentally different from the single-pass pipeline used by all current models, and requires significant infrastructure:
+
+- Generate loop with configurable stopping criteria
+- KV cache management
+- BPE tokenizer
+- Mel spectrogram / FFT (for Whisper)
+
+**Blocked models:** TrOCR (text recognition), Whisper (speech-to-text), OCR Pipeline (depends on TrOCR).
+
+We'll revisit once CLIP and the model test suite are complete.
 
 ## Dropped
 
@@ -76,12 +101,12 @@
 | Text | Cross-encoder reranker (ms-marco-MiniLM) | Done |
 | Text | Text classification (DistilBERT, sentiment, moderation) | Done |
 | Text | CRAFT (text detection) | Done |
-| Text | TrOCR (text recognition) | Planned |
+| Text | TrOCR (text recognition) | Parked |
 | Vision | ResNet | Done |
 | Vision | EfficientNet | Done |
 | Vision | YOLOv8 / YOLO11 | Done |
 | Vision | YOLO26 | Done |
-| Vision | CLIP (visual search) | Planned |
+| Vision | CLIP (visual search) | Next |
 | Audio | Wav2Vec2-CTC (speech-to-text) | Done |
 | Audio | Silero VAD (voice activity detection) | Done |
-| Audio | Whisper (autoregressive speech-to-text) | Future |
+| Audio | Whisper (autoregressive speech-to-text) | Parked |

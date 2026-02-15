@@ -38,15 +38,41 @@
 - [x] Task-oriented architecture — `InferenceTask` → `Classifier`/`Detector` → domain interfaces
 - [x] Builder API — `.session()` package-private, public API uses `modelId` + `modelSource` + `sessionOptions(SessionConfigurer)`
 
-## Phase 4: OCR
-- [x] CRAFT text detection wrapper — `TextDetector` interface, `TextRegion`, `CraftTextDetector`
-- [ ] TrOCR text recognition wrapper — `TextRecognizer` interface
-- [ ] `OcrPipeline` — curated pipeline: CRAFT detection → TrOCR recognition → embedding-based correction against domain dictionaries
-
-## Phase 5: Ecosystem
+## Ecosystem — Done
 - [x] Documentation site (MkDocs Material)
 - [x] Spring Boot Starter — auto-configuration, health indicators
-- [ ] CLIP visual search wrapper
+- [x] CRAFT text detection wrapper — `TextDetector` interface, `TextRegion`, `CraftTextDetector`
+
+## Next Up
+
+### CLIP — Visual Search & Zero-Shot Classification
+- [ ] CLIP image encoder — `ClipImageEncoder` wrapping the vision transformer
+- [ ] CLIP text encoder — `ClipTextEncoder` wrapping the text transformer
+- [ ] `ClipModel` — combined image-text similarity (`similarity(image, texts)` → scored rankings)
+- [ ] Zero-shot image classification — classify images against arbitrary text labels without training
+- [ ] Example in `inference4j-examples`
+
+### Model Test Suite
+- [ ] `./gradlew modelTest` — integration tests that download real models and verify inference output
+- [ ] Separate Gradle task so unit tests (`./gradlew test`) stay fast and offline
+- [ ] Coverage across all 10 supported model wrappers
+- [ ] CI integration — run model tests on a schedule or manually (not on every PR)
+
+## Parked
+
+### Autoregressive Generation
+TrOCR, Whisper, and any decoder-based model require an autoregressive generate loop (token-by-token decoding with KV cache). This is a fundamentally different inference pattern from the single-pass preprocess → infer → postprocess pipeline used by all current models. Requires:
+- Generate loop with configurable stopping criteria
+- KV cache management for efficient decoding
+- BPE tokenizer (preprocessing roadmap)
+- Mel spectrogram / FFT (for Whisper)
+
+This is significant infrastructure work. Parked until CLIP and model test suite are complete, then revisit.
+
+**Blocked models:**
+- TrOCR (text recognition) — needs generate loop
+- Whisper (speech-to-text) — needs generate loop + mel spectrogram + BPE tokenizer
+- OCR Pipeline (CRAFT + TrOCR + embedding correction) — depends on TrOCR
 
 ## Dropped
 - ~~Generic Pipeline API~~ — `Pipeline.builder().stage().stage().build()` adds abstraction without value. Models are too different for a generic composition framework. Java streams and plain code handle multi-model composition better. Named pipelines (e.g., `OcrPipeline`) as concrete classes instead.
@@ -60,12 +86,12 @@
 | Text | Cross-encoder reranker (ms-marco-MiniLM) | Done |
 | Text | Text classification (DistilBERT, sentiment, moderation) | Done |
 | Text | CRAFT (text detection) | Done |
-| Text | TrOCR (text recognition) | Planned (Phase 4) |
+| Text | TrOCR (text recognition) | Parked (autoregressive) |
 | Vision | ResNet | Done |
 | Vision | EfficientNet | Done |
 | Vision | YOLOv8 / YOLO11 | Done |
 | Vision | YOLO26 | Done |
-| Vision | CLIP (visual search) | Planned (Phase 5) |
+| Vision | CLIP (visual search) | Next |
 | Audio | Wav2Vec2-CTC (speech-to-text) | Done |
 | Audio | Silero VAD (voice activity detection) | Done |
-| Audio | Whisper (autoregressive speech-to-text) | Future |
+| Audio | Whisper (autoregressive speech-to-text) | Parked (autoregressive) |

@@ -305,8 +305,8 @@ Every model is opt-in — nothing is downloaded until you set `enabled: true`. B
 
 ## Roadmap
 
-- **OCR Pipeline** — CRAFT text detection + TrOCR recognition + embedding-based error correction against domain dictionaries
 - **CLIP** — image-text similarity for visual search and zero-shot classification
+- **Model test suite** — `./gradlew modelTest` for end-to-end inference verification across all supported models
 
 See the [Roadmap](ROADMAP.md) for details.
 
