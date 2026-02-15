@@ -105,6 +105,60 @@ class MiniLMSearchRerankerTest {
                         .build());
     }
 
+    @Test
+    void builder_maxLength_passedToTokenizer() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(tokenizer.encode(anyString(), anyString(), anyInt())).thenReturn(
+                new EncodedInput(
+                        new long[]{101, 102},
+                        new long[]{1, 1},
+                        new long[]{0, 0}));
+        when(session.run(any())).thenReturn(
+                Map.of("logits", Tensor.fromFloats(new float[]{1.0f}, new long[]{1, 1})));
+
+        MiniLMSearchReranker model = MiniLMSearchReranker.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .maxLength(256)
+                .build();
+
+        model.score("query", "doc");
+
+        verify(tokenizer).encode("query", "doc", 256);
+    }
+
+    @Test
+    void builder_modelIdAndModelSource_accepted() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        MiniLMSearchReranker model = MiniLMSearchReranker.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .modelId("custom/reranker")
+                .modelSource(id -> Path.of("/tmp"))
+                .build();
+
+        assertNotNull(model);
+    }
+
+    @Test
+    void builder_sessionOptions_accepted() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        MiniLMSearchReranker model = MiniLMSearchReranker.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .sessionOptions(opts -> { })
+                .build();
+
+        assertNotNull(model);
+    }
+
     // --- Inference flow ---
 
     @Test
