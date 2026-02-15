@@ -1,0 +1,71 @@
+site_name: inference4j
+site_url: https://inference4j.github.io/inference4j
+site_description: Run AI models in Java. Three lines of code, zero setup.
+repo_url: https://github.com/inference4j/inference4j
+repo_name: inference4j/inference4j
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - content.code.copy
+    - content.code.annotate
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - How It Works: getting-started/how-it-works.md
+  - Use Cases:
+    - Sentiment Analysis: use-cases/sentiment-analysis.md
+    - Semantic Search: use-cases/semantic-search.md
+    - Image Classification: use-cases/image-classification.md
+    - Object Detection: use-cases/object-detection.md
+    - Speech-to-Text: use-cases/speech-to-text.md
+    - Voice Activity Detection: use-cases/voice-activity-detection.md
+    - Text Detection: use-cases/text-detection.md
+  - Guides:
+    - Hardware Acceleration: guides/hardware-acceleration.md
+    - Spring Boot: guides/spring-boot.md
+    - Model Loading: guides/model-loading.md
+  - Reference:
+    - Supported Models: reference/supported-models.md
+    - Configuration: reference/configuration.md
+    - API Overview: reference/api-overview.md
+  - Contributing:
+    - Adding a Wrapper: contributing/adding-a-wrapper.md
+  - Roadmap: roadmap.md

@@ -3,10 +3,11 @@
 [![CI](https://github.com/inference4j/inference4j/actions/workflows/ci.yml/badge.svg)](https://github.com/inference4j/inference4j/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/inference4j/inference4j/graph/badge.svg)](https://codecov.io/gh/inference4j/inference4j)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-inference4j.github.io-7c4dff.svg)](https://inference4j.github.io/inference4j)
 
 **Run AI models in Java. Three lines of code, zero setup.**
 
-> **Note:** inference4j is under active development (0.x). APIs may change. A full user guide and wiki will follow — for now, this README and the [examples](inference4j-examples/README.md) are the best way to get started.
+> **Note:** inference4j is under active development (0.x). APIs may change. Check out the [documentation site](https://inference4j.github.io/inference4j) for the full user guide, or browse the [examples](inference4j-examples/README.md) to get started.
 
 ## What can you do with inference4j?
 
@@ -304,7 +305,6 @@ Every model is opt-in — nothing is downloaded until you set `enabled: true`. B
 
 - **OCR Pipeline** — CRAFT text detection + TrOCR recognition + embedding-based error correction against domain dictionaries
 - **CLIP** — image-text similarity for visual search and zero-shot classification
-- **Documentation site** — full user guide and API reference
 
 See the [Roadmap](ROADMAP.md) for details.
 

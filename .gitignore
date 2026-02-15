@@ -29,6 +29,9 @@ gradle-app.setting
 /assets/audio/
 /assets/images/
 
+# MkDocs build output
+site/
+
 # macOS
 .DS_Store
 
