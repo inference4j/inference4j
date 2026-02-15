@@ -1,0 +1,81 @@
+name: New Model Request
+description: Request support for a new model
+labels: ["new model"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Want inference4j to support a new model? Great! Please provide the details below so we can evaluate feasibility and licensing.
+
+  - type: input
+    id: model-name
+    attributes:
+      label: Model name and architecture
+      placeholder: "e.g., MobileNetV3 image classification"
+    validations:
+      required: true
+
+  - type: input
+    id: model-url
+    attributes:
+      label: Model source URL
+      description: Link to the model on HuggingFace, GitHub, or original paper.
+      placeholder: "e.g., https://huggingface.co/google/mobilenet_v3_large"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: model-license
+    attributes:
+      label: Model license
+      description: We can only support models with permissive licenses.
+      options:
+        - Apache 2.0
+        - MIT
+        - BSD
+        - CC-BY
+        - CC-BY-SA
+        - Other (specify below)
+    validations:
+      required: true
+
+  - type: input
+    id: license-other
+    attributes:
+      label: License (if Other)
+      description: Specify the license if not listed above.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: onnx-availability
+    attributes:
+      label: ONNX availability
+      description: Is the model already available in ONNX format?
+      options:
+        - "Yes — ONNX export exists"
+        - "No — needs conversion from PyTorch/TensorFlow"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What would you use this model for? This helps us prioritize.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Domain
+      options:
+        - NLP (text)
+        - Vision (image)
+        - Audio (speech/sound)
+        - Multimodal
+        - Other
+    validations:
+      required: true
