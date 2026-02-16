@@ -63,13 +63,12 @@ def publishedModules = [
 // Aggregate coverage report across library modules only
 tasks.register('jacocoMergedReport', JacocoReport) {
     def coveredProjects = subprojects.findAll { it.name in publishedModules }
-    dependsOn coveredProjects.collect { it.tasks.withType(Test) }
+    dependsOn coveredProjects.collect { it.tasks.named('test') }
 
     coveredProjects.each { subproject ->
         subproject.plugins.withType(JacocoPlugin) {
-            executionData.from subproject.tasks.withType(Test)
-                    .collect { it.extensions.getByType(JacocoTaskExtension) }
-                    .collect { it.destinationFile }
+            executionData.from subproject.tasks.named('test')
+                    .map { it.extensions.getByType(JacocoTaskExtension).destinationFile }
             sourceDirectories.from subproject.sourceSets.main.allJava.srcDirs
             classDirectories.from subproject.sourceSets.main.output
         }
