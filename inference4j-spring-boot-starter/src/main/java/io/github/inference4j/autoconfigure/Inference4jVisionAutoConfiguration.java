@@ -28,6 +28,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Lazy;
 
 /**
  * Auto-configuration for inference4j vision tasks.
@@ -38,6 +39,7 @@ import org.springframework.context.annotation.Bean;
 public class Inference4jVisionAutoConfiguration {
 
 	@Bean
+	@Lazy
 	@ConditionalOnMissingBean(ImageClassifier.class)
 	@ConditionalOnProperty(prefix = "inference4j.vision.image-classifier", name = "enabled", havingValue = "true")
 	public ImageClassifier imageClassifier(Inference4jProperties properties) {
@@ -47,6 +49,7 @@ public class Inference4jVisionAutoConfiguration {
 	}
 
 	@Bean
+	@Lazy
 	@ConditionalOnMissingBean(ObjectDetector.class)
 	@ConditionalOnProperty(prefix = "inference4j.vision.object-detector", name = "enabled", havingValue = "true")
 	public ObjectDetector objectDetector(Inference4jProperties properties) {
@@ -56,6 +59,7 @@ public class Inference4jVisionAutoConfiguration {
 	}
 
 	@Bean
+	@Lazy
 	@ConditionalOnMissingBean(TextDetector.class)
 	@ConditionalOnProperty(prefix = "inference4j.vision.text-detector", name = "enabled", havingValue = "true")
 	public TextDetector textDetector(Inference4jProperties properties) {

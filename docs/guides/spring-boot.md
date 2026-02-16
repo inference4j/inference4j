@@ -164,9 +164,36 @@ public class SearchService {
 }
 ```
 
+## Lazy loading
+
+All inference4j beans are **lazy by default** — models are downloaded and ONNX sessions are created on first use, not at application startup. This keeps startup fast even when multiple models are enabled.
+
+The trade-off is that the first request to each model may be slower due to the model download and session initialization.
+
+### Warming up specific models
+
+If you need a model ready immediately (e.g., for latency-sensitive endpoints), inject it eagerly at startup with an `ApplicationReadyEvent` listener:
+
+```java
+@Component
+public class ModelWarmup {
+    private final TextClassifier classifier;
+
+    public ModelWarmup(TextClassifier classifier) {
+        this.classifier = classifier;
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void warmup() {
+        classifier.classify("warmup");
+    }
+}
+```
+
+This triggers the lazy bean initialization during startup, so the model is ready when the first real request arrives.
+
 ## Tips
 
-- Models are downloaded on application startup when `enabled: true`. First startup may be slow due to model downloads.
 - Use `model-id` to swap models without changing code (e.g., switch from ResNet to EfficientNet).
 - The text embedder has no default model ID — you must specify one via `model-id`.
 - All beans implement `AutoCloseable` and are properly cleaned up on application shutdown.
