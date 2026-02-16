@@ -7,17 +7,18 @@ This guide explains the internals of inference4j for contributors who want to ad
 Every wrapper follows the same three-stage pattern enforced by `AbstractInferenceTask`:
 
 ```mermaid
-flowchart LR
-    Input["I — domain input"]
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '18px'}}}%%
+flowchart TD
+    Input["<b>I — domain input</b><br>String, BufferedImage, Path"]
 
     subgraph AbstractInferenceTask["AbstractInferenceTask (final run)"]
-        Pre["Preprocessor"]
-        Session["InferenceSession.run()"]
-        Post["Postprocessor"]
-        Pre -->|"Map of String, Tensor"| Session -->|"Map of String, Tensor"| Post
+        Pre["<b>Preprocessor</b><br>domain input → Map of String, Tensor"]
+        Session["<b>InferenceSession.run()</b><br>ONNX Runtime forward pass"]
+        Post["<b>Postprocessor</b><br>Map of String, Tensor → domain output"]
+        Pre --> Session --> Post
     end
 
-    Output["O — domain output"]
+    Output["<b>O — domain output</b><br>Classification, Transcription, Detection"]
 
     Input --> Pre
     Post --> Output
@@ -270,3 +271,6 @@ Postprocessor<InferenceContext<BufferedImage>, List<Classification>> postprocess
 6. **Host the ONNX model** under the `inference4j` HuggingFace org with required companion files
 7. **Write tests** — unit tests with mocked session, integration tests with the real model
 8. **Add Spring Boot auto-configuration** if the wrapper should be available as a managed bean
+
+!!! tip "Sharing your wrapper"
+    If you intend to share your wrapper or model with the community, please follow the [Contributing Guide](https://github.com/inference4j/inference4j/blob/main/CONTRIBUTING.md) for instructions on how to submit a pull request and host the model on the [inference4j HuggingFace org](https://huggingface.co/inference4j).

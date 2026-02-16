@@ -61,6 +61,7 @@ nav:
     - Text Detection: use-cases/text-detection.md
     - Visual Search: use-cases/visual-search.md
   - Guides:
+    - Tokenizers: guides/tokenizers.md
     - Hardware Acceleration: guides/hardware-acceleration.md
     - Spring Boot: guides/spring-boot.md
     - Model Loading: guides/model-loading.md
