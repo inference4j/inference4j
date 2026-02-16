@@ -7,6 +7,7 @@ description = 'Usage examples for inference4j'
 application {
     mainClass = providers.gradleProperty('mainClass')
             .orElse('io.github.inference4j.examples.SemanticSimilarityExample')
+    applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
 }
 
 tasks.named('run') {
@@ -24,5 +25,6 @@ tasks.register('runAllExamples', JavaExec) {
 dependencies {
     implementation project(':inference4j-tasks')
     implementation project(':inference4j-runtime')
+    implementation project(':inference4j-genai')
     runtimeOnly 'org.slf4j:slf4j-simple:2.0.16'
 }

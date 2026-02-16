@@ -85,4 +85,21 @@ public interface ModelSource {
     default Path resolve(String modelId, List<String> requiredFiles) {
         return resolve(modelId);
     }
+
+    /**
+     * Resolves a model identifier to a subdirectory within the model repository.
+     *
+     * <p>For genai models hosted on HuggingFace, models are organized in
+     * subdirectories within the repository (e.g.,
+     * {@code cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/}).
+     * This method resolves the model and returns the path to the subdirectory.
+     *
+     * @param modelId      the model identifier (e.g., "microsoft/Phi-3-mini-4k-instruct-onnx")
+     * @param subdirectory the subdirectory within the repo (e.g., "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4")
+     * @return path to the local subdirectory containing the model files
+     * @throws io.github.inference4j.exception.ModelSourceException if the model cannot be resolved
+     */
+    default Path resolve(String modelId, String subdirectory) {
+        return resolve(modelId).resolve(subdirectory);
+    }
 }

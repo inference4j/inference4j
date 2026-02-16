@@ -123,7 +123,24 @@ flowchart TD
 
 All of this — the resizing, normalization, channel layout, softmax, label mapping — is encoded in the `ResNetClassifier` wrapper. A different model (say, EfficientNet) has different normalization constants, a different input layout (NHWC instead of NCHW), and may or may not need softmax applied. Each wrapper knows its model's requirements.
 
+## Beyond single-pass: autoregressive generation
+
+The three-stage pipeline above covers **single-pass** models — those that produce their
+entire output in one forward pass. Classification, embedding, detection, and
+speech-to-text all follow this pattern.
+
+Text generation works differently. A generative model produces output **one token at a
+time**, feeding each token back into the model to produce the next one. This
+autoregressive loop, along with KV cache management and token sampling, requires a
+fundamentally different architecture that doesn't fit the preprocess-infer-postprocess
+pipeline.
+
+inference4j handles this through a separate module (`inference4j-genai`) backed by
+[onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai). See the
+[Generative AI](../generative-ai/index.md) section for details.
+
 ## Next steps
 
-- [Browse use cases](../use-cases/sentiment-analysis.md) to see the wrappers in action
+- [Browse use cases](../use-cases/sentiment-analysis.md) to see the single-pass wrappers in action
+- [Generative AI](../generative-ai/index.md) for autoregressive text generation
 - [Adding a Wrapper](../contributing/adding-a-wrapper.md) explains the internals for contributors
