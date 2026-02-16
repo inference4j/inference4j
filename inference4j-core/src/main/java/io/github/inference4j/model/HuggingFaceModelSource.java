@@ -166,6 +166,58 @@ public class HuggingFaceModelSource implements ModelSource {
         }
     }
 
+    /**
+     * Resolves a model subdirectory, downloading all files in it if not cached.
+     *
+     * <p>Genai models on HuggingFace are organized in subdirectories within the
+     * repository. This method lists the files in the subdirectory via the HuggingFace
+     * API and downloads any that are missing from the local cache.
+     *
+     * @param repoId       the HuggingFace repository ID
+     * @param subdirectory the subdirectory path within the repo
+     * @return path to the local subdirectory containing the model files
+     */
+    @Override
+    public Path resolve(String repoId, String subdirectory) {
+        Path subDir = cacheDir.resolve(repoId).resolve(subdirectory);
+
+        // Cache hit: directory exists and is non-empty
+        if (Files.isDirectory(subDir) && isNonEmpty(subDir)) {
+            logger.debug("Cache hit for {}/{}", repoId, subdirectory);
+            return subDir;
+        }
+
+        ReentrantLock lock = repoLocks.computeIfAbsent(
+                repoId + "/" + subdirectory, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            // Double-check after lock
+            if (Files.isDirectory(subDir) && isNonEmpty(subDir)) {
+                logger.debug("Cache hit for {}/{} (after lock)", repoId, subdirectory);
+                return subDir;
+            }
+
+            Files.createDirectories(subDir);
+            logger.info("Downloading genai model {}/{} to {}", repoId, subdirectory, subDir);
+
+            List<String> files = listRemoteFiles(repoId, subdirectory);
+            for (String filename : files) {
+                if (!Files.exists(subDir.resolve(filename))) {
+                    downloadFile(repoId, subdirectory + "/" + filename,
+                            subDir, filename);
+                }
+            }
+
+            logger.info("Model download complete for {}/{}", repoId, subdirectory);
+            return subDir;
+        } catch (IOException e) {
+            throw new ModelDownloadException(
+                    "Failed to create cache directory: " + subDir, e);
+        } finally {
+            lock.unlock();
+        }
+    }
+
     private static boolean allFilesPresent(Path dir, List<String> files) {
         if (!Files.isDirectory(dir)) {
             return false;
@@ -189,15 +241,19 @@ public class HuggingFaceModelSource implements ModelSource {
     }
 
     private void downloadFile(String repoId, String filename, Path targetDir) {
-        URI uri = URI.create(HF_BASE_URL + "/" + repoId + "/resolve/main/" + filename);
-        Path targetFile = targetDir.resolve(filename);
-        Path tmpFile = targetDir.resolve(filename + ".tmp");
+        downloadFile(repoId, filename, targetDir, filename);
+    }
 
-        HttpRequest request = HttpRequest.newBuilder(uri)
-                .GET()
-                .build();
+    private void downloadFile(String repoId, String remotePath,
+                              Path targetDir, String targetFilename) {
+        URI uri = URI.create(HF_BASE_URL + "/" + repoId + "/resolve/main/" + remotePath);
+        Path targetFile = targetDir.resolve(targetFilename);
+        Path tmpFile = targetDir.resolve(targetFilename + ".tmp");
+
+        HttpRequest request = HttpRequest.newBuilder(uri).GET().build();
 
         try {
+            logger.debug("Downloading {} ...", remotePath);
             HttpResponse<Path> response = httpClient.send(request,
                     HttpResponse.BodyHandlers.ofFile(tmpFile));
 
@@ -208,25 +264,87 @@ public class HuggingFaceModelSource implements ModelSource {
                         "Failed to download " + uri + " (HTTP " + status + ")", status);
             }
 
-            // Atomic move from tmp to final location
             Files.move(tmpFile, targetFile, StandardCopyOption.ATOMIC_MOVE,
                     StandardCopyOption.REPLACE_EXISTING);
-            logger.debug("Downloaded {}", filename);
+            logger.debug("Downloaded {}", targetFilename);
 
         } catch (ModelDownloadException e) {
             throw e;
         } catch (IOException | InterruptedException e) {
-            // Clean up tmp file on failure
-            try {
-                Files.deleteIfExists(tmpFile);
-            } catch (IOException ignored) {
-            }
+            try { Files.deleteIfExists(tmpFile); } catch (IOException ignored) { }
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
             throw new ModelDownloadException(
                     "Failed to download " + uri + ": " + e.getMessage(), e);
         }
+    }
+
+    private static boolean isNonEmpty(Path dir) {
+        try (var stream = Files.list(dir)) {
+            return stream.findFirst().isPresent();
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private List<String> listRemoteFiles(String repoId, String subdirectory) {
+        URI uri = URI.create(HF_BASE_URL + "/api/models/" + repoId
+                + "/tree/main/" + subdirectory);
+        HttpRequest request = HttpRequest.newBuilder(uri).GET().build();
+
+        try {
+            HttpResponse<String> response = httpClient.send(request,
+                    HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new ModelDownloadException(
+                        "Failed to list files at " + uri + " (HTTP " + response.statusCode() + ")",
+                        response.statusCode());
+            }
+            return parseFileList(response.body());
+        } catch (ModelDownloadException e) {
+            throw e;
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            throw new ModelDownloadException(
+                    "Failed to list files at " + uri + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Parses the HuggingFace tree API JSON response to extract filenames.
+     * The response is an array of objects, each with a "path" and "type" field.
+     * We only want entries where type is "file".
+     */
+    List<String> parseFileList(String json) {
+        List<String> files = new ArrayList<>();
+        int idx = 0;
+        while ((idx = json.indexOf("\"type\"", idx)) != -1) {
+            int typeStart = json.indexOf('"', json.indexOf(':', idx) + 1) + 1;
+            int typeEnd = json.indexOf('"', typeStart);
+            String type = json.substring(typeStart, typeEnd);
+            idx = typeEnd;
+
+            if (!"file".equals(type)) {
+                continue;
+            }
+
+            // Find the "path" field near this entry — search backward since
+            // in HF API response, "path" comes before "type" in each object
+            int pathIdx = json.lastIndexOf("\"path\"", idx);
+            if (pathIdx != -1) {
+                int pathStart = json.indexOf('"', json.indexOf(':', pathIdx) + 1) + 1;
+                int pathEnd = json.indexOf('"', pathStart);
+                String fullPath = json.substring(pathStart, pathEnd);
+                // Extract just the filename (strip the subdirectory prefix)
+                int lastSlash = fullPath.lastIndexOf('/');
+                String filename = lastSlash >= 0 ? fullPath.substring(lastSlash + 1) : fullPath;
+                files.add(filename);
+            }
+        }
+        return files;
     }
 
     private static Path resolveDefaultCacheDir() {
