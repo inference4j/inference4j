@@ -24,7 +24,6 @@ import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.genai.AbstractGenerativeTask;
 import io.github.inference4j.genai.GenerationResult;
-import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 
 import java.nio.file.Path;
@@ -38,7 +37,9 @@ import java.nio.file.Path;
  *
  * <p>Usage:
  * <pre>{@code
- * try (var gen = TextGenerator.builder().build()) {
+ * try (var gen = TextGenerator.builder()
+ *         .modelSource(ModelSources.phi3Mini())
+ *         .build()) {
  *     GenerationResult result = gen.generate("What is Java in one sentence?");
  *     System.out.println(result.text());
  * }
@@ -47,19 +48,17 @@ import java.nio.file.Path;
  * <p>With streaming:
  * <pre>{@code
  * try (var gen = TextGenerator.builder()
+ *         .modelSource(ModelSources.phi3Mini())
  *         .maxLength(200)
  *         .temperature(0.7)
  *         .build()) {
  *     gen.generate("Explain recursion.", token -> System.out.print(token));
  * }
  * }</pre>
+ *
+ * @see io.github.inference4j.genai.ModelSources
  */
 public class TextGenerator extends AbstractGenerativeTask<String, GenerationResult> {
-
-    private static final String DEFAULT_MODEL_ID =
-            "microsoft/Phi-3-mini-4k-instruct-onnx";
-    private static final String DEFAULT_SUBDIRECTORY =
-            "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4";
 
     TextGenerator(Model model, Tokenizer tokenizer,
                   int maxLength, double temperature, int topK, double topP) {
@@ -98,8 +97,6 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
     }
 
     public static class Builder {
-        private String modelId = DEFAULT_MODEL_ID;
-        private String subdirectory = DEFAULT_SUBDIRECTORY;
         private ModelSource modelSource;
         private int maxLength = 1024;
         private double temperature = 1.0;
@@ -109,16 +106,6 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
         // Package-private for testing
         Model model;
         Tokenizer tokenizer;
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
-        }
-
-        public Builder subdirectory(String subdirectory) {
-            this.subdirectory = subdirectory;
-            return this;
-        }
 
         public Builder modelSource(ModelSource modelSource) {
             this.modelSource = modelSource;
@@ -147,10 +134,13 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
 
         public TextGenerator build() {
             if (model == null) {
+                if (modelSource == null) {
+                    throw new IllegalStateException(
+                            "modelSource is required — use ModelSources.phi3Mini() "
+                                    + "or provide a custom ModelSource");
+                }
                 try {
-                    ModelSource source = modelSource != null
-                            ? modelSource : HuggingFaceModelSource.defaultInstance();
-                    Path modelDir = source.resolve(modelId, subdirectory);
+                    Path modelDir = modelSource.resolve("model");
                     model = new Model(modelDir.toString());
                     tokenizer = new Tokenizer(model);
                 } catch (GenAIException e) {

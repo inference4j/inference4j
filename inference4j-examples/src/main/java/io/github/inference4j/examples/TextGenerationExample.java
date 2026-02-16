@@ -16,10 +16,15 @@
 package io.github.inference4j.examples;
 
 import io.github.inference4j.genai.GenerationResult;
+import io.github.inference4j.genai.ModelSources;
+import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.nlp.TextGenerator;
 
 /**
- * Demonstrates autoregressive text generation with Phi-3-mini.
+ * Compares text generation across models side by side.
+ *
+ * <p>Runs the same prompts through Phi-3-mini (3.8B) and DeepSeek-R1 (1.5B),
+ * showing output quality and generation speed for each.
  *
  * <p>Usage:
  * <pre>
@@ -29,31 +34,46 @@ import io.github.inference4j.nlp.TextGenerator;
  */
 public class TextGenerationExample {
 
+    private static final String[] PROMPTS = {
+            "What is Java in one sentence?",
+            "Explain recursion in simple terms.",
+    };
+
     public static void main(String[] args) {
-        System.out.println("=== Text Generation with Phi-3-mini ===\n");
+        System.out.println("=== Text Generation — Model Comparison ===\n");
 
-        try (var generator = TextGenerator.builder()
-                .maxLength(200)
-                .temperature(0.7)
-                .build()) {
+        String[] modelNames = {"Phi-3-mini (3.8B)", "DeepSeek-R1 (1.5B)"};
+        ModelSource[] modelSources = {ModelSources.phi3Mini(), ModelSources.deepSeekR1_1_5B()};
+        GenerationResult[][] results = new GenerationResult[modelSources.length][PROMPTS.length];
 
-            // Simple generation
-            System.out.println("Q: What is Java in one sentence?");
-            System.out.print("A: ");
-            GenerationResult result = generator.generate(
-                    "What is Java in one sentence?",
-                    token -> System.out.print(token));
-            System.out.printf("%n[%d tokens in %dms]%n%n",
-                    result.tokenCount(), result.durationMillis());
+        for (int m = 0; m < modelSources.length; m++) {
+            System.out.printf("Loading %s...%n", modelNames[m]);
+            try (var generator = TextGenerator.builder()
+                    .modelSource(modelSources[m])
+                    .maxLength(200)
+                    .temperature(0.7)
+                    .build()) {
 
-            // Second generation reusing the same model
-            System.out.println("Q: What is recursion?");
-            System.out.print("A: ");
-            result = generator.generate(
-                    "What is recursion?",
-                    token -> System.out.print(token));
-            System.out.printf("%n[%d tokens in %dms]%n",
-                    result.tokenCount(), result.durationMillis());
+                for (int p = 0; p < PROMPTS.length; p++) {
+                    results[m][p] = generator.generate(PROMPTS[p]);
+                }
+            }
         }
+
+        // Print side-by-side results
+        for (int p = 0; p < PROMPTS.length; p++) {
+            System.out.println("─".repeat(70));
+            System.out.printf("Q: %s%n%n", PROMPTS[p]);
+
+            for (int m = 0; m < modelSources.length; m++) {
+                GenerationResult r = results[m][p];
+                System.out.printf("  [%s]%n", modelNames[m]);
+                System.out.printf("  %s%n", r.text().strip());
+                System.out.printf("  → %d tokens in %,d ms (%.1f tok/s)%n%n",
+                        r.tokenCount(), r.durationMillis(),
+                        r.tokenCount() * 1000.0 / r.durationMillis());
+            }
+        }
+        System.out.println("─".repeat(70));
     }
 }

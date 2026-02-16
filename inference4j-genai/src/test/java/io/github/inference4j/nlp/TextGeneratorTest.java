@@ -54,11 +54,10 @@ class TextGeneratorTest {
     }
 
     @Test
-    void builderDefaultsAreSet() {
+    void builderRequiresModelSource() {
         TextGenerator.Builder builder = TextGenerator.builder();
         assertNotNull(builder);
-        // Builder requires a model to build — verify it throws without one
-        assertThrows(Exception.class, builder::build);
+        assertThrows(IllegalStateException.class, builder::build);
     }
 
     @Test

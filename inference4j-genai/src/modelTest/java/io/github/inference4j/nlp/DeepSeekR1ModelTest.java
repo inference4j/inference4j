@@ -27,17 +27,17 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Integration test that runs real text generation with Phi-3-mini.
+ * Integration test that runs real text generation with DeepSeek-R1-Distill-Qwen-1.5B.
  *
  * <p>Requires the model to be downloaded locally. The model will be
- * auto-downloaded from HuggingFace on first run (requires network, ~2GB).
+ * auto-downloaded from HuggingFace on first run (requires network, ~1GB).
  */
-class TextGeneratorModelTest {
+class DeepSeekR1ModelTest {
 
     @Test
     void generateProducesNonEmptyOutput() {
         try (var generator = TextGenerator.builder()
-                .modelSource(ModelSources.phi3Mini())
+                .modelSource(ModelSources.deepSeekR1_1_5B())
                 .maxLength(100)
                 .temperature(0.7)
                 .build()) {
@@ -55,7 +55,7 @@ class TextGeneratorModelTest {
     @Test
     void generateWithStreamingCollectsAllTokens() {
         try (var generator = TextGenerator.builder()
-                .modelSource(ModelSources.phi3Mini())
+                .modelSource(ModelSources.deepSeekR1_1_5B())
                 .maxLength(50)
                 .build()) {
 
