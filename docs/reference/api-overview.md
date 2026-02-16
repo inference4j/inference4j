@@ -29,6 +29,13 @@
 | `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
 
+### inference4j-genai
+
+| Package | Contents |
+|---------|----------|
+| `io.github.inference4j.genai` | `GenerativeTask`, `AbstractGenerativeTask`, `GenerationResult`, `ChatTemplate`, `GenerativeModel`, `ModelSources` |
+| `io.github.inference4j.nlp` | `TextGenerator` |
+
 ### inference4j-runtime
 
 | Package | Contents |
@@ -70,6 +77,18 @@ Most task wrappers extend `AbstractInferenceTask<I, O>`, which enforces a `final
 
 Exceptions: `SileroVadDetector` (stateful hidden state), `MiniLMSearchReranker`, and `ClipTextEncoder` do not extend `AbstractInferenceTask`.
 
+### Generative AI hierarchy
+
+```
+GenerativeTask<I, O>                    // generate(I) → O, extends AutoCloseable
+└── AbstractGenerativeTask<I, O>        // owns the autoregressive loop
+    └── TextGenerator                   // generate(String) → GenerationResult
+```
+
+`GenerativeTask` is the generative counterpart to `InferenceTask`. While `InferenceTask`
+performs a single forward pass, `GenerativeTask` runs an iterative generate loop
+backed by onnxruntime-genai. See [Generative AI](../generative-ai/index.md) for details.
+
 ## Result types
 
 | Type | Fields | Used by |
@@ -81,6 +100,7 @@ Exceptions: `SileroVadDetector` (stateful hidden state), `MiniLMSearchReranker`,
 | `BoundingBox` | `x1()`, `y1()`, `x2()`, `y2()` | Embedded in `Detection`, `TextRegion` |
 | `Transcription` | `text()` | `Wav2Vec2Recognizer` |
 | `VoiceSegment` | `start()`, `end()`, `duration()`, `confidence()` | `SileroVadDetector` |
+| `GenerationResult` | `text()`, `tokenCount()`, `durationMillis()` | `TextGenerator` |
 
 ## Builder pattern
 
@@ -108,3 +128,4 @@ The `.session(InferenceSession)` method exists on all builders but is package-pr
 | `Preprocessor<I, O>` | `O process(I input)` | Input transformation |
 | `Postprocessor<I, O>` | `O process(I input)` | Output transformation |
 | `OutputOperator` | `float[] apply(float[] values)` | Activation function (softmax, sigmoid, identity) |
+| `ChatTemplate` | `String format(String userMessage)` | Prompt formatting for generative models |

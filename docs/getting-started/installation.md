@@ -25,6 +25,27 @@
     </dependency>
     ```
 
+## Generative AI
+
+For text generation (Phi-3, DeepSeek-R1, etc.), add `inference4j-genai` instead:
+
+=== "Gradle"
+
+    ```groovy
+    implementation 'io.github.inference4j:inference4j-genai'
+    ```
+
+=== "Maven"
+
+    ```xml
+    <dependency>
+        <groupId>io.github.inference4j</groupId>
+        <artifactId>inference4j-genai</artifactId>
+    </dependency>
+    ```
+
+This is a separate module backed by onnxruntime-genai. See the [Generative AI guide](../generative-ai/index.md) for details.
+
 ## JVM flags
 
 ONNX Runtime requires native access. Add this flag to your JVM arguments:

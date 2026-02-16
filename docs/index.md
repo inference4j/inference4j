@@ -86,6 +86,16 @@ try (var reranker = MiniLMSearchReranker.builder().build()) {
 }
 ```
 
+### Text Generation
+
+```java
+try (var generator = TextGenerator.builder()
+        .model(ModelSources.phi3Mini())
+        .build()) {
+    generator.generate("Explain recursion.", token -> System.out.print(token));
+}
+```
+
 ## What you don't have to do
 
 - **No tokenization** — WordPiece tokenizers are built in and handled automatically

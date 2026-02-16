@@ -60,6 +60,11 @@ nav:
     - Voice Activity Detection: use-cases/voice-activity-detection.md
     - Text Detection: use-cases/text-detection.md
     - Visual Search: use-cases/visual-search.md
+    - Text Generation: generative-ai/text-generation.md
+  - Generative AI:
+    - generative-ai/index.md
+    - Text Generation: generative-ai/text-generation.md
+    - Chat Templates: generative-ai/chat-templates.md
   - Guides:
     - Tokenizers: guides/tokenizers.md
     - Hardware Acceleration: guides/hardware-acceleration.md

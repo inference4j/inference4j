@@ -35,6 +35,15 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Speech-to-Text | `Wav2Vec2Recognizer` | `inference4j/wav2vec2-base-960h` | ~370 MB | `SpeechRecognizer` |
 | Voice Activity Detection | `SileroVadDetector` | `inference4j/silero-vad` | ~2 MB | `VoiceActivityDetector` |
 
+## Generative AI
+
+Generative models use a separate module (`inference4j-genai`) and a different builder pattern. See [Generative AI](../generative-ai/index.md) for details.
+
+| Capability | Wrapper | Model ID | Size | License |
+|------------|---------|----------|------|---------|
+| Text Generation | `TextGenerator` | `inference4j/phi-3-mini-4k-instruct` | ~2.7 GB | MIT |
+| Text Generation | `TextGenerator` | `inference4j/deepseek-r1-distill-qwen-1.5b` | ~1 GB | MIT |
+
 ## Model compatibility
 
 ### YOLOv8 / YOLO11
