@@ -112,23 +112,22 @@ inference4j embraces [ONNX](https://onnx.ai/) (Open Neural Network Exchange) as 
 
 The vast majority of inference tasks follow the same three-stage pattern: **preprocess → infer → postprocess**. inference4j provides curated wrappers that handle all three stages, so you work with standard Java types instead of tensors:
 
-```
-String / BufferedImage / Path
-        │
-        ▼
-  ┌─────────────┐
-  │ Preprocess   │  tokenize text, resize/normalize image, load audio
-  └──────┬──────┘
-         ▼
-  ┌─────────────┐
-  │ Infer        │  ONNX Runtime forward pass (tensors in, tensors out)
-  └──────┬──────┘
-         ▼
-  ┌─────────────┐
-  │ Postprocess  │  softmax, decode, NMS, label mapping
-  └──────┬──────┘
-         ▼
-List<Classification> / Transcription / List<Detection>
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '18px'}}}%%
+flowchart TD
+    Input["<b>Java Object</b><br>String, BufferedImage, Path"]
+
+    subgraph inference4j["inference4j wrapper"]
+        Pre["<b>Preprocess</b><br>tokenize text, resize/normalize image, load audio"]
+        Infer["<b>Infer</b><br>ONNX Runtime forward pass"]
+        Post["<b>Postprocess</b><br>softmax, decode, NMS, label mapping"]
+        Pre --> Infer --> Post
+    end
+
+    Output["<b>Java Object</b><br>Classification, Transcription, Detection"]
+
+    Input --> Pre
+    Post --> Output
 ```
 
 Each wrapper encapsulates the model-specific knowledge — the normalization constants, the tokenizer, the output decoding — so you don't have to.

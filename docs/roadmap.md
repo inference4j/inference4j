@@ -5,7 +5,7 @@
 ### Phase 1: Foundation (Core & NLP)
 
 - [x] `inference4j-core` — `InferenceSession`, `Tensor`, `ModelSource`, `MathOps` (softmax, sigmoid, logSoftmax, topK, NMS, cxcywh2xyxy)
-- [x] `inference4j-preprocessing` — `WordPieceTokenizer`, `EncodedInput`, `Tokenizer` interface
+- [x] `inference4j-preprocessing` — `WordPieceTokenizer`, `BpeTokenizer`, `EncodedInput`, `Tokenizer` interface
 - [x] `SentenceTransformer` wrapper — sentence embeddings with CLS/MEAN/MAX pooling
 - [x] `EmbeddingModelRouter` — A/B testing with round-robin routing
 
@@ -38,7 +38,15 @@
 - [x] `ModelConfig` — parses HuggingFace `config.json` for `id2label` and `problem_type`
 - [x] Sentence pair encoding in `Tokenizer`/`WordPieceTokenizer`
 
-### Architecture
+### Phase 4: CLIP — Visual Search & Zero-Shot Classification
+
+- [x] CLIP image encoder and text encoder
+- [x] `ClipClassifier` — zero-shot image classification against arbitrary text labels
+- [x] `ClipModel` with `similarity(image, texts)` API
+- [x] `BpeTokenizer` — byte-level BPE for CLIP/GPT-2 family
+- [x] Runnable examples in `inference4j-examples`
+
+### Architecture & Ecosystem
 
 - [x] `AbstractInferenceTask` — enforced preprocess → infer → postprocess pipeline with `final run()`
 - [x] `Preprocessor`/`Postprocessor` functional interfaces
@@ -48,45 +56,27 @@
 - [x] Spring Boot starter — auto-configuration, health indicators
 - [x] Documentation site (MkDocs Material)
 - [x] CRAFT text detection wrapper — `TextDetector` interface, `TextRegion`, `CraftTextDetector`
+- [x] Model test suite — `./gradlew modelTest` with real model downloads and inference verification
 
 ## Next Up
 
-### CLIP — Visual Search & Zero-Shot Classification
+### Autoregressive Generation via onnxruntime-genai
 
-[CLIP](https://openai.com/research/clip) (Contrastive Language–Image Pre-training) maps images and text into a shared embedding space. This unlocks two high-value use cases:
+All models in inference4j today are **single-pass** — one forward pass, one result. A large class of models require **autoregressive generation** instead: producing output token-by-token, where each token depends on all previous tokens. This includes language models, speech-to-text with attention, and vision-language models.
 
-- **Visual search** — find images that match a text query, or find text that matches an image
-- **Zero-shot classification** — classify images against arbitrary text labels without any training
+[onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai) provides exactly this capability — a generate loop with KV cache management, sampling strategies, and streaming — built on top of ONNX Runtime. We've published [community Java bindings](https://github.com/inference4j/onnxruntime-genai) to Maven Central (`io.github.inference4j:onnxruntime-genai`) since Microsoft does not currently publish them.
 
-CLIP is a single-pass model (no autoregressive decoding), so it fits naturally into inference4j's existing architecture.
+This is the next major focus area, and it unlocks an entirely new category of models:
 
-- [ ] CLIP image encoder
-- [ ] CLIP text encoder
-- [ ] Combined `ClipModel` with `similarity(image, texts)` API
-- [ ] Runnable example in `inference4j-examples`
-
-### Model Test Suite
-
-Integration tests that download real models and verify inference output end-to-end. Separate from unit tests so `./gradlew test` stays fast and offline.
-
-- [ ] `./gradlew modelTest` Gradle task
-- [ ] Coverage across all supported model wrappers
-- [ ] CI integration on a schedule (not on every PR)
-
-## Parked
-
-### Autoregressive Generation
-
-TrOCR, Whisper, and any decoder-based model require an autoregressive generate loop — token-by-token decoding with KV cache management. This is fundamentally different from the single-pass pipeline used by all current models, and requires significant infrastructure:
-
-- Generate loop with configurable stopping criteria
-- KV cache management
-- BPE tokenizer
-- Mel spectrogram / FFT (for Whisper)
-
-**Blocked models:** TrOCR (text recognition), Whisper (speech-to-text), OCR Pipeline (depends on TrOCR).
-
-We'll revisit once CLIP and the model test suite are complete.
+- [ ] Integrate `onnxruntime-genai` Java bindings into inference4j
+- [ ] **Whisper** — autoregressive speech-to-text with attention (replaces CTC-based Wav2Vec2 for multilingual/high-accuracy use cases)
+- [ ] **GPT-2** — text generation
+- [ ] **Phi-3** — small language model for local inference
+- [ ] **TrOCR** — text recognition (handwriting, printed text)
+- [ ] **ViT + decoder models** — vision-language tasks (image captioning, visual Q&A)
+- [ ] OCR Pipeline — CRAFT detection + TrOCR recognition composed end-to-end
+- [ ] Mel spectrogram / FFT preprocessing (for Whisper)
+- [ ] Streaming generation API — token-by-token callbacks
 
 ## Dropped
 
@@ -101,12 +91,14 @@ We'll revisit once CLIP and the model test suite are complete.
 | Text | Cross-encoder reranker (ms-marco-MiniLM) | Done |
 | Text | Text classification (DistilBERT, sentiment, moderation) | Done |
 | Text | CRAFT (text detection) | Done |
-| Text | TrOCR (text recognition) | Parked |
+| Text | TrOCR (text recognition) | Next |
+| Text | GPT-2 (text generation) | Next |
 | Vision | ResNet | Done |
 | Vision | EfficientNet | Done |
 | Vision | YOLOv8 / YOLO11 | Done |
 | Vision | YOLO26 | Done |
-| Vision | CLIP (visual search) | Next |
+| Vision | CLIP (visual search, zero-shot classification) | Done |
+| Vision | Phi-3 Vision / ViT-decoder (captioning, VQA) | Next |
 | Audio | Wav2Vec2-CTC (speech-to-text) | Done |
 | Audio | Silero VAD (voice activity detection) | Done |
-| Audio | Whisper (autoregressive speech-to-text) | Parked |
+| Audio | Whisper (autoregressive speech-to-text) | Next |

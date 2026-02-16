@@ -20,12 +20,13 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
   features:
-    - navigation.sections
-    - navigation.expand
     - navigation.indexes
     - content.code.copy
     - content.code.annotate
     - search.highlight
+
+extra_css:
+  - stylesheets/extra.css
 
 markdown_extensions:
   - admonition
@@ -60,6 +61,7 @@ nav:
     - Text Detection: use-cases/text-detection.md
     - Visual Search: use-cases/visual-search.md
   - Guides:
+    - Tokenizers: guides/tokenizers.md
     - Hardware Acceleration: guides/hardware-acceleration.md
     - Spring Boot: guides/spring-boot.md
     - Model Loading: guides/model-loading.md
