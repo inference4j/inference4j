@@ -59,6 +59,20 @@ class Inference4jNlpAutoConfigurationTest {
 	}
 
 	@Test
+	void beansAreLazyWhenEnabled() {
+		runner.withPropertyValues(
+				"inference4j.nlp.text-classifier.enabled=true",
+				"inference4j.nlp.text-embedder.enabled=true",
+				"inference4j.nlp.text-embedder.model-id=test/model",
+				"inference4j.nlp.search-reranker.enabled=true")
+			.run(ctx -> {
+				assertThat(ctx.getBeanFactory().getBeanDefinition("textClassifier").isLazyInit()).isTrue();
+				assertThat(ctx.getBeanFactory().getBeanDefinition("textEmbedder").isLazyInit()).isTrue();
+				assertThat(ctx.getBeanFactory().getBeanDefinition("searchReranker").isLazyInit()).isTrue();
+			});
+	}
+
+	@Test
 	void userBeanOverridesAutoConfiguredTextClassifier() {
 		runner.withPropertyValues("inference4j.nlp.text-classifier.enabled=true")
 			.withUserConfiguration(CustomTextClassifierConfig.class)

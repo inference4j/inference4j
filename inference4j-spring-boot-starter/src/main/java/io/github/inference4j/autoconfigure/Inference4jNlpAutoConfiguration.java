@@ -28,6 +28,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Lazy;
 
 /**
  * Auto-configuration for inference4j NLP tasks.
@@ -38,6 +39,7 @@ import org.springframework.context.annotation.Bean;
 public class Inference4jNlpAutoConfiguration {
 
 	@Bean
+	@Lazy
 	@ConditionalOnMissingBean(TextClassifier.class)
 	@ConditionalOnProperty(prefix = "inference4j.nlp.text-classifier", name = "enabled", havingValue = "true")
 	public TextClassifier textClassifier(Inference4jProperties properties) {
@@ -47,6 +49,7 @@ public class Inference4jNlpAutoConfiguration {
 	}
 
 	@Bean
+	@Lazy
 	@ConditionalOnMissingBean(TextEmbedder.class)
 	@ConditionalOnProperty(prefix = "inference4j.nlp.text-embedder", name = "enabled", havingValue = "true")
 	public TextEmbedder textEmbedder(Inference4jProperties properties) {
@@ -56,6 +59,7 @@ public class Inference4jNlpAutoConfiguration {
 	}
 
 	@Bean
+	@Lazy
 	@ConditionalOnMissingBean(SearchReranker.class)
 	@ConditionalOnProperty(prefix = "inference4j.nlp.search-reranker", name = "enabled", havingValue = "true")
 	public SearchReranker searchReranker(Inference4jProperties properties) {

@@ -26,6 +26,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Lazy;
 
 /**
  * Auto-configuration for inference4j audio tasks.
@@ -36,6 +37,7 @@ import org.springframework.context.annotation.Bean;
 public class Inference4jAudioAutoConfiguration {
 
 	@Bean
+	@Lazy
 	@ConditionalOnMissingBean(SpeechRecognizer.class)
 	@ConditionalOnProperty(prefix = "inference4j.audio.speech-recognizer", name = "enabled", havingValue = "true")
 	public SpeechRecognizer speechRecognizer(Inference4jProperties properties) {
@@ -45,6 +47,7 @@ public class Inference4jAudioAutoConfiguration {
 	}
 
 	@Bean
+	@Lazy
 	@ConditionalOnMissingBean(VoiceActivityDetector.class)
 	@ConditionalOnProperty(prefix = "inference4j.audio.vad", name = "enabled", havingValue = "true")
 	public VoiceActivityDetector voiceActivityDetector(Inference4jProperties properties) {
