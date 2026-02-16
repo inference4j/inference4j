@@ -21,15 +21,15 @@ import io.github.inference4j.model.ModelSource;
 import java.util.List;
 
 /**
- * Factory for preconfigured {@link ModelSource} instances for generative AI models.
+ * Factory for preconfigured {@link GenerativeModel} instances for generative AI models.
  *
- * <p>Each factory method returns a {@link ModelSource} that encapsulates the model
- * repository, required files, and download logic. Use these with
+ * <p>Each factory method returns a {@link GenerativeModel} that encapsulates the model
+ * repository, required files, download logic, and chat template. Use these with
  * {@link io.github.inference4j.nlp.TextGenerator}:
  *
  * <pre>{@code
  * try (var gen = TextGenerator.builder()
- *         .modelSource(ModelSources.phi3Mini())
+ *         .model(ModelSources.phi3Mini())
  *         .build()) {
  *     gen.generate("Hello!");
  * }
@@ -48,20 +48,23 @@ public final class ModelSources {
      * <p>3.8B-parameter lightweight model from Microsoft, quantized to INT4
      * for CPU inference. Hosted at {@code inference4j/phi-3-mini-4k-instruct}.
      *
-     * @return a preconfigured model source for Phi-3 Mini
+     * @return a preconfigured generative model for Phi-3 Mini
      */
-    public static ModelSource phi3Mini() {
-        return preconfigured("inference4j/phi-3-mini-4k-instruct", List.of(
-                "genai_config.json",
-                "config.json",
-                "phi3-mini-4k-instruct-cpu-int4-rtn-block-32-acc-level-4.onnx",
-                "phi3-mini-4k-instruct-cpu-int4-rtn-block-32-acc-level-4.onnx.data",
-                "tokenizer.json",
-                "tokenizer.model",
-                "tokenizer_config.json",
-                "special_tokens_map.json",
-                "added_tokens.json"
-        ));
+    public static GenerativeModel phi3Mini() {
+        return new GenerativeModel(
+                preconfigured("inference4j/phi-3-mini-4k-instruct", List.of(
+                        "genai_config.json",
+                        "config.json",
+                        "phi3-mini-4k-instruct-cpu-int4-rtn-block-32-acc-level-4.onnx",
+                        "phi3-mini-4k-instruct-cpu-int4-rtn-block-32-acc-level-4.onnx.data",
+                        "tokenizer.json",
+                        "tokenizer.model",
+                        "tokenizer_config.json",
+                        "special_tokens_map.json",
+                        "added_tokens.json"
+                )),
+                message -> "<|user|>\n" + message + "<|end|>\n<|assistant|>\n"
+        );
     }
 
     /**
@@ -70,17 +73,21 @@ public final class ModelSources {
      * <p>1.5B-parameter reasoning model distilled from DeepSeek-R1, quantized
      * to INT4 for CPU inference. Hosted at {@code inference4j/deepseek-r1-distill-qwen-1.5b}.
      *
-     * @return a preconfigured model source for DeepSeek-R1 1.5B
+     * @return a preconfigured generative model for DeepSeek-R1 1.5B
      */
-    public static ModelSource deepSeekR1_1_5B() {
-        return preconfigured("inference4j/deepseek-r1-distill-qwen-1.5b", List.of(
-                "genai_config.json",
-                "model.onnx",
-                "model.onnx.data",
-                "tokenizer.json",
-                "tokenizer_config.json",
-                "special_tokens_map.json"
-        ));
+    public static GenerativeModel deepSeekR1_1_5B() {
+        return new GenerativeModel(
+                preconfigured("inference4j/deepseek-r1-distill-qwen-1.5b", List.of(
+                        "genai_config.json",
+                        "model.onnx",
+                        "model.onnx.data",
+                        "tokenizer.json",
+                        "tokenizer_config.json",
+                        "special_tokens_map.json"
+                )),
+                message -> "<\uFF5Cbegin\u2581of\u2581sentence\uFF5C>"
+                        + "<\uFF5CUser\uFF5C>" + message + "<\uFF5CAssistant\uFF5C>"
+        );
     }
 
     private static ModelSource preconfigured(String repoId, List<String> requiredFiles) {

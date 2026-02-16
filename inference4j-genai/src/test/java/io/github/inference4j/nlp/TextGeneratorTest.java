@@ -17,6 +17,7 @@ package io.github.inference4j.nlp;
 
 import ai.onnxruntime.genai.Model;
 import ai.onnxruntime.genai.Tokenizer;
+import io.github.inference4j.genai.ChatTemplate;
 import io.github.inference4j.genai.GenerationResult;
 import org.junit.jupiter.api.Test;
 
@@ -28,12 +29,15 @@ import static org.mockito.Mockito.verify;
 
 class TextGeneratorTest {
 
+    private static final ChatTemplate DUMMY_TEMPLATE = msg -> "<|user|>\n" + msg + "<|end|>\n";
+
     @Test
     void parseOutputWrapsTextInGenerationResult() {
         Model model = mock(Model.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
 
-        TextGenerator gen = new TextGenerator(model, tokenizer, 100, 1.0, 0, 0.0);
+        TextGenerator gen = new TextGenerator(model, tokenizer, DUMMY_TEMPLATE,
+                100, 1.0, 0, 0.0);
         GenerationResult result = gen.parseOutput("Hello world", "prompt", 5, 120);
 
         assertEquals("Hello world", result.text());
@@ -46,7 +50,8 @@ class TextGeneratorTest {
         Model model = mock(Model.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
 
-        TextGenerator gen = new TextGenerator(model, tokenizer, 100, 1.0, 0, 0.0);
+        TextGenerator gen = new TextGenerator(model, tokenizer, DUMMY_TEMPLATE,
+                100, 1.0, 0, 0.0);
         gen.close();
 
         verify(tokenizer).close();
@@ -54,20 +59,16 @@ class TextGeneratorTest {
     }
 
     @Test
-    void builderRequiresModelSource() {
+    void builderRequiresModel() {
         TextGenerator.Builder builder = TextGenerator.builder();
         assertNotNull(builder);
         assertThrows(IllegalStateException.class, builder::build);
     }
 
     @Test
-    void buildMessagesJsonEscapesQuotes() {
-        Model model = mock(Model.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
-
-        TextGenerator gen = new TextGenerator(model, tokenizer, 100, 1.0, 0, 0.0);
-        String json = gen.buildMessagesJson("He said \"hello\"");
-
-        assertEquals("[{\"role\": \"user\", \"content\": \"He said \\\"hello\\\"\"}]", json);
+    void builderRequiresChatTemplateWhenModelSourceProvided() {
+        TextGenerator.Builder builder = TextGenerator.builder()
+                .modelSource(modelId -> null);
+        assertThrows(IllegalStateException.class, builder::build);
     }
 }

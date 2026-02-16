@@ -16,8 +16,8 @@
 package io.github.inference4j.examples;
 
 import io.github.inference4j.genai.GenerationResult;
+import io.github.inference4j.genai.GenerativeModel;
 import io.github.inference4j.genai.ModelSources;
-import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.nlp.TextGenerator;
 
 /**
@@ -43,13 +43,13 @@ public class TextGenerationExample {
         System.out.println("=== Text Generation — Model Comparison ===\n");
 
         String[] modelNames = {"Phi-3-mini (3.8B)", "DeepSeek-R1 (1.5B)"};
-        ModelSource[] modelSources = {ModelSources.phi3Mini(), ModelSources.deepSeekR1_1_5B()};
-        GenerationResult[][] results = new GenerationResult[modelSources.length][PROMPTS.length];
+        GenerativeModel[] models = {ModelSources.phi3Mini(), ModelSources.deepSeekR1_1_5B()};
+        GenerationResult[][] results = new GenerationResult[models.length][PROMPTS.length];
 
-        for (int m = 0; m < modelSources.length; m++) {
+        for (int m = 0; m < models.length; m++) {
             System.out.printf("Loading %s...%n", modelNames[m]);
             try (var generator = TextGenerator.builder()
-                    .modelSource(modelSources[m])
+                    .model(models[m])
                     .maxLength(200)
                     .temperature(0.7)
                     .build()) {
@@ -62,18 +62,18 @@ public class TextGenerationExample {
 
         // Print side-by-side results
         for (int p = 0; p < PROMPTS.length; p++) {
-            System.out.println("─".repeat(70));
+            System.out.println("\u2500".repeat(70));
             System.out.printf("Q: %s%n%n", PROMPTS[p]);
 
-            for (int m = 0; m < modelSources.length; m++) {
+            for (int m = 0; m < models.length; m++) {
                 GenerationResult r = results[m][p];
                 System.out.printf("  [%s]%n", modelNames[m]);
                 System.out.printf("  %s%n", r.text().strip());
-                System.out.printf("  → %d tokens in %,d ms (%.1f tok/s)%n%n",
+                System.out.printf("  \u2192 %d tokens in %,d ms (%.1f tok/s)%n%n",
                         r.tokenCount(), r.durationMillis(),
                         r.tokenCount() * 1000.0 / r.durationMillis());
             }
         }
-        System.out.println("─".repeat(70));
+        System.out.println("\u2500".repeat(70));
     }
 }

@@ -74,8 +74,8 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
     @Override
     public final O generate(I input, Consumer<String> tokenListener) {
         try {
-            GeneratorParams params = createParams();
-            try (Generator generator = new Generator(model, params)) {
+            try (GeneratorParams params = createParams();
+                 Generator generator = new Generator(model, params)) {
                 prepareGenerator(input, generator);
 
                 long start = System.currentTimeMillis();

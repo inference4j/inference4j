@@ -37,7 +37,7 @@ class DeepSeekR1ModelTest {
     @Test
     void generateProducesNonEmptyOutput() {
         try (var generator = TextGenerator.builder()
-                .modelSource(ModelSources.deepSeekR1_1_5B())
+                .model(ModelSources.deepSeekR1_1_5B())
                 .maxLength(100)
                 .temperature(0.7)
                 .build()) {
@@ -55,7 +55,7 @@ class DeepSeekR1ModelTest {
     @Test
     void generateWithStreamingCollectsAllTokens() {
         try (var generator = TextGenerator.builder()
-                .modelSource(ModelSources.deepSeekR1_1_5B())
+                .model(ModelSources.deepSeekR1_1_5B())
                 .maxLength(50)
                 .build()) {
 

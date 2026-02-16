@@ -37,7 +37,7 @@ class TextGeneratorModelTest {
     @Test
     void generateProducesNonEmptyOutput() {
         try (var generator = TextGenerator.builder()
-                .modelSource(ModelSources.phi3Mini())
+                .model(ModelSources.phi3Mini())
                 .maxLength(100)
                 .temperature(0.7)
                 .build()) {
@@ -55,7 +55,7 @@ class TextGeneratorModelTest {
     @Test
     void generateWithStreamingCollectsAllTokens() {
         try (var generator = TextGenerator.builder()
-                .modelSource(ModelSources.phi3Mini())
+                .model(ModelSources.phi3Mini())
                 .maxLength(50)
                 .build()) {
 

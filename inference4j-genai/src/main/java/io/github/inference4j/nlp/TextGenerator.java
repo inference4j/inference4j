@@ -23,7 +23,9 @@ import ai.onnxruntime.genai.Tokenizer;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.genai.AbstractGenerativeTask;
+import io.github.inference4j.genai.ChatTemplate;
 import io.github.inference4j.genai.GenerationResult;
+import io.github.inference4j.genai.GenerativeModel;
 import io.github.inference4j.model.ModelSource;
 
 import java.nio.file.Path;
@@ -32,13 +34,13 @@ import java.nio.file.Path;
  * Autoregressive text generator backed by onnxruntime-genai.
  *
  * <p>Wraps decoder-only language models (Phi-3, GPT-2, Llama, etc.) with an
- * ergonomic builder API. The model's built-in chat template is used to format
- * prompts automatically.
+ * ergonomic builder API. The model's chat template is applied to format
+ * prompts before tokenization.
  *
  * <p>Usage:
  * <pre>{@code
  * try (var gen = TextGenerator.builder()
- *         .modelSource(ModelSources.phi3Mini())
+ *         .model(ModelSources.phi3Mini())
  *         .build()) {
  *     GenerationResult result = gen.generate("What is Java in one sentence?");
  *     System.out.println(result.text());
@@ -48,7 +50,7 @@ import java.nio.file.Path;
  * <p>With streaming:
  * <pre>{@code
  * try (var gen = TextGenerator.builder()
- *         .modelSource(ModelSources.phi3Mini())
+ *         .model(ModelSources.phi3Mini())
  *         .maxLength(200)
  *         .temperature(0.7)
  *         .build()) {
@@ -60,19 +62,18 @@ import java.nio.file.Path;
  */
 public class TextGenerator extends AbstractGenerativeTask<String, GenerationResult> {
 
-    TextGenerator(Model model, Tokenizer tokenizer,
+    private final ChatTemplate chatTemplate;
+
+    TextGenerator(Model model, Tokenizer tokenizer, ChatTemplate chatTemplate,
                   int maxLength, double temperature, int topK, double topP) {
         super(model, tokenizer, maxLength, temperature, topK, topP);
+        this.chatTemplate = chatTemplate;
     }
 
     @Override
     protected void prepareGenerator(String input, Generator generator) {
         try {
-            String formatted = tokenizer.applyChatTemplate(
-                    null,
-                    buildMessagesJson(input),
-                    null,
-                    true);
+            String formatted = chatTemplate.format(input);
             Sequences sequences = tokenizer.encode(formatted);
             generator.appendTokenSequences(sequences);
         } catch (GenAIException e) {
@@ -87,17 +88,13 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
         return new GenerationResult(generatedText, tokenCount, durationMillis);
     }
 
-    String buildMessagesJson(String userMessage) {
-        return "[{\"role\": \"user\", \"content\": \"%s\"}]"
-                .formatted(userMessage.replace("\\", "\\\\").replace("\"", "\\\""));
-    }
-
     public static Builder builder() {
         return new Builder();
     }
 
     public static class Builder {
         private ModelSource modelSource;
+        private ChatTemplate chatTemplate;
         private int maxLength = 1024;
         private double temperature = 1.0;
         private int topK = 0;
@@ -107,8 +104,19 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
         Model model;
         Tokenizer tokenizer;
 
+        public Builder model(GenerativeModel generativeModel) {
+            this.modelSource = generativeModel.modelSource();
+            this.chatTemplate = generativeModel.chatTemplate();
+            return this;
+        }
+
         public Builder modelSource(ModelSource modelSource) {
             this.modelSource = modelSource;
+            return this;
+        }
+
+        public Builder chatTemplate(ChatTemplate chatTemplate) {
+            this.chatTemplate = chatTemplate;
             return this;
         }
 
@@ -136,8 +144,13 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
             if (model == null) {
                 if (modelSource == null) {
                     throw new IllegalStateException(
-                            "modelSource is required — use ModelSources.phi3Mini() "
-                                    + "or provide a custom ModelSource");
+                            "model is required — use model(ModelSources.phi3Mini()) "
+                                    + "or provide modelSource + chatTemplate");
+                }
+                if (chatTemplate == null) {
+                    throw new IllegalStateException(
+                            "chatTemplate is required — use model(ModelSources.phi3Mini()) "
+                                    + "or provide a chatTemplate alongside modelSource");
                 }
                 try {
                     Path modelDir = modelSource.resolve("model");
@@ -148,7 +161,7 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
                             "Failed to load genai model: " + e.getMessage(), e);
                 }
             }
-            return new TextGenerator(model, tokenizer,
+            return new TextGenerator(model, tokenizer, chatTemplate,
                     maxLength, temperature, topK, topP);
         }
     }
