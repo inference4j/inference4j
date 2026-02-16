@@ -5,3 +5,44 @@ dependencies {
     implementation project(':inference4j-core')
     runtimeOnly 'org.slf4j:slf4j-nop:2.0.16'
 }
+
+// Model integration tests — downloads real models and runs actual inference
+sourceSets {
+    modelTest {
+        java.srcDir 'src/modelTest/java'
+        resources.srcDir 'src/modelTest/resources'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+configurations {
+    modelTestImplementation.extendsFrom testImplementation
+    modelTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+tasks.named('processModelTestResources') {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.register('modelTest', Test) {
+    description = 'Runs model integration tests against real genai models'
+    group = 'verification'
+    testClassesDirs = sourceSets.modelTest.output.classesDirs
+    classpath = sourceSets.modelTest.runtimeClasspath
+    useJUnitPlatform()
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        showStandardStreams = true
+        afterSuite { desc, result ->
+            if (!desc.parent) {
+                println "\n${result.resultType}: ${result.testCount} tests, " +
+                        "${result.successfulTestCount} passed, " +
+                        "${result.failedTestCount} failed, " +
+                        "${result.skippedTestCount} skipped"
+            }
+        }
+    }
+}
