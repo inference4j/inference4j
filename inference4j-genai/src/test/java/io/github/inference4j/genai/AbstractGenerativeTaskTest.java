@@ -15,25 +15,37 @@
  */
 package io.github.inference4j.genai;
 
+import ai.onnxruntime.genai.GenAIException;
 import ai.onnxruntime.genai.Generator;
 import ai.onnxruntime.genai.Model;
-import ai.onnxruntime.genai.Tokenizer;
+import ai.onnxruntime.genai.TokenizerStream;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 class AbstractGenerativeTaskTest {
 
     @Test
-    void closeReleasesModelAndTokenizer() throws Exception {
+    void closeReleasesModel() throws Exception {
         Model model = mock(Model.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
 
-        var task = new TestGenerativeTask(model, tokenizer, 100, 1.0, 0, 0.0);
+        var task = new TestGenerativeTask(model, 100, 1.0, 0, 0.0);
         task.close();
 
-        verify(tokenizer).close();
+        verify(model).close();
+    }
+
+    @Test
+    void closeCallsCloseResources() throws Exception {
+        Model model = mock(Model.class);
+
+        var task = new TestGenerativeTask(model, 100, 1.0, 0, 0.0);
+        task.close();
+
+        assertTrue(task.closeResourcesCalled,
+                "closeResources() should be called during close()");
         verify(model).close();
     }
 
@@ -42,9 +54,16 @@ class AbstractGenerativeTaskTest {
      */
     static class TestGenerativeTask extends AbstractGenerativeTask<String, GenerationResult> {
 
-        TestGenerativeTask(Model model, Tokenizer tokenizer,
+        boolean closeResourcesCalled = false;
+
+        TestGenerativeTask(Model model,
                            int maxLength, double temperature, int topK, double topP) {
-            super(model, tokenizer, maxLength, temperature, topK, topP);
+            super(model, maxLength, temperature, topK, topP);
+        }
+
+        @Override
+        protected TokenizerStream createStream() throws GenAIException {
+            return null;
         }
 
         @Override
@@ -56,6 +75,11 @@ class AbstractGenerativeTaskTest {
         protected GenerationResult parseOutput(String generatedText, String input,
                                                int tokenCount, long durationMillis) {
             return new GenerationResult(generatedText, tokenCount, durationMillis);
+        }
+
+        @Override
+        protected void closeResources() {
+            closeResourcesCalled = true;
         }
     }
 }

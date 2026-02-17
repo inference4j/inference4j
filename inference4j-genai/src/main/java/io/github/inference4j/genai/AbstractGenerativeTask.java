@@ -18,7 +18,6 @@ package io.github.inference4j.genai;
 import ai.onnxruntime.genai.Generator;
 import ai.onnxruntime.genai.GeneratorParams;
 import ai.onnxruntime.genai.Model;
-import ai.onnxruntime.genai.Tokenizer;
 import ai.onnxruntime.genai.TokenizerStream;
 import ai.onnxruntime.genai.GenAIException;
 
@@ -49,17 +48,15 @@ import java.util.function.Consumer;
 public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, O> {
 
     protected final Model model;
-    protected final Tokenizer tokenizer;
     private final int maxLength;
     private final double temperature;
     private final int topK;
     private final double topP;
 
-    protected AbstractGenerativeTask(Model model, Tokenizer tokenizer,
+    protected AbstractGenerativeTask(Model model,
                                      int maxLength, double temperature,
                                      int topK, double topP) {
         this.model = model;
-        this.tokenizer = tokenizer;
         this.maxLength = maxLength;
         this.temperature = temperature;
         this.topK = topK;
@@ -82,7 +79,7 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
                 int tokenCount = 0;
                 StringBuilder sb = new StringBuilder();
 
-                try (TokenizerStream stream = tokenizer.createStream()) {
+                try (TokenizerStream stream = createStream()) {
                     while (!generator.isDone()) {
                         generator.generateNextToken();
                         int token = generator.getLastTokenInSequence(0);
@@ -103,6 +100,18 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
                     "Generation failed: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * Create a {@link TokenizerStream} for decoding generated tokens into text.
+     *
+     * <p>Subclasses backed by a {@code Tokenizer} (e.g. text generators) create the
+     * stream from the tokenizer. Subclasses backed by a {@code MultiModalProcessor}
+     * (e.g. Whisper audio transcription) create the stream from the processor.
+     *
+     * @return a new TokenizerStream for the current generation
+     * @throws GenAIException if stream creation fails
+     */
+    protected abstract TokenizerStream createStream() throws GenAIException;
 
     /**
      * Feed the generator with encoded input before the generate loop starts.
@@ -142,9 +151,19 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
         return params;
     }
 
+    /**
+     * Release subclass-owned resources (e.g. Tokenizer, MultiModalProcessor).
+     *
+     * <p>Called by {@link #close()} before closing the model. Subclasses should
+     * override this to close any resources they own. The default implementation
+     * does nothing.
+     */
+    protected void closeResources() {
+    }
+
     @Override
-    public void close() {
-        tokenizer.close();
+    public final void close() {
+        closeResources();
         model.close();
     }
 }

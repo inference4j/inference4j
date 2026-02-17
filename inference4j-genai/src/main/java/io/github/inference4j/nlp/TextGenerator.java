@@ -20,6 +20,7 @@ import ai.onnxruntime.genai.Generator;
 import ai.onnxruntime.genai.Model;
 import ai.onnxruntime.genai.Sequences;
 import ai.onnxruntime.genai.Tokenizer;
+import ai.onnxruntime.genai.TokenizerStream;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.genai.AbstractGenerativeTask;
@@ -62,12 +63,19 @@ import java.nio.file.Path;
  */
 public class TextGenerator extends AbstractGenerativeTask<String, GenerationResult> {
 
+    private final Tokenizer tokenizer;
     private final ChatTemplate chatTemplate;
 
     TextGenerator(Model model, Tokenizer tokenizer, ChatTemplate chatTemplate,
                   int maxLength, double temperature, int topK, double topP) {
-        super(model, tokenizer, maxLength, temperature, topK, topP);
+        super(model, maxLength, temperature, topK, topP);
+        this.tokenizer = tokenizer;
         this.chatTemplate = chatTemplate;
+    }
+
+    @Override
+    protected TokenizerStream createStream() throws GenAIException {
+        return tokenizer.createStream();
     }
 
     @Override
@@ -86,6 +94,11 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
     protected GenerationResult parseOutput(String generatedText, String input,
                                            int tokenCount, long durationMillis) {
         return new GenerationResult(generatedText, tokenCount, durationMillis);
+    }
+
+    @Override
+    protected void closeResources() {
+        tokenizer.close();
     }
 
     public static Builder builder() {
