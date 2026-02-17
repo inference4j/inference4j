@@ -233,6 +233,23 @@ public final class MathOps {
     }
 
     /**
+     * Computes the dot product of two vectors.
+     *
+     * @throws IllegalArgumentException if the vectors have different lengths
+     */
+    public static float dotProduct(float[] a, float[] b) {
+        if (a.length != b.length) {
+            throw new IllegalArgumentException(
+                    "Vectors must have the same length: " + a.length + " vs " + b.length);
+        }
+        float sum = 0f;
+        for (int i = 0; i < a.length; i++) {
+            sum += a[i] * b[i];
+        }
+        return sum;
+    }
+
+    /**
      * L2-normalizes a vector so that its Euclidean norm equals 1.
      * Returns a zero vector if the input norm is zero.
      */

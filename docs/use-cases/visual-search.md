@@ -5,10 +5,9 @@ Classify images using arbitrary text labels — no training required — powered
 ## Quick start
 
 ```java
-try (ClipClassifier classifier = ClipClassifier.builder()
-        .labels("cat", "dog", "bird", "car", "airplane")
-        .build()) {
-    List<Classification> results = classifier.classify(Path.of("photo.jpg"));
+try (ClipClassifier classifier = ClipClassifier.builder().build()) {
+    List<Classification> results = classifier.classify(
+            Path.of("photo.jpg"), List.of("cat", "dog", "bird", "car", "airplane"));
     System.out.println(results.get(0).label());      // "cat"
     System.out.println(results.get(0).confidence());  // 0.92
 }
@@ -16,66 +15,83 @@ try (ClipClassifier classifier = ClipClassifier.builder()
 
 ## Zero-shot classification
 
-Unlike traditional image classifiers that are trained on a fixed set of labels, CLIP classifies images against **any labels you provide at runtime**. Just pass the labels you need — no retraining, no fine-tuning:
+Unlike traditional image classifiers that are trained on a fixed set of labels, CLIP classifies images against **any labels you provide at each call**. Just pass the labels you need — no retraining, no fine-tuning, and no need to rebuild the classifier for different label sets:
 
 ```java
-// Emotion detection
-ClipClassifier emotionClassifier = ClipClassifier.builder()
-        .labels("happy", "sad", "angry", "surprised", "neutral")
-        .promptTemplate("a photo of a {} person")
-        .build();
+try (ClipClassifier classifier = ClipClassifier.builder().build()) {
+    // Emotion detection
+    classifier.classify(image, List.of(
+            "a photo of a happy person", "a photo of a sad person",
+            "a photo of an angry person", "a photo of a surprised person"));
 
-// Product categorization
-ClipClassifier productClassifier = ClipClassifier.builder()
-        .labels("electronics", "clothing", "furniture", "food", "sports equipment")
-        .promptTemplate("a product photo of {}")
-        .build();
+    // Product categorization
+    classifier.classify(image, List.of(
+            "a product photo of electronics", "a product photo of clothing",
+            "a product photo of furniture", "a product photo of food"));
 
-// Scene classification
-ClipClassifier sceneClassifier = ClipClassifier.builder()
-        .labels("beach", "mountain", "city", "forest", "desert")
-        .promptTemplate("a landscape photo of a {}")
-        .build();
+    // Scene classification
+    classifier.classify(image, List.of(
+            "a landscape photo of a beach", "a landscape photo of a mountain",
+            "a landscape photo of a city", "a landscape photo of a forest"));
+}
 ```
 
 ## How it works
 
 CLIP uses two separate encoders — one for images, one for text — trained so that matching image-text pairs produce similar embeddings. `ClipClassifier` wraps both encoders:
 
-1. **At build time**: encodes each label into a text embedding using the prompt template (e.g. "a photo of a cat")
-2. **At classify time**: encodes the image, computes similarity against all label embeddings, and returns ranked results with confidence scores
+```mermaid
+flowchart TD
+    Image["Image"]
+    Labels["Candidate labels<br><i>'a photo of a cat', 'a photo of a dog', ...</i>"]
 
-```
-                                     ┌─ "a photo of a cat"  → [512-dim] ─┐
-Labels (build time) → prompt template├─ "a photo of a dog"  → [512-dim] ─┤
-                                     └─ "a photo of a bird" → [512-dim] ─┤
-                                                                          ├─ similarity → softmax → Classification
-Image (classify time) ────────────────────────────────────── [512-dim] ──┘
+    Image --> IE["ClipImageEncoder"]
+    Labels --> TE["ClipTextEncoder"]
+
+    IE --> IEmb["Image embedding<br>[512-dim]"]
+    TE --> LEmb["Label embeddings<br>[512-dim] x N"]
+
+    IEmb --> Sim["Dot-product similarity"]
+    LEmb --> Sim
+
+    Sim --> SM["Softmax"]
+    SM --> Result["List&lt;Classification&gt;"]
 ```
 
 ## Builder options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `labels(String...)` | `String[]` | (required) | The classification labels |
-| `labels(List<String>)` | `List<String>` | (required) | The classification labels |
-| `promptTemplate(String)` | `String` | `"a photo of a {}"` | Template for label encoding — `{}` is replaced with each label |
-| `defaultTopK(int)` | `int` | Number of labels | How many results to return by default |
 | `modelId(String)` | `String` | `inference4j/clip-vit-base-patch32` | HuggingFace model ID |
 | `modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Where to load the model from |
 | `sessionOptions(SessionConfigurer)` | `SessionConfigurer` | Default (CPU) | ONNX Runtime session options |
 
-## Prompt template tips
+## Prompt tips
 
-The prompt template affects classification quality. CLIP was trained on natural language captions, so templates that resemble captions work best:
+CLIP was trained on natural language captions, so passing full prompt text as labels produces better results than bare nouns. The label text is passed directly to the text encoder — format it however works best for your use case:
 
-| Use case | Good template | Why |
-|----------|---------------|-----|
-| General objects | `"a photo of a {}"` | Default, works well for most cases |
-| Fine-grained | `"a photo of a {}, a type of pet"` | Adds context for disambiguation |
-| Scenes | `"a photo of a {}"` or `"a {} landscape"` | Matches CLIP training data |
-| Actions | `"a photo of a person {}"` | e.g., "running", "swimming" |
-| Styles | `"a {} style painting"` | e.g., "impressionist", "cubist" |
+| Use case | Label examples | Why |
+|----------|----------------|-----|
+| General objects | `"a photo of a cat"`, `"a photo of a dog"` | Matches CLIP training data format |
+| Fine-grained | `"a photo of a tabby cat, a type of pet"` | Adds context for disambiguation |
+| Scenes | `"a beach landscape"`, `"a mountain landscape"` | Descriptive captions |
+| Actions | `"a photo of a person running"` | Activity descriptions |
+| Styles | `"an impressionist style painting"` | Art style descriptions |
+
+## API methods
+
+```java
+// Primary API — classify with candidate labels
+List<Classification> classify(BufferedImage image, List<String> candidateLabels);
+List<Classification> classify(BufferedImage image, List<String> candidateLabels, int topK);
+
+// Path convenience overloads
+List<Classification> classify(Path imagePath, List<String> candidateLabels);
+List<Classification> classify(Path imagePath, List<String> candidateLabels, int topK);
+
+// InferenceTask compatibility
+List<Classification> run(ZeroShotInput<BufferedImage> input);
+```
 
 ## Advanced: direct encoder access
 

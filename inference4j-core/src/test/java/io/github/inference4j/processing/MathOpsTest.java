@@ -386,6 +386,32 @@ class MathOpsTest {
     }
 
     @Test
+    void dotProduct_identicalNormalizedVectors_returnsOne() {
+        float[] v = MathOps.l2Normalize(new float[]{3f, 4f});
+        assertEquals(1.0f, MathOps.dotProduct(v, v), 1e-5f);
+    }
+
+    @Test
+    void dotProduct_orthogonalVectors_returnsZero() {
+        float[] a = {1f, 0f};
+        float[] b = {0f, 1f};
+        assertEquals(0f, MathOps.dotProduct(a, b), 1e-6f);
+    }
+
+    @Test
+    void dotProduct_oppositeVectors_returnsNegativeOne() {
+        float[] a = MathOps.l2Normalize(new float[]{1f, 0f});
+        float[] b = MathOps.l2Normalize(new float[]{-1f, 0f});
+        assertEquals(-1.0f, MathOps.dotProduct(a, b), 1e-5f);
+    }
+
+    @Test
+    void dotProduct_mismatchedLengths_throws() {
+        assertThrows(IllegalArgumentException.class, () ->
+                MathOps.dotProduct(new float[]{1f, 2f}, new float[]{1f}));
+    }
+
+    @Test
     void cxcywh2xyxy_basicConversion() {
         // center=(50,50), size=20x30 → x1=40, y1=35, x2=60, y2=65
         float[] boxes = {50f, 50f, 20f, 30f};

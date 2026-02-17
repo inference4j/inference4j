@@ -155,14 +155,42 @@ class ClipClassifierTest {
         ClipClassifier classifier = ClipClassifier.builder()
                 .imageEncoder(imageEncoder)
                 .textEncoder(textEncoder)
-                .labels("cat", "dog")
                 .build();
 
         BufferedImage image = new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB);
-        List<Classification> results = classifier.classify(image);
+        List<Classification> results = classifier.classify(image, List.of("cat", "dog"));
 
         assertEquals(2, results.size());
         assertEquals("cat", results.get(0).label());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void classify_withEmptyCandidateLabels_returnsEmpty() {
+        InferenceSession visionSession = mock(InferenceSession.class);
+        InferenceSession textSession = mock(InferenceSession.class);
+        Preprocessor<BufferedImage, Tensor> preprocessor = mock(Preprocessor.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        ClipImageEncoder imageEncoder = ClipImageEncoder.builder()
+                .session(visionSession)
+                .preprocessor(preprocessor)
+                .build();
+
+        ClipTextEncoder textEncoder = ClipTextEncoder.builder()
+                .session(textSession)
+                .tokenizer(tokenizer)
+                .build();
+
+        ClipClassifier classifier = ClipClassifier.builder()
+                .imageEncoder(imageEncoder)
+                .textEncoder(textEncoder)
+                .build();
+
+        BufferedImage image = new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB);
+        List<Classification> results = classifier.classify(image, List.of());
+
+        assertTrue(results.isEmpty());
     }
 
     @Test
@@ -173,11 +201,6 @@ class ClipClassifierTest {
         Preprocessor<BufferedImage, Tensor> preprocessor = mock(Preprocessor.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
 
-        when(tokenizer.encode(anyString())).thenReturn(
-                new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
-        Tensor emb = Tensor.fromFloats(new float[]{1.0f}, new long[]{1, 1});
-        when(textSession.run(any())).thenReturn(Map.of("text_embeds", emb));
-
         ClipImageEncoder imageEncoder = ClipImageEncoder.builder()
                 .session(visionSession)
                 .preprocessor(preprocessor)
@@ -191,66 +214,11 @@ class ClipClassifierTest {
         ClipClassifier classifier = ClipClassifier.builder()
                 .imageEncoder(imageEncoder)
                 .textEncoder(textEncoder)
-                .labels("cat")
                 .build();
 
         classifier.close();
 
         verify(visionSession).close();
         verify(textSession).close();
-    }
-
-    @Test
-    void builder_missingLabels_throws() {
-        assertThrows(IllegalStateException.class, () ->
-                ClipClassifier.builder().build());
-    }
-
-    @Test
-    void builder_emptyLabels_throws() {
-        assertThrows(IllegalStateException.class, () ->
-                ClipClassifier.builder()
-                        .labels(List.of())
-                        .build());
-    }
-
-    @Test
-    void builder_defaultTopK_equalsLabelCount() {
-        InferenceSession visionSession = mock(InferenceSession.class);
-        InferenceSession textSession = mock(InferenceSession.class);
-        @SuppressWarnings("unchecked")
-        Preprocessor<BufferedImage, Tensor> preprocessor = mock(Preprocessor.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
-
-        when(tokenizer.encode(anyString())).thenReturn(
-                new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
-        Tensor emb = Tensor.fromFloats(new float[]{1.0f}, new long[]{1, 1});
-        when(textSession.run(any())).thenReturn(Map.of("text_embeds", emb));
-
-        Tensor inputTensor = Tensor.fromFloats(new float[]{0.5f}, new long[]{1});
-        when(preprocessor.process(any(BufferedImage.class))).thenReturn(inputTensor);
-        Tensor imageOutput = Tensor.fromFloats(new float[]{1.0f}, new long[]{1, 1});
-        when(visionSession.run(any())).thenReturn(Map.of("image_embeds", imageOutput));
-
-        ClipImageEncoder imageEncoder = ClipImageEncoder.builder()
-                .session(visionSession)
-                .preprocessor(preprocessor)
-                .build();
-        ClipTextEncoder textEncoder = ClipTextEncoder.builder()
-                .session(textSession)
-                .tokenizer(tokenizer)
-                .build();
-
-        ClipClassifier classifier = ClipClassifier.builder()
-                .imageEncoder(imageEncoder)
-                .textEncoder(textEncoder)
-                .labels("cat", "dog", "bird")
-                .build();
-
-        BufferedImage image = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
-        List<Classification> results = classifier.classify(image);
-
-        // Default topK should be 3 (number of labels)
-        assertEquals(3, results.size());
     }
 }

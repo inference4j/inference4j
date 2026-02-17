@@ -77,10 +77,8 @@ try (var classifier = DistilBertTextClassifier.builder()
 }
 
 // BPE loaded automatically from vocab.json + merges.txt
-try (var classifier = ClipClassifier.builder()
-        .labels("cat", "dog", "bird")
-        .build()) {
-    classifier.classify(Path.of("photo.jpg"));
+try (var classifier = ClipClassifier.builder().build()) {
+    classifier.classify(Path.of("photo.jpg"), List.of("cat", "dog", "bird"));
 }
 ```
 

@@ -34,14 +34,15 @@ class ClipClassifierModelTest {
 
     @Test
     void classify_catImage_catIsTopLabel() throws IOException {
-        try (ClipClassifier classifier = ClipClassifier.builder()
-                .labels("cat", "dog", "bird", "car", "airplane")
-                .build()) {
-            List<Classification> results = classifier.classify(loadCatImage());
+        try (ClipClassifier classifier = ClipClassifier.builder().build()) {
+            List<Classification> results = classifier.classify(
+                    loadCatImage(),
+                    List.of("a photo of a cat", "a photo of a dog", "a photo of a bird",
+                            "a photo of a car", "a photo of an airplane"));
 
             assertFalse(results.isEmpty());
-            assertEquals("cat", results.get(0).label(),
-                    "Expected 'cat' as top label, got: " + results.get(0).label());
+            assertEquals("a photo of a cat", results.get(0).label(),
+                    "Expected 'a photo of a cat' as top label, got: " + results.get(0).label());
             assertTrue(results.get(0).confidence() > 0.15f,
                     "Expected cat confidence > 0.15, got: " + results.get(0).confidence());
         }
@@ -49,10 +50,10 @@ class ClipClassifierModelTest {
 
     @Test
     void classify_catImage_confidencesSumToOne() throws IOException {
-        try (ClipClassifier classifier = ClipClassifier.builder()
-                .labels("cat", "dog", "bird")
-                .build()) {
-            List<Classification> results = classifier.classify(loadCatImage());
+        try (ClipClassifier classifier = ClipClassifier.builder().build()) {
+            List<Classification> results = classifier.classify(
+                    loadCatImage(),
+                    List.of("a photo of a cat", "a photo of a dog", "a photo of a bird"));
 
             float sum = 0f;
             for (Classification c : results) {
@@ -65,25 +66,14 @@ class ClipClassifierModelTest {
 
     @Test
     void classify_catImage_withTopK() throws IOException {
-        try (ClipClassifier classifier = ClipClassifier.builder()
-                .labels("cat", "dog", "bird", "car", "airplane")
-                .build()) {
-            List<Classification> results = classifier.classify(loadCatImage(), 2);
+        try (ClipClassifier classifier = ClipClassifier.builder().build()) {
+            List<Classification> results = classifier.classify(
+                    loadCatImage(),
+                    List.of("a photo of a cat", "a photo of a dog", "a photo of a bird",
+                            "a photo of a car", "a photo of an airplane"),
+                    2);
 
             assertEquals(2, results.size());
-        }
-    }
-
-    @Test
-    void classify_catImage_customPromptTemplate() throws IOException {
-        try (ClipClassifier classifier = ClipClassifier.builder()
-                .labels("cat", "dog", "bird")
-                .promptTemplate("this is a picture of a {}")
-                .build()) {
-            List<Classification> results = classifier.classify(loadCatImage());
-
-            assertEquals("cat", results.get(0).label(),
-                    "Custom prompt template should still identify cat");
         }
     }
 }

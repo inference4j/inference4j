@@ -2,7 +2,7 @@
 
 Low-level access to CLIP's vision and text encoders for image-text similarity, visual search, and custom retrieval pipelines.
 
-For zero-shot image classification, use [`ClipClassifier`](../use-cases/visual-search.md) instead — it provides a higher-level `ImageClassifier` API on top of these encoders.
+For zero-shot classification as a single API, see [Visual Search](../use-cases/visual-search.md). For direct encoder access, see below.
 
 ## ClipImageEncoder
 
@@ -69,7 +69,7 @@ try (ClipImageEncoder imageEncoder = ClipImageEncoder.builder().build();
     float[] imageEmb = imageEncoder.encode(ImageIO.read(Path.of("photo.jpg").toFile()));
     float[] textEmb = textEncoder.encode("a photo of a sunset");
 
-    float similarity = dot(imageEmb, textEmb);
+    float similarity = MathOps.dotProduct(imageEmb, textEmb);
     System.out.println("Similarity: " + similarity);
 }
 ```
@@ -89,7 +89,7 @@ float[] queryEmb = textEncoder.encode("a red sports car");
 int bestIdx = 0;
 float bestScore = Float.NEGATIVE_INFINITY;
 for (int i = 0; i < imageEmbeddings.size(); i++) {
-    float score = dot(queryEmb, imageEmbeddings.get(i));
+    float score = MathOps.dotProduct(queryEmb, imageEmbeddings.get(i));
     if (score > bestScore) {
         bestScore = score;
         bestIdx = i;
@@ -99,14 +99,10 @@ for (int i = 0; i < imageEmbeddings.size(); i++) {
 
 ## Dot product helper
 
-Since both encoders produce L2-normalized vectors, the dot product equals cosine similarity:
+Since both encoders produce L2-normalized vectors, the dot product equals cosine similarity. Use `MathOps.dotProduct()` from inference4j-core:
 
 ```java
-static float dot(float[] a, float[] b) {
-    float sum = 0f;
-    for (int i = 0; i < a.length; i++) {
-        sum += a[i] * b[i];
-    }
-    return sum;
-}
+import io.github.inference4j.processing.MathOps;
+
+float similarity = MathOps.dotProduct(imageEmb, textEmb);
 ```

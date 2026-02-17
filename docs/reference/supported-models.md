@@ -24,7 +24,7 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 
 | Capability | Wrapper | Default Model ID | Size | API |
 |------------|---------|-------------------|------|-----|
-| Zero-Shot Classification | `ClipClassifier` | `inference4j/clip-vit-base-patch32` | ~595 MB | `ImageClassifier` |
+| Zero-Shot Classification | `ClipClassifier` | `inference4j/clip-vit-base-patch32` | ~595 MB | `ZeroShotClassifier` |
 | Image Embeddings | `ClipImageEncoder` | `inference4j/clip-vit-base-patch32` | ~340 MB | `ImageEmbedder` |
 | Text Embeddings (CLIP) | `ClipTextEncoder` | `inference4j/clip-vit-base-patch32` | ~255 MB | `TextEmbedder` |
 
