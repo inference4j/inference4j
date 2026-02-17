@@ -6,7 +6,7 @@
 
 | Package | Contents |
 |---------|----------|
-| `io.github.inference4j` | Core contracts: `InferenceTask`, `Classifier`, `Detector`, `AbstractInferenceTask`, `Tensor`, `TensorType`, `InferenceSession`, `InferenceContext` |
+| `io.github.inference4j` | Core contracts: `InferenceTask`, `Classifier`, `Detector`, `ZeroShotClassifier`, `ZeroShotInput`, `AbstractInferenceTask`, `Tensor`, `TensorType`, `InferenceSession`, `InferenceContext` |
 | `io.github.inference4j.session` | Session config: `SessionConfigurer`, `SessionOptions` |
 | `io.github.inference4j.model` | Model resolution: `ModelSource`, `HuggingFaceModelSource`, `LocalModelSource` |
 | `io.github.inference4j.processing` | Pre/post-processing: `Preprocessor`, `Postprocessor`, `OutputOperator`, `MathOps` |
@@ -55,6 +55,7 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 ├── Classifier<I, C>                    // classify(I) → List<C>
 │   ├── ImageClassifier                 // classify(BufferedImage/Path) → List<Classification>
 │   └── TextClassifier                  // classify(String) → List<TextClassification>
+├── ZeroShotClassifier<I, C>            // classify(I, List<String>) → List<C>, run(ZeroShotInput<I>) → List<C>
 ├── Detector<I, D>                      // detect(I) → List<D>
 │   ├── ObjectDetector                  // detect(BufferedImage/Path) → List<Detection>
 │   ├── TextDetector                    // detect(BufferedImage/Path) → List<TextRegion>
@@ -75,7 +76,7 @@ Most task wrappers extend `AbstractInferenceTask<I, O>`, which enforces a `final
 
 `InferenceContext<I>` carries data across stages — the original input, preprocessed tensors, and output tensors.
 
-Exceptions: `SileroVadDetector` (stateful hidden state), `MiniLMSearchReranker`, and `ClipTextEncoder` do not extend `AbstractInferenceTask`.
+Exceptions: `SileroVadDetector` (stateful hidden state), `MiniLMSearchReranker`, `ClipClassifier`, and `ClipTextEncoder` do not extend `AbstractInferenceTask`.
 
 ### Generative AI hierarchy
 

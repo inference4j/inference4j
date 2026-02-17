@@ -16,19 +16,18 @@
 
 package io.github.inference4j.multimodal;
 
+import io.github.inference4j.ZeroShotClassifier;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.vision.Classification;
-import io.github.inference4j.vision.ImageClassifier;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -36,50 +35,36 @@ import java.util.List;
  * text labels with no training required.
  *
  * <p>Wraps {@link ClipImageEncoder} and {@link ClipTextEncoder} to provide a
- * familiar {@link ImageClassifier} API. At build time, label text is encoded
- * into embeddings using the prompt template (e.g. "a photo of a cat"). At
- * classify time, the image is encoded and compared against all label embeddings
- * via dot-product similarity.
+ * familiar {@link ZeroShotClassifier} API. Labels are provided per call,
+ * allowing the same classifier instance to be reused for different label sets
+ * without rebuilding ONNX sessions.
  *
  * <h2>Quick start</h2>
  * <pre>{@code
- * try (ClipClassifier classifier = ClipClassifier.builder()
- *         .labels("cat", "dog", "bird", "car", "airplane")
- *         .build()) {
- *     List<Classification> results = classifier.classify(Path.of("photo.jpg"));
+ * try (ClipClassifier classifier = ClipClassifier.builder().build()) {
+ *     List<Classification> results = classifier.classify(
+ *             Path.of("photo.jpg"), List.of("cat", "dog", "bird"));
  *     System.out.println(results.get(0).label()); // "cat"
  * }
  * }</pre>
  *
- * <h2>Custom prompt template</h2>
- * <pre>{@code
- * ClipClassifier classifier = ClipClassifier.builder()
- *         .labels("happy", "sad", "angry", "surprised")
- *         .promptTemplate("a photo of a {} person")
- *         .build();
- * }</pre>
+ * <h2>Prompt tips</h2>
+ * <p>CLIP was trained on natural language captions, so passing full prompt text
+ * as labels produces better results. For example, instead of {@code "cat"},
+ * pass {@code "a photo of a cat"}.
  *
  * @see ClipImageEncoder
  * @see ClipTextEncoder
- * @see ImageClassifier
+ * @see ZeroShotClassifier
  */
-public class ClipClassifier implements ImageClassifier {
-
-    private static final String DEFAULT_PROMPT_TEMPLATE = "a photo of a {}";
+public class ClipClassifier implements ZeroShotClassifier<BufferedImage, Classification> {
 
     private final ClipImageEncoder imageEncoder;
     private final ClipTextEncoder textEncoder;
-    private final float[][] labelEmbeddings;
-    private final List<String> labels;
-    private final int defaultTopK;
 
-    private ClipClassifier(ClipImageEncoder imageEncoder, ClipTextEncoder textEncoder,
-                           float[][] labelEmbeddings, List<String> labels, int defaultTopK) {
+    private ClipClassifier(ClipImageEncoder imageEncoder, ClipTextEncoder textEncoder) {
         this.imageEncoder = imageEncoder;
         this.textEncoder = textEncoder;
-        this.labelEmbeddings = labelEmbeddings;
-        this.labels = labels;
-        this.defaultTopK = defaultTopK;
     }
 
     public static Builder builder() {
@@ -87,25 +72,26 @@ public class ClipClassifier implements ImageClassifier {
     }
 
     @Override
-    public List<Classification> classify(BufferedImage image) {
-        return classify(image, defaultTopK);
+    public List<Classification> classify(BufferedImage image, List<String> candidateLabels) {
+        return classify(image, candidateLabels, candidateLabels.size());
     }
 
-    @Override
-    public List<Classification> classify(BufferedImage image, int topK) {
+    public List<Classification> classify(BufferedImage image, List<String> candidateLabels, int topK) {
+        if (candidateLabels.isEmpty()) {
+            return List.of();
+        }
         float[] imageEmbedding = imageEncoder.encode(image);
-        return toClassifications(imageEmbedding, labelEmbeddings, labels, topK);
+        float[][] labelEmbeddings = encodeLabels(candidateLabels);
+        return toClassifications(imageEmbedding, labelEmbeddings, candidateLabels, topK);
     }
 
-    @Override
-    public List<Classification> classify(Path imagePath) {
-        return classify(imagePath, defaultTopK);
+    public List<Classification> classify(Path imagePath, List<String> candidateLabels) {
+        return classify(imagePath, candidateLabels, candidateLabels.size());
     }
 
-    @Override
-    public List<Classification> classify(Path imagePath, int topK) {
+    public List<Classification> classify(Path imagePath, List<String> candidateLabels, int topK) {
         BufferedImage image = loadImage(imagePath);
-        return classify(image, topK);
+        return classify(image, candidateLabels, topK);
     }
 
     @Override
@@ -114,12 +100,20 @@ public class ClipClassifier implements ImageClassifier {
         textEncoder.close();
     }
 
+    private float[][] encodeLabels(List<String> labels) {
+        float[][] embeddings = new float[labels.size()][];
+        for (int i = 0; i < labels.size(); i++) {
+            embeddings[i] = textEncoder.encode(labels.get(i));
+        }
+        return embeddings;
+    }
+
     static List<Classification> toClassifications(float[] imageEmbedding,
                                                    float[][] labelEmbeddings,
                                                    List<String> labels, int topK) {
         float[] similarities = new float[labelEmbeddings.length];
         for (int i = 0; i < labelEmbeddings.length; i++) {
-            similarities[i] = dot(imageEmbedding, labelEmbeddings[i]);
+            similarities[i] = MathOps.dotProduct(imageEmbedding, labelEmbeddings[i]);
         }
 
         float[] probabilities = MathOps.softmax(similarities);
@@ -130,14 +124,6 @@ public class ClipClassifier implements ImageClassifier {
             results.add(new Classification(labels.get(idx), idx, probabilities[idx]));
         }
         return results;
-    }
-
-    private static float dot(float[] a, float[] b) {
-        float sum = 0f;
-        for (int i = 0; i < a.length; i++) {
-            sum += a[i] * b[i];
-        }
-        return sum;
     }
 
     private static BufferedImage loadImage(Path path) {
@@ -158,9 +144,6 @@ public class ClipClassifier implements ImageClassifier {
         private ModelSource modelSource;
         private String modelId;
         private SessionConfigurer sessionConfigurer;
-        private List<String> labels;
-        private String promptTemplate = DEFAULT_PROMPT_TEMPLATE;
-        private int defaultTopK = -1;
 
         Builder imageEncoder(ClipImageEncoder imageEncoder) {
             this.imageEncoder = imageEncoder;
@@ -187,31 +170,7 @@ public class ClipClassifier implements ImageClassifier {
             return this;
         }
 
-        public Builder labels(String... labels) {
-            this.labels = Arrays.asList(labels);
-            return this;
-        }
-
-        public Builder labels(List<String> labels) {
-            this.labels = List.copyOf(labels);
-            return this;
-        }
-
-        public Builder promptTemplate(String promptTemplate) {
-            this.promptTemplate = promptTemplate;
-            return this;
-        }
-
-        public Builder defaultTopK(int defaultTopK) {
-            this.defaultTopK = defaultTopK;
-            return this;
-        }
-
         public ClipClassifier build() {
-            if (labels == null || labels.isEmpty()) {
-                throw new IllegalStateException("Labels are required for zero-shot classification");
-            }
-
             if (imageEncoder == null) {
                 ClipImageEncoder.Builder imageBuilder = ClipImageEncoder.builder();
                 if (modelSource != null) imageBuilder.modelSource(modelSource);
@@ -233,20 +192,7 @@ public class ClipClassifier implements ImageClassifier {
                 throw e;
             }
 
-            int topK = defaultTopK > 0 ? defaultTopK : labels.size();
-
-            try {
-                float[][] embeddings = new float[labels.size()][];
-                for (int i = 0; i < labels.size(); i++) {
-                    String prompt = promptTemplate.replace("{}", labels.get(i));
-                    embeddings[i] = textEncoder.encode(prompt);
-                }
-                return new ClipClassifier(imageEncoder, textEncoder, embeddings, labels, topK);
-            } catch (Exception e) {
-                imageEncoder.close();
-                textEncoder.close();
-                throw e;
-            }
+            return new ClipClassifier(imageEncoder, textEncoder);
         }
     }
 }

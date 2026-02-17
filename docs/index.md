@@ -70,10 +70,9 @@ try (var detector = CraftTextDetector.builder().build()) {
 ### Zero-Shot Image Classification
 
 ```java
-try (var classifier = ClipClassifier.builder()
-        .labels("cat", "dog", "bird", "car")
-        .build()) {
-    List<Classification> results = classifier.classify(Path.of("photo.jpg"));
+try (var classifier = ClipClassifier.builder().build()) {
+    List<Classification> results = classifier.classify(
+            Path.of("photo.jpg"), List.of("cat", "dog", "bird", "car"));
     // [Classification[label=cat, confidence=0.82], ...]
 }
 ```
