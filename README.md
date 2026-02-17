@@ -13,6 +13,8 @@ inference4j is an inference-only AI library for Java built on ONNX Runtime. It p
 
 ## What can you do with inference4j?
 
+Want to see it in action? Check out [inference4j-showcase](https://github.com/inference4j/inference4j-showcase) — a local demo app you can run to explore every capability the library provides.
+
 ### Sentiment Analysis
 
 ```java
