@@ -33,6 +33,11 @@ public class TextDetection {
 }
 ```
 
+<figure markdown="span">
+  ![Screenshot from showcase app](../assets/images/text-detection.png)
+  <figcaption>Screenshot from showcase app</figcaption>
+</figure>
+
 ## Custom thresholds
 
 The default thresholds (0.7, 0.4) are tuned for clean document scans. For real-world images (photos, screenshots), use lower thresholds:

@@ -39,6 +39,11 @@ public class TextGeneration {
 }
 ```
 
+<figure markdown="span">
+  ![Screenshot from showcase app](../assets/images/text-generation.png)
+  <figcaption>Screenshot from showcase app</figcaption>
+</figure>
+
 ## Streaming
 
 Pass a `Consumer<String>` to receive tokens as they are generated:

@@ -31,6 +31,11 @@ public class ImageClassification {
 }
 ```
 
+<figure markdown="span">
+  ![Screenshot from showcase app](../assets/images/image-classification.png)
+  <figcaption>Screenshot from showcase app</figcaption>
+</figure>
+
 ## Available models
 
 ### ResNet

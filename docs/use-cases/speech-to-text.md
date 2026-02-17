@@ -27,6 +27,11 @@ public class SpeechToText {
 }
 ```
 
+<figure markdown="span">
+  ![Screenshot from showcase app](../assets/images/speech-to-text.png)
+  <figcaption>Screenshot from showcase app</figcaption>
+</figure>
+
 ## From raw audio data
 
 If you already have audio samples as a float array:

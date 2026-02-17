@@ -13,6 +13,11 @@ try (ClipClassifier classifier = ClipClassifier.builder().build()) {
 }
 ```
 
+<figure markdown="span">
+  ![Screenshot from showcase app](../assets/images/visual-search.png)
+  <figcaption>Screenshot from showcase app</figcaption>
+</figure>
+
 ## Zero-shot classification
 
 Unlike traditional image classifiers that are trained on a fixed set of labels, CLIP classifies images against **any labels you provide at each call**. Just pass the labels you need — no retraining, no fine-tuning, and no need to rebuild the classifier for different label sets:

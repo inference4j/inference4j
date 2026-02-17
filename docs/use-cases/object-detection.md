@@ -33,6 +33,11 @@ public class ObjectDetection {
 }
 ```
 
+<figure markdown="span">
+  ![Screenshot from showcase app](../assets/images/object-detection.png)
+  <figcaption>Screenshot from showcase app</figcaption>
+</figure>
+
 ## Available models
 
 ### YOLOv8 / YOLO11

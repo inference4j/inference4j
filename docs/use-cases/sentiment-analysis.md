@@ -38,6 +38,11 @@ public class SentimentAnalysis {
 }
 ```
 
+<figure markdown="span">
+  ![Screenshot from showcase app](../assets/images/sentiment-analysis.png)
+  <figcaption>Screenshot from showcase app</figcaption>
+</figure>
+
 ## Builder options
 
 | Method | Type | Default | Description |

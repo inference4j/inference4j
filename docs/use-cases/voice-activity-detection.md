@@ -37,6 +37,11 @@ public class VoiceActivityDetection {
 }
 ```
 
+<figure markdown="span">
+  ![Screenshot from showcase app](../assets/images/voice-activity-detection.png)
+  <figcaption>Screenshot from showcase app</figcaption>
+</figure>
+
 ## Per-frame probabilities
 
 For visualization or custom segmentation logic, extract raw speech probabilities:
