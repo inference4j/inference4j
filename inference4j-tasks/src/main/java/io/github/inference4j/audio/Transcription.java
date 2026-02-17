@@ -16,10 +16,40 @@
 
 package io.github.inference4j.audio;
 
+import java.util.List;
+
 /**
  * Result of a speech-to-text transcription.
  *
- * @param text the transcribed text
+ * <p>For models that produce timestamps (e.g. Whisper), the {@link #segments} list contains
+ * timed segments with start and end times in seconds. For models that produce only plain text
+ * (e.g. Wav2Vec2), the segments list is empty.
+ *
+ * @param text the full transcribed text
+ * @param segments timed segments of the transcription, empty if timestamps are not available
  */
-public record Transcription(String text) {
+public record Transcription(String text, List<Segment> segments) {
+
+	/**
+	 * Creates a transcription with no timed segments.
+	 *
+	 * <p>This convenience constructor is used by models that produce only plain text
+	 * without timestamp information.
+	 *
+	 * @param text the transcribed text
+	 */
+	public Transcription(String text) {
+		this(text, List.of());
+	}
+
+	/**
+	 * A timed segment of a transcription.
+	 *
+	 * @param text the text content of this segment
+	 * @param startTime the start time in seconds
+	 * @param endTime the end time in seconds
+	 */
+	public record Segment(String text, float startTime, float endTime) {
+	}
+
 }
