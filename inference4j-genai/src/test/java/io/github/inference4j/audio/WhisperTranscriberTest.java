@@ -83,8 +83,16 @@ class WhisperTranscriberTest {
     }
 
     @Test
-    void builderDefaults() {
+    void builderDefaultsToEnglishTranscription() {
+        Model model = mock(Model.class);
+        MultiModalProcessor processor = mock(MultiModalProcessor.class);
+
         WhisperTranscriber.Builder builder = WhisperTranscriber.builder();
-        assertNotNull(builder);
+        builder.model = model;
+        builder.processor = processor;
+        WhisperTranscriber transcriber = builder.build();
+
+        assertEquals("<|startoftranscript|><|en|><|transcribe|><|notimestamps|>",
+                transcriber.buildPrompt());
     }
 }

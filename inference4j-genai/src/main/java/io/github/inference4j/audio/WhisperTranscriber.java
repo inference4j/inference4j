@@ -113,12 +113,10 @@ public class WhisperTranscriber
 						}
 						fullText.append(partial.text());
 					}
+				} finally {
+					deleteTempFile(tempFile);
 				}
-				finally {
-					Files.deleteIfExists(tempFile);
-				}
-			}
-			catch (IOException e) {
+			} catch (IOException e) {
 				throw new InferenceException(
 						"Failed to write temp chunk file: " + e.getMessage(), e);
 			}
@@ -133,12 +131,10 @@ public class WhisperTranscriber
 			try {
 				AudioWriter.write(new AudioData(audioData, sampleRate), tempFile);
 				return transcribe(tempFile);
+			} finally {
+				deleteTempFile(tempFile);
 			}
-			finally {
-				Files.deleteIfExists(tempFile);
-			}
-		}
-		catch (IOException e) {
+		} catch (IOException e) {
 			throw new InferenceException(
 					"Failed to write temp audio file: " + e.getMessage(), e);
 		}
@@ -153,8 +149,7 @@ public class WhisperTranscriber
 					generator.setInputs(inputs);
 				}
 			}
-		}
-		catch (GenAIException e) {
+		} catch (GenAIException e) {
 			throw new InferenceException(
 					"Failed to prepare Whisper generator: " + e.getMessage(), e);
 		}
@@ -182,6 +177,14 @@ public class WhisperTranscriber
 	String buildPrompt() {
 		return "<|startoftranscript|><|" + language + "|>"
 				+ task.token() + "<|notimestamps|>";
+	}
+
+	private static void deleteTempFile(Path file) {
+		try {
+			Files.deleteIfExists(file);
+		} catch (IOException ignored) {
+			// best-effort cleanup
+		}
 	}
 
 	/**
@@ -258,11 +261,15 @@ public class WhisperTranscriber
 				ModelSource source = modelSource != null
 						? modelSource : HuggingFaceModelSource.defaultInstance();
 				Path modelDir = source.resolve(modelId);
+				Model m = null;
 				try {
-					model = new Model(modelDir.toString());
-					processor = new MultiModalProcessor(model);
-				}
-				catch (GenAIException e) {
+					m = new Model(modelDir.toString());
+					model = m;
+					processor = new MultiModalProcessor(m);
+				} catch (GenAIException e) {
+					if (m != null) {
+						m.close();
+					}
 					throw new ModelSourceException(
 							"Failed to load Whisper model: " + e.getMessage(), e);
 				}
