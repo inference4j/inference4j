@@ -1,13 +1,5 @@
 # Phi-3.5 Vision
 
-!!! warning "Work in Progress"
-
-    `VisionLanguageModel` is implemented but the pre-exported model artifact
-    (`inference4j/phi-3.5-vision-instruct`) is not yet available on our
-    HuggingFace organization. Microsoft publishes the model at
-    [`microsoft/Phi-3.5-vision-instruct-onnx`](https://huggingface.co/microsoft/Phi-3.5-vision-instruct-onnx).
-    This page documents the target API.
-
 Ask questions about images and get text answers using Microsoft's Phi-3.5 Vision model.
 
 See the [overview](introduction.md) for background on how autoregressive generation
@@ -19,8 +11,14 @@ differs from single-pass inference.
 try (var vision = VisionLanguageModel.builder()
         .model(ModelSources.phi3Vision())
         .build()) {
-    System.out.println(vision.describe(Path.of("photo.jpg")).text());
+    System.out.println(vision.describe(Path.of("cat.jpg")).text());
 }
+```
+
+```
+The image shows a close-up of an orange tabby cat with a white collar.
+The cat's eyes are green, and it has a neutral expression. The background
+is blurred, with hints of a red object and a green plant.
 ```
 
 ## Full example
@@ -35,14 +33,17 @@ public class ImageDescription {
     public static void main(String[] args) {
         try (var vision = VisionLanguageModel.builder()
                 .model(ModelSources.phi3Vision())
-                .maxLength(500)
                 .build()) {
 
-            GenerationResult result = vision.describe(Path.of("photo.jpg"));
+            // Describe an image
+            GenerationResult description = vision.describe(Path.of("cat.jpg"));
+            System.out.println(description.text());
 
-            System.out.println(result.text());
-            System.out.printf("%d tokens in %,d ms%n",
-                    result.tokenCount(), result.durationMillis());
+            // Ask a question about it
+            GenerationResult answer = vision.ask(
+                    Path.of("cat.jpg"),
+                    "What colors are prominent in this image?");
+            System.out.println(answer.text());
         }
     }
 }
@@ -55,10 +56,17 @@ try (var vision = VisionLanguageModel.builder()
         .model(ModelSources.phi3Vision())
         .build()) {
     GenerationResult answer = vision.ask(
-            Path.of("chart.png"),
-            "What trend does this chart show?");
+            Path.of("cat.jpg"),
+            "What colors are prominent in this image?");
     System.out.println(answer.text());
 }
+```
+
+```
+The image prominently features shades of orange and white, which are the
+colors of the cat's fur. There is also a hint of green in the cat's eyes,
+and the background includes a red object, possibly a part of a fence or
+a piece of clothing.
 ```
 
 ## Streaming
@@ -68,10 +76,8 @@ Pass a `Consumer<String>` to receive tokens as they are generated:
 ```java
 try (var vision = VisionLanguageModel.builder()
         .model(ModelSources.phi3Vision())
-        .maxLength(500)
         .build()) {
-    vision.ask(Path.of("photo.jpg"), "Describe what you see.",
-            token -> System.out.print(token));
+    vision.describe(Path.of("cat.jpg"), token -> System.out.print(token));
 }
 ```
 
@@ -83,7 +89,7 @@ try (var vision = VisionLanguageModel.builder()
 | `.modelId(String)` | `String` | — | HuggingFace model ID (requires `.chatTemplate()`) |
 | `.modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Model resolution strategy |
 | `.chatTemplate(ChatTemplate)` | `ChatTemplate` | — | Prompt formatting (must include `<\|image_1\|>` placeholder) |
-| `.maxLength(int)` | `int` | `1024` | Maximum number of tokens to generate |
+| `.maxLength(int)` | `int` | `4096` | Maximum total sequence length (input image tokens + output tokens) |
 | `.temperature(double)` | `double` | `0.0` | Sampling temperature (0 = greedy) |
 | `.topK(int)` | `int` | `0` (disabled) | Top-K sampling |
 | `.topP(double)` | `double` | `0.0` (disabled) | Nucleus sampling |

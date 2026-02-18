@@ -206,7 +206,7 @@ public class VisionLanguageModel extends AbstractGenerativeTask<VisionInput, Gen
 		private ModelSource modelSource;
 		private ChatTemplate chatTemplate;
 		private String modelId;
-		private int maxLength = 1024;
+		private int maxLength = 4096;
 		private double temperature = 0.0;
 		private int topK = 0;
 		private double topP = 0.0;
