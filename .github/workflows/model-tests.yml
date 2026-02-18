@@ -29,8 +29,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/inference4j
-          key: model-cache-${{ hashFiles('inference4j-tasks/src/main/**/*.java') }}
+          key: model-cache-${{ hashFiles('inference4j-tasks/src/main/**/*.java', 'inference4j-genai/src/main/**/*.java') }}
           restore-keys: model-cache-
 
       - name: Run model tests
-        run: ./gradlew :inference4j-tasks:modelTest
+        run: ./gradlew :inference4j-tasks:modelTest :inference4j-genai:modelTest
