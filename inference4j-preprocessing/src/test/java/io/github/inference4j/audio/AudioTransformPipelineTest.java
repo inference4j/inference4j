@@ -107,34 +107,6 @@ class AudioTransformPipelineTest {
     }
 
     @Test
-    void wav2vec2Preset_resamplesAndNormalizes() {
-        float[] samples = {0.5f, 1.0f, 0.5f, 0.0f};
-        AudioData input = new AudioData(samples, 16000);
-
-        AudioData result = AudioTransformPipeline.wav2vec2().transform(input);
-
-        assertEquals(16000, result.sampleRate());
-
-        // Should be normalized
-        double mean = 0;
-        for (float s : result.samples()) mean += s;
-        mean /= result.samples().length;
-        assertEquals(0.0, mean, 1e-5);
-    }
-
-    @Test
-    void whisperPreset_resamplesOnly() {
-        float[] samples = {0.5f, 1.0f, 0.5f, 0.0f};
-        AudioData input = new AudioData(samples, 16000);
-
-        AudioData result = AudioTransformPipeline.whisper().transform(input);
-
-        assertEquals(16000, result.sampleRate());
-        // Should NOT be normalized — samples should be unchanged
-        assertArrayEquals(samples, result.samples());
-    }
-
-    @Test
     void customTransform_isApplied() {
         AudioData input = new AudioData(new float[]{1.0f, 2.0f, 3.0f}, 16000);
 

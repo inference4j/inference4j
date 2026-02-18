@@ -23,18 +23,12 @@ import java.util.List;
 /**
  * Composes audio transforms into a preprocessing pipeline.
  *
- * <p>Preset usage:
- * <pre>{@code
- * AudioTransformPipeline pipeline = AudioTransformPipeline.wav2vec2();
- * AudioData processed = pipeline.transform(audio);
- * }</pre>
- *
- * <p>Custom pipeline:
  * <pre>{@code
  * AudioTransformPipeline pipeline = AudioTransformPipeline.builder()
  *     .resample(16000)
  *     .normalize()
  *     .build();
+ * AudioData processed = pipeline.transform(audio);
  * }</pre>
  *
  * @see AudioTransform
@@ -45,27 +39,6 @@ public class AudioTransformPipeline implements Preprocessor<AudioData, AudioData
 
 	private AudioTransformPipeline(List<AudioTransform> transforms) {
 		this.transforms = List.copyOf(transforms);
-	}
-
-	/**
-	 * Standard Wav2Vec2 preprocessing: resample(16kHz) &rarr; normalize().
-	 */
-	public static AudioTransformPipeline wav2vec2() {
-		return builder()
-				.resample(16000)
-				.normalize()
-				.build();
-	}
-
-	/**
-	 * Standard Whisper preprocessing: resample(16kHz).
-	 *
-	 * <p>Mel spectrogram computation is handled natively by onnxruntime-genai.
-	 */
-	public static AudioTransformPipeline whisper() {
-		return builder()
-				.resample(16000)
-				.build();
 	}
 
 	public static Builder builder() {
