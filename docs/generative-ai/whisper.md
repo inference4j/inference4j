@@ -1,5 +1,12 @@
 # Whisper Speech-to-Text
 
+!!! warning "Work in Progress"
+
+    `WhisperSpeechModel` is implemented but the pre-exported model artifact
+    (`inference4j/whisper-small-genai`) is not yet available on HuggingFace.
+    The onnxruntime Whisper converter has compatibility issues with current
+    Python package versions. This page documents the target API.
+
 Transcribe and translate speech using OpenAI's Whisper models, with automatic chunking for long audio.
 
 See the [overview](index.md) for background on how autoregressive generation differs from single-pass inference.
