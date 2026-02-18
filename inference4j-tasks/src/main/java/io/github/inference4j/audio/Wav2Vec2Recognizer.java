@@ -76,14 +76,14 @@ public class Wav2Vec2Recognizer
 
     private final Vocabulary vocabulary;
     private final String inputName;
-    private final int targetSampleRate;
+    private final AudioTransformPipeline pipeline;
     private final int blankIndex;
     private final String wordDelimiter;
 
     private Wav2Vec2Recognizer(InferenceSession session, Vocabulary vocabulary, String inputName,
-                               int targetSampleRate, int blankIndex, String wordDelimiter) {
+                               AudioTransformPipeline pipeline, int blankIndex, String wordDelimiter) {
         super(session,
-                createPreprocessor(inputName, targetSampleRate),
+                createPreprocessor(inputName, pipeline),
                 ctx -> {
                     Tensor outputTensor = ctx.outputs().values().iterator().next();
                     long[] shape = outputTensor.shape();
@@ -94,7 +94,7 @@ public class Wav2Vec2Recognizer
                 });
         this.vocabulary = vocabulary;
         this.inputName = inputName;
-        this.targetSampleRate = targetSampleRate;
+        this.pipeline = pipeline;
         this.blankIndex = blankIndex;
         this.wordDelimiter = wordDelimiter;
     }
@@ -110,9 +110,10 @@ public class Wav2Vec2Recognizer
 
     @Override
     public Transcription transcribe(float[] audioData, int sampleRate) {
-        float[] resampled = AudioProcessor.resample(audioData, sampleRate, targetSampleRate);
-        float[] normalized = AudioProcessor.normalize(resampled);
-        Tensor inputTensor = Tensor.fromFloats(normalized, new long[]{1, normalized.length});
+        AudioData audio = new AudioData(audioData, sampleRate);
+        AudioData processed = pipeline.transform(audio);
+        float[] samples = processed.samples();
+        Tensor inputTensor = Tensor.fromFloats(samples, new long[]{1, samples.length});
         Map<String, Tensor> inputs = Map.of(inputName, inputTensor);
         Map<String, Tensor> outputs = session.run(inputs);
         Tensor outputTensor = outputs.values().iterator().next();
@@ -124,12 +125,12 @@ public class Wav2Vec2Recognizer
     }
 
     private static io.github.inference4j.processing.Preprocessor<Path, Map<String, Tensor>> createPreprocessor(
-            String inputName, int targetSampleRate) {
+            String inputName, AudioTransformPipeline pipeline) {
         return audioPath -> {
             AudioData audio = AudioLoader.load(audioPath);
-            float[] resampled = AudioProcessor.resample(audio.samples(), audio.sampleRate(), targetSampleRate);
-            float[] normalized = AudioProcessor.normalize(resampled);
-            Tensor inputTensor = Tensor.fromFloats(normalized, new long[]{1, normalized.length});
+            AudioData processed = pipeline.transform(audio);
+            float[] samples = processed.samples();
+            Tensor inputTensor = Tensor.fromFloats(samples, new long[]{1, samples.length});
             return Map.of(inputName, inputTensor);
         };
     }
@@ -221,8 +222,12 @@ public class Wav2Vec2Recognizer
             if (inputName == null) {
                 inputName = session.inputNames().iterator().next();
             }
+            AudioTransformPipeline pipeline = AudioTransformPipeline.builder()
+                    .resample(sampleRate)
+                    .normalize()
+                    .build();
             return new Wav2Vec2Recognizer(session, vocabulary, inputName,
-                    sampleRate, blankIndex, wordDelimiter);
+                    pipeline, blankIndex, wordDelimiter);
         }
 
         private void loadFromDirectory(Path dir) {

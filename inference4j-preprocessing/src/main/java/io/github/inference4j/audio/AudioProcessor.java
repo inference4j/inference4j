@@ -16,6 +16,9 @@
 
 package io.github.inference4j.audio;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Audio signal processing utilities for model inference.
  */
@@ -91,5 +94,34 @@ public final class AudioProcessor {
         }
 
         return result;
+    }
+
+    /**
+     * Splits audio into fixed-duration chunks.
+     *
+     * <p>Each chunk has exactly {@code sampleRate * chunkDurationSeconds} samples.
+     * The last chunk is zero-padded if the audio doesn't divide evenly.
+     * If the input is shorter than one chunk, a single zero-padded chunk is returned.
+     *
+     * @param audio                 the audio to split
+     * @param chunkDurationSeconds  duration of each chunk in seconds
+     * @return list of audio chunks, each with the same sample rate
+     */
+    public static List<AudioData> chunk(AudioData audio, int chunkDurationSeconds) {
+        int chunkSamples = audio.sampleRate() * chunkDurationSeconds;
+        float[] samples = audio.samples();
+        int totalChunks = Math.max(1, (int) Math.ceil((double) samples.length / chunkSamples));
+
+        List<AudioData> chunks = new ArrayList<>(totalChunks);
+        for (int i = 0; i < totalChunks; i++) {
+            int start = i * chunkSamples;
+            float[] chunk = new float[chunkSamples];
+            int copyLen = Math.min(chunkSamples, samples.length - start);
+            if (copyLen > 0) {
+                System.arraycopy(samples, start, chunk, 0, copyLen);
+            }
+            chunks.add(new AudioData(chunk, audio.sampleRate()));
+        }
+        return chunks;
     }
 }

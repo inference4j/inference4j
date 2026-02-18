@@ -3,6 +3,8 @@ description = 'Autoregressive generation wrappers for inference4j via onnxruntim
 dependencies {
     api 'io.github.inference4j:onnxruntime-genai:0.12.0'
     implementation project(':inference4j-core')
+    implementation project(':inference4j-tasks')
+    implementation project(':inference4j-preprocessing')
     runtimeOnly 'org.slf4j:slf4j-nop:2.0.16'
 }
 

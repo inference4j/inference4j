@@ -97,10 +97,11 @@ public class SileroVadDetector implements VoiceActivityDetector {
     private final float threshold;
     private final float minSpeechDuration;
     private final float minSilenceDuration;
-
+    private final AudioTransformPipeline pipeline;
 
     private SileroVadDetector(InferenceSession session, int targetSampleRate, int windowSizeSamples,
-                              int contextSize, float threshold, float minSpeechDuration, float minSilenceDuration) {
+                              int contextSize, float threshold, float minSpeechDuration,
+                              float minSilenceDuration, AudioTransformPipeline pipeline) {
         this.session = session;
         this.targetSampleRate = targetSampleRate;
         this.windowSizeSamples = windowSizeSamples;
@@ -108,6 +109,7 @@ public class SileroVadDetector implements VoiceActivityDetector {
         this.threshold = threshold;
         this.minSpeechDuration = minSpeechDuration;
         this.minSilenceDuration = minSilenceDuration;
+        this.pipeline = pipeline;
     }
 
     /**
@@ -127,14 +129,13 @@ public class SileroVadDetector implements VoiceActivityDetector {
 
     @Override
     public List<VoiceSegment> detect(float[] audioData, int sampleRate) {
-        // Resample if needed
-        float[] samples = AudioProcessor.resample(audioData, sampleRate, targetSampleRate);
+        AudioData processed = pipeline.transform(new AudioData(audioData, sampleRate));
 
         // Get per-frame probabilities
-        float[] probabilities = runInference(samples);
+        float[] probabilities = runInference(processed.samples());
 
         // Convert probabilities to segments
-        return extractSegments(probabilities, samples.length);
+        return extractSegments(probabilities, processed.samples().length);
     }
 
     /**
@@ -158,8 +159,8 @@ public class SileroVadDetector implements VoiceActivityDetector {
      * @return array of speech probabilities, one per frame
      */
     public float[] probabilities(float[] audioData, int sampleRate) {
-        float[] samples = AudioProcessor.resample(audioData, sampleRate, targetSampleRate);
-        return runInference(samples);
+        AudioData processed = pipeline.transform(new AudioData(audioData, sampleRate));
+        return runInference(processed.samples());
     }
 
     @Override
@@ -350,8 +351,11 @@ public class SileroVadDetector implements VoiceActivityDetector {
                 loadFromDirectory(dir);
             }
             int contextSize = (sampleRate == 16000) ? 64 : 32;
+            AudioTransformPipeline pipeline = AudioTransformPipeline.builder()
+                    .resample(sampleRate)
+                    .build();
             return new SileroVadDetector(session, sampleRate, windowSizeSamples,
-                    contextSize, threshold, minSpeechDuration, minSilenceDuration);
+                    contextSize, threshold, minSpeechDuration, minSilenceDuration, pipeline);
         }
 
         private void loadFromDirectory(Path dir) {

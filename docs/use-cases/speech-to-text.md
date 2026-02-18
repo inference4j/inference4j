@@ -64,6 +64,7 @@ try (var recognizer = Wav2Vec2Recognizer.builder().build()) {
 | Field | Type | Description |
 |-------|------|-------------|
 | `text()` | `String` | The transcribed text |
+| `segments()` | `List<Segment>` | Timed segments (empty for Wav2Vec2) |
 
 ## Audio requirements
 
@@ -88,4 +89,4 @@ The pipeline:
 
 - The default model (`wav2vec2-base-960h`) is trained on English LibriSpeech data. For other languages, use an appropriate fine-tuned model.
 - Wav2Vec2 works best with clean speech. For noisy audio, consider preprocessing with VAD to extract speech segments first — see [Voice Activity Detection](voice-activity-detection.md).
-- This is a CTC model (single-pass), not an autoregressive model like Whisper. It's fast but may be less accurate on complex audio.
+- This is a CTC model (single-pass), not an autoregressive model. It's fast but may be less accurate on complex audio. For multilingual support or translation, see [Whisper](../generative-ai/whisper.md).

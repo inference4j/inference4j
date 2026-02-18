@@ -18,6 +18,8 @@ package io.github.inference4j.audio;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class AudioProcessorTest {
@@ -100,5 +102,88 @@ class AudioProcessorTest {
         // Single value → std=0, should return zero
         float[] result = AudioProcessor.normalize(new float[]{42.0f});
         assertEquals(0.0f, result[0], 1e-6f);
+    }
+
+    // --- chunk() tests ---
+
+    @Test
+    void chunk_shorterThanDuration_returnsSingleChunkPaddedToFull() {
+        // 3 samples at 3Hz, chunk to 2s → 1 chunk of 6 samples, last 3 zero-padded
+        float[] samples = {0.1f, 0.2f, 0.3f};
+        AudioData audio = new AudioData(samples, 3);
+
+        List<AudioData> chunks = AudioProcessor.chunk(audio, 2);
+
+        assertEquals(1, chunks.size());
+        assertEquals(6, chunks.get(0).samples().length);
+        assertEquals(0.1f, chunks.get(0).samples()[0], 1e-6f);
+        assertEquals(0.2f, chunks.get(0).samples()[1], 1e-6f);
+        assertEquals(0.3f, chunks.get(0).samples()[2], 1e-6f);
+        assertEquals(0.0f, chunks.get(0).samples()[3], 1e-6f);
+        assertEquals(0.0f, chunks.get(0).samples()[4], 1e-6f);
+        assertEquals(0.0f, chunks.get(0).samples()[5], 1e-6f);
+    }
+
+    @Test
+    void chunk_exactlyDuration_returnsSingleChunk() {
+        // 4 samples at 2Hz, chunk to 2s → 1 chunk of 4 samples
+        float[] samples = {0.1f, 0.2f, 0.3f, 0.4f};
+        AudioData audio = new AudioData(samples, 2);
+
+        List<AudioData> chunks = AudioProcessor.chunk(audio, 2);
+
+        assertEquals(1, chunks.size());
+        assertEquals(4, chunks.get(0).samples().length);
+        assertArrayEquals(samples, chunks.get(0).samples(), 1e-6f);
+    }
+
+    @Test
+    void chunk_longerThanDuration_returnsMultipleChunks() {
+        // 100 samples at 10Hz (10s), chunk to 3s → 4 chunks of 30 samples each
+        float[] samples = new float[100];
+        for (int i = 0; i < 100; i++) {
+            samples[i] = i * 0.01f;
+        }
+        AudioData audio = new AudioData(samples, 10);
+
+        List<AudioData> chunks = AudioProcessor.chunk(audio, 3);
+
+        assertEquals(4, chunks.size());
+        for (AudioData chunk : chunks) {
+            assertEquals(30, chunk.samples().length);
+        }
+        // First sample of first chunk
+        assertEquals(0.0f, chunks.get(0).samples()[0], 1e-6f);
+        // First sample of second chunk
+        assertEquals(0.30f, chunks.get(1).samples()[0], 1e-6f);
+        // Last chunk should have 10 real samples + 20 zero-padded
+        assertEquals(0.90f, chunks.get(3).samples()[0], 1e-6f);
+        assertEquals(0.0f, chunks.get(3).samples()[10], 1e-6f);
+    }
+
+    @Test
+    void chunk_allChunksPreserveSampleRate() {
+        float[] samples = new float[100];
+        AudioData audio = new AudioData(samples, 16000);
+
+        List<AudioData> chunks = AudioProcessor.chunk(audio, 30);
+
+        for (AudioData chunk : chunks) {
+            assertEquals(16000, chunk.sampleRate());
+        }
+    }
+
+    @Test
+    void chunk_emptySamples_returnsSingleEmptyPaddedChunk() {
+        // Empty audio at 16kHz, chunk to 30s → 1 chunk of 480000 samples
+        AudioData audio = new AudioData(new float[0], 16000);
+
+        List<AudioData> chunks = AudioProcessor.chunk(audio, 30);
+
+        assertEquals(1, chunks.size());
+        assertEquals(480000, chunks.get(0).samples().length);
+        for (float s : chunks.get(0).samples()) {
+            assertEquals(0.0f, s, 1e-6f);
+        }
     }
 }

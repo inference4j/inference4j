@@ -1,6 +1,6 @@
 # Generative AI
 
-Run decoder-only language models (Phi-3, DeepSeek-R1, Llama) directly in Java with token-by-token generation and streaming.
+Run autoregressive models — text generation (Phi-3, DeepSeek-R1) and speech-to-text (Whisper) — directly in Java with token-by-token generation and streaming.
 
 !!! warning "Experimental"
 
@@ -138,15 +138,24 @@ TextGenerator.builder()
 
 ## Supported models
 
+### Text generation
+
 | Model | Model ID | Parameters | Size | License |
 |-------|----------|-----------|------|---------|
 | Phi-3 Mini 4K Instruct | `inference4j/phi-3-mini-4k-instruct` | 3.8B | ~2.7 GB | MIT |
 | DeepSeek-R1-Distill-Qwen-1.5B | `inference4j/deepseek-r1-distill-qwen-1.5b` | 1.5B | ~1 GB | MIT |
 
-Both models are quantized to INT4 for CPU inference and hosted on the
-[inference4j HuggingFace org](https://huggingface.co/inference4j).
-Models are downloaded automatically on first use.
+### Speech-to-text
+
+| Model | Model ID | Size | License |
+|-------|----------|------|---------|
+| Whisper Small | `inference4j/whisper-small-genai` | ~500 MB | MIT |
+
+All models are hosted on the
+[inference4j HuggingFace org](https://huggingface.co/inference4j)
+and downloaded automatically on first use.
 
 ## Next steps
 
 - [Text Generation](text-generation.md) — builder options, streaming, and usage details
+- [Whisper Speech-to-Text](whisper.md) — transcription, translation, and auto-chunking

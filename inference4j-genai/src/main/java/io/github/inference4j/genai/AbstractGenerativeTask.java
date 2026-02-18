@@ -18,7 +18,6 @@ package io.github.inference4j.genai;
 import ai.onnxruntime.genai.Generator;
 import ai.onnxruntime.genai.GeneratorParams;
 import ai.onnxruntime.genai.Model;
-import ai.onnxruntime.genai.Tokenizer;
 import ai.onnxruntime.genai.TokenizerStream;
 import ai.onnxruntime.genai.GenAIException;
 
@@ -49,21 +48,9 @@ import java.util.function.Consumer;
 public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, O> {
 
     protected final Model model;
-    protected final Tokenizer tokenizer;
-    private final int maxLength;
-    private final double temperature;
-    private final int topK;
-    private final double topP;
 
-    protected AbstractGenerativeTask(Model model, Tokenizer tokenizer,
-                                     int maxLength, double temperature,
-                                     int topK, double topP) {
+    protected AbstractGenerativeTask(Model model) {
         this.model = model;
-        this.tokenizer = tokenizer;
-        this.maxLength = maxLength;
-        this.temperature = temperature;
-        this.topK = topK;
-        this.topP = topP;
     }
 
     @Override
@@ -82,7 +69,7 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
                 int tokenCount = 0;
                 StringBuilder sb = new StringBuilder();
 
-                try (TokenizerStream stream = tokenizer.createStream()) {
+                try (TokenizerStream stream = createStream()) {
                     while (!generator.isDone()) {
                         generator.generateNextToken();
                         int token = generator.getLastTokenInSequence(0);
@@ -103,6 +90,18 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
                     "Generation failed: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * Create a {@link TokenizerStream} for decoding generated tokens into text.
+     *
+     * <p>Subclasses backed by a {@code Tokenizer} (e.g. text generators) create the
+     * stream from the tokenizer. Subclasses backed by a {@code MultiModalProcessor}
+     * (e.g. Whisper audio transcription) create the stream from the processor.
+     *
+     * @return a new TokenizerStream for the current generation
+     * @throws GenAIException if stream creation fails
+     */
+    protected abstract TokenizerStream createStream() throws GenAIException;
 
     /**
      * Feed the generator with encoded input before the generate loop starts.
@@ -127,24 +126,33 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
     protected abstract O parseOutput(String generatedText, I input,
                                      int tokenCount, long durationMillis);
 
-    private GeneratorParams createParams() throws GenAIException {
-        GeneratorParams params = new GeneratorParams(model);
-        params.setSearchOption("max_length", maxLength);
-        if (temperature > 0) {
-            params.setSearchOption("temperature", temperature);
-        }
-        if (topK > 0) {
-            params.setSearchOption("top_k", topK);
-        }
-        if (topP > 0) {
-            params.setSearchOption("top_p", topP);
-        }
-        return params;
+    /**
+     * Create {@link GeneratorParams} for this generation run.
+     *
+     * <p>The default implementation returns bare params with no search options.
+     * Subclasses should override this to configure model-specific options
+     * (max_length, temperature, top_k, top_p, etc.).
+     *
+     * @return configured generator params
+     * @throws GenAIException if param creation fails
+     */
+    protected GeneratorParams createParams() throws GenAIException {
+        return new GeneratorParams(model);
+    }
+
+    /**
+     * Release subclass-owned resources (e.g. Tokenizer, MultiModalProcessor).
+     *
+     * <p>Called by {@link #close()} before closing the model. Subclasses should
+     * override this to close any resources they own. The default implementation
+     * does nothing.
+     */
+    protected void closeResources() {
     }
 
     @Override
-    public void close() {
-        tokenizer.close();
+    public final void close() {
+        closeResources();
         model.close();
     }
 }
