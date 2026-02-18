@@ -44,7 +44,7 @@ For text generation (Phi-3, DeepSeek-R1, etc.), add `inference4j-genai` instead:
     </dependency>
     ```
 
-This is a separate module backed by onnxruntime-genai. See the [Generative AI guide](../generative-ai/index.md) for details.
+This is a separate module backed by onnxruntime-genai. See the [Generative AI guide](../generative-ai/introduction.md) for details.
 
 ## JVM flags
 

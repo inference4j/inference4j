@@ -62,7 +62,7 @@ nav:
     - Visual Search: use-cases/visual-search.md
     - Text Generation: generative-ai/text-generation.md
   - Generative AI:
-    - generative-ai/index.md
+    - Introduction: generative-ai/introduction.md
     - Text Generation: generative-ai/text-generation.md
     - Whisper Speech-to-Text: generative-ai/whisper.md
     - Chat Templates: generative-ai/chat-templates.md

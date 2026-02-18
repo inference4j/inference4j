@@ -2,7 +2,7 @@
 
 Generate text with decoder-only language models like Phi-3 and DeepSeek-R1, with built-in streaming support.
 
-See the [overview](index.md) for background on how autoregressive generation differs from single-pass inference.
+See the [overview](introduction.md) for background on how autoregressive generation differs from single-pass inference.
 
 ## Quick example
 
@@ -94,7 +94,7 @@ flowchart LR
     C --> D["GenerationResult"]
 ```
 
-See the [overview](index.md) for a detailed explanation of the
+See the [overview](introduction.md) for a detailed explanation of the
 generation loop, KV cache, and why this architecture differs from single-pass wrappers.
 
 ## Tips

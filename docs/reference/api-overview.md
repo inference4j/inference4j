@@ -94,7 +94,7 @@ performs a single forward pass, `GenerativeTask` runs an iterative generate loop
 backed by onnxruntime-genai. `AbstractGenerativeTask` owns the generate loop and
 provides hooks for subclasses: `prepareGenerator()`, `createStream()`, `parseOutput()`,
 and `createParams()` (for model-specific generation options like temperature and max length).
-See [Generative AI](../generative-ai/index.md) for details.
+See [Generative AI](../generative-ai/introduction.md) for details.
 
 ## Result types
 

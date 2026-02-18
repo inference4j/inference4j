@@ -37,7 +37,7 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 
 ## Generative AI
 
-Generative models use a separate module (`inference4j-genai`) and a different builder pattern. See [Generative AI](../generative-ai/index.md) for details.
+Generative models use a separate module (`inference4j-genai`) and a different builder pattern. See [Generative AI](../generative-ai/introduction.md) for details.
 
 | Capability | Wrapper | Model ID | Size | License |
 |------------|---------|----------|------|---------|

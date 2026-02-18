@@ -137,10 +137,10 @@ pipeline.
 
 inference4j handles this through a separate module (`inference4j-genai`) backed by
 [onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai). See the
-[Generative AI](../generative-ai/index.md) section for details.
+[Generative AI](../generative-ai/introduction.md) section for details.
 
 ## Next steps
 
 - [Browse use cases](../use-cases/sentiment-analysis.md) to see the single-pass wrappers in action
-- [Generative AI](../generative-ai/index.md) for autoregressive text generation
+- [Generative AI](../generative-ai/introduction.md) for autoregressive text generation
 - [Adding a Wrapper](../contributing/adding-a-wrapper.md) explains the internals for contributors

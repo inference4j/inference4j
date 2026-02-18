@@ -9,7 +9,7 @@
 
 Transcribe and translate speech using OpenAI's Whisper models, with automatic chunking for long audio.
 
-See the [overview](index.md) for background on how autoregressive generation differs from single-pass inference.
+See the [overview](introduction.md) for background on how autoregressive generation differs from single-pass inference.
 
 ## Quick example
 
