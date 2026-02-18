@@ -25,7 +25,8 @@ import java.util.List;
  *
  * <p>Each factory method returns a {@link GenerativeModel} that encapsulates the model
  * repository, required files, download logic, and chat template. Use these with
- * {@link io.github.inference4j.nlp.TextGenerator}:
+ * {@link io.github.inference4j.nlp.TextGenerator} or
+ * {@link io.github.inference4j.vision.VisionLanguageModel}:
  *
  * <pre>{@code
  * try (var gen = TextGenerator.builder()
@@ -36,6 +37,7 @@ import java.util.List;
  * }</pre>
  *
  * @see io.github.inference4j.nlp.TextGenerator
+ * @see io.github.inference4j.vision.VisionLanguageModel
  */
 public final class ModelSources {
 
@@ -87,6 +89,34 @@ public final class ModelSources {
                 )),
                 message -> "<\uFF5Cbegin\u2581of\u2581sentence\uFF5C>"
                         + "<\uFF5CUser\uFF5C>" + message + "<\uFF5CAssistant\uFF5C>"
+        );
+    }
+
+    /**
+     * Phi-3.5 Vision Instruct (INT4, ~3.3 GB).
+     *
+     * <p>4.2B-parameter multimodal model from Microsoft that accepts images and
+     * text prompts to generate text output. Quantized to INT4 for CPU inference.
+     * Hosted at {@code inference4j/phi-3.5-vision-instruct}.
+     *
+     * @return a preconfigured generative model for Phi-3.5 Vision
+     */
+    public static GenerativeModel phi3Vision() {
+        return new GenerativeModel(
+                preconfigured("inference4j/phi-3.5-vision-instruct", List.of(
+                        "genai_config.json",
+                        "processor_config.json",
+                        "phi-3.5-v-instruct-text.onnx",
+                        "phi-3.5-v-instruct-text.onnx.data",
+                        "phi-3.5-v-instruct-embedding.onnx",
+                        "phi-3.5-v-instruct-embedding.onnx.data",
+                        "phi-3.5-v-instruct-vision.onnx",
+                        "phi-3.5-v-instruct-vision.onnx.data",
+                        "tokenizer.json",
+                        "tokenizer_config.json",
+                        "special_tokens_map.json"
+                )),
+                message -> "<|user|>\n<|image_1|>\n" + message + "\n<|end|>\n<|assistant|>\n"
         );
     }
 
