@@ -1,6 +1,6 @@
 # Generative AI
 
-Run autoregressive models — text generation (Phi-3, DeepSeek-R1) and speech-to-text (Whisper) — directly in Java with token-by-token generation and streaming.
+Run autoregressive models — text generation (Phi-3, DeepSeek-R1), speech-to-text (Whisper), and vision-language (Phi-3.5 Vision) — directly in Java with token-by-token generation and streaming.
 
 !!! warning "Experimental"
 
@@ -28,7 +28,7 @@ and few are published this way today. That's why the supported model list is sho
 a limitation of inference4j, but of the export ecosystem.
 
 **Your code is insulated from this.** The API you write against — `TextGenerator`,
-`WhisperSpeechModel`, their builders and result types — is stable regardless of what
+`WhisperSpeechModel`, `VisionLanguageModel`, their builders and result types — is stable regardless of what
 runs underneath. Adding a native generation loop later would be a provider switch on
 the builder, unlocking the full HuggingFace catalog without changing your application code.
 
@@ -174,6 +174,12 @@ TextGenerator.builder()
 |-------|----------|------|---------|
 | Whisper Small | `inference4j/whisper-small-genai` | ~500 MB | MIT |
 
+### Vision-language
+
+| Model | Model ID | Parameters | Size | License |
+|-------|----------|-----------|------|---------|
+| Phi-3.5 Vision Instruct | `inference4j/phi-3.5-vision-instruct` | 4.2B | ~3.3 GB | MIT |
+
 All models are hosted on the
 [inference4j HuggingFace org](https://huggingface.co/inference4j)
 and downloaded automatically on first use.
@@ -182,3 +188,4 @@ and downloaded automatically on first use.
 
 - [Text Generation](text-generation.md) — builder options, streaming, and usage details
 - [Whisper Speech-to-Text](whisper.md) — transcription, translation, and auto-chunking
+- [Phi-3.5 Vision](phi-vision.md) — image description, visual Q&A, and streaming

@@ -37,6 +37,7 @@
 | `io.github.inference4j.genai` | `GenerativeTask`, `AbstractGenerativeTask`, `GenerationResult`, `ChatTemplate`, `GenerativeModel`, `ModelSources` |
 | `io.github.inference4j.nlp` | `TextGenerator` |
 | `io.github.inference4j.audio` | `WhisperSpeechModel`, `WhisperTask` |
+| `io.github.inference4j.vision` | `VisionLanguageModel`, `VisionInput` |
 
 ### inference4j-runtime
 
@@ -86,7 +87,8 @@ Exceptions: `SileroVadDetector` (stateful hidden state), `MiniLMSearchReranker`,
 GenerativeTask<I, O>                    // generate(I) → O, extends AutoCloseable
 └── AbstractGenerativeTask<I, O>        // owns the autoregressive loop
     ├── TextGenerator                   // generate(String) → GenerationResult
-    └── WhisperSpeechModel              // transcribe(Path) → Transcription
+    ├── WhisperSpeechModel              // transcribe(Path) → Transcription
+    └── VisionLanguageModel             // describe(Path) / ask(Path, String) → GenerationResult
 ```
 
 `GenerativeTask` is the generative counterpart to `InferenceTask`. While `InferenceTask`
@@ -107,7 +109,8 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | `BoundingBox` | `x1()`, `y1()`, `x2()`, `y2()` | Embedded in `Detection`, `TextRegion` |
 | `Transcription` | `text()`, `segments()` | `Wav2Vec2Recognizer`, `WhisperSpeechModel` |
 | `VoiceSegment` | `start()`, `end()`, `duration()`, `confidence()` | `SileroVadDetector` |
-| `GenerationResult` | `text()`, `tokenCount()`, `durationMillis()` | `TextGenerator` |
+| `GenerationResult` | `text()`, `tokenCount()`, `durationMillis()` | `TextGenerator`, `VisionLanguageModel` |
+| `VisionInput` | `imagePath()`, `prompt()` | `VisionLanguageModel` |
 
 ## Builder pattern
 

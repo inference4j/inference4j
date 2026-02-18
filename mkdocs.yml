@@ -65,6 +65,7 @@ nav:
     - Introduction: generative-ai/introduction.md
     - Text Generation: generative-ai/text-generation.md
     - Whisper Speech-to-Text: generative-ai/whisper.md
+    - Phi-3.5 Vision: generative-ai/phi-vision.md
     - Chat Templates: generative-ai/chat-templates.md
   - Guides:
     - Tokenizers: guides/tokenizers.md
