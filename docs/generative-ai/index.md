@@ -136,6 +136,34 @@ TextGenerator.builder()
         .build();
 ```
 
+## Model availability and our approach
+
+If you've browsed HuggingFace for ONNX models, you've probably noticed that most
+generative models are exported in a format that gives you separate ONNX files — one
+for the encoder, one for the decoder, one for the decoder with a pre-filled cache — and
+leaves you to wire them together. You'd need to write the generation loop yourself:
+run the decoder, extract the next token, feed it back in, manage the memory cache,
+handle sampling, detect when to stop. This is how most of the ONNX ecosystem works
+today, and there are hundreds of models available in this format.
+
+inference4j uses a different approach. Instead of implementing that loop in Java,
+we delegate to [onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai),
+a library by Microsoft that bundles the entire generation pipeline — loop, cache,
+sampling, tokenization — into a single native call. This is faster and far less
+error-prone than managing it ourselves.
+
+The trade-off is **model availability**. onnxruntime-genai requires models in its own
+format (with a `genai_config.json` that describes how the pieces connect). Very few
+models are published in this format today. That's why the supported model list below
+is short — not because of a limitation in inference4j, but because each model needs
+to be specifically converted.
+
+**What this means for you:** the API you write against — `TextGenerator`, `WhisperSpeechModel`,
+their builders and result types — is stable and independent of how inference happens
+underneath. If we later implement the generation loop natively in Java (to unlock the
+hundreds of standard ONNX models on HuggingFace), your code won't change. The wrapper
+is the contract; the engine behind it is an implementation detail.
+
 ## Supported models
 
 ### Text generation
