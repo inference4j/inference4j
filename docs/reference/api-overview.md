@@ -19,6 +19,7 @@
 | `io.github.inference4j.tokenizer` | `Tokenizer`, `EncodedInput`, `WordPieceTokenizer`, `BpeTokenizer` |
 | `io.github.inference4j.text` | `ModelConfig` (HuggingFace config.json parser) |
 | `io.github.inference4j.image` | Image transforms pipeline |
+| `io.github.inference4j.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
 
 ### inference4j-tasks
 
@@ -35,6 +36,7 @@
 |---------|----------|
 | `io.github.inference4j.genai` | `GenerativeTask`, `AbstractGenerativeTask`, `GenerationResult`, `ChatTemplate`, `GenerativeModel`, `ModelSources` |
 | `io.github.inference4j.nlp` | `TextGenerator` |
+| `io.github.inference4j.audio` | `WhisperSpeechModel`, `WhisperTask` |
 
 ### inference4j-runtime
 
@@ -83,12 +85,16 @@ Exceptions: `SileroVadDetector` (stateful hidden state), `MiniLMSearchReranker`,
 ```
 GenerativeTask<I, O>                    // generate(I) → O, extends AutoCloseable
 └── AbstractGenerativeTask<I, O>        // owns the autoregressive loop
-    └── TextGenerator                   // generate(String) → GenerationResult
+    ├── TextGenerator                   // generate(String) → GenerationResult
+    └── WhisperSpeechModel              // transcribe(Path) → Transcription
 ```
 
 `GenerativeTask` is the generative counterpart to `InferenceTask`. While `InferenceTask`
 performs a single forward pass, `GenerativeTask` runs an iterative generate loop
-backed by onnxruntime-genai. See [Generative AI](../generative-ai/index.md) for details.
+backed by onnxruntime-genai. `AbstractGenerativeTask` owns the generate loop and
+provides hooks for subclasses: `prepareGenerator()`, `createStream()`, `parseOutput()`,
+and `createParams()` (for model-specific generation options like temperature and max length).
+See [Generative AI](../generative-ai/index.md) for details.
 
 ## Result types
 
@@ -99,7 +105,7 @@ backed by onnxruntime-genai. See [Generative AI](../generative-ai/index.md) for 
 | `Detection` | `label()`, `classIndex()`, `confidence()`, `box()` | `YoloV8Detector`, `Yolo26Detector` |
 | `TextRegion` | `box()`, `confidence()` | `CraftTextDetector` |
 | `BoundingBox` | `x1()`, `y1()`, `x2()`, `y2()` | Embedded in `Detection`, `TextRegion` |
-| `Transcription` | `text()` | `Wav2Vec2Recognizer` |
+| `Transcription` | `text()`, `segments()` | `Wav2Vec2Recognizer`, `WhisperSpeechModel` |
 | `VoiceSegment` | `start()`, `end()`, `duration()`, `confidence()` | `SileroVadDetector` |
 | `GenerationResult` | `text()`, `tokenCount()`, `durationMillis()` | `TextGenerator` |
 
