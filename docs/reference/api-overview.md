@@ -88,7 +88,7 @@ GenerativeTask<I, O>                    // generate(I) → O, extends AutoClosea
 └── AbstractGenerativeTask<I, O>        // owns the autoregressive loop
     ├── TextGenerator                   // generate(String) → GenerationResult
     ├── WhisperSpeechModel              // transcribe(Path) → Transcription
-    └── VisionLanguageModel             // describe(Path) / ask(Path, String) → GenerationResult
+    └── VisionLanguageModel             // generate(VisionInput) → GenerationResult
 ```
 
 `GenerativeTask` is the generative counterpart to `InferenceTask`. While `InferenceTask`

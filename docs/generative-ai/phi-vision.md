@@ -11,7 +11,9 @@ differs from single-pass inference.
 try (var vision = VisionLanguageModel.builder()
         .model(ModelSources.phi3Vision())
         .build()) {
-    System.out.println(vision.describe(Path.of("cat.jpg")).text());
+    GenerationResult result = vision.generate(
+            new VisionInput(Path.of("cat.jpg"), "Describe this image."));
+    System.out.println(result.text());
 }
 ```
 
@@ -26,47 +28,30 @@ is blurred, with hints of a red object and a green plant.
 ```java
 import io.github.inference4j.genai.GenerationResult;
 import io.github.inference4j.genai.ModelSources;
+import io.github.inference4j.vision.VisionInput;
 import io.github.inference4j.vision.VisionLanguageModel;
 import java.nio.file.Path;
 
 public class ImageDescription {
     public static void main(String[] args) {
+        Path image = Path.of("cat.jpg");
+
         try (var vision = VisionLanguageModel.builder()
                 .model(ModelSources.phi3Vision())
                 .build()) {
 
             // Describe an image
-            GenerationResult description = vision.describe(Path.of("cat.jpg"));
+            GenerationResult description = vision.generate(
+                    new VisionInput(image, "Describe this image."));
             System.out.println(description.text());
 
             // Ask a question about it
-            GenerationResult answer = vision.ask(
-                    Path.of("cat.jpg"),
-                    "What colors are prominent in this image?");
+            GenerationResult answer = vision.generate(
+                    new VisionInput(image, "What colors are prominent in this image?"));
             System.out.println(answer.text());
         }
     }
 }
-```
-
-## Ask a question
-
-```java
-try (var vision = VisionLanguageModel.builder()
-        .model(ModelSources.phi3Vision())
-        .build()) {
-    GenerationResult answer = vision.ask(
-            Path.of("cat.jpg"),
-            "What colors are prominent in this image?");
-    System.out.println(answer.text());
-}
-```
-
-```
-The image prominently features shades of orange and white, which are the
-colors of the cat's fur. There is also a hint of green in the cat's eyes,
-and the background includes a red object, possibly a part of a fence or
-a piece of clothing.
 ```
 
 ## Streaming
@@ -77,7 +62,9 @@ Pass a `Consumer<String>` to receive tokens as they are generated:
 try (var vision = VisionLanguageModel.builder()
         .model(ModelSources.phi3Vision())
         .build()) {
-    vision.describe(Path.of("cat.jpg"), token -> System.out.print(token));
+    vision.generate(
+            new VisionInput(Path.of("cat.jpg"), "Describe this image."),
+            token -> System.out.print(token));
 }
 ```
 
@@ -94,15 +81,12 @@ try (var vision = VisionLanguageModel.builder()
 | `.topK(int)` | `int` | `0` (disabled) | Top-K sampling |
 | `.topP(double)` | `double` | `0.0` (disabled) | Nucleus sampling |
 
-## Convenience methods
+## Methods
 
 | Method | Description |
 |--------|-------------|
-| `describe(Path)` | Describe an image using a default prompt |
-| `describe(Path, Consumer)` | Describe with streaming |
-| `ask(Path, String)` | Ask a question about an image |
-| `ask(Path, String, Consumer)` | Ask with streaming |
-| `generate(VisionInput)` | Raw method with explicit `VisionInput` |
+| `generate(VisionInput)` | Generate text from an image and prompt |
+| `generate(VisionInput, Consumer)` | Generate with token streaming |
 
 ## How it works
 
@@ -133,7 +117,7 @@ try (var vision = VisionLanguageModel.builder()
         .chatTemplate(msg ->
                 "<|user|>\n<|image_1|>\n" + msg + "\n<|end|>\n<|assistant|>\n")
         .build()) {
-    vision.describe(Path.of("photo.jpg"));
+    vision.generate(new VisionInput(Path.of("photo.jpg"), "Describe this image."));
 }
 ```
 

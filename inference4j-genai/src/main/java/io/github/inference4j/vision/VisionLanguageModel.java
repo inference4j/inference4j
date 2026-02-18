@@ -33,7 +33,6 @@ import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 
 import java.nio.file.Path;
-import java.util.function.Consumer;
 
 /**
  * Vision-language model backed by onnxruntime-genai.
@@ -48,7 +47,8 @@ import java.util.function.Consumer;
  * try (var vision = VisionLanguageModel.builder()
  *         .model(ModelSources.phi3Vision())
  *         .build()) {
- *     GenerationResult result = vision.describe(Path.of("photo.jpg"));
+ *     GenerationResult result = vision.generate(
+ *             new VisionInput(Path.of("photo.jpg"), "Describe this image."));
  *     System.out.println(result.text());
  * }
  * }</pre>
@@ -58,7 +58,8 @@ import java.util.function.Consumer;
  * try (var vision = VisionLanguageModel.builder()
  *         .model(ModelSources.phi3Vision())
  *         .build()) {
- *     vision.ask(Path.of("chart.png"), "What trend does this chart show?",
+ *     vision.generate(
+ *             new VisionInput(Path.of("chart.png"), "What trend does this chart show?"),
  *             token -> System.out.print(token));
  * }
  * }</pre>
@@ -89,51 +90,6 @@ public class VisionLanguageModel extends AbstractGenerativeTask<VisionInput, Gen
 
 	public static Builder builder() {
 		return new Builder();
-	}
-
-	/**
-	 * Describes an image using a default prompt.
-	 *
-	 * @param imagePath path to an image file (PNG, JPEG, etc.)
-	 * @return the generated description
-	 */
-	public GenerationResult describe(Path imagePath) {
-		return generate(new VisionInput(imagePath, "Describe this image."));
-	}
-
-	/**
-	 * Describes an image using a default prompt, streaming tokens as they are generated.
-	 *
-	 * @param imagePath     path to an image file (PNG, JPEG, etc.)
-	 * @param tokenListener receives each decoded text fragment as it is generated
-	 * @return the complete generation result
-	 */
-	public GenerationResult describe(Path imagePath, Consumer<String> tokenListener) {
-		return generate(new VisionInput(imagePath, "Describe this image."), tokenListener);
-	}
-
-	/**
-	 * Asks a question about an image.
-	 *
-	 * @param imagePath path to an image file (PNG, JPEG, etc.)
-	 * @param question  the question to ask about the image
-	 * @return the generated answer
-	 */
-	public GenerationResult ask(Path imagePath, String question) {
-		return generate(new VisionInput(imagePath, question));
-	}
-
-	/**
-	 * Asks a question about an image, streaming tokens as they are generated.
-	 *
-	 * @param imagePath     path to an image file (PNG, JPEG, etc.)
-	 * @param question      the question to ask about the image
-	 * @param tokenListener receives each decoded text fragment as it is generated
-	 * @return the complete generation result
-	 */
-	public GenerationResult ask(Path imagePath, String question,
-								Consumer<String> tokenListener) {
-		return generate(new VisionInput(imagePath, question), tokenListener);
 	}
 
 	@Override

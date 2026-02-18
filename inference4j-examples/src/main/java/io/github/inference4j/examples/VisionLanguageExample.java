@@ -17,6 +17,7 @@ package io.github.inference4j.examples;
 
 import io.github.inference4j.genai.GenerationResult;
 import io.github.inference4j.genai.ModelSources;
+import io.github.inference4j.vision.VisionInput;
 import io.github.inference4j.vision.VisionLanguageModel;
 
 import java.nio.file.Path;
@@ -36,7 +37,7 @@ import java.nio.file.Path;
 public class VisionLanguageExample {
 
     public static void main(String[] args) {
-        String imagePath = "assets/images/sample.jpg";
+        Path imagePath = Path.of("assets/images/sample.jpg");
 
         System.out.println("=== Vision Language Model — Phi-3.5 Vision ===");
         System.out.printf("Image: %s%n%n", imagePath);
@@ -50,7 +51,8 @@ public class VisionLanguageExample {
 
             // Describe the image
             System.out.print("Description: ");
-            GenerationResult description = vision.describe(Path.of(imagePath),
+            GenerationResult description = vision.generate(
+                    new VisionInput(imagePath, "Describe this image."),
                     token -> System.out.print(token));
             System.out.printf("%n→ %d tokens in %,d ms (%.1f tok/s)%n%n",
                     description.tokenCount(), description.durationMillis(),
@@ -59,7 +61,8 @@ public class VisionLanguageExample {
             // Ask a question about the image
             String question = "What colors are prominent in this image?";
             System.out.printf("Q: %s%nA: ", question);
-            GenerationResult answer = vision.ask(Path.of(imagePath), question,
+            GenerationResult answer = vision.generate(
+                    new VisionInput(imagePath, question),
                     token -> System.out.print(token));
             System.out.printf("%n→ %d tokens in %,d ms (%.1f tok/s)%n",
                     answer.tokenCount(), answer.durationMillis(),
