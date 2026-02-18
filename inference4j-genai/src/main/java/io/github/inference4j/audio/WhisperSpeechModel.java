@@ -18,6 +18,7 @@ package io.github.inference4j.audio;
 import ai.onnxruntime.genai.Audios;
 import ai.onnxruntime.genai.GenAIException;
 import ai.onnxruntime.genai.Generator;
+import ai.onnxruntime.genai.GeneratorParams;
 import ai.onnxruntime.genai.Model;
 import ai.onnxruntime.genai.MultiModalProcessor;
 import ai.onnxruntime.genai.NamedTensors;
@@ -72,14 +73,22 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 	private final MultiModalProcessor processor;
 	private final String language;
 	private final WhisperTask task;
+	private final int maxLength;
+	private final double temperature;
+	private final int topK;
+	private final double topP;
 
 	WhisperSpeechModel(Model model, MultiModalProcessor processor,
 					   String language, WhisperTask task,
 					   int maxLength, double temperature, int topK, double topP) {
-		super(model, maxLength, temperature, topK, topP);
+		super(model);
 		this.processor = processor;
 		this.language = language;
 		this.task = task;
+		this.maxLength = maxLength;
+		this.temperature = temperature;
+		this.topK = topK;
+		this.topP = topP;
 	}
 
 	public static Builder builder() {
@@ -154,6 +163,22 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 			throw new InferenceException(
 					"Failed to write temp audio file: " + e.getMessage(), e);
 		}
+	}
+
+	@Override
+	protected GeneratorParams createParams() throws GenAIException {
+		GeneratorParams params = super.createParams();
+		params.setSearchOption("max_length", maxLength);
+		if (temperature > 0) {
+			params.setSearchOption("temperature", temperature);
+		}
+		if (topK > 0) {
+			params.setSearchOption("top_k", topK);
+		}
+		if (topP > 0) {
+			params.setSearchOption("top_p", topP);
+		}
+		return params;
 	}
 
 	@Override

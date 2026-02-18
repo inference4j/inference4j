@@ -48,19 +48,9 @@ import java.util.function.Consumer;
 public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, O> {
 
     protected final Model model;
-    private final int maxLength;
-    private final double temperature;
-    private final int topK;
-    private final double topP;
 
-    protected AbstractGenerativeTask(Model model,
-                                     int maxLength, double temperature,
-                                     int topK, double topP) {
+    protected AbstractGenerativeTask(Model model) {
         this.model = model;
-        this.maxLength = maxLength;
-        this.temperature = temperature;
-        this.topK = topK;
-        this.topP = topP;
     }
 
     @Override
@@ -136,19 +126,18 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
     protected abstract O parseOutput(String generatedText, I input,
                                      int tokenCount, long durationMillis);
 
-    private GeneratorParams createParams() throws GenAIException {
-        GeneratorParams params = new GeneratorParams(model);
-        params.setSearchOption("max_length", maxLength);
-        if (temperature > 0) {
-            params.setSearchOption("temperature", temperature);
-        }
-        if (topK > 0) {
-            params.setSearchOption("top_k", topK);
-        }
-        if (topP > 0) {
-            params.setSearchOption("top_p", topP);
-        }
-        return params;
+    /**
+     * Create {@link GeneratorParams} for this generation run.
+     *
+     * <p>The default implementation returns bare params with no search options.
+     * Subclasses should override this to configure model-specific options
+     * (max_length, temperature, top_k, top_p, etc.).
+     *
+     * @return configured generator params
+     * @throws GenAIException if param creation fails
+     */
+    protected GeneratorParams createParams() throws GenAIException {
+        return new GeneratorParams(model);
     }
 
     /**

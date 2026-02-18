@@ -31,7 +31,7 @@ class AbstractGenerativeTaskTest {
     void closeReleasesModel() throws Exception {
         Model model = mock(Model.class);
 
-        var task = new TestGenerativeTask(model, 100, 1.0, 0, 0.0);
+        var task = new TestGenerativeTask(model);
         task.close();
 
         verify(model).close();
@@ -41,7 +41,7 @@ class AbstractGenerativeTaskTest {
     void closeCallsCloseResources() throws Exception {
         Model model = mock(Model.class);
 
-        var task = new TestGenerativeTask(model, 100, 1.0, 0, 0.0);
+        var task = new TestGenerativeTask(model);
         task.close();
 
         assertTrue(task.closeResourcesCalled,
@@ -56,9 +56,8 @@ class AbstractGenerativeTaskTest {
 
         boolean closeResourcesCalled = false;
 
-        TestGenerativeTask(Model model,
-                           int maxLength, double temperature, int topK, double topP) {
-            super(model, maxLength, temperature, topK, topP);
+        TestGenerativeTask(Model model) {
+            super(model);
         }
 
         @Override

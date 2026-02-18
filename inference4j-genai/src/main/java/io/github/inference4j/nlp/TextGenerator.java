@@ -17,6 +17,7 @@ package io.github.inference4j.nlp;
 
 import ai.onnxruntime.genai.GenAIException;
 import ai.onnxruntime.genai.Generator;
+import ai.onnxruntime.genai.GeneratorParams;
 import ai.onnxruntime.genai.Model;
 import ai.onnxruntime.genai.Sequences;
 import ai.onnxruntime.genai.Tokenizer;
@@ -65,12 +66,36 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
 
     private final Tokenizer tokenizer;
     private final ChatTemplate chatTemplate;
+    private final int maxLength;
+    private final double temperature;
+    private final int topK;
+    private final double topP;
 
     TextGenerator(Model model, Tokenizer tokenizer, ChatTemplate chatTemplate,
                   int maxLength, double temperature, int topK, double topP) {
-        super(model, maxLength, temperature, topK, topP);
+        super(model);
         this.tokenizer = tokenizer;
         this.chatTemplate = chatTemplate;
+        this.maxLength = maxLength;
+        this.temperature = temperature;
+        this.topK = topK;
+        this.topP = topP;
+    }
+
+    @Override
+    protected GeneratorParams createParams() throws GenAIException {
+        GeneratorParams params = super.createParams();
+        params.setSearchOption("max_length", maxLength);
+        if (temperature > 0) {
+            params.setSearchOption("temperature", temperature);
+        }
+        if (topK > 0) {
+            params.setSearchOption("top_k", topK);
+        }
+        if (topP > 0) {
+            params.setSearchOption("top_p", topP);
+        }
+        return params;
     }
 
     @Override
