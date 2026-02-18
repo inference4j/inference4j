@@ -34,16 +34,16 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Whisper speech-to-text transcriber backed by onnxruntime-genai.
+ * Whisper speech model backed by onnxruntime-genai.
  *
  * <p>Wraps OpenAI Whisper models (tiny, base, small) for automatic speech
  * recognition and translation. Audio preprocessing (mel spectrogram),
  * autoregressive decoding, KV cache, and beam search are all handled
  * natively by onnxruntime-genai's C++ layer.
  *
- * <h2>Quick start</h2>
+ * <h2>Transcription</h2>
  * <pre>{@code
- * try (var whisper = WhisperTranscriber.builder()
+ * try (var whisper = WhisperSpeechModel.builder()
  *         .modelId("inference4j/whisper-small-genai")
  *         .build()) {
  *     Transcription result = whisper.transcribe(Path.of("meeting.wav"));
@@ -51,9 +51,9 @@ import java.util.List;
  * }
  * }</pre>
  *
- * <h2>Multilingual translation</h2>
+ * <h2>Translation to English</h2>
  * <pre>{@code
- * try (var whisper = WhisperTranscriber.builder()
+ * try (var whisper = WhisperSpeechModel.builder()
  *         .modelId("inference4j/whisper-small-genai")
  *         .language("fr")
  *         .task(WhisperTask.TRANSLATE)
@@ -63,12 +63,9 @@ import java.util.List;
  * }
  * }</pre>
  *
- * @see SpeechRecognizer
  * @see WhisperTask
  */
-public class WhisperTranscriber
-		extends AbstractGenerativeTask<Path, Transcription>
-		implements SpeechRecognizer {
+public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcription> {
 
 	private static final int CHUNK_DURATION_SECONDS = 30;
 
@@ -76,7 +73,7 @@ public class WhisperTranscriber
 	private final String language;
 	private final WhisperTask task;
 
-	WhisperTranscriber(Model model, MultiModalProcessor processor,
+	WhisperSpeechModel(Model model, MultiModalProcessor processor,
 					   String language, WhisperTask task,
 					   int maxLength, double temperature, int topK, double topP) {
 		super(model, maxLength, temperature, topK, topP);
@@ -89,7 +86,17 @@ public class WhisperTranscriber
 		return new Builder();
 	}
 
-	@Override
+	/**
+	 * Transcribes or translates speech from an audio file.
+	 *
+	 * <p>Audio longer than 30 seconds is automatically split into chunks,
+	 * processed individually, and concatenated. The task mode (transcription
+	 * or translation) is determined by the {@link WhisperTask} configured
+	 * via the builder.
+	 *
+	 * @param audioPath path to a WAV audio file
+	 * @return the transcription result
+	 */
 	public Transcription transcribe(Path audioPath) {
 		AudioData audio = AudioLoader.load(audioPath);
 		int chunkSamples = audio.sampleRate() * CHUNK_DURATION_SECONDS;
@@ -124,7 +131,16 @@ public class WhisperTranscriber
 		return new Transcription(fullText.toString());
 	}
 
-	@Override
+	/**
+	 * Transcribes or translates speech from raw audio samples.
+	 *
+	 * <p>Convenience method that writes the samples to a temporary WAV file
+	 * and delegates to {@link #transcribe(Path)}.
+	 *
+	 * @param audioData  mono float32 PCM samples in {@code [-1.0, 1.0]}
+	 * @param sampleRate sample rate in Hz (e.g., 16000)
+	 * @return the transcription result
+	 */
 	public Transcription transcribe(float[] audioData, int sampleRate) {
 		try {
 			Path tempFile = Files.createTempFile("inference4j-whisper-", ".wav");
@@ -188,11 +204,11 @@ public class WhisperTranscriber
 	}
 
 	/**
-	 * Builder for {@link WhisperTranscriber}.
+	 * Builder for {@link WhisperSpeechModel}.
 	 *
 	 * <p>Minimal usage:
 	 * <pre>{@code
-	 * WhisperTranscriber whisper = WhisperTranscriber.builder()
+	 * WhisperSpeechModel whisper = WhisperSpeechModel.builder()
 	 *         .modelId("inference4j/whisper-small-genai")
 	 *         .build();
 	 * }</pre>
@@ -252,7 +268,7 @@ public class WhisperTranscriber
 			return this;
 		}
 
-		public WhisperTranscriber build() {
+		public WhisperSpeechModel build() {
 			if (model == null) {
 				if (modelId == null) {
 					throw new IllegalStateException(
@@ -274,7 +290,7 @@ public class WhisperTranscriber
 							"Failed to load Whisper model: " + e.getMessage(), e);
 				}
 			}
-			return new WhisperTranscriber(model, processor, language, task,
+			return new WhisperSpeechModel(model, processor, language, task,
 					maxLength, temperature, topK, topP);
 		}
 	}

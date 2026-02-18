@@ -22,17 +22,17 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class WhisperTranscriberTest {
+class WhisperSpeechModelTest {
 
     @Test
     void parseOutput_stripsWhitespaceAndWrapsInTranscription() {
         Model model = mock(Model.class);
         MultiModalProcessor processor = mock(MultiModalProcessor.class);
 
-        WhisperTranscriber transcriber = new WhisperTranscriber(
+        WhisperSpeechModel whisper = new WhisperSpeechModel(
                 model, processor, "en", WhisperTask.TRANSCRIBE, 448, 1.0, 0, 0.0);
 
-        Transcription result = transcriber.parseOutput(
+        Transcription result = whisper.parseOutput(
                 "  Hello world  ", null, 5, 100);
 
         assertEquals("Hello world", result.text());
@@ -44,9 +44,9 @@ class WhisperTranscriberTest {
         Model model = mock(Model.class);
         MultiModalProcessor processor = mock(MultiModalProcessor.class);
 
-        WhisperTranscriber transcriber = new WhisperTranscriber(
+        WhisperSpeechModel whisper = new WhisperSpeechModel(
                 model, processor, "en", WhisperTask.TRANSCRIBE, 448, 1.0, 0, 0.0);
-        transcriber.close();
+        whisper.close();
 
         verify(processor).close();
         verify(model).close();
@@ -57,11 +57,11 @@ class WhisperTranscriberTest {
         Model model = mock(Model.class);
         MultiModalProcessor processor = mock(MultiModalProcessor.class);
 
-        WhisperTranscriber transcriber = new WhisperTranscriber(
+        WhisperSpeechModel whisper = new WhisperSpeechModel(
                 model, processor, "en", WhisperTask.TRANSCRIBE, 448, 1.0, 0, 0.0);
 
         assertEquals("<|startoftranscript|><|en|><|transcribe|><|notimestamps|>",
-                transcriber.buildPrompt());
+                whisper.buildPrompt());
     }
 
     @Test
@@ -69,17 +69,17 @@ class WhisperTranscriberTest {
         Model model = mock(Model.class);
         MultiModalProcessor processor = mock(MultiModalProcessor.class);
 
-        WhisperTranscriber transcriber = new WhisperTranscriber(
+        WhisperSpeechModel whisper = new WhisperSpeechModel(
                 model, processor, "fr", WhisperTask.TRANSLATE, 448, 1.0, 0, 0.0);
 
         assertEquals("<|startoftranscript|><|fr|><|translate|><|notimestamps|>",
-                transcriber.buildPrompt());
+                whisper.buildPrompt());
     }
 
     @Test
     void builderRequiresModelId() {
         assertThrows(IllegalStateException.class, () ->
-                WhisperTranscriber.builder().build());
+                WhisperSpeechModel.builder().build());
     }
 
     @Test
@@ -87,12 +87,12 @@ class WhisperTranscriberTest {
         Model model = mock(Model.class);
         MultiModalProcessor processor = mock(MultiModalProcessor.class);
 
-        WhisperTranscriber.Builder builder = WhisperTranscriber.builder();
+        WhisperSpeechModel.Builder builder = WhisperSpeechModel.builder();
         builder.model = model;
         builder.processor = processor;
-        WhisperTranscriber transcriber = builder.build();
+        WhisperSpeechModel whisper = builder.build();
 
         assertEquals("<|startoftranscript|><|en|><|transcribe|><|notimestamps|>",
-                transcriber.buildPrompt());
+                whisper.buildPrompt());
     }
 }
