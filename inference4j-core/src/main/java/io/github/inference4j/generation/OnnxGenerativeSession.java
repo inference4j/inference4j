@@ -1,12 +1,24 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.github.inference4j.generation;
 
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.processing.MathOps;
-import io.github.inference4j.sampling.LogitsProcessor;
-import io.github.inference4j.sampling.LogitsProcessors;
 
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -26,7 +38,7 @@ public class OnnxGenerativeSession implements GenerativeSession {
         long[] cacheShape = this.session.inputShape("past_key_values.0.key");
         this.numHeads = (int) cacheShape[1];
         this.headDim = (int) cacheShape[3];
-        this.numLayers = (int)session.inputNames().stream()
+        this.numLayers = (int) session.inputNames().stream()
             .filter(n -> n.startsWith("past_key_values") && n.endsWith(".key"))
             .count();
     }
@@ -71,17 +83,18 @@ public class OnnxGenerativeSession implements GenerativeSession {
 
     @Override
     public int cacheSequenceLength() {
-        return 0;
+        return this.sequenceLength;
     }
 
     @Override
     public void resetCache() {
-
+        this.cache.clear();
+        this.sequenceLength = 0;
     }
 
     @Override
     public void close() throws Exception {
-
+        this.session.close();
     }
 
     private long[] ones(int length) {
@@ -97,63 +110,4 @@ public class OnnxGenerativeSession implements GenerativeSession {
             inputs.put("past_key_values." + i + ".value", empty);
         }
     }
-
-    public static void main(String[] args) {
-        var session = InferenceSession.create(Path.of("/Users/vinicius/projects/python/model-debugger/models/gpt2/model.onnx"));
-        var generativeSession = new OnnxGenerativeSession(session);
-        ForwardResult result;
-        LogitsProcessor pipeline = LogitsProcessors.temperature(0.7f).andThen(LogitsProcessors.topP(0.9f));
-        var tokenIds = new long[]{15496, 995};
-        result = generativeSession.prefill(tokenIds);
-        float[] logits = result.logits().clone();
-        float[] processed = pipeline.process(logits);
-        float[] probs = MathOps.softmax(processed);
-        printTop5(probs);
-        printTop5(result.logits());
-        int maxIndex = argMax(result.logits());
-        for (int i = 0; i < 10; i++) {
-            result = generativeSession.decode(maxIndex);
-            System.out.println("=".repeat(40));
-            printTop5(result.logits());
-            maxIndex = argMax(result.logits());
-        }
-
-    }
-
-
-    static void printTop5(float[] logits){
-        int[] topIndices = {0, 0, 0, 0, 0};
-        float[] topValues = {Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY,
-            Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
-
-        for (int i = 0; i < logits.length; i++) {
-            for (int j = 0; j < 5; j++) {
-                if (logits[i] > topValues[j]) {
-                    // Shift everything down
-                    for (int k = 4; k > j; k--) {
-                        topIndices[k] = topIndices[k - 1];
-                        topValues[k] = topValues[k - 1];
-                    }
-                    topIndices[j] = i;
-                    topValues[j] = logits[i];
-                    break;
-                }
-            }
-        }
-
-        for (int j = 0; j < 5; j++) {
-            System.out.printf("  index=%d  logit=%.6f%n", topIndices[j], topValues[j]);
-        }
-    }
-
-    static int argMax(float[] logits) {
-        int maxIndex = 0;
-        for (int i = 1; i < logits.length; i++) {
-            if (logits[i] > logits[maxIndex]) {
-                maxIndex = i;
-            }
-        }
-        return maxIndex;
-    }
-
 }
