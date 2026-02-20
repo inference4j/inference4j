@@ -13,21 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.inference4j.genai;
+
+package io.github.inference4j.generation;
 
 /**
  * Formats a user message into the model's expected prompt format.
  *
  * <p>Different models use different chat template formats (e.g., Phi-3 uses
  * {@code <|user|>} markers, Qwen/DeepSeek uses {@code <|User|>} markers).
- * This interface abstracts the formatting so {@link io.github.inference4j.nlp.TextGenerator}
- * can work with any model.
- *
- * <p>Pre-configured templates are available via {@link ModelSources} factory methods
- * which return {@link GenerativeModel} instances bundling both model source and template.
+ * This interface abstracts the formatting so text generators can work with
+ * any model.
  *
  * @see GenerativeModel
- * @see ModelSources
  */
 @FunctionalInterface
 public interface ChatTemplate {

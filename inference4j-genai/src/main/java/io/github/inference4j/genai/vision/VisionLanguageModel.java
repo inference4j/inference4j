@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.inference4j.vision;
+package io.github.inference4j.genai.vision;
 
 import ai.onnxruntime.genai.GenAIException;
 import ai.onnxruntime.genai.Generator;
@@ -26,9 +26,9 @@ import ai.onnxruntime.genai.TokenizerStream;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.genai.AbstractGenerativeTask;
-import io.github.inference4j.genai.ChatTemplate;
-import io.github.inference4j.genai.GenerationResult;
-import io.github.inference4j.genai.GenerativeModel;
+import io.github.inference4j.generation.ChatTemplate;
+import io.github.inference4j.generation.GenerationResult;
+import io.github.inference4j.generation.GenerativeModel;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 
@@ -131,7 +131,8 @@ public class VisionLanguageModel extends AbstractGenerativeTask<VisionInput, Gen
 	@Override
 	protected GenerationResult parseOutput(String generatedText, VisionInput input,
 										   int tokenCount, long durationMillis) {
-		return new GenerationResult(generatedText.strip(), tokenCount, durationMillis);
+		return new GenerationResult(generatedText.strip(), 0, tokenCount,
+				java.time.Duration.ofMillis(durationMillis));
 	}
 
 	@Override

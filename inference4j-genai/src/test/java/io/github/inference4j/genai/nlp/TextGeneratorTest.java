@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.inference4j.nlp;
+package io.github.inference4j.genai.nlp;
 
 import ai.onnxruntime.genai.Model;
 import ai.onnxruntime.genai.Tokenizer;
-import io.github.inference4j.genai.ChatTemplate;
-import io.github.inference4j.genai.GenerationResult;
+import io.github.inference4j.genai.nlp.TextGenerator;
+import io.github.inference4j.generation.ChatTemplate;
+import io.github.inference4j.generation.GenerationResult;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -41,8 +42,8 @@ class TextGeneratorTest {
         GenerationResult result = gen.parseOutput("Hello world", "prompt", 5, 120);
 
         assertEquals("Hello world", result.text());
-        assertEquals(5, result.tokenCount());
-        assertEquals(120, result.durationMillis());
+        assertEquals(5, result.generatedTokens());
+        assertEquals(java.time.Duration.ofMillis(120), result.duration());
     }
 
     @Test

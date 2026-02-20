@@ -109,7 +109,7 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | `BoundingBox` | `x1()`, `y1()`, `x2()`, `y2()` | Embedded in `Detection`, `TextRegion` |
 | `Transcription` | `text()`, `segments()` | `Wav2Vec2Recognizer`, `WhisperSpeechModel` |
 | `VoiceSegment` | `start()`, `end()`, `duration()`, `confidence()` | `SileroVadDetector` |
-| `GenerationResult` | `text()`, `tokenCount()`, `durationMillis()` | `TextGenerator`, `VisionLanguageModel` |
+| `GenerationResult` | `text()`, `promptTokens()`, `generatedTokens()`, `duration()` | `TextGenerator`, `VisionLanguageModel` |
 | `VisionInput` | `imagePath()`, `prompt()` | `VisionLanguageModel` |
 
 ## Builder pattern

@@ -13,10 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.inference4j.audio;
+package io.github.inference4j.genai.audio;
 
 import ai.onnxruntime.genai.Model;
 import ai.onnxruntime.genai.MultiModalProcessor;
+import io.github.inference4j.audio.Transcription;
+import io.github.inference4j.genai.audio.WhisperSpeechModel;
+import io.github.inference4j.genai.audio.WhisperTask;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

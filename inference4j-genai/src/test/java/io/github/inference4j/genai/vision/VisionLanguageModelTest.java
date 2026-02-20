@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.inference4j.vision;
+package io.github.inference4j.genai.vision;
 
 import ai.onnxruntime.genai.Model;
 import ai.onnxruntime.genai.MultiModalProcessor;
-import io.github.inference4j.genai.ChatTemplate;
-import io.github.inference4j.genai.GenerationResult;
+import io.github.inference4j.genai.vision.VisionInput;
+import io.github.inference4j.genai.vision.VisionLanguageModel;
+import io.github.inference4j.generation.ChatTemplate;
+import io.github.inference4j.generation.GenerationResult;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -45,8 +47,8 @@ class VisionLanguageModelTest {
 				10, 250);
 
 		assertEquals("A cat sitting on a mat.", result.text());
-		assertEquals(10, result.tokenCount());
-		assertEquals(250, result.durationMillis());
+		assertEquals(10, result.generatedTokens());
+		assertEquals(java.time.Duration.ofMillis(250), result.duration());
 	}
 
 	@Test

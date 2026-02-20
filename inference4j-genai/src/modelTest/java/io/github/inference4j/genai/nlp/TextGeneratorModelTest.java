@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.inference4j.vision;
+package io.github.inference4j.genai.nlp;
 
-import io.github.inference4j.genai.GenerationResult;
+import io.github.inference4j.genai.nlp.TextGenerator;
+import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.genai.ModelSources;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,56 +28,41 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Integration test that runs real image generation with Phi-3.5 Vision.
+ * Integration test that runs real text generation with Phi-3-mini.
  *
  * <p>Requires the model to be downloaded locally. The model will be
- * auto-downloaded from HuggingFace on first run (requires network, ~3.3GB).
+ * auto-downloaded from HuggingFace on first run (requires network, ~2GB).
  */
-class VisionLanguageModelModelTest {
-
-    private static final Path TEST_IMAGE = Path.of("src/modelTest/resources/fixtures/cat.jpg");
+class TextGeneratorModelTest {
 
     @Test
     void generateProducesNonEmptyOutput() {
-        try (var vision = VisionLanguageModel.builder()
-                .model(ModelSources.phi3Vision())
+        try (var generator = TextGenerator.builder()
+                .model(ModelSources.phi3Mini())
+                .maxLength(100)
+                .temperature(0.7)
                 .build()) {
 
-            GenerationResult result = vision.generate(
-                    new VisionInput(TEST_IMAGE, "Describe this image."));
+            GenerationResult result = generator.generate("What is 2 + 2?");
 
             assertNotNull(result);
             assertNotNull(result.text());
-            assertFalse(result.text().isBlank(), "Description should not be blank");
-            assertTrue(result.tokenCount() > 0, "Should generate at least one token");
-            assertTrue(result.durationMillis() >= 0, "Duration should be non-negative");
-        }
-    }
-
-    @Test
-    void generateWithCustomPromptProducesRelevantAnswer() {
-        try (var vision = VisionLanguageModel.builder()
-                .model(ModelSources.phi3Vision())
-                .build()) {
-
-            GenerationResult result = vision.generate(
-                    new VisionInput(TEST_IMAGE, "What colors are prominent in this image?"));
-
-            assertNotNull(result);
-            assertFalse(result.text().isBlank(), "Answer should not be blank");
-            assertTrue(result.tokenCount() > 0, "Should generate at least one token");
+            assertFalse(result.text().isBlank(), "Generated text should not be blank");
+            assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
+            assertNotNull(result.duration(), "Duration should not be null");
         }
     }
 
     @Test
     void generateWithStreamingCollectsAllTokens() {
-        try (var vision = VisionLanguageModel.builder()
-                .model(ModelSources.phi3Vision())
+        try (var generator = TextGenerator.builder()
+                .model(ModelSources.phi3Mini())
+                .maxLength(50)
                 .build()) {
 
             List<String> streamedTokens = new ArrayList<>();
-            GenerationResult result = vision.generate(
-                    new VisionInput(TEST_IMAGE, "Describe this image."),
+            GenerationResult result = generator.generate(
+                    "Say hello.",
                     streamedTokens::add);
 
             assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");

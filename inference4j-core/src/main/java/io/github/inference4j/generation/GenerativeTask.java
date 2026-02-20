@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.inference4j.genai;
+
+package io.github.inference4j.generation;
 
 import java.util.function.Consumer;
 
@@ -22,8 +23,7 @@ import java.util.function.Consumer;
  *
  * <p>This is the generative counterpart to
  * {@link io.github.inference4j.InferenceTask InferenceTask}. While InferenceTask
- * performs a single forward pass, GenerativeTask runs an iterative generate loop
- * backed by onnxruntime-genai.
+ * performs a single forward pass, GenerativeTask runs an iterative generate loop.
  *
  * @param <I> the domain input type (e.g., {@code String}, {@code Path})
  * @param <O> the domain output type (e.g., {@code GenerationResult}, {@code Transcription})
@@ -43,8 +43,7 @@ public interface GenerativeTask<I, O> extends AutoCloseable {
      * as they are produced.
      *
      * @param input         the domain input
-     * @param tokenListener receives each decoded text fragment as it is generated;
-     *                      may be {@code null} to disable streaming
+     * @param tokenListener receives each decoded text fragment as it is generated
      * @return the complete generation result
      */
     O generate(I input, Consumer<String> tokenListener);

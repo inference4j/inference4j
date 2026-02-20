@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.inference4j.nlp;
+package io.github.inference4j.genai.nlp;
 
 import ai.onnxruntime.genai.GenAIException;
 import ai.onnxruntime.genai.Generator;
@@ -25,9 +25,9 @@ import ai.onnxruntime.genai.TokenizerStream;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.genai.AbstractGenerativeTask;
-import io.github.inference4j.genai.ChatTemplate;
-import io.github.inference4j.genai.GenerationResult;
-import io.github.inference4j.genai.GenerativeModel;
+import io.github.inference4j.generation.ChatTemplate;
+import io.github.inference4j.generation.GenerationResult;
+import io.github.inference4j.generation.GenerativeModel;
 import io.github.inference4j.model.ModelSource;
 
 import java.nio.file.Path;
@@ -118,7 +118,8 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
     @Override
     protected GenerationResult parseOutput(String generatedText, String input,
                                            int tokenCount, long durationMillis) {
-        return new GenerationResult(generatedText, tokenCount, durationMillis);
+        return new GenerationResult(generatedText, 0, tokenCount,
+                java.time.Duration.ofMillis(durationMillis));
     }
 
     @Override

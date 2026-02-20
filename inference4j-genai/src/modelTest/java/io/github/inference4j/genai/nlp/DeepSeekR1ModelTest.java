@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.inference4j.nlp;
+package io.github.inference4j.genai.nlp;
 
-import io.github.inference4j.genai.GenerationResult;
+import io.github.inference4j.genai.nlp.TextGenerator;
+import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.genai.ModelSources;
 import org.junit.jupiter.api.Test;
 
@@ -47,8 +48,8 @@ class DeepSeekR1ModelTest {
             assertNotNull(result);
             assertNotNull(result.text());
             assertFalse(result.text().isBlank(), "Generated text should not be blank");
-            assertTrue(result.tokenCount() > 0, "Should generate at least one token");
-            assertTrue(result.durationMillis() >= 0, "Duration should be non-negative");
+            assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
+            assertNotNull(result.duration(), "Duration should not be null");
         }
     }
 

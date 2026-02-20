@@ -13,18 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.inference4j.genai;
+
+package io.github.inference4j.generation;
+
+import io.github.inference4j.model.ModelSource;
 
 /**
- * Result of an autoregressive text generation task.
+ * Bundles a {@link ModelSource} with the model's {@link ChatTemplate}.
  *
- * @param text            the generated text
- * @param tokenCount      number of tokens generated
- * @param durationMillis  wall-clock generation time in milliseconds
+ * @param modelSource  resolves and downloads model files
+ * @param chatTemplate formats user messages into the model's expected prompt format
+ * @see ChatTemplate
  */
-public record GenerationResult(
-        String text,
-        int tokenCount,
-        long durationMillis
-) {
+public record GenerativeModel(ModelSource modelSource, ChatTemplate chatTemplate) {
 }

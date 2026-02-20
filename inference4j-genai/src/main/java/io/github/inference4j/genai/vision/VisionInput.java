@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.inference4j.vision;
+package io.github.inference4j.genai.vision;
 
 import java.nio.file.Path;
 

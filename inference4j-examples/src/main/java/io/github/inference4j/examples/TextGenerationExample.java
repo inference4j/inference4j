@@ -15,10 +15,10 @@
  */
 package io.github.inference4j.examples;
 
-import io.github.inference4j.genai.GenerationResult;
-import io.github.inference4j.genai.GenerativeModel;
+import io.github.inference4j.generation.GenerationResult;
+import io.github.inference4j.generation.GenerativeModel;
 import io.github.inference4j.genai.ModelSources;
-import io.github.inference4j.nlp.TextGenerator;
+import io.github.inference4j.genai.nlp.TextGenerator;
 
 /**
  * Compares text generation across models side by side.
@@ -70,8 +70,8 @@ public class TextGenerationExample {
                 System.out.printf("  [%s]%n", modelNames[m]);
                 System.out.printf("  %s%n", r.text().strip());
                 System.out.printf("  \u2192 %d tokens in %,d ms (%.1f tok/s)%n%n",
-                        r.tokenCount(), r.durationMillis(),
-                        r.tokenCount() * 1000.0 / r.durationMillis());
+                        r.generatedTokens(), r.duration().toMillis(),
+                        r.generatedTokens() * 1000.0 / r.duration().toMillis());
             }
         }
         System.out.println("\u2500".repeat(70));
