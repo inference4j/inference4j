@@ -101,7 +101,7 @@ public class BpeTokenizer implements Tokenizer {
     private final boolean pad;
     private final int defaultMaxLength;
 
-    private BpeTokenizer(Builder builder) {
+    BpeTokenizer(Builder builder) {
         this.vocab = builder.vocab;
         this.mergeRanks = builder.mergeRanks;
         this.byteToUnicode = buildByteToUnicode();
@@ -289,7 +289,7 @@ public class BpeTokenizer implements Tokenizer {
         return -1;
     }
 
-    private static Map<Integer, Character> buildByteToUnicode() {
+    static Map<Integer, Character> buildByteToUnicode() {
         Map<Integer, Character> map = new HashMap<>();
 
         for (int i = 33; i <= 126; i++) {
@@ -313,7 +313,7 @@ public class BpeTokenizer implements Tokenizer {
         return map;
     }
 
-    private static Map<String, Integer> loadVocab(Path vocabJson) {
+    static Map<String, Integer> loadVocab(Path vocabJson) {
         try {
             ObjectMapper mapper = new ObjectMapper();
             return mapper.readValue(vocabJson.toFile(), new TypeReference<>() {});
@@ -323,7 +323,7 @@ public class BpeTokenizer implements Tokenizer {
         }
     }
 
-    private static Map<Pair, Integer> loadMerges(Path mergesTxt) {
+    static Map<Pair, Integer> loadMerges(Path mergesTxt) {
         try {
             List<String> mergeLines = Files.readAllLines(mergesTxt);
             Map<Pair, Integer> mergeRanks = new LinkedHashMap<>();
@@ -348,15 +348,15 @@ public class BpeTokenizer implements Tokenizer {
 
     public static class Builder {
 
-        private final Map<String, Integer> vocab;
-        private final Map<Pair, Integer> mergeRanks;
-        private Pattern pattern = GPT2_PATTERN;
-        private boolean lowercase = false;
-        private String endOfWordMarker = null;
-        private String bosToken = null;
-        private String eosToken = null;
-        private boolean pad = false;
-        private int defaultMaxLength = 512;
+        final Map<String, Integer> vocab;
+        final Map<Pair, Integer> mergeRanks;
+        Pattern pattern = GPT2_PATTERN;
+        boolean lowercase = false;
+        String endOfWordMarker = null;
+        String bosToken = null;
+        String eosToken = null;
+        boolean pad = false;
+        int defaultMaxLength = 512;
 
         Builder(Map<String, Integer> vocab, Map<Pair, Integer> mergeRanks) {
             this.vocab = vocab;

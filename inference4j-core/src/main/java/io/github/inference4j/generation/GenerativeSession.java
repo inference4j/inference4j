@@ -1,4 +1,4 @@
-package io.github.inference4j.session;
+package io.github.inference4j.generation;
 
 public interface GenerativeSession extends AutoCloseable {
 

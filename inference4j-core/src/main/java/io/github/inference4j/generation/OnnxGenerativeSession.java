@@ -1,4 +1,4 @@
-package io.github.inference4j.session;
+package io.github.inference4j.generation;
 
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
