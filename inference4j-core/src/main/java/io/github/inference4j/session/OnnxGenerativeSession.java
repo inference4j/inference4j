@@ -1,5 +1,7 @@
-package io.github.inference4j;
+package io.github.inference4j.session;
 
+import io.github.inference4j.InferenceSession;
+import io.github.inference4j.Tensor;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.sampling.LogitsProcessor;
 import io.github.inference4j.sampling.LogitsProcessors;
