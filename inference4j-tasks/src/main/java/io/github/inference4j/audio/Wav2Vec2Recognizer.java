@@ -19,6 +19,7 @@ package io.github.inference4j.audio;
 import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
+import io.github.inference4j.preprocessing.audio.AudioData;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.session.SessionConfigurer;
@@ -74,14 +75,14 @@ public class Wav2Vec2Recognizer
     private static final int DEFAULT_BLANK_INDEX = 0;
     private static final String DEFAULT_WORD_DELIMITER = "|";
 
-    private final Vocabulary vocabulary;
+    private final io.github.inference4j.preprocessing.audio.Vocabulary vocabulary;
     private final String inputName;
-    private final AudioTransformPipeline pipeline;
+    private final io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline;
     private final int blankIndex;
     private final String wordDelimiter;
 
-    private Wav2Vec2Recognizer(InferenceSession session, Vocabulary vocabulary, String inputName,
-                               AudioTransformPipeline pipeline, int blankIndex, String wordDelimiter) {
+    private Wav2Vec2Recognizer(InferenceSession session, io.github.inference4j.preprocessing.audio.Vocabulary vocabulary, String inputName,
+                               io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline, int blankIndex, String wordDelimiter) {
         super(session,
                 createPreprocessor(inputName, pipeline),
                 ctx -> {
@@ -125,9 +126,9 @@ public class Wav2Vec2Recognizer
     }
 
     private static io.github.inference4j.processing.Preprocessor<Path, Map<String, Tensor>> createPreprocessor(
-            String inputName, AudioTransformPipeline pipeline) {
+            String inputName, io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline) {
         return audioPath -> {
-            AudioData audio = AudioLoader.load(audioPath);
+            AudioData audio = io.github.inference4j.preprocessing.audio.AudioLoader.load(audioPath);
             AudioData processed = pipeline.transform(audio);
             float[] samples = processed.samples();
             Tensor inputTensor = Tensor.fromFloats(samples, new long[]{1, samples.length});
@@ -136,7 +137,7 @@ public class Wav2Vec2Recognizer
     }
 
     static Transcription postProcess(float[] logits, int timeSteps, int vocabSize,
-                                     Vocabulary vocabulary, int blankIndex, String wordDelimiter) {
+                                     io.github.inference4j.preprocessing.audio.Vocabulary vocabulary, int blankIndex, String wordDelimiter) {
         int[] tokenIds = MathOps.ctcGreedyDecode(logits, timeSteps, vocabSize, blankIndex);
 
         StringBuilder sb = new StringBuilder();
@@ -157,7 +158,7 @@ public class Wav2Vec2Recognizer
         private ModelSource modelSource;
         private String modelId;
         private SessionConfigurer sessionConfigurer;
-        private Vocabulary vocabulary;
+        private io.github.inference4j.preprocessing.audio.Vocabulary vocabulary;
         private String inputName;
         private int sampleRate = DEFAULT_SAMPLE_RATE;
         private int blankIndex = DEFAULT_BLANK_INDEX;
@@ -183,7 +184,7 @@ public class Wav2Vec2Recognizer
             return this;
         }
 
-        public Builder vocabulary(Vocabulary vocabulary) {
+        public Builder vocabulary(io.github.inference4j.preprocessing.audio.Vocabulary vocabulary) {
             this.vocabulary = vocabulary;
             return this;
         }
@@ -222,7 +223,7 @@ public class Wav2Vec2Recognizer
             if (inputName == null) {
                 inputName = session.inputNames().iterator().next();
             }
-            AudioTransformPipeline pipeline = AudioTransformPipeline.builder()
+            io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline = io.github.inference4j.preprocessing.audio.AudioTransformPipeline.builder()
                     .resample(sampleRate)
                     .normalize()
                     .build();
@@ -250,7 +251,7 @@ public class Wav2Vec2Recognizer
                     : InferenceSession.create(modelPath);
             try {
                 if (this.vocabulary == null) {
-                    this.vocabulary = Vocabulary.fromFile(vocabPath);
+                    this.vocabulary = io.github.inference4j.preprocessing.audio.Vocabulary.fromFile(vocabPath);
                 }
             } catch (Exception e) {
                 this.session.close();

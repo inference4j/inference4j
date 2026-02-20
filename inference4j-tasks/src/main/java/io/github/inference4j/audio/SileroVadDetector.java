@@ -19,6 +19,7 @@ package io.github.inference4j.audio;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.preprocessing.audio.AudioData;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
@@ -97,11 +98,11 @@ public class SileroVadDetector implements VoiceActivityDetector {
     private final float threshold;
     private final float minSpeechDuration;
     private final float minSilenceDuration;
-    private final AudioTransformPipeline pipeline;
+    private final io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline;
 
     private SileroVadDetector(InferenceSession session, int targetSampleRate, int windowSizeSamples,
                               int contextSize, float threshold, float minSpeechDuration,
-                              float minSilenceDuration, AudioTransformPipeline pipeline) {
+                              float minSilenceDuration, io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline) {
         this.session = session;
         this.targetSampleRate = targetSampleRate;
         this.windowSizeSamples = windowSizeSamples;
@@ -123,7 +124,7 @@ public class SileroVadDetector implements VoiceActivityDetector {
 
     @Override
     public List<VoiceSegment> detect(Path audioPath) {
-        AudioData audio = AudioLoader.load(audioPath);
+        AudioData audio = io.github.inference4j.preprocessing.audio.AudioLoader.load(audioPath);
         return detect(audio.samples(), audio.sampleRate());
     }
 
@@ -147,7 +148,7 @@ public class SileroVadDetector implements VoiceActivityDetector {
      * @return array of speech probabilities, one per frame
      */
     public float[] probabilities(Path audioPath) {
-        AudioData audio = AudioLoader.load(audioPath);
+        AudioData audio = io.github.inference4j.preprocessing.audio.AudioLoader.load(audioPath);
         return probabilities(audio.samples(), audio.sampleRate());
     }
 
@@ -351,7 +352,7 @@ public class SileroVadDetector implements VoiceActivityDetector {
                 loadFromDirectory(dir);
             }
             int contextSize = (sampleRate == 16000) ? 64 : 32;
-            AudioTransformPipeline pipeline = AudioTransformPipeline.builder()
+            io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline = io.github.inference4j.preprocessing.audio.AudioTransformPipeline.builder()
                     .resample(sampleRate)
                     .build();
             return new SileroVadDetector(session, sampleRate, windowSizeSamples,

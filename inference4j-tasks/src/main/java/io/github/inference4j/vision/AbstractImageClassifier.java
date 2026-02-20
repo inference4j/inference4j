@@ -26,9 +26,9 @@ import io.github.inference4j.processing.Preprocessor;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
-import io.github.inference4j.image.ImageLayout;
-import io.github.inference4j.image.ImageTransformPipeline;
-import io.github.inference4j.image.Labels;
+import io.github.inference4j.preprocessing.image.ImageLayout;
+import io.github.inference4j.preprocessing.image.ImageTransformPipeline;
+import io.github.inference4j.preprocessing.image.Labels;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;

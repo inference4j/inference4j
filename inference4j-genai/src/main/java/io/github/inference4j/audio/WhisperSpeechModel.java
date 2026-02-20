@@ -28,6 +28,7 @@ import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.genai.AbstractGenerativeTask;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.preprocessing.audio.AudioData;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -107,7 +108,7 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 	 * @return the transcription result
 	 */
 	public Transcription transcribe(Path audioPath) {
-		AudioData audio = AudioLoader.load(audioPath);
+		AudioData audio = io.github.inference4j.preprocessing.audio.AudioLoader.load(audioPath);
 		int chunkSamples = audio.sampleRate() * CHUNK_DURATION_SECONDS;
 
 		if (audio.samples().length <= chunkSamples) {
@@ -115,13 +116,13 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 		}
 
 		// Auto-chunking for audio > 30 seconds
-		List<AudioData> chunks = AudioProcessor.chunk(audio, CHUNK_DURATION_SECONDS);
+		List<AudioData> chunks = io.github.inference4j.preprocessing.audio.AudioProcessor.chunk(audio, CHUNK_DURATION_SECONDS);
 		StringBuilder fullText = new StringBuilder();
 		for (AudioData chunk : chunks) {
 			try {
 				Path tempFile = Files.createTempFile("inference4j-whisper-chunk-", ".wav");
 				try {
-					AudioWriter.write(chunk, tempFile);
+					io.github.inference4j.preprocessing.audio.AudioWriter.write(chunk, tempFile);
 					Transcription partial = generate(tempFile);
 					if (!partial.text().isEmpty()) {
 						if (fullText.length() > 0) {
@@ -154,7 +155,7 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 		try {
 			Path tempFile = Files.createTempFile("inference4j-whisper-", ".wav");
 			try {
-				AudioWriter.write(new AudioData(audioData, sampleRate), tempFile);
+				io.github.inference4j.preprocessing.audio.AudioWriter.write(new AudioData(audioData, sampleRate), tempFile);
 				return transcribe(tempFile);
 			} finally {
 				deleteTempFile(tempFile);

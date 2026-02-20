@@ -23,7 +23,7 @@ import io.github.inference4j.processing.OutputOperator;
 import io.github.inference4j.processing.Preprocessor;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.image.Labels;
+import io.github.inference4j.preprocessing.image.Labels;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;

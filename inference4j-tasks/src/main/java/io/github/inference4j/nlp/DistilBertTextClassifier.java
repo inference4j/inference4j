@@ -25,7 +25,7 @@ import io.github.inference4j.processing.OutputOperator;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.text.ModelConfig;
+import io.github.inference4j.preprocessing.text.ModelConfig;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.Tokenizer;
 import io.github.inference4j.tokenizer.WordPieceTokenizer;

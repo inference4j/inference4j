@@ -20,7 +20,7 @@ import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.image.Labels;
+import io.github.inference4j.preprocessing.image.Labels;
 import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;

@@ -34,7 +34,7 @@ import static org.mockito.Mockito.*;
 class Wav2Vec2RecognizerTest {
 
     // Test vocabulary: 0=<pad>(blank), 1=a, 2=b, 3=c, 4=|
-    private static final Vocabulary VOCAB = Vocabulary.of(Map.of(
+    private static final io.github.inference4j.preprocessing.audio.Vocabulary VOCAB = io.github.inference4j.preprocessing.audio.Vocabulary.of(Map.of(
             0, "<pad>",
             1, "a",
             2, "b",
