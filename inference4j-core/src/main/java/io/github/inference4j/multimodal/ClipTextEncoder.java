@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * CLIP text encoder — maps text to 512-dimensional L2-normalized embeddings
@@ -83,6 +84,11 @@ public class ClipTextEncoder implements TextEmbedder {
 
     private static final String DEFAULT_MODEL_ID = "inference4j/clip-vit-base-patch32";
     private static final String TEXT_MODEL_FILE = "text_model.onnx";
+
+    private static final Pattern CLIP_PATTERN = Pattern.compile(
+            "<\\|startoftext\\|>|<\\|endoftext\\|>|'s|'t|'re|'ve|'m|'ll|'d|[\\p{L}]+|[\\p{N}]|[^\\s\\p{L}\\p{N}]+",
+            Pattern.CASE_INSENSITIVE
+    );
 
     private final InferenceSession session;
     private final Tokenizer tokenizer;
@@ -195,7 +201,15 @@ public class ClipTextEncoder implements TextEmbedder {
                     if (!Files.exists(mergesPath)) {
                         throw new ModelSourceException("Merges file not found: " + mergesPath);
                     }
-                    this.tokenizer = BpeTokenizer.fromFiles(vocabPath, mergesPath);
+                    this.tokenizer = BpeTokenizer.builder(vocabPath, mergesPath)
+                            .lowercase(true)
+                            .endOfWordMarker("</w>")
+                            .pattern(CLIP_PATTERN)
+                            .bosToken("<|startoftext|>")
+                            .eosToken("<|endoftext|>")
+                            .pad(true)
+                            .defaultMaxLength(77)
+                            .build();
                 }
             } catch (Exception e) {
                 this.session.close();

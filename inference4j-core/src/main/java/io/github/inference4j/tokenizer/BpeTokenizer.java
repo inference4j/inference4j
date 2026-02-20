@@ -34,38 +34,46 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Tokenizer implementing byte-level Byte-Pair Encoding (BPE) as used by CLIP and GPT-2.
+ * Configurable byte-level Byte-Pair Encoding (BPE) tokenizer.
  *
  * <p>BPE was introduced by
  * <a href="https://arxiv.org/abs/1508.07909">Sennrich et al. (2016)</a> and extended
  * to byte-level encoding by GPT-2
  * (<a href="https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf">Radford et al., 2019</a>).
- * CLIP uses a variant with lowercased input and {@code </w>} end-of-word markers.
+ * This implementation supports the full family of models that use
+ * {@code vocab.json} + {@code merges.txt}: GPT-2, CLIP, Whisper, RoBERTa,
+ * Phi-1/2, GPT-J, StarCoder, and others.
  *
  * <h2>Algorithm</h2>
  * <ol>
- *   <li><b>Pre-tokenization</b> — input text is lowercased, whitespace-normalized, and
- *       split via regex into words, contractions, digits, and punctuation sequences.</li>
+ *   <li><b>Pre-tokenization</b> — input text is optionally lowercased, whitespace-normalized,
+ *       and split via a configurable regex into words, contractions, digits, and
+ *       punctuation sequences.</li>
  *   <li><b>Byte-level encoding</b> — each byte of the UTF-8 representation is mapped to
- *       a Unicode character via GPT-2's byte-to-unicode table. This ensures every possible
- *       byte sequence maps to valid Unicode strings.</li>
- *   <li><b>BPE merges</b> — starting from character-level tokens (with {@code </w>}
- *       appended to the last character), pairs are iteratively merged according to the
- *       merge priority table loaded from {@code merges.txt}.</li>
+ *       a Unicode character via GPT-2's byte-to-unicode table.</li>
+ *   <li><b>BPE merges</b> — starting from character-level tokens (with an optional
+ *       end-of-word marker appended to the last character), pairs are iteratively merged
+ *       according to the merge priority table loaded from {@code merges.txt}.</li>
  *   <li><b>Vocabulary lookup</b> — merged tokens are mapped to integer IDs via
  *       {@code vocab.json}.</li>
- *   <li><b>Special tokens</b> — BOS ({@code <|startoftext|>}) and EOS
- *       ({@code <|endoftext|>}) are added, and the sequence is padded to
- *       {@code maxLength}.</li>
+ *   <li><b>Special tokens</b> — BOS/EOS tokens are optionally added, and the sequence
+ *       is optionally padded to {@code maxLength}.</li>
  * </ol>
  *
  * <h2>Usage</h2>
  * <pre>{@code
- * Tokenizer tokenizer = BpeTokenizer.fromFiles(
- *         Path.of("vocab.json"), Path.of("merges.txt"));
- * EncodedInput encoded = tokenizer.encode("a photo of a cat");
- * // encoded.inputIds()      → [49406, 320, 1125, 539, 320, 2368, 49407, 0, ...]
- * // encoded.attentionMask() → [1, 1, 1, 1, 1, 1, 1, 0, ...]
+ * // GPT-2 style (default — no lowercasing, no padding, no BOS/EOS)
+ * Tokenizer tokenizer = BpeTokenizer.fromFiles(vocabPath, mergesPath);
+ *
+ * // Custom configuration
+ * Tokenizer tokenizer = BpeTokenizer.builder(vocabPath, mergesPath)
+ *         .lowercase(true)
+ *         .endOfWordMarker("</w>")
+ *         .bosToken("<|startoftext|>")
+ *         .eosToken("<|endoftext|>")
+ *         .pad(true)
+ *         .defaultMaxLength(77)
+ *         .build();
  * }</pre>
  *
  * @see Tokenizer
@@ -73,77 +81,118 @@ import java.util.regex.Pattern;
  */
 public class BpeTokenizer implements Tokenizer {
 
-    private static final int DEFAULT_MAX_LENGTH = 77;
-    private static final String BOS_TOKEN = "<|startoftext|>";
-    private static final String EOS_TOKEN = "<|endoftext|>";
-    private static final String END_OF_WORD = "</w>";
-
-    private static final Pattern TOKENIZE_PATTERN = Pattern.compile(
-            "<\\|startoftext\\|>|<\\|endoftext\\|>|'s|'t|'re|'ve|'m|'ll|'d|[\\p{L}]+|[\\p{N}]|[^\\s\\p{L}\\p{N}]+",
-            Pattern.CASE_INSENSITIVE
+    /**
+     * GPT-2 pre-tokenization pattern. Splits on contractions, words (with optional
+     * leading space), numbers, punctuation, and whitespace.
+     */
+    public static final Pattern GPT2_PATTERN = Pattern.compile(
+            "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| ?[^\\s\\p{L}\\p{N}]+|\\s+(?!\\S)|\\s+"
     );
+
 
     private final Map<String, Integer> vocab;
     private final Map<Pair, Integer> mergeRanks;
-    private final int bosId;
-    private final int eosId;
     private final Map<Integer, Character> byteToUnicode;
+    private final Pattern pattern;
+    private final boolean lowercase;
+    private final String endOfWordMarker;
+    private final Integer bosId;
+    private final Integer eosId;
+    private final boolean pad;
+    private final int defaultMaxLength;
 
-    private BpeTokenizer(Map<String, Integer> vocab, Map<Pair, Integer> mergeRanks) {
-        this.vocab = vocab;
-        this.mergeRanks = mergeRanks;
-        this.bosId = vocab.getOrDefault(BOS_TOKEN, 49406);
-        this.eosId = vocab.getOrDefault(EOS_TOKEN, 49407);
+    private BpeTokenizer(Builder builder) {
+        this.vocab = builder.vocab;
+        this.mergeRanks = builder.mergeRanks;
         this.byteToUnicode = buildByteToUnicode();
+        this.pattern = builder.pattern;
+        this.lowercase = builder.lowercase;
+        this.endOfWordMarker = builder.endOfWordMarker;
+        this.bosId = builder.bosToken != null ? vocab.get(builder.bosToken) : null;
+        this.eosId = builder.eosToken != null ? vocab.get(builder.eosToken) : null;
+        this.pad = builder.pad;
+        this.defaultMaxLength = builder.defaultMaxLength;
     }
 
     /**
-     * Creates a BPE tokenizer from vocabulary and merge files.
+     * Creates a BPE tokenizer with GPT-2 defaults (no lowercasing, no end-of-word
+     * marker, no padding, no BOS/EOS wrapping).
      *
-     * @param vocabJson  path to {@code vocab.json} (token string → integer ID)
+     * @param vocabJson  path to {@code vocab.json} (token string to integer ID)
      * @param mergesTxt  path to {@code merges.txt} (merge rules, one per line)
-     * @return a new BPE tokenizer
+     * @return a new BPE tokenizer with GPT-2 defaults
      * @throws ModelSourceException if the files cannot be read or parsed
      */
     public static BpeTokenizer fromFiles(Path vocabJson, Path mergesTxt) {
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            Map<String, Integer> vocab = mapper.readValue(
-                    vocabJson.toFile(), new TypeReference<>() {});
+        return builder(vocabJson, mergesTxt).build();
+    }
 
-            List<String> mergeLines = Files.readAllLines(mergesTxt);
-            Map<Pair, Integer> mergeRanks = new LinkedHashMap<>();
-            for (int i = 1; i < mergeLines.size(); i++) {
-                String line = mergeLines.get(i).trim();
-                if (line.isEmpty()) {
-                    continue;
-                }
-                String[] parts = line.split(" ", 2);
-                if (parts.length == 2) {
-                    mergeRanks.put(new Pair(parts[0], parts[1]), i - 1);
-                }
-            }
-
-            return new BpeTokenizer(vocab, mergeRanks);
-        } catch (IOException e) {
-            throw new ModelSourceException(
-                    "Failed to load BPE tokenizer files: " + e.getMessage(), e);
-        }
+    /**
+     * Creates a builder for a BPE tokenizer.
+     *
+     * @param vocabJson  path to {@code vocab.json}
+     * @param mergesTxt  path to {@code merges.txt}
+     * @return a new builder
+     * @throws ModelSourceException if the files cannot be read or parsed
+     */
+    public static Builder builder(Path vocabJson, Path mergesTxt) {
+        return new Builder(loadVocab(vocabJson), loadMerges(mergesTxt));
     }
 
     @Override
     public EncodedInput encode(String text) {
-        return encode(text, DEFAULT_MAX_LENGTH);
+        return encode(text, defaultMaxLength);
     }
 
     @Override
     public EncodedInput encode(String text, int maxLength) {
+        List<Integer> tokenIds = tokenize(text);
+
+        if (bosId != null) {
+            tokenIds.add(0, bosId);
+        }
+        if (eosId != null) {
+            tokenIds.add(eosId);
+        }
+
+        if (tokenIds.size() > maxLength) {
+            tokenIds = new ArrayList<>(tokenIds.subList(0, maxLength - (eosId != null ? 1 : 0)));
+            if (eosId != null) {
+                tokenIds.add(eosId);
+            }
+        }
+
+        int actualLength = tokenIds.size();
+        int arrayLength = pad ? maxLength : actualLength;
+
+        long[] inputIds = new long[arrayLength];
+        for (int i = 0; i < actualLength; i++) {
+            inputIds[i] = tokenIds.get(i);
+        }
+
+        long[] attentionMask = new long[arrayLength];
+        Arrays.fill(attentionMask, 0, actualLength, 1L);
+
+        long[] tokenTypeIds = new long[arrayLength];
+
+        return new EncodedInput(inputIds, attentionMask, tokenTypeIds);
+    }
+
+    /**
+     * Tokenizes text into token IDs without adding special tokens, padding, or truncation.
+     *
+     * @param text the input text
+     * @return mutable list of token IDs
+     */
+    List<Integer> tokenize(String text) {
         List<Integer> tokenIds = new ArrayList<>();
-        tokenIds.add(bosId);
 
-        text = text.strip().replaceAll("\\s+", " ").toLowerCase();
+        String processed = text.strip().replaceAll("\\s+", " ");
+        if (lowercase) {
+            processed = processed.toLowerCase();
+        }
 
-        Matcher matcher = TOKENIZE_PATTERN.matcher(text);
+        Matcher matcher = pattern.matcher(processed);
         while (matcher.find()) {
             String token = matcher.group();
             String byteEncoded = byteEncode(token);
@@ -156,25 +205,7 @@ public class BpeTokenizer implements Tokenizer {
             }
         }
 
-        tokenIds.add(eosId);
-
-        if (tokenIds.size() > maxLength) {
-            tokenIds = new ArrayList<>(tokenIds.subList(0, maxLength - 1));
-            tokenIds.add(eosId);
-        }
-
-        int actualLength = tokenIds.size();
-        long[] inputIds = new long[maxLength];
-        for (int i = 0; i < actualLength; i++) {
-            inputIds[i] = tokenIds.get(i);
-        }
-
-        long[] attentionMask = new long[maxLength];
-        Arrays.fill(attentionMask, 0, actualLength, 1L);
-
-        long[] tokenTypeIds = new long[maxLength];
-
-        return new EncodedInput(inputIds, attentionMask, tokenTypeIds);
+        return tokenIds;
     }
 
     private String byteEncode(String token) {
@@ -191,7 +222,11 @@ public class BpeTokenizer implements Tokenizer {
         for (int i = 0; i < token.length() - 1; i++) {
             word.add(String.valueOf(token.charAt(i)));
         }
-        word.add(token.charAt(token.length() - 1) + END_OF_WORD);
+        if (endOfWordMarker != null) {
+            word.add(token.charAt(token.length() - 1) + endOfWordMarker);
+        } else {
+            word.add(String.valueOf(token.charAt(token.length() - 1)));
+        }
 
         if (word.size() == 1) {
             return word;
@@ -257,7 +292,6 @@ public class BpeTokenizer implements Tokenizer {
     private static Map<Integer, Character> buildByteToUnicode() {
         Map<Integer, Character> map = new HashMap<>();
 
-        // Printable ASCII (33-126) and extended Latin (161-172, 174-255) map to themselves
         for (int i = 33; i <= 126; i++) {
             map.put(i, (char) i);
         }
@@ -268,7 +302,6 @@ public class BpeTokenizer implements Tokenizer {
             map.put(i, (char) i);
         }
 
-        // Remaining bytes (0-32, 127-160, 173) map to Unicode codepoints 256+
         int n = 0;
         for (int b = 0; b < 256; b++) {
             if (!map.containsKey(b)) {
@@ -280,5 +313,93 @@ public class BpeTokenizer implements Tokenizer {
         return map;
     }
 
-    private record Pair(String first, String second) {}
+    private static Map<String, Integer> loadVocab(Path vocabJson) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readValue(vocabJson.toFile(), new TypeReference<>() {});
+        } catch (IOException e) {
+            throw new ModelSourceException(
+                    "Failed to load BPE vocabulary: " + e.getMessage(), e);
+        }
+    }
+
+    private static Map<Pair, Integer> loadMerges(Path mergesTxt) {
+        try {
+            List<String> mergeLines = Files.readAllLines(mergesTxt);
+            Map<Pair, Integer> mergeRanks = new LinkedHashMap<>();
+            for (int i = 1; i < mergeLines.size(); i++) {
+                String line = mergeLines.get(i).trim();
+                if (line.isEmpty()) {
+                    continue;
+                }
+                String[] parts = line.split(" ", 2);
+                if (parts.length == 2) {
+                    mergeRanks.put(new Pair(parts[0], parts[1]), i - 1);
+                }
+            }
+            return mergeRanks;
+        } catch (IOException e) {
+            throw new ModelSourceException(
+                    "Failed to load BPE merges: " + e.getMessage(), e);
+        }
+    }
+
+    record Pair(String first, String second) {}
+
+    public static class Builder {
+
+        private final Map<String, Integer> vocab;
+        private final Map<Pair, Integer> mergeRanks;
+        private Pattern pattern = GPT2_PATTERN;
+        private boolean lowercase = false;
+        private String endOfWordMarker = null;
+        private String bosToken = null;
+        private String eosToken = null;
+        private boolean pad = false;
+        private int defaultMaxLength = 512;
+
+        Builder(Map<String, Integer> vocab, Map<Pair, Integer> mergeRanks) {
+            this.vocab = vocab;
+            this.mergeRanks = mergeRanks;
+        }
+
+        public Builder pattern(Pattern pattern) {
+            this.pattern = pattern;
+            return this;
+        }
+
+        public Builder lowercase(boolean lowercase) {
+            this.lowercase = lowercase;
+            return this;
+        }
+
+        public Builder endOfWordMarker(String endOfWordMarker) {
+            this.endOfWordMarker = endOfWordMarker;
+            return this;
+        }
+
+        public Builder bosToken(String bosToken) {
+            this.bosToken = bosToken;
+            return this;
+        }
+
+        public Builder eosToken(String eosToken) {
+            this.eosToken = eosToken;
+            return this;
+        }
+
+        public Builder pad(boolean pad) {
+            this.pad = pad;
+            return this;
+        }
+
+        public Builder defaultMaxLength(int defaultMaxLength) {
+            this.defaultMaxLength = defaultMaxLength;
+            return this;
+        }
+
+        public BpeTokenizer build() {
+            return new BpeTokenizer(this);
+        }
+    }
 }
