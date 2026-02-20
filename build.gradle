@@ -53,8 +53,6 @@ subprojects {
 // Library modules included in coverage and publishing
 def publishedModules = [
     'inference4j-core',
-    'inference4j-preprocessing',
-    'inference4j-tasks',
     'inference4j-runtime',
     'inference4j-spring-boot-starter',
     'inference4j-genai',

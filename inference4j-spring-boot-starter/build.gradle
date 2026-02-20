@@ -5,7 +5,7 @@ ext {
 }
 
 dependencies {
-    api project(':inference4j-tasks')
+    api project(':inference4j-core')
 
     compileOnly "org.springframework.boot:spring-boot-autoconfigure:${springBootVersion}"
     compileOnly "org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}"
@@ -14,5 +14,4 @@ dependencies {
 
     testImplementation "org.springframework.boot:spring-boot-starter-test:${springBootVersion}"
     testImplementation "org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}"
-    testImplementation project(':inference4j-tasks')
 }

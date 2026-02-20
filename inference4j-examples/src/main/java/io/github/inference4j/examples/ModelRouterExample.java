@@ -18,7 +18,7 @@ package io.github.inference4j.examples;
 
 import io.github.inference4j.nlp.SentenceTransformerEmbedder;
 import io.github.inference4j.nlp.TextEmbedder;
-import io.github.inference4j.nlp.TextEmbedderRouter;
+import io.github.inference4j.routing.TextEmbedderRouter;
 import io.github.inference4j.metrics.RouterMetrics;
 import io.github.inference4j.routing.RoundRobinRoutingStrategy;
 
