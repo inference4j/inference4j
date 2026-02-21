@@ -17,6 +17,7 @@
 package io.github.inference4j;
 
 import ai.onnxruntime.NodeInfo;
+import ai.onnxruntime.OnnxModelMetadata;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OnnxValue;
 import ai.onnxruntime.OrtEnvironment;
@@ -63,6 +64,7 @@ public class InferenceSession implements AutoCloseable {
 
     private final OrtEnvironment environment;
     private final OrtSession session;
+    private volatile ModelMetadata metadata;
 
     private InferenceSession(OrtEnvironment environment, OrtSession session) {
         this.environment = environment;
@@ -159,6 +161,33 @@ public class InferenceSession implements AutoCloseable {
         } catch (OrtException e) {
             throw new InferenceException("Failed to get input shape: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Returns metadata embedded in the ONNX model file.
+     *
+     * <p>The result is computed lazily on first call and cached for subsequent calls.
+     *
+     * @return the model metadata
+     * @throws InferenceException if the metadata cannot be read
+     */
+    public ModelMetadata metadata() {
+        if (metadata == null) {
+            try {
+                OnnxModelMetadata ortMeta = session.getMetadata();
+                metadata = new ModelMetadata(
+                        ortMeta.getProducerName(),
+                        ortMeta.getGraphName(),
+                        ortMeta.getDescription(),
+                        ortMeta.getVersion(),
+                        ortMeta.getCustomMetadata()
+                );
+            } catch (OrtException e) {
+                throw new InferenceException(
+                        "Failed to read model metadata: " + e.getMessage(), e);
+            }
+        }
+        return metadata;
     }
 
     /**
