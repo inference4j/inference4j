@@ -104,7 +104,7 @@ public class OnnxGenerativeSession implements GenerativeSession {
     }
 
     private void preFillCache(Map<String, Tensor> inputs) {
-        Tensor empty = Tensor.fromFloats(new float[0], new long[]{1, this.numLayers, 0, this.headDim});
+        Tensor empty = Tensor.fromFloats(new float[0], new long[]{1, this.numHeads, 0, this.headDim});
         for (int i = 0; i < this.numLayers; i++) {
             inputs.put("past_key_values." + i + ".key", empty);
             inputs.put("past_key_values." + i + ".value", empty);

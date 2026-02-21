@@ -80,6 +80,12 @@ public class DecodingBpeTokenizer extends BpeTokenizer implements TokenDecoder {
                 specialTokenIds.add(id);
             }
         }
+        for (String addedToken : builder.addedTokens) {
+            Integer id = builder.vocab.get(addedToken);
+            if (id != null) {
+                specialTokenIds.add(id);
+            }
+        }
     }
 
     /**

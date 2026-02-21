@@ -100,6 +100,8 @@ public class BpeTokenizer implements Tokenizer {
     private final Integer eosId;
     private final boolean pad;
     private final int defaultMaxLength;
+    private final Map<String, Integer> addedTokenMap;
+    private final Pattern addedTokenPattern;
 
     BpeTokenizer(Builder builder) {
         this.vocab = builder.vocab;
@@ -112,6 +114,27 @@ public class BpeTokenizer implements Tokenizer {
         this.eosId = builder.eosToken != null ? vocab.get(builder.eosToken) : null;
         this.pad = builder.pad;
         this.defaultMaxLength = builder.defaultMaxLength;
+
+        if (builder.addedTokens.isEmpty()) {
+            this.addedTokenMap = Map.of();
+            this.addedTokenPattern = null;
+        } else {
+            this.addedTokenMap = new HashMap<>();
+            StringBuilder patternBuilder = new StringBuilder();
+            for (String token : builder.addedTokens) {
+                Integer id = vocab.get(token);
+                if (id != null) {
+                    addedTokenMap.put(token, id);
+                    if (patternBuilder.length() > 0) {
+                        patternBuilder.append('|');
+                    }
+                    patternBuilder.append(Pattern.quote(token));
+                }
+            }
+            this.addedTokenPattern = addedTokenMap.isEmpty()
+                    ? null
+                    : Pattern.compile(patternBuilder.toString());
+        }
     }
 
     /**
@@ -192,7 +215,28 @@ public class BpeTokenizer implements Tokenizer {
             processed = processed.toLowerCase();
         }
 
-        Matcher matcher = pattern.matcher(processed);
+        if (addedTokenPattern != null) {
+            Matcher addedMatcher = addedTokenPattern.matcher(processed);
+            int lastEnd = 0;
+            while (addedMatcher.find()) {
+                if (addedMatcher.start() > lastEnd) {
+                    tokenizeBpe(processed.substring(lastEnd, addedMatcher.start()), tokenIds);
+                }
+                tokenIds.add(addedTokenMap.get(addedMatcher.group()));
+                lastEnd = addedMatcher.end();
+            }
+            if (lastEnd < processed.length()) {
+                tokenizeBpe(processed.substring(lastEnd), tokenIds);
+            }
+        } else {
+            tokenizeBpe(processed, tokenIds);
+        }
+
+        return tokenIds;
+    }
+
+    private void tokenizeBpe(String text, List<Integer> tokenIds) {
+        Matcher matcher = pattern.matcher(text);
         while (matcher.find()) {
             String token = matcher.group();
             String byteEncoded = byteEncode(token);
@@ -204,8 +248,6 @@ public class BpeTokenizer implements Tokenizer {
                 }
             }
         }
-
-        return tokenIds;
     }
 
     private String byteEncode(String token) {
@@ -357,6 +399,7 @@ public class BpeTokenizer implements Tokenizer {
         String eosToken = null;
         boolean pad = false;
         int defaultMaxLength = 512;
+        final List<String> addedTokens = new ArrayList<>();
 
         Builder(Map<String, Integer> vocab, Map<Pair, Integer> mergeRanks) {
             this.vocab = vocab;
@@ -395,6 +438,11 @@ public class BpeTokenizer implements Tokenizer {
 
         public Builder defaultMaxLength(int defaultMaxLength) {
             this.defaultMaxLength = defaultMaxLength;
+            return this;
+        }
+
+        public Builder addedToken(String token) {
+            this.addedTokens.add(token);
             return this;
         }
 
