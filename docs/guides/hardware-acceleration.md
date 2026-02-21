@@ -21,7 +21,7 @@ For NVIDIA GPU acceleration, swap the ONNX Runtime dependency:
 === "Gradle"
 
     ```groovy
-    implementation('io.github.inference4j:inference4j-tasks:${inference4jVersion}') {
+    implementation('io.github.inference4j:inference4j-core:${inference4jVersion}') {
         exclude group: 'com.microsoft.onnxruntime', module: 'onnxruntime'
     }
     implementation 'com.microsoft.onnxruntime:onnxruntime_gpu:${onnxruntimeVersion}'
@@ -32,7 +32,7 @@ For NVIDIA GPU acceleration, swap the ONNX Runtime dependency:
     ```xml
     <dependency>
         <groupId>io.github.inference4j</groupId>
-        <artifactId>inference4j-tasks</artifactId>
+        <artifactId>inference4j-core</artifactId>
         <version>${inference4jVersion}</version>
         <exclusions>
             <exclusion>

@@ -5,7 +5,7 @@
 ### Phase 1: Foundation (Core & NLP)
 
 - [x] `inference4j-core` — `InferenceSession`, `Tensor`, `ModelSource`, `MathOps` (softmax, sigmoid, logSoftmax, topK, NMS, cxcywh2xyxy)
-- [x] `inference4j-preprocessing` — `WordPieceTokenizer`, `BpeTokenizer`, `EncodedInput`, `Tokenizer` interface
+- [x] Tokenizers — `WordPieceTokenizer`, `BpeTokenizer`, `DecodingBpeTokenizer`, `EncodedInput`, `Tokenizer` interface
 - [x] `SentenceTransformer` wrapper — sentence embeddings with CLS/MEAN/MAX pooling
 - [x] `EmbeddingModelRouter` — A/B testing with round-robin routing
 
@@ -46,6 +46,17 @@
 - [x] `BpeTokenizer` — byte-level BPE for CLIP/GPT-2 family
 - [x] Runnable examples in `inference4j-examples`
 
+### Phase 5: Autoregressive Generation
+
+- [x] `GenerationEngine` — pure ONNX Runtime autoregressive loop with KV cache
+- [x] `GenerativeTask` / `GenerativeSession` — generation contracts in core
+- [x] Sampling pipeline — `LogitsProcessor`, `GreedySampler`, `CategoricalSampler`, temperature/topK/topP
+- [x] `TokenStreamer` — streaming token delivery with stop sequence support
+- [x] `Gpt2TextGenerator` — text generation with GPT-2 (pure ONNX Runtime, no genai dependency)
+- [x] `DecodingBpeTokenizer` / `TokenDecoder` — BPE tokenizer with decoding support
+- [x] `inference4j-genai` — onnxruntime-genai backed generation for larger models (Phi-3, DeepSeek-R1, Phi-3.5 Vision)
+- [x] Streaming generation API — token-by-token callbacks via `Consumer<String>`
+
 ### Architecture & Ecosystem
 
 - [x] `AbstractInferenceTask` — enforced preprocess → infer → postprocess pipeline with `final run()`
@@ -57,26 +68,14 @@
 - [x] Documentation site (MkDocs Material)
 - [x] CRAFT text detection wrapper — `TextDetector` interface, `TextRegion`, `CraftTextDetector`
 - [x] Model test suite — `./gradlew modelTest` with real model downloads and inference verification
+- [x] Module consolidation — `inference4j-tasks` and `inference4j-preprocessing` merged into `inference4j-core`
 
 ## Next Up
 
-### Autoregressive Generation via onnxruntime-genai
-
-All models in inference4j today are **single-pass** — one forward pass, one result. A large class of models require **autoregressive generation** instead: producing output token-by-token, where each token depends on all previous tokens. This includes language models, speech-to-text with attention, and vision-language models.
-
-[onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai) provides exactly this capability — a generate loop with KV cache management, sampling strategies, and streaming — built on top of ONNX Runtime. We've published [community Java bindings](https://github.com/inference4j/onnxruntime-genai) to Maven Central (`io.github.inference4j:onnxruntime-genai`) since Microsoft does not currently publish them.
-
-This is the next major focus area, and it unlocks an entirely new category of models:
-
-- [ ] Integrate `onnxruntime-genai` Java bindings into inference4j
-- [ ] **Whisper** — autoregressive speech-to-text with attention (replaces CTC-based Wav2Vec2 for multilingual/high-accuracy use cases)
-- [ ] **GPT-2** — text generation
-- [ ] **Phi-3** — small language model for local inference
 - [ ] **TrOCR** — text recognition (handwriting, printed text)
-- [ ] **ViT + decoder models** — vision-language tasks (image captioning, visual Q&A)
 - [ ] OCR Pipeline — CRAFT detection + TrOCR recognition composed end-to-end
-- [ ] Mel spectrogram / FFT preprocessing (for Whisper)
-- [ ] Streaming generation API — token-by-token callbacks
+- [ ] **Whisper** — autoregressive speech-to-text via pure ONNX Runtime (mel spectrogram / FFT preprocessing)
+- [ ] Mel spectrogram / FFT preprocessing (unlocks Whisper)
 
 ## Dropped
 
@@ -92,13 +91,13 @@ This is the next major focus area, and it unlocks an entirely new category of mo
 | Text | Text classification (DistilBERT, sentiment, moderation) | Done |
 | Text | CRAFT (text detection) | Done |
 | Text | TrOCR (text recognition) | Next |
-| Text | GPT-2 (text generation) | Next |
+| Text | GPT-2 (text generation) | Done |
 | Vision | ResNet | Done |
 | Vision | EfficientNet | Done |
 | Vision | YOLOv8 / YOLO11 | Done |
 | Vision | YOLO26 | Done |
 | Vision | CLIP (visual search, zero-shot classification) | Done |
-| Vision | Phi-3 Vision / ViT-decoder (captioning, VQA) | Next |
+| Vision | Phi-3.5 Vision (captioning, VQA) | Done |
 | Audio | Wav2Vec2-CTC (speech-to-text) | Done |
 | Audio | Silero VAD (voice activity detection) | Done |
 | Audio | Whisper (autoregressive speech-to-text) | Next |

@@ -251,15 +251,16 @@ Postprocessor<InferenceContext<BufferedImage>, List<Classification>> postprocess
 
 | Utility | Package | Purpose |
 |---------|---------|---------|
-| `ImageTransformPipeline` | `io.github.inference4j.image` | BufferedImage → Tensor with resize, normalize, layout |
+| `ImageTransformPipeline` | `io.github.inference4j.preprocessing.image` | BufferedImage → Tensor with resize, normalize, layout |
 | `WordPieceTokenizer` | `io.github.inference4j.tokenizer` | Text → token IDs (BERT-family models) |
+| `BpeTokenizer` | `io.github.inference4j.tokenizer` | Byte-level BPE for CLIP/GPT-2 family |
 | `MathOps` | `io.github.inference4j.processing` | `softmax`, `sigmoid`, `topK`, `nms`, `ctcGreedyDecode`, `cxcywh2xyxy` |
 | `OutputOperator` | `io.github.inference4j.processing` | Pre-built activations: `softmax()`, `sigmoid()`, `identity()` |
-| `Labels` | `io.github.inference4j.image` | Label sets with presets: `Labels.imagenet()`, `Labels.coco()` |
-| `AudioLoader` | `io.github.inference4j.audio` | WAV file loading |
-| `AudioProcessor` | `io.github.inference4j.audio` | Resample, normalize audio |
-| `Vocabulary` | `io.github.inference4j.audio` | Load vocab.json for CTC models |
-| `ModelConfig` | `io.github.inference4j.text` | Parse HuggingFace config.json (`id2label`, `problem_type`) |
+| `Labels` | `io.github.inference4j.preprocessing.image` | Label sets with presets: `Labels.imagenet()`, `Labels.coco()` |
+| `AudioLoader` | `io.github.inference4j.preprocessing.audio` | WAV file loading |
+| `AudioProcessor` | `io.github.inference4j.preprocessing.audio` | Resample, normalize audio |
+| `Vocabulary` | `io.github.inference4j.preprocessing.audio` | Load vocab.json for CTC models |
+| `ModelConfig` | `io.github.inference4j.preprocessing.text` | Parse HuggingFace config.json (`id2label`, `problem_type`) |
 
 ## Checklist for a new wrapper
 
