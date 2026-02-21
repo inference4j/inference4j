@@ -27,13 +27,13 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class SmolLM2TextGeneratorTest {
+class OnnxTextGeneratorTest {
 
     @Test
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
         assertThrows(ModelSourceException.class, () ->
-                SmolLM2TextGenerator.builder()
+                OnnxTextGenerator.builder()
                         .modelSource(badSource)
                         .build());
     }
@@ -47,7 +47,7 @@ class SmolLM2TextGeneratorTest {
         ModelSource source = id -> dir;
 
         assertThrows(ModelSourceException.class, () ->
-                SmolLM2TextGenerator.builder()
+                OnnxTextGenerator.builder()
                         .modelSource(source)
                         .build());
     }
@@ -61,7 +61,7 @@ class SmolLM2TextGeneratorTest {
         ModelSource source = id -> dir;
 
         assertThrows(ModelSourceException.class, () ->
-                SmolLM2TextGenerator.builder()
+                OnnxTextGenerator.builder()
                         .modelSource(source)
                         .build());
     }
@@ -75,7 +75,7 @@ class SmolLM2TextGeneratorTest {
         ModelSource source = id -> dir;
 
         assertThrows(ModelSourceException.class, () ->
-                SmolLM2TextGenerator.builder()
+                OnnxTextGenerator.builder()
                         .modelSource(source)
                         .build());
     }
@@ -89,25 +89,45 @@ class SmolLM2TextGeneratorTest {
         ModelSource source = id -> dir;
 
         assertThrows(ModelSourceException.class, () ->
-                SmolLM2TextGenerator.builder()
+                OnnxTextGenerator.builder()
                         .modelSource(source)
                         .build());
     }
 
     @Test
     void builder_fluentApi_acceptsAllOptions() {
-        SmolLM2TextGenerator.Builder builder = SmolLM2TextGenerator.builder()
-                .modelId("custom/smollm2")
+        OnnxTextGenerator.Builder builder = OnnxTextGenerator.builder()
+                .modelId("custom/model")
                 .modelSource(id -> Path.of("/tmp"))
                 .sessionOptions(opts -> {})
                 .temperature(0.8f)
                 .topK(40)
                 .topP(0.9f)
                 .maxNewTokens(100)
-                .eosTokenId(2)
-                .stopSequence("<|im_end|>")
-                .chatTemplate(msg -> "<|im_start|>user\n" + msg);
+                .eosTokenId(50256)
+                .stopSequence("<|endoftext|>")
+                .addedToken("<|special|>")
+                .tokenizerPattern(OnnxTextGenerator.QWEN2_PATTERN)
+                .chatTemplate(msg -> "<|user|>" + msg);
 
+        assertNotNull(builder);
+    }
+
+    @Test
+    void gpt2_preset_returnsBuilder() {
+        OnnxTextGenerator.Builder builder = OnnxTextGenerator.gpt2();
+        assertNotNull(builder);
+    }
+
+    @Test
+    void smolLM2_preset_returnsBuilder() {
+        OnnxTextGenerator.Builder builder = OnnxTextGenerator.smolLM2();
+        assertNotNull(builder);
+    }
+
+    @Test
+    void qwen2_preset_returnsBuilder() {
+        OnnxTextGenerator.Builder builder = OnnxTextGenerator.qwen2();
         assertNotNull(builder);
     }
 }

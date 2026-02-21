@@ -65,7 +65,7 @@ nav:
     - Introduction: generative-ai/introduction.md
     - Chat Templates: generative-ai/chat-templates.md
     - Native Generation:
-      - GPT-2 Text Generation: generative-ai/gpt2.md
+      - Text Generation: generative-ai/gpt2.md
     - onnxruntime-genai:
       - Text Generation: generative-ai/text-generation.md
       - Phi-3.5 Vision: generative-ai/phi-vision.md

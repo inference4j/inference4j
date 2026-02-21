@@ -1,16 +1,25 @@
-# GPT-2 Text Generation
+# Native Text Generation
 
-Generate text with GPT-2 using inference4j's native generation loop — no additional dependencies beyond ONNX Runtime.
+Generate text with GPT-2, SmolLM2, Qwen2.5, and other models using inference4j's native generation loop — no additional dependencies beyond ONNX Runtime.
 
-GPT-2 is the "hello world" of generative AI in inference4j. It's a small model (124M parameters) that demonstrates the full native generation pipeline: BPE tokenization, KV cache management, token sampling, and streaming — all running in Java on top of standard ONNX Runtime. More model families (Llama, Mistral, Phi via standard ONNX export) will follow this same approach.
+`OnnxTextGenerator` is the single entry point for all natively-supported text generation models. Named presets provide one-liner access to popular models, and the generic builder supports custom models.
 
 ## Quick example
 
 ```java
-try (var gen = Gpt2TextGenerator.builder()
-        .maxNewTokens(50)
-        .build()) {
+// GPT-2 — completion model
+try (var gen = OnnxTextGenerator.gpt2().maxNewTokens(50).build()) {
     System.out.println(gen.generate("Once upon a time").text());
+}
+
+// SmolLM2-360M — ChatML instruct model
+try (var gen = OnnxTextGenerator.smolLM2().maxNewTokens(50).build()) {
+    System.out.println(gen.generate("What is the capital of France?").text());
+}
+
+// Qwen2.5-1.5B — ChatML instruct model
+try (var gen = OnnxTextGenerator.qwen2().maxNewTokens(100).build()) {
+    System.out.println(gen.generate("Explain gravity").text());
 }
 ```
 
@@ -18,11 +27,11 @@ try (var gen = Gpt2TextGenerator.builder()
 
 ```java
 import io.github.inference4j.generation.GenerationResult;
-import io.github.inference4j.nlp.Gpt2TextGenerator;
+import io.github.inference4j.nlp.OnnxTextGenerator;
 
-public class Gpt2TextGeneration {
+public class TextGeneration {
     public static void main(String[] args) {
-        try (var gen = Gpt2TextGenerator.builder()
+        try (var gen = OnnxTextGenerator.qwen2()
                 .maxNewTokens(100)
                 .temperature(0.8f)
                 .topK(50)
@@ -43,32 +52,43 @@ public class Gpt2TextGeneration {
 
     GPT-2 defaults to greedy decoding (`temperature=0`), which produces repetitive
     text. Set `temperature`, `topK`, and `topP` for more coherent output.
+    Instruct models (SmolLM2, Qwen2.5) also benefit from sampling.
 
 ## Streaming
 
 Pass a `Consumer<String>` to receive tokens as they are generated:
 
 ```java
-try (var gen = Gpt2TextGenerator.builder()
+try (var gen = OnnxTextGenerator.smolLM2()
         .maxNewTokens(100)
         .temperature(0.8f)
         .topK(50)
         .build()) {
-    gen.generate("The quick brown fox", token -> System.out.print(token));
+    gen.generate("Tell me a joke", token -> System.out.print(token));
 }
 ```
 
 The final `GenerationResult` is still returned after generation completes, containing
 the full text and timing information.
 
+## Model presets
+
+| Preset | Model | Parameters | Size | Chat Template |
+|--------|-------|-----------|------|---------------|
+| `OnnxTextGenerator.gpt2()` | GPT-2 | 124M | ~500 MB | None (completion) |
+| `OnnxTextGenerator.smolLM2()` | SmolLM2-360M-Instruct | 360M | ~700 MB | ChatML |
+| `OnnxTextGenerator.qwen2()` | Qwen2.5-1.5B-Instruct | 1.5B | ~3 GB | ChatML |
+
 ## Builder options
 
 | Method | Type | Default | Description |
 |--------|------|---------|-------------|
-| `.modelId(String)` | `String` | `"inference4j/gpt2"` | HuggingFace model ID |
+| `.modelId(String)` | `String` | Preset-dependent | HuggingFace model ID |
 | `.modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Model resolution strategy |
 | `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | — | ONNX Runtime session options (e.g., thread count) |
-| `.chatTemplate(ChatTemplate)` | `ChatTemplate` | — | Optional prompt formatting |
+| `.chatTemplate(ChatTemplate)` | `ChatTemplate` | Preset-dependent | Prompt formatting |
+| `.addedToken(String)` | `String` | Preset-dependent | Register a special token for atomic encoding |
+| `.tokenizerPattern(Pattern)` | `Pattern` | GPT-2 pattern | Pre-tokenization regex |
 | `.maxNewTokens(int)` | `int` | `256` | Maximum number of tokens to generate |
 | `.temperature(float)` | `float` | `0.0` | Sampling temperature (higher = more random) |
 | `.topK(int)` | `int` | `0` (disabled) | Top-K sampling (keep K most probable tokens) |
@@ -89,7 +109,7 @@ the full text and timing information.
 
 ## How it works
 
-`Gpt2TextGenerator` uses inference4j's native generation engine. The entire autoregressive loop — tokenization, KV cache management, sampling, and decoding — runs in Java, with only the forward passes delegated to ONNX Runtime.
+`OnnxTextGenerator` uses inference4j's native generation engine. The entire autoregressive loop — tokenization, KV cache management, sampling, and decoding — runs in Java, with only the forward passes delegated to ONNX Runtime.
 
 ```mermaid
 flowchart TD
@@ -104,19 +124,28 @@ flowchart TD
 
 See the [introduction](introduction.md) for a detailed explanation of the autoregressive loop, KV cache, and how native generation compares to onnxruntime-genai.
 
-## What to expect from GPT-2
+## Custom models
 
-GPT-2 is a 2019 model with 124 million parameters. It's useful for demonstrating generation mechanics but it's not a powerful language model by modern standards:
+Use `OnnxTextGenerator.builder()` for any BPE-based causal LM exported to ONNX with KV cache:
 
-- **Output quality** — coherent sentences but not meaningful reasoning. This is expected.
-- **No instruction following** — GPT-2 is a base model (not instruction-tuned), so it completes text rather than following instructions.
-- **Speed** — fast inference due to its small size (~500 MB). Typical throughput on CPU is 10-30 tokens/second.
+```java
+try (var gen = OnnxTextGenerator.builder()
+        .modelId("my-org/my-model")
+        .addedToken("<|special_start|>")
+        .addedToken("<|special_end|>")
+        .chatTemplate(msg -> "<|user|>" + msg + "<|assistant|>")
+        .temperature(0.7f)
+        .maxNewTokens(100)
+        .build()) {
+    gen.generate("Hello", token -> System.out.print(token));
+}
+```
 
-As inference4j adds support for larger model families (Llama, Mistral, Phi via standard ONNX export), the same native generation pipeline will power those models with significantly better output quality.
+The model directory must contain `model.onnx`, `vocab.json`, `merges.txt`, and `config.json`.
 
 ## Tips
 
 - Use `temperature(0.8f)`, `topK(50)`, `topP(0.9f)` to avoid degenerate repetition from greedy decoding.
 - Lower `maxNewTokens` for demos or quick tests — it directly controls how many forward passes run.
-- Reuse `Gpt2TextGenerator` instances across prompts — each one holds the model and tokenizer in memory.
-- The model downloads ~500 MB on first use and is cached in `~/.cache/inference4j/`.
+- Reuse `OnnxTextGenerator` instances across prompts — each one holds the model and tokenizer in memory.
+- Models download on first use and are cached in `~/.cache/inference4j/`.

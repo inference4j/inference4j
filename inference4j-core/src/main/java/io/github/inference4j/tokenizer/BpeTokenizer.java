@@ -369,7 +369,8 @@ public class BpeTokenizer implements Tokenizer {
         try {
             List<String> mergeLines = Files.readAllLines(mergesTxt);
             Map<Pair, Integer> mergeRanks = new LinkedHashMap<>();
-            for (int i = 1; i < mergeLines.size(); i++) {
+            int start = !mergeLines.isEmpty() && mergeLines.get(0).startsWith("#") ? 1 : 0;
+            for (int i = start; i < mergeLines.size(); i++) {
                 String line = mergeLines.get(i).trim();
                 if (line.isEmpty()) {
                     continue;

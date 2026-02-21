@@ -21,7 +21,7 @@ inference4j implements the full autoregressive loop in Java on top of standard O
 **Cons:**
 
 - The generation loop runs in Java rather than optimized C++, so it's slightly slower per token
-- Currently supports GPT-2 architecture; more model families will follow
+- Currently supports GPT-2, SmolLM2, and Qwen2.5; more model families will follow
 
 ### onnxruntime-genai (inference4j-genai)
 
@@ -47,7 +47,7 @@ inference4j implements the full autoregressive loop in Java on top of standard O
 
 ### Where we're heading
 
-The native generation approach is the future. It unlocks any ONNX model on HuggingFace that exports with KV cache support — hundreds of models — without depending on a third-party native library. GPT-2 is the first model supported natively, serving as the foundation for adding larger model families (Llama, Mistral, Phi via standard ONNX export, etc.).
+The native generation approach is the future. It unlocks any ONNX model on HuggingFace that exports with KV cache support — hundreds of models — without depending on a third-party native library. `OnnxTextGenerator` already supports GPT-2, SmolLM2-360M, and Qwen2.5-1.5B, with more model families to follow.
 
 The onnxruntime-genai path remains valuable for models that need native multimodal preprocessing (like Phi-3.5 Vision) and for users who prefer the optimized C++ loop.
 
@@ -108,9 +108,11 @@ In native generation, inference4j handles tokenization, sampling, and decoding i
 
 ### Native generation (inference4j-core)
 
-| Model | Wrapper | Model ID | Parameters | Size |
-|-------|---------|----------|-----------|------|
-| GPT-2 | `Gpt2TextGenerator` | `inference4j/gpt2` | 124M | ~500 MB |
+| Model | Preset | Model ID | Parameters | Size |
+|-------|--------|----------|-----------|------|
+| GPT-2 | `OnnxTextGenerator.gpt2()` | `inference4j/gpt2` | 124M | ~500 MB |
+| SmolLM2-360M-Instruct | `OnnxTextGenerator.smolLM2()` | `inference4j/smollm2-360m-instruct` | 360M | ~700 MB |
+| Qwen2.5-1.5B-Instruct | `OnnxTextGenerator.qwen2()` | `inference4j/qwen2.5-1.5b-instruct` | 1.5B | ~3 GB |
 
 ### onnxruntime-genai (inference4j-genai)
 
@@ -127,7 +129,7 @@ and downloaded automatically on first use.
 
 ## Next steps
 
-- [GPT-2 Text Generation](gpt2.md) — native generation with GPT-2 (no extra dependencies)
+- [Native Text Generation](gpt2.md) — GPT-2, SmolLM2, Qwen2.5 via OnnxTextGenerator (no extra dependencies)
 - [Chat Templates](chat-templates.md) — how prompt formatting works across models
 - [Text Generation (onnxruntime-genai)](text-generation.md) — Phi-3, DeepSeek-R1 via onnxruntime-genai
 - [Whisper Speech-to-Text](whisper.md) — transcription and translation via onnxruntime-genai
