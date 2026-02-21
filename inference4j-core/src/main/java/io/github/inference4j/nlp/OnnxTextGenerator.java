@@ -135,6 +135,7 @@ public class OnnxTextGenerator implements TextGenerator {
     public static Builder qwen2() {
         return builder()
                 .modelId("inference4j/qwen2.5-1.5b-instruct")
+                .requiredFile("model.onnx_data")
                 .addedToken("<|im_start|>")
                 .addedToken("<|im_end|>")
                 .addedToken("<|endoftext|>")
@@ -188,6 +189,7 @@ public class OnnxTextGenerator implements TextGenerator {
         private final Set<Integer> eosTokenIds = new LinkedHashSet<>();
         private final Set<String> stopSequences = new LinkedHashSet<>();
         private final List<String> addedTokens = new ArrayList<>();
+        private final List<String> extraFiles = new ArrayList<>();
 
         public Builder modelSource(ModelSource modelSource) {
             this.modelSource = modelSource;
@@ -259,12 +261,19 @@ public class OnnxTextGenerator implements TextGenerator {
             return this;
         }
 
+        Builder requiredFile(String filename) {
+            this.extraFiles.add(filename);
+            return this;
+        }
+
         public OnnxTextGenerator build() {
             ModelSource source = modelSource != null
                     ? modelSource : HuggingFaceModelSource.defaultInstance();
             String id = modelId != null ? modelId : "inference4j/gpt2";
-            Path dir = source.resolve(id,
+            List<String> files = new ArrayList<>(
                     List.of("model.onnx", "vocab.json", "merges.txt", "config.json"));
+            files.addAll(extraFiles);
+            Path dir = source.resolve(id, files);
             return loadFromDirectory(dir);
         }
 

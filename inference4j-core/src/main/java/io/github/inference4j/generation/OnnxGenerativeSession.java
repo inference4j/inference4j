@@ -18,6 +18,7 @@ package io.github.inference4j.generation;
 
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
+import io.github.inference4j.TensorType;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -30,6 +31,7 @@ public class OnnxGenerativeSession implements GenerativeSession {
     private final int numLayers;
     private final int numHeads;
     private final int headDim;
+    private final TensorType kvCacheType;
     private int sequenceLength;
 
     public OnnxGenerativeSession(InferenceSession session) {
@@ -41,6 +43,7 @@ public class OnnxGenerativeSession implements GenerativeSession {
         this.numLayers = (int) session.inputNames().stream()
             .filter(n -> n.startsWith("past_key_values") && n.endsWith(".key"))
             .count();
+        this.kvCacheType = session.inputType("past_key_values.0.key");
     }
 
     @Override
@@ -104,7 +107,10 @@ public class OnnxGenerativeSession implements GenerativeSession {
     }
 
     private void preFillCache(Map<String, Tensor> inputs) {
-        Tensor empty = Tensor.fromFloats(new float[0], new long[]{1, this.numHeads, 0, this.headDim});
+        long[] emptyShape = {1, this.numHeads, 0, this.headDim};
+        Tensor empty = kvCacheType == TensorType.FLOAT16
+                ? Tensor.fromFloat16(new short[0], emptyShape)
+                : Tensor.fromFloats(new float[0], emptyShape);
         for (int i = 0; i < this.numLayers; i++) {
             inputs.put("past_key_values." + i + ".key", empty);
             inputs.put("past_key_values." + i + ".value", empty);

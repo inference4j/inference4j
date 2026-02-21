@@ -77,6 +77,23 @@ public class Tensor {
     }
 
     /**
+     * Creates a float16 tensor with the given data and shape.
+     *
+     * <p>Each {@code short} value holds a raw IEEE 754 half-precision float.
+     * This format is used internally for efficient KV cache pass-through in
+     * FP16 models. Call {@link #toFloats()} to convert to float32.
+     *
+     * @param data  flat array of raw FP16 values (as shorts)
+     * @param shape the tensor dimensions
+     * @return a new float16 tensor
+     * @throws TensorConversionException if data length does not match the shape
+     */
+    public static Tensor fromFloat16(short[] data, long[] shape) {
+        validateShape(data.length, shape);
+        return new Tensor(data.clone(), shape, TensorType.FLOAT16);
+    }
+
+    /**
      * Creates a long tensor with the given data and shape.
      *
      * @param data  flat array of long values
@@ -102,15 +119,25 @@ public class Tensor {
     /**
      * Returns this tensor's data as a flat float array.
      *
-     * @return a copy of the underlying float data
-     * @throws TensorConversionException if this is not a {@link TensorType#FLOAT} tensor
+     * <p>{@link TensorType#FLOAT16} tensors are automatically converted to float32.
+     *
+     * @return a copy of the underlying float data (or converted from float16)
+     * @throws TensorConversionException if this tensor's type cannot be converted to float
      */
     public float[] toFloats() {
-        if (type != TensorType.FLOAT) {
-            throw new TensorConversionException(
-                    "Cannot convert " + type + " tensor to FLOAT");
+        if (type == TensorType.FLOAT) {
+            return ((float[]) data).clone();
         }
-        return ((float[]) data).clone();
+        if (type == TensorType.FLOAT16) {
+            short[] fp16 = (short[]) data;
+            float[] result = new float[fp16.length];
+            for (int i = 0; i < fp16.length; i++) {
+                result[i] = fp16ToFloat32(fp16[i]);
+            }
+            return result;
+        }
+        throw new TensorConversionException(
+                "Cannot convert " + type + " tensor to FLOAT");
     }
 
     /**
@@ -305,6 +332,17 @@ public class Tensor {
                 }
                 yield new Tensor(dst, newShape, TensorType.LONG);
             }
+            case FLOAT16 -> {
+                short[] src = (short[]) data;
+                short[] dst = new short[outerSize * innerSize];
+                for (int outer = 0; outer < outerSize; outer++) {
+                    System.arraycopy(
+                            src, outer * axisSize * innerSize + index * innerSize,
+                            dst, outer * innerSize,
+                            innerSize);
+                }
+                yield new Tensor(dst, newShape, TensorType.FLOAT16);
+            }
             case STRING -> {
                 String[] src = (String[]) data;
                 String[] dst = new String[outerSize * innerSize];
@@ -336,5 +374,35 @@ public class Tensor {
                     "Data length " + dataLength + " does not match shape " +
                             Arrays.toString(shape) + " (expected " + expected + " elements)");
         }
+    }
+
+    /**
+     * Converts an IEEE 754 half-precision (FP16) value to single-precision (FP32).
+     */
+    static float fp16ToFloat32(short fp16) {
+        int bits = fp16 & 0xFFFF;
+        int sign = (bits >> 15) & 1;
+        int exp = (bits >> 10) & 0x1F;
+        int mantissa = bits & 0x3FF;
+
+        if (exp == 0) {
+            if (mantissa == 0) {
+                return Float.intBitsToFloat(sign << 31);
+            }
+            // Subnormal: normalize
+            while ((mantissa & 0x400) == 0) {
+                mantissa <<= 1;
+                exp--;
+            }
+            exp++;
+            mantissa &= 0x3FF;
+        } else if (exp == 31) {
+            // Infinity or NaN
+            return Float.intBitsToFloat(
+                    (sign << 31) | 0x7F800000 | (mantissa << 13));
+        }
+
+        return Float.intBitsToFloat(
+                (sign << 31) | ((exp - 15 + 127) << 23) | (mantissa << 13));
     }
 }
