@@ -122,6 +122,7 @@ public class OnnxTextGenerator implements TextGenerator {
                 .addedToken("<|im_start|>")
                 .addedToken("<|im_end|>")
                 .addedToken("<|endoftext|>")
+                .stopSequence("<|im_end|>")
                 .chatTemplate(msg ->
                         "<|im_start|>user\n" + msg + "<|im_end|>\n<|im_start|>assistant\n");
     }
@@ -139,6 +140,7 @@ public class OnnxTextGenerator implements TextGenerator {
                 .addedToken("<|im_start|>")
                 .addedToken("<|im_end|>")
                 .addedToken("<|endoftext|>")
+                .stopSequence("<|im_end|>")
                 .tokenizerPattern(QWEN2_PATTERN)
                 .chatTemplate(msg ->
                         "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
