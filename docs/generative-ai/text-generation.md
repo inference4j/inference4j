@@ -19,7 +19,7 @@ try (var generator = TextGenerator.builder()
 ```java
 import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.genai.ModelSources;
-import io.github.inference4j.nlp.TextGenerator;
+import io.github.inference4j.genai.nlp.TextGenerator;
 
 public class TextGeneration {
     public static void main(String[] args) {

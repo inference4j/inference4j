@@ -28,8 +28,8 @@ is blurred, with hints of a red object and a green plant.
 ```java
 import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.genai.ModelSources;
-import io.github.inference4j.vision.VisionInput;
-import io.github.inference4j.vision.VisionLanguageModel;
+import io.github.inference4j.genai.vision.VisionInput;
+import io.github.inference4j.genai.vision.VisionLanguageModel;
 import java.nio.file.Path;
 
 public class ImageDescription {

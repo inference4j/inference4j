@@ -60,13 +60,16 @@ nav:
     - Voice Activity Detection: use-cases/voice-activity-detection.md
     - Text Detection: use-cases/text-detection.md
     - Visual Search: use-cases/visual-search.md
-    - Text Generation: generative-ai/text-generation.md
+    - Text Generation: generative-ai/gpt2.md
   - Generative AI:
     - Introduction: generative-ai/introduction.md
-    - Text Generation: generative-ai/text-generation.md
-    - Phi-3.5 Vision: generative-ai/phi-vision.md
-    - Whisper Speech-to-Text: generative-ai/whisper.md
     - Chat Templates: generative-ai/chat-templates.md
+    - Native Generation:
+      - GPT-2 Text Generation: generative-ai/gpt2.md
+    - onnxruntime-genai:
+      - Text Generation: generative-ai/text-generation.md
+      - Phi-3.5 Vision: generative-ai/phi-vision.md
+      - Whisper Speech-to-Text: generative-ai/whisper.md
   - Guides:
     - Tokenizers: guides/tokenizers.md
     - Hardware Acceleration: guides/hardware-acceleration.md
