@@ -21,6 +21,8 @@ import ai.onnxruntime.genai.Model;
 import ai.onnxruntime.genai.TokenizerStream;
 import ai.onnxruntime.genai.GenAIException;
 
+import io.github.inference4j.generation.GenerativeTask;
+
 import java.util.function.Consumer;
 
 /**

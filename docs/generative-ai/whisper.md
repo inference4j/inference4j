@@ -24,7 +24,7 @@ try (var whisper = WhisperSpeechModel.builder()
 ## Full example
 
 ```java
-import io.github.inference4j.audio.WhisperSpeechModel;
+import io.github.inference4j.genai.audio.WhisperSpeechModel;
 import io.github.inference4j.audio.Transcription;
 import java.nio.file.Path;
 
@@ -135,7 +135,7 @@ decoding, KV cache, beam search — is handled natively by onnxruntime-genai's C
 | Accuracy | Good on clean speech | Better on diverse audio |
 | Languages | English (default model) | 99 languages |
 | Translation | No | Yes (to English) |
-| Module | `inference4j-tasks` | `inference4j-genai` |
+| Module | `inference4j-core` | `inference4j-genai` |
 
 ## Tips
 

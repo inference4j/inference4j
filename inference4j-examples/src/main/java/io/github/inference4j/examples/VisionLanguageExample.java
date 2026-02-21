@@ -15,10 +15,10 @@
  */
 package io.github.inference4j.examples;
 
-import io.github.inference4j.genai.GenerationResult;
+import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.genai.ModelSources;
-import io.github.inference4j.vision.VisionInput;
-import io.github.inference4j.vision.VisionLanguageModel;
+import io.github.inference4j.genai.vision.VisionInput;
+import io.github.inference4j.genai.vision.VisionLanguageModel;
 
 import java.nio.file.Path;
 
@@ -41,12 +41,12 @@ public class VisionLanguageExample {
 
         System.out.println("=== Vision Language Model — Phi-3.5 Vision ===");
         System.out.printf("Image: %s%n%n", imagePath);
-
+        var start = 0L;
         try (var vision = VisionLanguageModel.builder()
                 .model(ModelSources.phi3Vision())
                 .maxLength(4096)
                 .build()) {
-
+            start = System.currentTimeMillis();
             System.out.println("Phi-3.5 Vision loaded successfully.\n");
 
             // Describe the image
@@ -55,18 +55,21 @@ public class VisionLanguageExample {
                     new VisionInput(imagePath, "Describe this image."),
                     token -> System.out.print(token));
             System.out.printf("%n→ %d tokens in %,d ms (%.1f tok/s)%n%n",
-                    description.tokenCount(), description.durationMillis(),
-                    description.tokenCount() * 1000.0 / description.durationMillis());
+                    description.generatedTokens(), description.duration().toMillis(),
+                    description.generatedTokens() * 1000.0 / description.duration().toMillis());
 
             // Ask a question about the image
-            String question = "What colors are prominent in this image?";
-            System.out.printf("Q: %s%nA: ", question);
-            GenerationResult answer = vision.generate(
-                    new VisionInput(imagePath, question),
-                    token -> System.out.print(token));
-            System.out.printf("%n→ %d tokens in %,d ms (%.1f tok/s)%n",
-                    answer.tokenCount(), answer.durationMillis(),
-                    answer.tokenCount() * 1000.0 / answer.durationMillis());
+//            String question = "What colors are prominent in this image?";
+//            System.out.printf("Q: %s%nA: ", question);
+//            GenerationResult answer = vision.generate(
+//                    new VisionInput(imagePath, question),
+//                    token -> System.out.print(token));
+//            System.out.printf("%n→ %d tokens in %,d ms (%.1f tok/s)%n",
+//                    answer.generatedTokens(), answer.duration().toMillis(),
+//                    answer.generatedTokens() * 1000.0 / answer.duration().toMillis());
         }
+        var end = System.currentTimeMillis();
+        System.out.println("Inference time: " + (end - start) + "ms");
+
     }
 }

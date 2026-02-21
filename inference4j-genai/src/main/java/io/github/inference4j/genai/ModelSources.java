@@ -15,6 +15,9 @@
  */
 package io.github.inference4j.genai;
 
+import io.github.inference4j.genai.nlp.TextGenerator;
+import io.github.inference4j.genai.vision.VisionLanguageModel;
+import io.github.inference4j.generation.GenerativeModel;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 
@@ -25,8 +28,8 @@ import java.util.List;
  *
  * <p>Each factory method returns a {@link GenerativeModel} that encapsulates the model
  * repository, required files, download logic, and chat template. Use these with
- * {@link io.github.inference4j.nlp.TextGenerator} or
- * {@link io.github.inference4j.vision.VisionLanguageModel}:
+ * {@link TextGenerator} or
+ * {@link VisionLanguageModel}:
  *
  * <pre>{@code
  * try (var gen = TextGenerator.builder()
@@ -36,8 +39,8 @@ import java.util.List;
  * }
  * }</pre>
  *
- * @see io.github.inference4j.nlp.TextGenerator
- * @see io.github.inference4j.vision.VisionLanguageModel
+ * @see TextGenerator
+ * @see VisionLanguageModel
  */
 public final class ModelSources {
 

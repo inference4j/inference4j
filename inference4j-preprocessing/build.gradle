@@ -1,6 +1,0 @@
-description = 'Tokenizers and data processors for inference4j'
-
-dependencies {
-    api project(':inference4j-core')
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.3'
-}

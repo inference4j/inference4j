@@ -9,6 +9,7 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Text Classification | `DistilBertTextClassifier` | `inference4j/distilbert-base-uncased-finetuned-sst-2-english` | ~260 MB | `TextClassifier` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/all-MiniLM-L6-v2` | ~90 MB | `TextEmbedder` |
 | Search Reranking | `MiniLMSearchReranker` | `inference4j/ms-marco-MiniLM-L-6-v2` | ~90 MB | `SearchReranker` |
+| Text Generation | `Gpt2TextGenerator` | `inference4j/gpt2` | ~500 MB | `TextGenerator` |
 
 ## Vision
 

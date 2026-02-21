@@ -23,7 +23,7 @@ tasks.register('runAllExamples', JavaExec) {
 }
 
 dependencies {
-    implementation project(':inference4j-tasks')
+    implementation project(':inference4j-core')
     implementation project(':inference4j-runtime')
     implementation project(':inference4j-genai')
     runtimeOnly 'org.slf4j:slf4j-simple:2.0.16'

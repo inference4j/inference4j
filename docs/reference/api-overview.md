@@ -11,33 +11,25 @@
 | `io.github.inference4j.model` | Model resolution: `ModelSource`, `HuggingFaceModelSource`, `LocalModelSource` |
 | `io.github.inference4j.processing` | Pre/post-processing: `Preprocessor`, `Postprocessor`, `OutputOperator`, `MathOps` |
 | `io.github.inference4j.exception` | Custom exceptions: `ModelLoadException`, `InferenceException` |
-
-### inference4j-preprocessing
-
-| Package | Contents |
-|---------|----------|
-| `io.github.inference4j.tokenizer` | `Tokenizer`, `EncodedInput`, `WordPieceTokenizer`, `BpeTokenizer` |
-| `io.github.inference4j.text` | `ModelConfig` (HuggingFace config.json parser) |
-| `io.github.inference4j.image` | Image transforms pipeline |
-| `io.github.inference4j.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
-
-### inference4j-tasks
-
-| Package | Contents |
-|---------|----------|
+| `io.github.inference4j.tokenizer` | `Tokenizer`, `EncodedInput`, `WordPieceTokenizer`, `BpeTokenizer`, `DecodingBpeTokenizer`, `TokenDecoder` |
+| `io.github.inference4j.preprocessing.text` | `ModelConfig` (HuggingFace config.json parser) |
+| `io.github.inference4j.preprocessing.image` | Image transforms pipeline: `ImageTransformPipeline`, `ResizeTransform`, `CenterCropTransform`, `ImageLayout`, `Labels` |
+| `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
 | `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `ImageEmbedder` |
 | `io.github.inference4j.audio` | `Wav2Vec2Recognizer`, `SileroVadDetector` |
-| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker` |
+| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `Gpt2TextGenerator`, `TextGenerator` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
+| `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `ChatTemplate`, `GenerativeModel` |
+| `io.github.inference4j.sampling` | `LogitsProcessor`, `LogitsSampler`, `CategoricalSampler`, `GreedySampler` |
 
 ### inference4j-genai
 
 | Package | Contents |
 |---------|----------|
-| `io.github.inference4j.genai` | `GenerativeTask`, `AbstractGenerativeTask`, `GenerationResult`, `ChatTemplate`, `GenerativeModel`, `ModelSources` |
-| `io.github.inference4j.nlp` | `TextGenerator` |
-| `io.github.inference4j.audio` | `WhisperSpeechModel`, `WhisperTask` |
-| `io.github.inference4j.vision` | `VisionLanguageModel`, `VisionInput` |
+| `io.github.inference4j.genai` | `AbstractGenerativeTask`, `ModelSources` |
+| `io.github.inference4j.genai.nlp` | `TextGenerator` (onnxruntime-genai backed) |
+| `io.github.inference4j.genai.audio` | `WhisperSpeechModel`, `WhisperTask` |
+| `io.github.inference4j.genai.vision` | `VisionLanguageModel`, `VisionInput` |
 
 ### inference4j-runtime
 
@@ -109,7 +101,7 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | `BoundingBox` | `x1()`, `y1()`, `x2()`, `y2()` | Embedded in `Detection`, `TextRegion` |
 | `Transcription` | `text()`, `segments()` | `Wav2Vec2Recognizer`, `WhisperSpeechModel` |
 | `VoiceSegment` | `start()`, `end()`, `duration()`, `confidence()` | `SileroVadDetector` |
-| `GenerationResult` | `text()`, `tokenCount()`, `durationMillis()` | `TextGenerator`, `VisionLanguageModel` |
+| `GenerationResult` | `text()`, `promptTokens()`, `generatedTokens()`, `duration()` | `TextGenerator`, `VisionLanguageModel` |
 | `VisionInput` | `imagePath()`, `prompt()` | `VisionLanguageModel` |
 
 ## Builder pattern

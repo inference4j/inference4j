@@ -7,12 +7,12 @@
 
 ## Add the dependency
 
-`inference4j-tasks` is the only dependency you need — it transitively includes core, preprocessing, and runtime.
+`inference4j-core` is the only dependency you need — it includes all task wrappers, preprocessing, and tokenizers.
 
 === "Gradle"
 
     ```groovy
-    implementation 'io.github.inference4j:inference4j-tasks:${inference4jVersion}'
+    implementation 'io.github.inference4j:inference4j-core:${inference4jVersion}'
     ```
 
 === "Maven"
@@ -20,7 +20,7 @@
     ```xml
     <dependency>
         <groupId>io.github.inference4j</groupId>
-        <artifactId>inference4j-tasks</artifactId>
+        <artifactId>inference4j-core</artifactId>
         <version>${inference4jVersion}</version>
     </dependency>
     ```
@@ -101,7 +101,7 @@ The default dependency includes CPU and CoreML (macOS) support. For CUDA (Linux/
 === "Gradle"
 
     ```groovy
-    implementation('io.github.inference4j:inference4j-tasks:${inference4jVersion}') {
+    implementation('io.github.inference4j:inference4j-core:${inference4jVersion}') {
         exclude group: 'com.microsoft.onnxruntime', module: 'onnxruntime'
     }
     implementation 'com.microsoft.onnxruntime:onnxruntime_gpu:${onnxruntimeVersion}'
@@ -112,7 +112,7 @@ The default dependency includes CPU and CoreML (macOS) support. For CUDA (Linux/
     ```xml
     <dependency>
         <groupId>io.github.inference4j</groupId>
-        <artifactId>inference4j-tasks</artifactId>
+        <artifactId>inference4j-core</artifactId>
         <version>${inference4jVersion}</version>
         <exclusions>
             <exclusion>

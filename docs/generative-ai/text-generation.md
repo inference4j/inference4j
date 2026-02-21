@@ -17,9 +17,9 @@ try (var generator = TextGenerator.builder()
 ## Full example
 
 ```java
-import io.github.inference4j.genai.GenerationResult;
+import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.genai.ModelSources;
-import io.github.inference4j.nlp.TextGenerator;
+import io.github.inference4j.genai.nlp.TextGenerator;
 
 public class TextGeneration {
     public static void main(String[] args) {
@@ -33,7 +33,7 @@ public class TextGeneration {
 
             System.out.println(result.text());
             System.out.printf("%d tokens in %,d ms%n",
-                    result.tokenCount(), result.durationMillis());
+                    result.generatedTokens(), result.duration().toMillis());
         }
     }
 }
@@ -79,8 +79,9 @@ the full text and timing information.
 | Field | Type | Description |
 |-------|------|-------------|
 | `text()` | `String` | The generated text |
-| `tokenCount()` | `int` | Number of tokens generated |
-| `durationMillis()` | `long` | Wall-clock generation time in milliseconds |
+| `promptTokens()` | `int` | Number of tokens in the input prompt (0 if unknown) |
+| `generatedTokens()` | `int` | Number of tokens generated |
+| `duration()` | `Duration` | Wall-clock generation time |
 
 ## How it works
 

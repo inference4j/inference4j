@@ -135,9 +135,10 @@ autoregressive loop, along with KV cache management and token sampling, requires
 fundamentally different architecture that doesn't fit the preprocess-infer-postprocess
 pipeline.
 
-inference4j handles this through a separate module (`inference4j-genai`) backed by
-[onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai). See the
-[Generative AI](../generative-ai/introduction.md) section for details.
+inference4j handles this in two ways:
+
+- **`Gpt2TextGenerator`** (in `inference4j-core`) — a pure ONNX Runtime generation loop with KV cache management, sampling, and streaming. No additional dependencies.
+- **`inference4j-genai`** — backed by [onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai) for larger models (Phi-3, DeepSeek-R1, Phi-3.5 Vision). See the [Generative AI](../generative-ai/introduction.md) section for details.
 
 ## Next steps
 

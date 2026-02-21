@@ -19,6 +19,7 @@ import ai.onnxruntime.genai.GenAIException;
 import ai.onnxruntime.genai.Generator;
 import ai.onnxruntime.genai.Model;
 import ai.onnxruntime.genai.TokenizerStream;
+import io.github.inference4j.generation.GenerationResult;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -73,7 +74,8 @@ class AbstractGenerativeTaskTest {
         @Override
         protected GenerationResult parseOutput(String generatedText, String input,
                                                int tokenCount, long durationMillis) {
-            return new GenerationResult(generatedText, tokenCount, durationMillis);
+            return new GenerationResult(generatedText, 0, tokenCount,
+                    java.time.Duration.ofMillis(durationMillis));
         }
 
         @Override

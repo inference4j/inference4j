@@ -52,6 +52,8 @@ recognizes.
 
 ## Preconfigured templates
 
+### onnxruntime-genai models
+
 When you use `ModelSources` factory methods, the chat template is already configured:
 
 ```java
@@ -64,6 +66,19 @@ TextGenerator.builder()
 `ModelSources.phi3Mini()` returns a `GenerativeModel` that pairs the model source
 with the correct Phi-3 chat template. `ModelSources.deepSeekR1_1_5B()` does the same
 for DeepSeek's format.
+
+### Native generation models
+
+Native generation models like `Gpt2TextGenerator` also accept an optional `ChatTemplate`.
+GPT-2 is a base model (not instruction-tuned) so it doesn't require a chat template,
+but you can provide one to format prompts for instruction-tuned models:
+
+```java
+Gpt2TextGenerator.builder()
+        .chatTemplate(msg -> "Q: " + msg + "\nA:")
+        .maxNewTokens(100)
+        .build();
+```
 
 ## Custom templates
 
