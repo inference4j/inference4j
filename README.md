@@ -94,18 +94,27 @@ try (var reranker = MiniLMSearchReranker.builder().build()) {
 }
 ```
 
+### Text Generation
+
+```java
+try (var gen = Gpt2TextGenerator.builder()
+        .maxNewTokens(50).temperature(0.8f).topK(50).build()) {
+    gen.generate("Once upon a time", token -> System.out.print(token));
+}
+```
+
 ## Getting Started
 
 **Requirements:** Java 17+
 
 ### Add the dependency
 
-`inference4j-tasks` is the only dependency you need — it transitively includes core, preprocessing, and runtime.
+`inference4j-core` is the only dependency you need — it includes all model wrappers, tokenizers, and preprocessing.
 
 **Gradle**
 
 ```groovy
-implementation 'io.github.inference4j:inference4j-tasks:${inference4jVersion}'
+implementation 'io.github.inference4j:inference4j-core:${inference4jVersion}'
 ```
 
 **Maven**
@@ -113,7 +122,7 @@ implementation 'io.github.inference4j:inference4j-tasks:${inference4jVersion}'
 ```xml
 <dependency>
     <groupId>io.github.inference4j</groupId>
-    <artifactId>inference4j-tasks</artifactId>
+    <artifactId>inference4j-core</artifactId>
     <version>${inference4jVersion}</version>
 </dependency>
 ```
@@ -139,7 +148,7 @@ That's it. The model downloads automatically on first run (~260MB, cached in `~/
 
 ## What you don't have to do
 
-- **No tokenization** — WordPiece tokenizers are built in and handled automatically
+- **No tokenization** — WordPiece and BPE tokenizers are built in and handled automatically
 - **No tensor handling** — pass a `String`, `BufferedImage`, or `Path`; get Java objects back
 - **No ONNX session setup** — `builder().build()` handles everything
 - **No model downloads** — auto-downloaded from HuggingFace and cached on first use
@@ -231,6 +240,7 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 | Classification | DistilBERT, BERT | `TextClassifier` |
 | Embeddings | all-MiniLM, all-mpnet | `TextEmbedder` |
 | Reranking | ms-marco-MiniLM | `SearchReranker` |
+| Text Generation | GPT-2 | `TextGenerator` |
 
 ### Vision
 
@@ -244,7 +254,7 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 
 | Capability | Models | API |
 |---|---|---|
-| Zero-Shot Classification | CLIP | `ImageClassifier` |
+| Zero-Shot Classification | CLIP | `ZeroShotClassifier` |
 | Image Embeddings | CLIP | `ImageEmbedder` |
 | Text Embeddings | CLIP | `TextEmbedder` |
 
@@ -254,6 +264,14 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 |---|---|---|
 | Recognition | Wav2Vec2 | `SpeechRecognizer` |
 | Voice Activity Detection | Silero VAD | `VoiceActivityDetector` |
+
+### Generative AI (onnxruntime-genai)
+
+| Capability | Models | API |
+|---|---|---|
+| Text Generation | Phi-3, DeepSeek-R1 | `TextGenerator` |
+| Vision-Language | Phi-3.5 Vision | `VisionLanguageModel` |
+| Speech-to-Text | Whisper | `WhisperSpeechModel` |
 
 > **Auto-download:** All supported models are hosted under the [`inference4j`](https://huggingface.co/inference4j) HuggingFace organization. Models are automatically downloaded and cached on first use — no manual setup required. Cache location defaults to `~/.cache/inference4j/` and can be customized via `INFERENCE4J_CACHE_DIR` or `-Dinference4j.cache.dir`.
 
@@ -325,15 +343,14 @@ Every model is opt-in — nothing is downloaded until you set `enabled: true`. B
 
 ## Roadmap
 
-See the [Roadmap](ROADMAP.md) for details and what's coming next.
+See the [Roadmap](https://inference4j.github.io/inference4j/roadmap/) for details and what's coming next.
 
 ## Project Structure
 
 | Module | Description |
 |--------|-------------|
-| `inference4j-core` | Low-level ONNX Runtime abstractions — `InferenceSession`, `Tensor`, `ModelSource`, `MathOps` |
-| `inference4j-preprocessing` | Tokenizers, image transforms, audio processing |
-| `inference4j-tasks` | Model wrappers with domain-specific APIs |
+| `inference4j-core` | Model wrappers, tokenizers, preprocessing, ONNX Runtime abstractions, native generation engine |
+| `inference4j-genai` | Generative AI via [onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai) — Phi-3, DeepSeek-R1, Whisper, Phi-3.5 Vision |
 | `inference4j-runtime` | Operational layer — model routing, A/B testing, Micrometer metrics |
 | `inference4j-spring-boot-starter` | Spring Boot auto-configuration, health indicators |
 | `inference4j-examples` | Runnable examples ([see README](inference4j-examples/README.md)) |
