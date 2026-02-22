@@ -128,6 +128,24 @@ public class OnnxTextGenerator implements TextGenerator {
     }
 
     /**
+     * SmolLM2-1.7B-Instruct preset.
+     *
+     * <p>ChatML instruct model (FP16). Downloads from
+     * {@code inference4j/smollm2-1.7b-instruct} (~3.4 GB) on first use.
+     */
+    public static Builder smolLM2_1_7B() {
+        return builder()
+                .modelId("inference4j/smollm2-1.7b-instruct")
+                .requiredFile("model.onnx_data")
+                .addedToken("<|im_start|>")
+                .addedToken("<|im_end|>")
+                .addedToken("<|endoftext|>")
+                .stopSequence("<|im_end|>")
+                .chatTemplate(msg ->
+                        "<|im_start|>user\n" + msg + "<|im_end|>\n<|im_start|>assistant\n");
+    }
+
+    /**
      * Qwen2.5-1.5B-Instruct preset.
      *
      * <p>ChatML instruct model with system prompt. Downloads from
