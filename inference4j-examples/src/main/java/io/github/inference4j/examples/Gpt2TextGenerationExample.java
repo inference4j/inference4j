@@ -17,7 +17,7 @@
 package io.github.inference4j.examples;
 
 import io.github.inference4j.generation.GenerationResult;
-import io.github.inference4j.nlp.Gpt2TextGenerator;
+import io.github.inference4j.nlp.OnnxTextGenerator;
 
 /**
  * Demonstrates text generation with GPT-2 (124M parameters).
@@ -29,7 +29,7 @@ import io.github.inference4j.nlp.Gpt2TextGenerator;
 public class Gpt2TextGenerationExample {
 
     public static void main(String[] args) throws Exception {
-        try (Gpt2TextGenerator gen = Gpt2TextGenerator.builder()
+        try (var gen = OnnxTextGenerator.gpt2()
                 .maxNewTokens(50)
                 .build()) {
 

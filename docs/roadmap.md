@@ -52,7 +52,7 @@
 - [x] `GenerativeTask` / `GenerativeSession` — generation contracts in core
 - [x] Sampling pipeline — `LogitsProcessor`, `GreedySampler`, `CategoricalSampler`, temperature/topK/topP
 - [x] `TokenStreamer` — streaming token delivery with stop sequence support
-- [x] `Gpt2TextGenerator` — text generation with GPT-2 (pure ONNX Runtime, no genai dependency)
+- [x] `OnnxTextGenerator` — native text generation with GPT-2, SmolLM2, Qwen2.5 (pure ONNX Runtime, no genai dependency)
 - [x] `DecodingBpeTokenizer` / `TokenDecoder` — BPE tokenizer with decoding support
 - [x] `inference4j-genai` — onnxruntime-genai backed generation for larger models (Phi-3, DeepSeek-R1, Phi-3.5 Vision)
 - [x] Streaming generation API — token-by-token callbacks via `Consumer<String>`
@@ -92,6 +92,8 @@
 | Text | CRAFT (text detection) | Done |
 | Text | TrOCR (text recognition) | Next |
 | Text | GPT-2 (text generation) | Done |
+| Text | SmolLM2-360M-Instruct (text generation) | Done |
+| Text | Qwen2.5-1.5B-Instruct (text generation) | Done |
 | Vision | ResNet | Done |
 | Vision | EfficientNet | Done |
 | Vision | YOLOv8 / YOLO11 | Done |

@@ -27,20 +27,19 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class Gpt2TextGeneratorTest {
+class OnnxTextGeneratorTest {
 
     @Test
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
         assertThrows(ModelSourceException.class, () ->
-                Gpt2TextGenerator.builder()
+                OnnxTextGenerator.builder()
                         .modelSource(badSource)
                         .build());
     }
 
     @Test
     void builder_directoryMissingModelFile_throws(@TempDir Path dir) throws IOException {
-        // Create vocab, merges, and config but NOT model.onnx
         Files.writeString(dir.resolve("vocab.json"), "{}");
         Files.writeString(dir.resolve("merges.txt"), "");
         Files.writeString(dir.resolve("config.json"), "{}");
@@ -48,7 +47,7 @@ class Gpt2TextGeneratorTest {
         ModelSource source = id -> dir;
 
         assertThrows(ModelSourceException.class, () ->
-                Gpt2TextGenerator.builder()
+                OnnxTextGenerator.builder()
                         .modelSource(source)
                         .build());
     }
@@ -62,7 +61,7 @@ class Gpt2TextGeneratorTest {
         ModelSource source = id -> dir;
 
         assertThrows(ModelSourceException.class, () ->
-                Gpt2TextGenerator.builder()
+                OnnxTextGenerator.builder()
                         .modelSource(source)
                         .build());
     }
@@ -76,7 +75,7 @@ class Gpt2TextGeneratorTest {
         ModelSource source = id -> dir;
 
         assertThrows(ModelSourceException.class, () ->
-                Gpt2TextGenerator.builder()
+                OnnxTextGenerator.builder()
                         .modelSource(source)
                         .build());
     }
@@ -90,17 +89,15 @@ class Gpt2TextGeneratorTest {
         ModelSource source = id -> dir;
 
         assertThrows(ModelSourceException.class, () ->
-                Gpt2TextGenerator.builder()
+                OnnxTextGenerator.builder()
                         .modelSource(source)
                         .build());
     }
 
     @Test
     void builder_fluentApi_acceptsAllOptions() {
-        // Verify the builder compiles and accepts all options without throwing.
-        // Actual build() requires real model files, so we just verify the fluent chain.
-        Gpt2TextGenerator.Builder builder = Gpt2TextGenerator.builder()
-                .modelId("custom/gpt2")
+        OnnxTextGenerator.Builder builder = OnnxTextGenerator.builder()
+                .modelId("custom/model")
                 .modelSource(id -> Path.of("/tmp"))
                 .sessionOptions(opts -> {})
                 .temperature(0.8f)
@@ -109,8 +106,28 @@ class Gpt2TextGeneratorTest {
                 .maxNewTokens(100)
                 .eosTokenId(50256)
                 .stopSequence("<|endoftext|>")
+                .addedToken("<|special|>")
+                .tokenizerPattern(OnnxTextGenerator.QWEN2_PATTERN)
                 .chatTemplate(msg -> "<|user|>" + msg);
 
+        assertNotNull(builder);
+    }
+
+    @Test
+    void gpt2_preset_returnsBuilder() {
+        OnnxTextGenerator.Builder builder = OnnxTextGenerator.gpt2();
+        assertNotNull(builder);
+    }
+
+    @Test
+    void smolLM2_preset_returnsBuilder() {
+        OnnxTextGenerator.Builder builder = OnnxTextGenerator.smolLM2();
+        assertNotNull(builder);
+    }
+
+    @Test
+    void qwen2_preset_returnsBuilder() {
+        OnnxTextGenerator.Builder builder = OnnxTextGenerator.qwen2();
         assertNotNull(builder);
     }
 }

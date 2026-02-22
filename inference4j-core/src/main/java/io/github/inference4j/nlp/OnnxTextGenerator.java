@@ -28,6 +28,7 @@ import io.github.inference4j.generation.OnnxGenerativeSession;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.session.SessionConfigurer;
+import io.github.inference4j.tokenizer.BpeTokenizer;
 import io.github.inference4j.tokenizer.DecodingBpeTokenizer;
 import io.github.inference4j.tokenizer.TokenDecoder;
 import io.github.inference4j.tokenizer.Tokenizer;
@@ -35,60 +36,144 @@ import io.github.inference4j.tokenizer.Tokenizer;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 /**
- * GPT-2 text generator.
+ * General-purpose ONNX text generator for autoregressive language models.
  *
- * <h2>Target model</h2>
- * <p>Designed for <a href="https://huggingface.co/openai-community/gpt2">GPT-2</a>
- * (124M parameters, MIT license). Works with any GPT-2 variant exported to ONNX
- * with KV cache support using BPE tokenization.
+ * <p>Works with any causal language model exported to ONNX with KV cache
+ * support and BPE tokenization ({@code vocab.json} + {@code merges.txt}).
+ * Named presets provide one-liner access to popular models; the generic
+ * {@link #builder()} supports custom models.
  *
- * <p>The model directory should contain:
- * <ul>
- *   <li>{@code model.onnx} — the ONNX model with KV cache inputs/outputs</li>
- *   <li>{@code vocab.json} — BPE vocabulary</li>
- *   <li>{@code merges.txt} — BPE merge rules</li>
- *   <li>{@code config.json} — model config with {@code eos_token_id}</li>
- * </ul>
- *
- * <h2>Quick start</h2>
+ * <h2>Presets</h2>
  * <pre>{@code
- * try (Gpt2TextGenerator gen = Gpt2TextGenerator.builder().build()) {
- *     GenerationResult result = gen.generate("Once upon a time");
- *     System.out.println(result.text());
+ * // GPT-2 (124M) — completion model
+ * try (var gen = OnnxTextGenerator.gpt2().build()) {
+ *     System.out.println(gen.generate("Once upon a time").text());
+ * }
+ *
+ * // SmolLM2-360M-Instruct — ChatML instruct model
+ * try (var gen = OnnxTextGenerator.smolLM2().build()) {
+ *     System.out.println(gen.generate("What is the capital of France?").text());
+ * }
+ *
+ * // Qwen2.5-1.5B-Instruct — ChatML instruct model
+ * try (var gen = OnnxTextGenerator.qwen2().maxNewTokens(100).build()) {
+ *     System.out.println(gen.generate("Explain gravity").text());
  * }
  * }</pre>
  *
- * <h2>Streaming</h2>
+ * <h2>Custom model</h2>
  * <pre>{@code
- * try (Gpt2TextGenerator gen = Gpt2TextGenerator.builder()
- *         .temperature(0.8f)
- *         .topP(0.9f)
- *         .maxNewTokens(100)
+ * try (var gen = OnnxTextGenerator.builder()
+ *         .modelId("my-org/my-model")
+ *         .addedToken("<|special|>")
+ *         .chatTemplate(msg -> "<|user|>" + msg + "<|assistant|>")
+ *         .temperature(0.7f)
  *         .build()) {
- *     gen.generate("The meaning of life is", token -> System.out.print(token));
+ *     gen.generate("Hello", token -> System.out.print(token));
  * }
  * }</pre>
  *
  * @see TextGenerator
  * @see GenerationResult
  */
-public class Gpt2TextGenerator implements TextGenerator {
+public class OnnxTextGenerator implements TextGenerator {
 
-    private static final String DEFAULT_MODEL_ID = "inference4j/gpt2";
-    private static final int DEFAULT_EOS_TOKEN_ID = 50256;
+    /**
+     * Qwen2 / Qwen2.5 pre-tokenization pattern. Differs from GPT-2 in
+     * case-insensitive contractions, single-digit matching, and newline handling.
+     */
+    static final Pattern QWEN2_PATTERN = Pattern.compile(
+            "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+"
+    );
 
     private final GenerationEngine engine;
 
-    private Gpt2TextGenerator(GenerationEngine engine) {
+    private OnnxTextGenerator(GenerationEngine engine) {
         this.engine = engine;
     }
 
+    /**
+     * GPT-2 (124M parameters) preset.
+     *
+     * <p>Completion model with no chat template. Downloads from
+     * {@code inference4j/gpt2} (~500 MB) on first use.
+     */
+    public static Builder gpt2() {
+        return builder().modelId("inference4j/gpt2");
+    }
+
+    /**
+     * SmolLM2-360M-Instruct preset.
+     *
+     * <p>ChatML instruct model. Downloads from
+     * {@code inference4j/smollm2-360m-instruct} (~700 MB) on first use.
+     */
+    public static Builder smolLM2() {
+        return builder()
+                .modelId("inference4j/smollm2-360m-instruct")
+                .addedToken("<|im_start|>")
+                .addedToken("<|im_end|>")
+                .addedToken("<|endoftext|>")
+                .stopSequence("<|im_end|>")
+                .chatTemplate(msg ->
+                        "<|im_start|>user\n" + msg + "<|im_end|>\n<|im_start|>assistant\n");
+    }
+
+    /**
+     * SmolLM2-1.7B-Instruct preset.
+     *
+     * <p>ChatML instruct model (FP16). Downloads from
+     * {@code inference4j/smollm2-1.7b-instruct} (~3.4 GB) on first use.
+     */
+    public static Builder smolLM2_1_7B() {
+        return builder()
+                .modelId("inference4j/smollm2-1.7b-instruct")
+                .requiredFile("model.onnx_data")
+                .addedToken("<|im_start|>")
+                .addedToken("<|im_end|>")
+                .addedToken("<|endoftext|>")
+                .stopSequence("<|im_end|>")
+                .chatTemplate(msg ->
+                        "<|im_start|>user\n" + msg + "<|im_end|>\n<|im_start|>assistant\n");
+    }
+
+    /**
+     * Qwen2.5-1.5B-Instruct preset.
+     *
+     * <p>ChatML instruct model with system prompt. Downloads from
+     * {@code inference4j/qwen2.5-1.5b-instruct} (~3 GB) on first use.
+     */
+    public static Builder qwen2() {
+        return builder()
+                .modelId("inference4j/qwen2.5-1.5b-instruct")
+                .requiredFile("model.onnx_data")
+                .addedToken("<|im_start|>")
+                .addedToken("<|im_end|>")
+                .addedToken("<|endoftext|>")
+                .stopSequence("<|im_end|>")
+                .tokenizerPattern(QWEN2_PATTERN)
+                .chatTemplate(msg ->
+                        "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
+                                + "<|im_start|>user\n" + msg + "<|im_end|>\n"
+                                + "<|im_start|>assistant\n");
+    }
+
+    /**
+     * Generic builder for custom models.
+     *
+     * <p>Requires at minimum a {@link #modelId(String) modelId} (or
+     * {@link #modelSource(ModelSource) modelSource}) pointing to a directory
+     * with {@code model.onnx}, {@code vocab.json}, {@code merges.txt}, and
+     * {@code config.json}.
+     */
     public static Builder builder() {
         return new Builder();
     }
@@ -116,12 +201,15 @@ public class Gpt2TextGenerator implements TextGenerator {
         private Tokenizer tokenizer;
         private TokenDecoder decoder;
         private ChatTemplate chatTemplate;
+        private Pattern tokenizerPattern;
         private int maxNewTokens = 256;
         private float temperature = 0f;
         private int topK = 0;
         private float topP = 0f;
-        private int eosTokenId = -1;
+        private final Set<Integer> eosTokenIds = new LinkedHashSet<>();
         private final Set<String> stopSequences = new LinkedHashSet<>();
+        private final List<String> addedTokens = new ArrayList<>();
+        private final List<String> extraFiles = new ArrayList<>();
 
         public Builder modelSource(ModelSource modelSource) {
             this.modelSource = modelSource;
@@ -153,6 +241,11 @@ public class Gpt2TextGenerator implements TextGenerator {
             return this;
         }
 
+        public Builder tokenizerPattern(Pattern pattern) {
+            this.tokenizerPattern = pattern;
+            return this;
+        }
+
         public Builder maxNewTokens(int maxNewTokens) {
             this.maxNewTokens = maxNewTokens;
             return this;
@@ -174,7 +267,7 @@ public class Gpt2TextGenerator implements TextGenerator {
         }
 
         public Builder eosTokenId(int eosTokenId) {
-            this.eosTokenId = eosTokenId;
+            this.eosTokenIds.add(eosTokenId);
             return this;
         }
 
@@ -183,16 +276,28 @@ public class Gpt2TextGenerator implements TextGenerator {
             return this;
         }
 
-        public Gpt2TextGenerator build() {
+        public Builder addedToken(String token) {
+            this.addedTokens.add(token);
+            return this;
+        }
+
+        Builder requiredFile(String filename) {
+            this.extraFiles.add(filename);
+            return this;
+        }
+
+        public OnnxTextGenerator build() {
             ModelSource source = modelSource != null
                     ? modelSource : HuggingFaceModelSource.defaultInstance();
-            String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-            Path dir = source.resolve(id,
+            String id = modelId != null ? modelId : "inference4j/gpt2";
+            List<String> files = new ArrayList<>(
                     List.of("model.onnx", "vocab.json", "merges.txt", "config.json"));
+            files.addAll(extraFiles);
+            Path dir = source.resolve(id, files);
             return loadFromDirectory(dir);
         }
 
-        private Gpt2TextGenerator loadFromDirectory(Path dir) {
+        private OnnxTextGenerator loadFromDirectory(Path dir) {
             if (!Files.isDirectory(dir)) {
                 throw new ModelSourceException("Model directory not found: " + dir);
             }
@@ -223,7 +328,15 @@ public class Gpt2TextGenerator implements TextGenerator {
                 OnnxGenerativeSession generativeSession = new OnnxGenerativeSession(session);
 
                 if (this.tokenizer == null || this.decoder == null) {
-                    DecodingBpeTokenizer bpe = DecodingBpeTokenizer.fromFiles(vocabPath, mergesPath);
+                    BpeTokenizer.Builder bpeBuilder =
+                            BpeTokenizer.builder(vocabPath, mergesPath);
+                    for (String token : addedTokens) {
+                        bpeBuilder.addedToken(token);
+                    }
+                    if (tokenizerPattern != null) {
+                        bpeBuilder.pattern(tokenizerPattern);
+                    }
+                    DecodingBpeTokenizer bpe = DecodingBpeTokenizer.from(bpeBuilder);
                     if (this.tokenizer == null) {
                         this.tokenizer = bpe;
                     }
@@ -232,20 +345,22 @@ public class Gpt2TextGenerator implements TextGenerator {
                     }
                 }
 
-                int eos = this.eosTokenId >= 0
-                        ? this.eosTokenId
-                        : readEosTokenId(configPath);
+                Set<Integer> eos = this.eosTokenIds.isEmpty()
+                        ? readEosTokenIds(configPath)
+                        : this.eosTokenIds;
 
                 GenerationEngine.Builder engineBuilder = GenerationEngine.builder()
                         .session(generativeSession)
                         .tokenizer(this.tokenizer)
                         .decoder(this.decoder)
-                        .eosTokenId(eos)
                         .maxNewTokens(this.maxNewTokens)
                         .temperature(this.temperature)
                         .topK(this.topK)
                         .topP(this.topP);
 
+                for (int eosId : eos) {
+                    engineBuilder.eosTokenId(eosId);
+                }
                 if (this.chatTemplate != null) {
                     engineBuilder.chatTemplate(this.chatTemplate);
                 }
@@ -253,28 +368,43 @@ public class Gpt2TextGenerator implements TextGenerator {
                     engineBuilder.stopSequence(seq);
                 }
 
-                return new Gpt2TextGenerator(engineBuilder.build());
+                return new OnnxTextGenerator(engineBuilder.build());
             } catch (Exception e) {
                 session.close();
                 if (e instanceof RuntimeException re) {
                     throw re;
                 }
                 throw new ModelLoadException(
-                        "Failed to initialize GPT-2 model: " + e.getMessage(), e);
+                        "Failed to initialize model: " + e.getMessage(), e);
             }
         }
 
-        private static int readEosTokenId(Path configPath) {
+        private static Set<Integer> readEosTokenIds(Path configPath) {
             try {
                 ObjectMapper mapper = new ObjectMapper();
                 JsonNode root = mapper.readTree(Files.newInputStream(configPath));
                 JsonNode eosNode = root.get("eos_token_id");
-                if (eosNode != null && eosNode.isInt()) {
-                    return eosNode.intValue();
+                if (eosNode != null) {
+                    if (eosNode.isInt()) {
+                        return Set.of(eosNode.intValue());
+                    }
+                    if (eosNode.isArray()) {
+                        Set<Integer> ids = new LinkedHashSet<>();
+                        for (JsonNode element : eosNode) {
+                            if (element.isInt()) {
+                                ids.add(element.intValue());
+                            }
+                        }
+                        if (!ids.isEmpty()) {
+                            return ids;
+                        }
+                    }
                 }
-                return DEFAULT_EOS_TOKEN_ID;
+                throw new ModelLoadException(
+                        "config.json missing eos_token_id — set it explicitly via eosTokenId()");
             } catch (IOException e) {
-                return DEFAULT_EOS_TOKEN_ID;
+                throw new ModelLoadException(
+                        "Failed to read config.json: " + e.getMessage(), e);
             }
         }
     }

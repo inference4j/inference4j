@@ -69,12 +69,12 @@ for DeepSeek's format.
 
 ### Native generation models
 
-Native generation models like `Gpt2TextGenerator` also accept an optional `ChatTemplate`.
-GPT-2 is a base model (not instruction-tuned) so it doesn't require a chat template,
-but you can provide one to format prompts for instruction-tuned models:
+`OnnxTextGenerator` presets for instruct models (SmolLM2, Qwen2.5) come with a
+ChatML template preconfigured. GPT-2 is a base model (not instruction-tuned) so
+it has no default template, but you can provide one:
 
 ```java
-Gpt2TextGenerator.builder()
+OnnxTextGenerator.gpt2()
         .chatTemplate(msg -> "Q: " + msg + "\nA:")
         .maxNewTokens(100)
         .build();

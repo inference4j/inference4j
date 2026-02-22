@@ -17,6 +17,7 @@
 package io.github.inference4j;
 
 import ai.onnxruntime.NodeInfo;
+import ai.onnxruntime.OnnxJavaType;
 import ai.onnxruntime.OnnxModelMetadata;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OnnxValue;
@@ -32,6 +33,7 @@ import io.github.inference4j.session.SessionOptions;
 
 import java.nio.FloatBuffer;
 import java.nio.LongBuffer;
+import java.nio.ShortBuffer;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -164,6 +166,36 @@ public class InferenceSession implements AutoCloseable {
     }
 
     /**
+     * Returns the element type of the named input tensor as defined in the model.
+     *
+     * @param name the input tensor name
+     * @return the tensor type
+     * @throws InferenceException if the input name is not found
+     */
+    public TensorType inputType(String name) {
+        try {
+            NodeInfo info = session.getInputInfo().get(name);
+            if (info == null) {
+                throw new InferenceException("Unknown input: " + name);
+            }
+            OnnxJavaType javaType = ((TensorInfo) info.getInfo()).type;
+            return switch (javaType) {
+                case FLOAT -> TensorType.FLOAT;
+                case FLOAT16, BFLOAT16 -> TensorType.FLOAT16;
+                case INT64 -> TensorType.LONG;
+                case INT32 -> TensorType.INT;
+                case INT8, UINT8, BOOL -> TensorType.BYTE;
+                case DOUBLE -> TensorType.DOUBLE;
+                case STRING -> TensorType.STRING;
+                default -> throw new InferenceException(
+                        "Unsupported input type for '" + name + "': " + javaType);
+            };
+        } catch (OrtException e) {
+            throw new InferenceException("Failed to get input type: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Returns metadata embedded in the ONNX model file.
      *
      * <p>The result is computed lazily on first call and cached for subsequent calls.
@@ -225,6 +257,9 @@ public class InferenceSession implements AutoCloseable {
         return switch (tensor.type()) {
             case FLOAT -> OnnxTensor.createTensor(environment,
                     FloatBuffer.wrap((float[]) tensor.rawData()), tensor.shape());
+            case FLOAT16 -> OnnxTensor.createTensor(environment,
+                    ShortBuffer.wrap((short[]) tensor.rawData()), tensor.shape(),
+                    OnnxJavaType.FLOAT16);
             case LONG -> OnnxTensor.createTensor(environment,
                     LongBuffer.wrap((long[]) tensor.rawData()), tensor.shape());
             case STRING -> OnnxTensor.createTensor(environment,
@@ -244,6 +279,12 @@ public class InferenceSession implements AutoCloseable {
                 float[] data = new float[buffer.remaining()];
                 buffer.get(data);
                 yield Tensor.fromFloats(data, shape);
+            }
+            case FLOAT16, BFLOAT16 -> {
+                ShortBuffer buffer = onnxTensor.getShortBuffer();
+                short[] data = new short[buffer.remaining()];
+                buffer.get(data);
+                yield Tensor.fromFloat16(data, shape);
             }
             case INT64 -> {
                 LongBuffer buffer = onnxTensor.getLongBuffer();

@@ -97,9 +97,9 @@ try (var reranker = MiniLMSearchReranker.builder().build()) {
 ### Text Generation
 
 ```java
-try (var gen = Gpt2TextGenerator.builder()
+try (var gen = OnnxTextGenerator.qwen2()
         .maxNewTokens(50).temperature(0.8f).topK(50).build()) {
-    gen.generate("Once upon a time", token -> System.out.print(token));
+    gen.generate("Explain gravity", token -> System.out.print(token));
 }
 ```
 
@@ -240,7 +240,7 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 | Classification | DistilBERT, BERT | `TextClassifier` |
 | Embeddings | all-MiniLM, all-mpnet | `TextEmbedder` |
 | Reranking | ms-marco-MiniLM | `SearchReranker` |
-| Text Generation | GPT-2 | `TextGenerator` |
+| Text Generation | GPT-2, SmolLM2, Qwen2.5 | `TextGenerator` |
 
 ### Vision
 

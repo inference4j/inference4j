@@ -17,7 +17,7 @@
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
 | `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `ImageEmbedder` |
 | `io.github.inference4j.audio` | `Wav2Vec2Recognizer`, `SileroVadDetector` |
-| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `Gpt2TextGenerator`, `TextGenerator` |
+| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `OnnxTextGenerator`, `TextGenerator` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
 | `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `ChatTemplate`, `GenerativeModel` |
 | `io.github.inference4j.sampling` | `LogitsProcessor`, `LogitsSampler`, `CategoricalSampler`, `GreedySampler` |

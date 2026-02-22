@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 class BpeTokenizerTest {
 
@@ -146,6 +147,52 @@ class BpeTokenizerTest {
         void encode_defaultMaxLength() {
             EncodedInput result = tokenizer.encode("hello");
             assertEquals(77, result.inputIds().length);
+        }
+    }
+
+    @Nested
+    class AddedTokenMode {
+
+        private static BpeTokenizer tokenizer;
+
+        @BeforeAll
+        static void setUp() {
+            tokenizer = BpeTokenizer.builder(vocabPath, mergesPath)
+                    .addedToken("<|im_start|>")
+                    .addedToken("<|im_end|>")
+                    .build();
+        }
+
+        @Test
+        void encode_addedTokenAtStart() {
+            EncodedInput result = tokenizer.encode("<|im_start|>hello", 512);
+            assertEquals(200, result.inputIds()[0], "<|im_start|> should be token 200");
+        }
+
+        @Test
+        void encode_addedTokenAtEnd() {
+            EncodedInput result = tokenizer.encode("hello<|im_end|>", 512);
+            long lastId = result.inputIds()[result.inputIds().length - 1];
+            assertEquals(201, lastId, "<|im_end|> should be token 201");
+        }
+
+        @Test
+        void encode_multipleAddedTokens() {
+            EncodedInput result = tokenizer.encode("<|im_start|>hello<|im_end|>", 512);
+            assertEquals(200, result.inputIds()[0], "first token should be <|im_start|>");
+            long lastId = result.inputIds()[result.inputIds().length - 1];
+            assertEquals(201, lastId, "last token should be <|im_end|>");
+        }
+
+        @Test
+        void encode_addedTokensNotRegistered() {
+            BpeTokenizer noAddedTokens = BpeTokenizer.fromFiles(vocabPath, mergesPath);
+            EncodedInput result = noAddedTokens.encode("<|im_start|>", 512);
+            // Without added tokens, <|im_start|> is byte-encoded — should NOT produce ID 200
+            for (long id : result.inputIds()) {
+                assertNotEquals(200, id,
+                        "Without addedToken(), <|im_start|> should be byte-encoded, not mapped to 200");
+            }
         }
     }
 
