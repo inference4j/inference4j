@@ -20,8 +20,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * A {@link BpeTokenizer} that also supports decoding token IDs back to text.
@@ -86,6 +88,40 @@ public class DecodingBpeTokenizer extends BpeTokenizer implements TokenDecoder {
                 specialTokenIds.add(id);
             }
         }
+    }
+
+    /**
+     * Creates a provider that builds GPT-2-style BPE tokenizers from
+     * {@code vocab.json} and {@code merges.txt} files.
+     */
+    public static TokenizerProvider provider() {
+        return provider(BpeTokenizer.GPT2_PATTERN);
+    }
+
+    /**
+     * Creates a provider with a custom pre-tokenization pattern.
+     *
+     * @param pattern the regex pattern for pre-tokenization
+     */
+    public static TokenizerProvider provider(Pattern pattern) {
+        return new TokenizerProvider() {
+            @Override
+            public List<String> requiredFiles() {
+                return List.of("vocab.json", "merges.txt");
+            }
+
+            @Override
+            public TokenizerAndDecoder create(Path dir, List<String> addedTokens) {
+                BpeTokenizer.Builder b = BpeTokenizer.builder(
+                        dir.resolve("vocab.json"), dir.resolve("merges.txt"));
+                for (String t : addedTokens) {
+                    b.addedToken(t);
+                }
+                b.pattern(pattern);
+                DecodingBpeTokenizer tok = DecodingBpeTokenizer.from(b);
+                return new TokenizerAndDecoder(tok, tok);
+            }
+        };
     }
 
     /**

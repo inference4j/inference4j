@@ -11,7 +11,10 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Search Reranking | `MiniLMSearchReranker` | `inference4j/ms-marco-MiniLM-L-6-v2` | ~90 MB | `SearchReranker` |
 | Text Generation | `OnnxTextGenerator.gpt2()` | `inference4j/gpt2` | ~500 MB | `TextGenerator` |
 | Text Generation | `OnnxTextGenerator.smolLM2()` | `inference4j/smollm2-360m-instruct` | ~700 MB | `TextGenerator` |
+| Text Generation | `OnnxTextGenerator.smolLM2_1_7B()` | `inference4j/smollm2-1.7b-instruct` | ~3.4 GB | `TextGenerator` |
+| Text Generation | `OnnxTextGenerator.tinyLlama()` | `inference4j/tinyllama-1.1b-chat` | ~2.2 GB | `TextGenerator` |
 | Text Generation | `OnnxTextGenerator.qwen2()` | `inference4j/qwen2.5-1.5b-instruct` | ~3 GB | `TextGenerator` |
+| Text Generation | `OnnxTextGenerator.gemma2()` | Gated — requires manual download | ~5 GB | `TextGenerator` |
 
 ## Vision
 

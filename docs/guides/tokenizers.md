@@ -6,12 +6,13 @@ inference4j handles tokenization automatically. When you call `classifier.classi
 
 ## Built-in tokenizers
 
-inference4j ships two tokenizer implementations, covering the two most common algorithms in production transformer models:
+inference4j ships three tokenizer implementations, covering the most common algorithms in production transformer models:
 
 | Tokenizer | Algorithm | Models | Vocabulary format |
 |-----------|-----------|--------|-------------------|
 | `WordPieceTokenizer` | WordPiece (greedy longest-match subword splitting) | BERT, DistilBERT, MiniLM, SentenceTransformer | `vocab.txt` (one token per line) |
-| `BpeTokenizer` | Byte-level BPE (iterative pair merging) | CLIP, GPT-2 | `vocab.json` + `merges.txt` |
+| `BpeTokenizer` | Byte-level BPE (iterative pair merging) | CLIP, GPT-2, SmolLM2, Qwen2.5 | `vocab.json` + `merges.txt` |
+| `SentencePieceBpeTokenizer` | SentencePiece BPE (Unicode-native, `▁` space prefix) | Gemma, LLaMA, TinyLlama | `tokenizer.json` |
 
 ### WordPiece
 
@@ -62,6 +63,29 @@ Tokenizer tokenizer = BpeTokenizer.fromFiles(
 EncodedInput encoded = tokenizer.encode("a photo of a cat");
 // encoded.inputIds()      → [49406, 320, 1125, 539, 320, 2368, 49407, 0, ...]
 // encoded.attentionMask() → [1, 1, 1, 1, 1, 1, 1, 0, ...]
+```
+
+### SentencePiece BPE
+
+SentencePiece BPE operates directly on Unicode text without a pre-tokenization regex. Word boundaries are encoded using the `▁` (U+2581) space prefix, and characters not in the vocabulary fall back to `<0xNN>` byte tokens.
+
+The encoding pipeline:
+
+1. Prepend `▁` and replace all spaces with `▁`
+2. Split on special tokens (added tokens preserved atomically)
+3. Split into characters and apply BPE merges
+4. Characters not in vocab → UTF-8 bytes → `<0xNN>` token IDs
+
+`SentencePieceBpeTokenizer` is used automatically by `OnnxTextGenerator.tinyLlama()` and `OnnxTextGenerator.gemma2()`. For custom SentencePiece models, use the `TokenizerProvider`:
+
+```java
+try (var gen = OnnxTextGenerator.builder()
+        .modelId("my-org/my-sentencepiece-model")
+        .tokenizerProvider(SentencePieceBpeTokenizer.provider())
+        .chatTemplate(msg -> "<start>" + msg + "<end>")
+        .build()) {
+    gen.generate("Hello", token -> System.out.print(token));
+}
 ```
 
 ## Default behavior
