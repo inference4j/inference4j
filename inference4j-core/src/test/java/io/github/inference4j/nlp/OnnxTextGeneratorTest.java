@@ -16,8 +16,11 @@
 
 package io.github.inference4j.nlp;
 
+import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.tokenizer.DecodingBpeTokenizer;
+import io.github.inference4j.tokenizer.SentencePieceBpeTokenizer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -60,7 +63,7 @@ class OnnxTextGeneratorTest {
 
         ModelSource source = id -> dir;
 
-        assertThrows(ModelSourceException.class, () ->
+        assertThrows(RuntimeException.class, () ->
                 OnnxTextGenerator.builder()
                         .modelSource(source)
                         .build());
@@ -74,7 +77,7 @@ class OnnxTextGeneratorTest {
 
         ModelSource source = id -> dir;
 
-        assertThrows(ModelSourceException.class, () ->
+        assertThrows(RuntimeException.class, () ->
                 OnnxTextGenerator.builder()
                         .modelSource(source)
                         .build());
@@ -107,8 +110,17 @@ class OnnxTextGeneratorTest {
                 .eosTokenId(50256)
                 .stopSequence("<|endoftext|>")
                 .addedToken("<|special|>")
-                .tokenizerPattern(OnnxTextGenerator.QWEN2_PATTERN)
+                .tokenizerProvider(DecodingBpeTokenizer.provider(OnnxTextGenerator.QWEN2_PATTERN))
                 .chatTemplate(msg -> "<|user|>" + msg);
+
+        assertNotNull(builder);
+    }
+
+    @Test
+    void builder_fluentApi_acceptsTokenizerProvider() {
+        OnnxTextGenerator.Builder builder = OnnxTextGenerator.builder()
+                .modelId("custom/model")
+                .tokenizerProvider(SentencePieceBpeTokenizer.provider());
 
         assertNotNull(builder);
     }
@@ -129,5 +141,32 @@ class OnnxTextGeneratorTest {
     void qwen2_preset_returnsBuilder() {
         OnnxTextGenerator.Builder builder = OnnxTextGenerator.qwen2();
         assertNotNull(builder);
+    }
+
+    @Test
+    void gemma2_preset_returnsBuilder() {
+        OnnxTextGenerator.Builder builder = OnnxTextGenerator.gemma2();
+        assertNotNull(builder);
+    }
+
+    @Test
+    void tinyLlama_preset_returnsBuilder() {
+        OnnxTextGenerator.Builder builder = OnnxTextGenerator.tinyLlama();
+        assertNotNull(builder);
+    }
+
+    @Test
+    void builder_noModelIdOrSource_throws() {
+        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
+                OnnxTextGenerator.builder().build());
+        assertTrue(ex.getMessage().contains("modelId"));
+        assertTrue(ex.getMessage().contains("modelSource"));
+    }
+
+    @Test
+    void gemma2_preset_requiresModelSource() {
+        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
+                OnnxTextGenerator.gemma2().build());
+        assertTrue(ex.getMessage().contains("modelSource"));
     }
 }

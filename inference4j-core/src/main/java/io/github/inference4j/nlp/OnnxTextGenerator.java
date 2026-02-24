@@ -28,10 +28,11 @@ import io.github.inference4j.generation.OnnxGenerativeSession;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.session.SessionConfigurer;
-import io.github.inference4j.tokenizer.BpeTokenizer;
 import io.github.inference4j.tokenizer.DecodingBpeTokenizer;
+import io.github.inference4j.tokenizer.SentencePieceBpeTokenizer;
 import io.github.inference4j.tokenizer.TokenDecoder;
 import io.github.inference4j.tokenizer.Tokenizer;
+import io.github.inference4j.tokenizer.TokenizerProvider;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -61,6 +62,11 @@ import java.util.regex.Pattern;
  * // SmolLM2-360M-Instruct — ChatML instruct model
  * try (var gen = OnnxTextGenerator.smolLM2().build()) {
  *     System.out.println(gen.generate("What is the capital of France?").text());
+ * }
+ *
+ * // TinyLlama-1.1B-Chat — Zephyr-style instruct model
+ * try (var gen = OnnxTextGenerator.tinyLlama().maxNewTokens(100).build()) {
+ *     System.out.println(gen.generate("Explain gravity").text());
  * }
  *
  * // Qwen2.5-1.5B-Instruct — ChatML instruct model
@@ -159,11 +165,67 @@ public class OnnxTextGenerator implements TextGenerator {
                 .addedToken("<|im_end|>")
                 .addedToken("<|endoftext|>")
                 .stopSequence("<|im_end|>")
-                .tokenizerPattern(QWEN2_PATTERN)
+                .tokenizerProvider(DecodingBpeTokenizer.provider(QWEN2_PATTERN))
                 .chatTemplate(msg ->
                         "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
                                 + "<|im_start|>user\n" + msg + "<|im_end|>\n"
                                 + "<|im_start|>assistant\n");
+    }
+
+    /**
+     * TinyLlama-1.1B-Chat preset.
+     *
+     * <p>Zephyr-style instruct model using SentencePiece tokenization. Downloads from
+     * {@code inference4j/tinyllama-1.1b-chat} (~2.2 GB) on first use.
+     */
+    public static Builder tinyLlama() {
+        return builder()
+                .modelId("inference4j/tinyllama-1.1b-chat")
+                .requiredFile("model.onnx_data")
+                .tokenizerProvider(SentencePieceBpeTokenizer.provider())
+                .addedToken("<|user|>")
+                .addedToken("<|assistant|>")
+                .addedToken("<|system|>")
+                .eosTokenId(2)          // </s>
+                .stopSequence("</s>")
+                .chatTemplate(msg ->
+                        "<|user|>\n" + msg + "</s>\n<|assistant|>\n");
+    }
+
+    /**
+     * Gemma 2-2B-IT preset.
+     *
+     * <p>Instruction-tuned model using SentencePiece tokenization.
+     *
+     * <p><strong>Note:</strong> Gemma is a gated model. You must accept Google's
+     * license terms on HuggingFace, download the ONNX model yourself, and provide
+     * it via {@link Builder#modelSource(ModelSource) modelSource}:
+     *
+     * <pre>{@code
+     * try (var gen = OnnxTextGenerator.gemma2()
+     *         .modelSource(id -> Path.of("/path/to/gemma-2-2b-it"))
+     *         .maxNewTokens(100)
+     *         .build()) {
+     *     gen.generate("What is Java?", token -> System.out.print(token));
+     * }
+     * }</pre>
+     *
+     * @see <a href="https://huggingface.co/google/gemma-2-2b-it">Gemma 2-2B-IT on HuggingFace</a>
+     */
+    public static Builder gemma2() {
+        return builder()
+                .requiredFile("model.onnx_data")
+                .tokenizerProvider(SentencePieceBpeTokenizer.provider())
+                .addedToken("<start_of_turn>")
+                .addedToken("<end_of_turn>")
+                .addedToken("<bos>")
+                .addedToken("<eos>")
+                .eosTokenId(1)
+                .eosTokenId(107)
+                .stopSequence("<end_of_turn>")
+                .chatTemplate(msg ->
+                        "<bos><start_of_turn>user\n" + msg
+                                + "<end_of_turn>\n<start_of_turn>model\n");
     }
 
     /**
@@ -201,7 +263,7 @@ public class OnnxTextGenerator implements TextGenerator {
         private Tokenizer tokenizer;
         private TokenDecoder decoder;
         private ChatTemplate chatTemplate;
-        private Pattern tokenizerPattern;
+        private TokenizerProvider tokenizerProvider;
         private int maxNewTokens = 256;
         private float temperature = 0f;
         private int topK = 0;
@@ -241,8 +303,8 @@ public class OnnxTextGenerator implements TextGenerator {
             return this;
         }
 
-        public Builder tokenizerPattern(Pattern pattern) {
-            this.tokenizerPattern = pattern;
+        public Builder tokenizerProvider(TokenizerProvider tokenizerProvider) {
+            this.tokenizerProvider = tokenizerProvider;
             return this;
         }
 
@@ -287,34 +349,33 @@ public class OnnxTextGenerator implements TextGenerator {
         }
 
         public OnnxTextGenerator build() {
+            if (modelId == null && modelSource == null) {
+                throw new ModelLoadException(
+                        "Model source not configured. Set modelId() for HuggingFace models "
+                        + "or modelSource() for local models.");
+            }
             ModelSource source = modelSource != null
                     ? modelSource : HuggingFaceModelSource.defaultInstance();
-            String id = modelId != null ? modelId : "inference4j/gpt2";
-            List<String> files = new ArrayList<>(
-                    List.of("model.onnx", "vocab.json", "merges.txt", "config.json"));
+            String id = modelId != null ? modelId : "";
+            TokenizerProvider provider = tokenizerProvider != null
+                    ? tokenizerProvider : DecodingBpeTokenizer.provider();
+            List<String> files = new ArrayList<>(List.of("model.onnx", "config.json"));
+            files.addAll(provider.requiredFiles());
             files.addAll(extraFiles);
             Path dir = source.resolve(id, files);
-            return loadFromDirectory(dir);
+            return loadFromDirectory(dir, provider);
         }
 
-        private OnnxTextGenerator loadFromDirectory(Path dir) {
+        private OnnxTextGenerator loadFromDirectory(Path dir, TokenizerProvider provider) {
             if (!Files.isDirectory(dir)) {
                 throw new ModelSourceException("Model directory not found: " + dir);
             }
 
             Path modelPath = dir.resolve("model.onnx");
-            Path vocabPath = dir.resolve("vocab.json");
-            Path mergesPath = dir.resolve("merges.txt");
             Path configPath = dir.resolve("config.json");
 
             if (!Files.exists(modelPath)) {
                 throw new ModelSourceException("Model file not found: " + modelPath);
-            }
-            if (!Files.exists(vocabPath)) {
-                throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
-            }
-            if (!Files.exists(mergesPath)) {
-                throw new ModelSourceException("Merges file not found: " + mergesPath);
             }
             if (!Files.exists(configPath)) {
                 throw new ModelSourceException("Config file not found: " + configPath);
@@ -328,20 +389,13 @@ public class OnnxTextGenerator implements TextGenerator {
                 OnnxGenerativeSession generativeSession = new OnnxGenerativeSession(session);
 
                 if (this.tokenizer == null || this.decoder == null) {
-                    BpeTokenizer.Builder bpeBuilder =
-                            BpeTokenizer.builder(vocabPath, mergesPath);
-                    for (String token : addedTokens) {
-                        bpeBuilder.addedToken(token);
-                    }
-                    if (tokenizerPattern != null) {
-                        bpeBuilder.pattern(tokenizerPattern);
-                    }
-                    DecodingBpeTokenizer bpe = DecodingBpeTokenizer.from(bpeBuilder);
+                    TokenizerProvider.TokenizerAndDecoder td =
+                            provider.create(dir, addedTokens);
                     if (this.tokenizer == null) {
-                        this.tokenizer = bpe;
+                        this.tokenizer = td.tokenizer();
                     }
                     if (this.decoder == null) {
-                        this.decoder = bpe;
+                        this.decoder = td.decoder();
                     }
                 }
 

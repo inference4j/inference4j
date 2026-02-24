@@ -20,10 +20,13 @@ import io.github.inference4j.generation.GenerationResult;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class OnnxTextGeneratorModelTest {
 
@@ -149,6 +152,113 @@ class OnnxTextGeneratorModelTest {
                 List<String> streamedTokens = new ArrayList<>();
 
                 GenerationResult result = gen.generate("What is the capital of France?",
+                        streamedTokens::add);
+
+                assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+                String concatenated = String.join("", streamedTokens);
+                assertEquals(result.text(), concatenated,
+                        "Concatenated streamed tokens should match result text");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    @Nested
+    class TinyLlama {
+
+        @Test
+        void generate_producesNonEmptyText() {
+            try (var gen = OnnxTextGenerator.tinyLlama().maxNewTokens(20).build()) {
+                GenerationResult result = gen.generate("What is the capital of France?");
+
+                assertFalse(result.text().isBlank(), "Generated text should not be blank");
+                assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void generate_respectsMaxNewTokens() {
+            try (var gen = OnnxTextGenerator.tinyLlama().maxNewTokens(5).build()) {
+                GenerationResult result = gen.generate("Tell me a joke");
+
+                assertTrue(result.generatedTokens() <= 5,
+                        "Should generate at most 5 tokens, got: " + result.generatedTokens());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void generate_streamsTokensToListener() {
+            try (var gen = OnnxTextGenerator.tinyLlama().maxNewTokens(20).build()) {
+                List<String> streamedTokens = new ArrayList<>();
+
+                GenerationResult result = gen.generate("Explain gravity", streamedTokens::add);
+
+                assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+                String concatenated = String.join("", streamedTokens);
+                assertEquals(result.text(), concatenated,
+                        "Concatenated streamed tokens should match result text");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    @Nested
+    class Gemma2 {
+
+        private static final Path GEMMA_MODEL_DIR = Path.of(
+                System.getProperty("user.home"), ".cache", "inference4j", "gemma-2-2b-it");
+
+        @Test
+        void generate_producesNonEmptyText() {
+            assumeTrue(Files.isDirectory(GEMMA_MODEL_DIR),
+                    "Gated model — requires manual download to " + GEMMA_MODEL_DIR);
+
+            try (var gen = OnnxTextGenerator.gemma2()
+                    .modelSource(id -> GEMMA_MODEL_DIR)
+                    .maxNewTokens(20).build()) {
+                GenerationResult result = gen.generate("What is the capital of France?");
+
+                assertFalse(result.text().isBlank(), "Generated text should not be blank");
+                assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void generate_respectsMaxNewTokens() {
+            assumeTrue(Files.isDirectory(GEMMA_MODEL_DIR),
+                    "Gated model — requires manual download to " + GEMMA_MODEL_DIR);
+
+            try (var gen = OnnxTextGenerator.gemma2()
+                    .modelSource(id -> GEMMA_MODEL_DIR)
+                    .maxNewTokens(5).build()) {
+                GenerationResult result = gen.generate("Explain gravity");
+
+                assertTrue(result.generatedTokens() <= 5,
+                        "Should generate at most 5 tokens, got: " + result.generatedTokens());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void generate_streamsTokensToListener() {
+            assumeTrue(Files.isDirectory(GEMMA_MODEL_DIR),
+                    "Gated model — requires manual download to " + GEMMA_MODEL_DIR);
+
+            try (var gen = OnnxTextGenerator.gemma2()
+                    .modelSource(id -> GEMMA_MODEL_DIR)
+                    .maxNewTokens(20).build()) {
+                List<String> streamedTokens = new ArrayList<>();
+
+                GenerationResult result = gen.generate("What is 2+2?",
                         streamedTokens::add);
 
                 assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");

@@ -1,6 +1,6 @@
 # Native Text Generation
 
-Generate text with GPT-2, SmolLM2, Qwen2.5, and other models using inference4j's native generation loop — no additional dependencies beyond ONNX Runtime.
+Generate text with GPT-2, SmolLM2, TinyLlama, Qwen2.5, Gemma 2, and other models using inference4j's native generation loop — no additional dependencies beyond ONNX Runtime.
 
 `OnnxTextGenerator` is the single entry point for all natively-supported text generation models. Named presets provide one-liner access to popular models, and the generic builder supports custom models.
 
@@ -15,6 +15,11 @@ try (var gen = OnnxTextGenerator.gpt2().maxNewTokens(50).build()) {
 // SmolLM2-360M — ChatML instruct model
 try (var gen = OnnxTextGenerator.smolLM2().maxNewTokens(50).build()) {
     System.out.println(gen.generate("What is the capital of France?").text());
+}
+
+// TinyLlama-1.1B-Chat — Zephyr-style instruct model
+try (var gen = OnnxTextGenerator.tinyLlama().maxNewTokens(100).build()) {
+    System.out.println(gen.generate("Explain gravity").text());
 }
 
 // Qwen2.5-1.5B — ChatML instruct model
@@ -77,7 +82,24 @@ the full text and timing information.
 |--------|-------|-----------|------|---------------|
 | `OnnxTextGenerator.gpt2()` | GPT-2 | 124M | ~500 MB | None (completion) |
 | `OnnxTextGenerator.smolLM2()` | SmolLM2-360M-Instruct | 360M | ~700 MB | ChatML |
+| `OnnxTextGenerator.tinyLlama()` | TinyLlama-1.1B-Chat | 1.1B | ~2.2 GB | Zephyr (`<\|user\|>` / `</s>`) |
 | `OnnxTextGenerator.qwen2()` | Qwen2.5-1.5B-Instruct | 1.5B | ~3 GB | ChatML |
+| `OnnxTextGenerator.gemma2()` | Gemma 2-2B-IT | 2.6B | ~5 GB | `<start_of_turn>` / `<end_of_turn>` |
+
+!!! warning "Gated models"
+
+    **Gemma 2** is a gated model — you must accept Google's license terms on HuggingFace
+    before downloading. The `gemma2()` preset does not set a model ID for auto-download.
+    Provide the model directory yourself via `modelSource()`:
+
+    ```java
+    try (var gen = OnnxTextGenerator.gemma2()
+            .modelSource(id -> Path.of("/path/to/gemma-2-2b-it"))
+            .maxNewTokens(100)
+            .build()) {
+        gen.generate("What is Java?", token -> System.out.print(token));
+    }
+    ```
 
 ## Builder options
 
@@ -88,7 +110,7 @@ the full text and timing information.
 | `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | — | ONNX Runtime session options (e.g., thread count) |
 | `.chatTemplate(ChatTemplate)` | `ChatTemplate` | Preset-dependent | Prompt formatting |
 | `.addedToken(String)` | `String` | Preset-dependent | Register a special token for atomic encoding |
-| `.tokenizerPattern(Pattern)` | `Pattern` | GPT-2 pattern | Pre-tokenization regex |
+| `.tokenizerProvider(TokenizerProvider)` | `TokenizerProvider` | GPT-2 BPE | Tokenizer construction strategy (e.g., SentencePiece for Gemma) |
 | `.maxNewTokens(int)` | `int` | `256` | Maximum number of tokens to generate |
 | `.temperature(float)` | `float` | `0.0` | Sampling temperature (higher = more random) |
 | `.topK(int)` | `int` | `0` (disabled) | Top-K sampling (keep K most probable tokens) |
@@ -113,7 +135,7 @@ the full text and timing information.
 
 ```mermaid
 flowchart TD
-    A["User prompt"] --> B["BPE tokenize<br><small>inference4j</small>"]
+    A["User prompt"] --> B["Tokenize<br><small>inference4j</small>"]
     B --> C["Forward pass + KV cache<br><small>ONNX Runtime</small>"]
     C --> D["Sample next token<br><small>inference4j</small>"]
     D --> E{"Stop?"}
@@ -141,7 +163,9 @@ try (var gen = OnnxTextGenerator.builder()
 }
 ```
 
-The model directory must contain `model.onnx`, `vocab.json`, `merges.txt`, and `config.json`.
+By default, the builder uses GPT-2-style BPE (`vocab.json` + `merges.txt`). For SentencePiece models (Gemma, LLaMA, TinyLlama), use `.tokenizerProvider(SentencePieceBpeTokenizer.provider())` which reads `tokenizer.json` instead.
+
+The model directory must contain `model.onnx` and `config.json`, plus the tokenizer files required by the provider.
 
 ## Tips
 

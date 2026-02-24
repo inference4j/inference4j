@@ -32,6 +32,7 @@ public class OnnxGenerativeSession implements GenerativeSession {
     private final int numHeads;
     private final int headDim;
     private final TensorType kvCacheType;
+    private final boolean hasPositionIds;
     private int sequenceLength;
 
     public OnnxGenerativeSession(InferenceSession session) {
@@ -44,6 +45,7 @@ public class OnnxGenerativeSession implements GenerativeSession {
             .filter(n -> n.startsWith("past_key_values") && n.endsWith(".key"))
             .count();
         this.kvCacheType = session.inputType("past_key_values.0.key");
+        this.hasPositionIds = session.inputNames().contains("position_ids");
     }
 
     @Override
@@ -52,18 +54,17 @@ public class OnnxGenerativeSession implements GenerativeSession {
         Map<String, Tensor> inputs = new LinkedHashMap<>();
         inputs.put("input_ids", Tensor.fromLongs(tokenIds, new long[]{1, tokenIds.length}));
         inputs.put("attention_mask", Tensor.fromLongs(ones(tokenIds.length), new long[]{1, tokenIds.length}));
-        long[] positionIds = new long[tokenIds.length];
-        for (int i = 0; i < tokenIds.length; i++) {
-            positionIds[i] = i;
+        if (hasPositionIds) {
+            long[] positionIds = new long[tokenIds.length];
+            for (int i = 0; i < tokenIds.length; i++) {
+                positionIds[i] = i;
+            }
+            inputs.put("position_ids", Tensor.fromLongs(positionIds, new long[]{1, tokenIds.length}));
         }
-        inputs.put("position_ids", Tensor.fromLongs(positionIds, new long[]{1, tokenIds.length}));
         preFillCache(inputs);
         Map<String, Tensor> outputs = session.run(inputs);
         var logitsOutput = outputs.get("logits").slice(0, 0).slice(0, -1).toFloats();
-        for (int i = 0; i < this.numLayers; i++) {
-            cache.put("past_key_values." + i + ".key",   outputs.get("present." + i + ".key"));
-            cache.put("past_key_values." + i + ".value", outputs.get("present." + i + ".value"));
-        }
+        updateCache(outputs);
         return new ForwardResult(logitsOutput);
     }
 
@@ -72,14 +73,13 @@ public class OnnxGenerativeSession implements GenerativeSession {
         Map<String, Tensor> inputs = new LinkedHashMap<>();
         inputs.put("input_ids", Tensor.fromLongs(new long[]{tokenId}, new long[]{1, 1}));
         inputs.put("attention_mask", Tensor.fromLongs(ones(sequenceLength + 1), new long[]{1, sequenceLength + 1}));
-        inputs.put("position_ids", Tensor.fromLongs(new long[]{sequenceLength}, new long[]{1, 1}));
+        if (hasPositionIds) {
+            inputs.put("position_ids", Tensor.fromLongs(new long[]{sequenceLength}, new long[]{1, 1}));
+        }
         inputs.putAll(this.cache);
         Map<String, Tensor> outputs = session.run(inputs);
         var logitsOutput = outputs.get("logits").slice(0, 0).slice(0, -1).toFloats();
-        for (int i = 0; i < this.numLayers; i++) {
-            cache.put("past_key_values." + i + ".key",   outputs.get("present." + i + ".key"));
-            cache.put("past_key_values." + i + ".value", outputs.get("present." + i + ".value"));
-        }
+        updateCache(outputs);
         this.sequenceLength++;
         return new ForwardResult(logitsOutput);
     }
@@ -104,6 +104,20 @@ public class OnnxGenerativeSession implements GenerativeSession {
         long[] ones = new long[length];
         Arrays.fill(ones, 1L);
         return ones;
+    }
+
+    private void updateCache(Map<String, Tensor> outputs) {
+        for (int i = 0; i < this.numLayers; i++) {
+            cache.put("past_key_values." + i + ".key",   castToKvType(outputs.get("present." + i + ".key")));
+            cache.put("past_key_values." + i + ".value", castToKvType(outputs.get("present." + i + ".value")));
+        }
+    }
+
+    private Tensor castToKvType(Tensor tensor) {
+        if (kvCacheType == TensorType.FLOAT16 && tensor.type() == TensorType.FLOAT) {
+            return tensor.castToFloat16();
+        }
+        return tensor;
     }
 
     private void preFillCache(Map<String, Tensor> inputs) {
