@@ -377,6 +377,31 @@ public class Tensor {
     }
 
     /**
+     * Returns a new tensor with the data cast to float16.
+     *
+     * <p>If this tensor is already {@link TensorType#FLOAT16}, returns {@code this}.
+     * If this tensor is {@link TensorType#FLOAT}, converts each FP32 value to FP16.
+     *
+     * @return a float16 tensor with the same shape
+     * @throws TensorConversionException if the tensor type is not FLOAT or FLOAT16
+     */
+    public Tensor castToFloat16() {
+        if (type == TensorType.FLOAT16) {
+            return this;
+        }
+        if (type != TensorType.FLOAT) {
+            throw new TensorConversionException(
+                    "Cannot cast " + type + " tensor to FLOAT16");
+        }
+        float[] src = (float[]) data;
+        short[] dst = new short[src.length];
+        for (int i = 0; i < src.length; i++) {
+            dst[i] = float32ToFp16(src[i]);
+        }
+        return new Tensor(dst, shape.clone(), TensorType.FLOAT16);
+    }
+
+    /**
      * Converts an IEEE 754 half-precision (FP16) value to single-precision (FP32).
      */
     static float fp16ToFloat32(short fp16) {
@@ -404,5 +429,28 @@ public class Tensor {
 
         return Float.intBitsToFloat(
                 (sign << 31) | ((exp - 15 + 127) << 23) | (mantissa << 13));
+    }
+
+    /**
+     * Converts an IEEE 754 single-precision (FP32) value to half-precision (FP16).
+     */
+    static short float32ToFp16(float value) {
+        int bits = Float.floatToRawIntBits(value);
+        int sign = (bits >> 16) & 0x8000;
+        int exp = ((bits >> 23) & 0xFF) - 127 + 15;
+        int mantissa = bits & 0x7FFFFF;
+
+        if (exp <= 0) {
+            if (exp < -10) {
+                return (short) sign;
+            }
+            mantissa |= 0x800000;
+            int shift = 14 - exp;
+            return (short) (sign | (mantissa >> shift));
+        }
+        if (exp >= 31) {
+            return (short) (sign | 0x7C00);
+        }
+        return (short) (sign | (exp << 10) | (mantissa >> 13));
     }
 }
