@@ -22,12 +22,40 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.net.http.HttpResponse.BodySubscriber;
 
+/**
+ * A {@link BodySubscriber} decorator that tracks download progress.
+ *
+ * <p>Wraps an existing subscriber and intercepts each {@link #onNext} call to
+ * accumulate the number of bytes received, notifying a {@link ProgressListener}
+ * after every chunk. All other subscriber methods are forwarded to the delegate unchanged.
+ *
+ * <p>Example usage with {@link java.net.http.HttpClient}:
+ * <pre>{@code
+ * HttpResponse.BodyHandler<Path> handler = responseInfo -> {
+ *     long total = responseInfo.headers()
+ *             .firstValueAsLong("Content-Length").orElse(-1L);
+ *     BodySubscriber<Path> downstream = HttpResponse.BodySubscribers.ofFile(target);
+ *     return new ProgressSubscriber<>(downstream, total, new DownloadProgressBar("model.onnx"));
+ * };
+ * }</pre>
+ *
+ * @param <T> the response body type
+ * @see ProgressListener
+ */
 public class ProgressSubscriber<T> implements BodySubscriber<T> {
+
     private final BodySubscriber<T> delegate;
     private final long totalBytes;
     private final ProgressListener listener;
     private long bytesReceived = 0;
 
+    /**
+     * Creates a new progress-tracking subscriber.
+     *
+     * @param delegate   the subscriber to forward data to
+     * @param totalBytes expected total size in bytes (from {@code Content-Length}), or {@code -1} if unknown
+     * @param listener   callback invoked after each chunk with cumulative progress
+     */
     public ProgressSubscriber(BodySubscriber<T> delegate, long totalBytes, ProgressListener listener) {
         this.delegate = delegate;
         this.totalBytes = totalBytes;

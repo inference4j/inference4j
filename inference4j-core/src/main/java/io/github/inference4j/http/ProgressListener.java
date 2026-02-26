@@ -16,7 +16,20 @@
 
 package io.github.inference4j.http;
 
+/**
+ * Callback for tracking download progress.
+ *
+ * @see ProgressSubscriber
+ * @see DownloadProgressBar
+ */
 @FunctionalInterface
 public interface ProgressListener {
+
+    /**
+     * Called when new bytes have been received.
+     *
+     * @param bytesDownloaded cumulative number of bytes downloaded so far
+     * @param totalBytes      expected total size in bytes, or {@code 0} if unknown
+     */
     void onProgress(long bytesDownloaded, long totalBytes);
 }

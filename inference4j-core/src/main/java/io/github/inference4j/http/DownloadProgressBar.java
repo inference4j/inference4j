@@ -1,5 +1,20 @@
 package io.github.inference4j.http;
 
+/**
+ * A {@link ProgressListener} that renders a console progress bar to {@code System.out}.
+ *
+ * <p>Displays file name, a visual bar, percentage, downloaded/total sizes, and current speed.
+ * Updates are throttled to at most once every 500 ms to avoid excessive console output,
+ * except for the final update when the download completes.
+ *
+ * <p>When the total size is unknown ({@code total <= 0}), only the downloaded size and speed
+ * are shown, without a bar or percentage.
+ *
+ * <p>Example output:
+ * <pre>
+ * model.onnx           [████████████░░░░░░░░░░░░░░░░░░]  40.0%  48.0 MiB / 120.0 MiB @ 12.5 MiB/s
+ * </pre>
+ */
 public class DownloadProgressBar implements ProgressListener {
 
     private final String fileName;
@@ -8,10 +23,21 @@ public class DownloadProgressBar implements ProgressListener {
     private long lastBytes = 0;
     private long lastTime = System.currentTimeMillis();
 
+    /**
+     * Creates a progress bar with the default width of 30 characters.
+     *
+     * @param fileName the file name to display (truncated to 20 characters if longer)
+     */
     public DownloadProgressBar(String fileName) {
         this(fileName, 30);
     }
 
+    /**
+     * Creates a progress bar with a custom width.
+     *
+     * @param fileName the file name to display (truncated to 20 characters if longer)
+     * @param barWidth the number of characters for the visual bar
+     */
     public DownloadProgressBar(String fileName, int barWidth) {
         this.fileName = fileName;
         this.barWidth = barWidth;
