@@ -31,12 +31,15 @@ import io.github.inference4j.exception.TensorConversionException;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.session.SessionOptions;
 
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.LongBuffer;
 import java.nio.ShortBuffer;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -66,11 +69,13 @@ public class InferenceSession implements AutoCloseable {
 
     private final OrtEnvironment environment;
     private final OrtSession session;
+    private final DirectBufferPool bufferPool;
     private volatile ModelMetadata metadata;
 
     private InferenceSession(OrtEnvironment environment, OrtSession session) {
         this.environment = environment;
         this.session = session;
+        this.bufferPool = new DirectBufferPool();
     }
 
     /**
@@ -232,9 +237,10 @@ public class InferenceSession implements AutoCloseable {
      */
     public Map<String, Tensor> run(Map<String, Tensor> inputs) {
         Map<String, OnnxTensor> onnxInputs = new HashMap<>();
+        List<ByteBuffer> leasedBuffers = new ArrayList<>();
         try {
             for (var entry : inputs.entrySet()) {
-                onnxInputs.put(entry.getKey(), toOnnxTensor(entry.getValue()));
+                onnxInputs.put(entry.getKey(), toOnnxTensor(entry.getValue(), leasedBuffers));
             }
 
             try (OrtSession.Result result = session.run(onnxInputs)) {
@@ -250,18 +256,43 @@ public class InferenceSession implements AutoCloseable {
             throw new InferenceException("Inference failed: " + e.getMessage(), e);
         } finally {
             onnxInputs.values().forEach(OnnxTensor::close);
+            for (ByteBuffer bb : leasedBuffers) {
+                bufferPool.returnBuffer(bb);
+            }
         }
     }
 
-    private OnnxTensor toOnnxTensor(Tensor tensor) throws OrtException {
+    private OnnxTensor toOnnxTensor(Tensor tensor, List<ByteBuffer> leasedBuffers)
+            throws OrtException {
         return switch (tensor.type()) {
-            case FLOAT -> OnnxTensor.createTensor(environment,
-                    FloatBuffer.wrap((float[]) tensor.rawData()), tensor.shape());
-            case FLOAT16 -> OnnxTensor.createTensor(environment,
-                    ShortBuffer.wrap((short[]) tensor.rawData()), tensor.shape(),
-                    OnnxJavaType.FLOAT16);
-            case LONG -> OnnxTensor.createTensor(environment,
-                    LongBuffer.wrap((long[]) tensor.rawData()), tensor.shape());
+            case FLOAT -> {
+                float[] data = (float[]) tensor.rawData();
+                ByteBuffer bb = bufferPool.lease(data.length * Float.BYTES);
+                leasedBuffers.add(bb);
+                FloatBuffer fb = bb.asFloatBuffer();
+                fb.put(data);
+                fb.flip();
+                yield OnnxTensor.createTensor(environment, fb, tensor.shape());
+            }
+            case FLOAT16 -> {
+                short[] data = (short[]) tensor.rawData();
+                ByteBuffer bb = bufferPool.lease(data.length * Short.BYTES);
+                leasedBuffers.add(bb);
+                ShortBuffer sb = bb.asShortBuffer();
+                sb.put(data);
+                sb.flip();
+                yield OnnxTensor.createTensor(environment, sb, tensor.shape(),
+                        OnnxJavaType.FLOAT16);
+            }
+            case LONG -> {
+                long[] data = (long[]) tensor.rawData();
+                ByteBuffer bb = bufferPool.lease(data.length * Long.BYTES);
+                leasedBuffers.add(bb);
+                LongBuffer lb = bb.asLongBuffer();
+                lb.put(data);
+                lb.flip();
+                yield OnnxTensor.createTensor(environment, lb, tensor.shape());
+            }
             case STRING -> OnnxTensor.createTensor(environment,
                     (String[]) tensor.rawData(), tensor.shape());
             default -> throw new TensorConversionException(
@@ -313,5 +344,6 @@ public class InferenceSession implements AutoCloseable {
         } catch (OrtException e) {
             // Silently ignore close errors
         }
+        bufferPool.clear();
     }
 }
