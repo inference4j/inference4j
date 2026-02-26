@@ -12,27 +12,9 @@ Cache location can be customized via:
 - System property: `-Dinference4j.cache.dir=/path/to/cache`
 - Environment variable: `INFERENCE4J_CACHE_DIR=/path/to/cache`
 
-### Sample files
-
-Some examples require sample images or audio files:
-
-```bash
-# Sample image for classification/detection
-mkdir -p assets/images
-curl -L -o assets/images/sample.jpg \
-  https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Cat03.jpg/1200px-Cat03.jpg
-
-# Sample audio for speech-to-text and VAD (LibriSpeech sample, 16kHz mono WAV)
-mkdir -p assets/audio
-curl -L -o assets/audio/sample.wav \
-  "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/jfk.wav?download=true"
-
-# Sample image for text detection
-curl -L -o assets/images/text-sample.jpg \
-  https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Rotunda_of_Mosta_04.jpg/800px-Rotunda_of_Mosta_04.jpg
-```
-
 ### Run an example
+
+Sample images and audio files are bundled in `src/main/resources/fixtures/` — no manual download needed.
 
 ```bash
 # Semantic similarity — compare sentence pairs

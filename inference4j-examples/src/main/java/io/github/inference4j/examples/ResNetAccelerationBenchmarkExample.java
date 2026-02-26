@@ -37,7 +37,16 @@ import java.util.List;
  */
 public class ResNetAccelerationBenchmarkExample {
 
-	private static final Path IMAGE_PATH = Path.of("assets/images/sample.jpg");
+	private static final Path IMAGE_PATH;
+
+	static {
+		try {
+			IMAGE_PATH = Path.of(ResNetAccelerationBenchmarkExample.class.getResource("/fixtures/sample.jpg").toURI());
+		}
+		catch (java.net.URISyntaxException e) {
+			throw new ExceptionInInitializerError(e);
+		}
+	}
 	private static final int TOP_K = 5;
 	private static final int WARMUP_RUNS = 3;
 	private static final int TIMED_RUNS = 10;

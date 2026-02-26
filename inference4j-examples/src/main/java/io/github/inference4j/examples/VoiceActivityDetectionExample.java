@@ -38,14 +38,14 @@ import java.util.List;
  */
 public class VoiceActivityDetectionExample {
 
-    public static void main(String[] args) {
-        String audioPath = "assets/audio/sample.wav";
+    public static void main(String[] args) throws Exception {
+        Path audioPath = Path.of(VoiceActivityDetectionExample.class.getResource("/fixtures/sample.wav").toURI());
 
         System.out.println("=== Silero Voice Activity Detection ===");
         System.out.println();
 
         // Print audio file info
-        Path audioFile = Path.of(audioPath);
+        Path audioFile = audioPath;
         System.out.println("Audio file: " + audioFile.toAbsolutePath());
         System.out.println("File exists: " + java.nio.file.Files.exists(audioFile));
         try {
@@ -103,7 +103,7 @@ public class VoiceActivityDetectionExample {
                 .minSilenceDuration(0.15f) // Require more silence to end a segment
                 .build()) {
 
-            List<VoiceSegment> segments = vad.detect(Path.of(audioPath));
+            List<VoiceSegment> segments = vad.detect(audioPath);
 
             System.out.printf("With higher threshold (0.7): %d segment(s)%n", segments.size());
             for (VoiceSegment segment : segments) {
@@ -118,7 +118,7 @@ public class VoiceActivityDetectionExample {
 
         // Get raw probabilities for visualization
         try (SileroVadDetector vad = SileroVadDetector.builder().build()) {
-            float[] probabilities = vad.probabilities(Path.of(audioPath));
+            float[] probabilities = vad.probabilities(audioPath);
 
             System.out.printf("Total frames analyzed: %d%n", probabilities.length);
             System.out.println();

@@ -30,8 +30,8 @@ import java.nio.file.Path;
  */
 public class SpeechToTextExample {
 
-    public static void main(String[] args) {
-        String audioPath = "assets/audio/sample.wav";
+    public static void main(String[] args) throws Exception {
+        Path audioPath = Path.of(SpeechToTextExample.class.getResource("/fixtures/sample.wav").toURI());
 
         System.out.println("=== Wav2Vec2 Speech-to-Text ===");
         try (Wav2Vec2Recognizer model = Wav2Vec2Recognizer.builder().build()) {
@@ -39,7 +39,7 @@ public class SpeechToTextExample {
             System.out.println();
 
             long start = System.currentTimeMillis();
-            Transcription result = model.transcribe(Path.of(audioPath));
+            Transcription result = model.transcribe(audioPath);
             long elapsed = System.currentTimeMillis() - start;
 
             System.out.println("Transcription: \"" + result.text() + "\"");
