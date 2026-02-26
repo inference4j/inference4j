@@ -10,16 +10,11 @@ application {
     applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
 }
 
-tasks.named('run') {
-    workingDir = rootProject.projectDir
-}
-
 tasks.register('runAllExamples', JavaExec) {
     description = 'Runs all inference4j examples sequentially'
     group = 'application'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'io.github.inference4j.examples.AllExamplesRunner'
-    workingDir = rootProject.projectDir
 }
 
 dependencies {

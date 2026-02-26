@@ -25,8 +25,7 @@ import java.nio.file.Path;
 /**
  * Demonstrates image description and visual Q&A with Phi-3.5 Vision.
  *
- * <p>Requires a sample image at {@code assets/images/sample.jpg} — see
- * inference4j-examples/README.md for setup.
+ * <p>Uses the sample image bundled in {@code src/main/resources/fixtures/sample.jpg}.
  *
  * <p>Usage:
  * <pre>
@@ -36,8 +35,8 @@ import java.nio.file.Path;
  */
 public class VisionLanguageExample {
 
-    public static void main(String[] args) {
-        Path imagePath = Path.of("assets/images/sample.jpg");
+    public static void main(String[] args) throws Exception {
+        Path imagePath = Path.of(VisionLanguageExample.class.getResource("/fixtures/sample.jpg").toURI());
 
         System.out.println("=== Vision Language Model — Phi-3.5 Vision ===");
         System.out.printf("Image: %s%n%n", imagePath);

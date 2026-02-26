@@ -36,8 +36,8 @@ import java.util.List;
  */
 public class CraftTextDetectionExample {
 
-    public static void main(String[] args) throws IOException {
-        Path imagePath = Path.of("assets/images/product_placement.jpg");
+    public static void main(String[] args) throws Exception {
+        Path imagePath = Path.of(CraftTextDetectionExample.class.getResource("/fixtures/product_placement.jpg").toURI());
 
         System.out.println("=== CRAFT Text Detection ===");
         try (CraftTextDetector craft = CraftTextDetector.builder().build()) {

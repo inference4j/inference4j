@@ -32,8 +32,8 @@ import java.util.List;
  */
 public class ImageClassificationExample {
 
-    public static void main(String[] args) {
-        String imagePath = "assets/images/sample.jpg";
+    public static void main(String[] args) throws Exception {
+        Path imagePath = Path.of(ImageClassificationExample.class.getResource("/fixtures/sample.jpg").toURI());
 
         // --- ResNet-50 ---
         System.out.println("=== ResNet-50 ===");
@@ -41,7 +41,7 @@ public class ImageClassificationExample {
             System.out.println("ResNet-50 loaded successfully.");
             System.out.println();
 
-            List<Classification> results = resnet.classify(Path.of(imagePath), 5);
+            List<Classification> results = resnet.classify(imagePath, 5);
 
             System.out.println("Top-5 predictions:");
             printResults(results);
@@ -55,7 +55,7 @@ public class ImageClassificationExample {
             System.out.println("EfficientNet-Lite4 loaded successfully.");
             System.out.println();
 
-            List<Classification> results = efficientnet.classify(Path.of(imagePath), 5);
+            List<Classification> results = efficientnet.classify(imagePath, 5);
 
             System.out.println("Top-5 predictions:");
             printResults(results);

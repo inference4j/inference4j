@@ -34,7 +34,16 @@ import java.util.List;
  */
 public class CraftAccelerationBenchmarkExample {
 
-	private static final Path IMAGE_PATH = Path.of("assets/images/product_placement.jpg");
+	private static final Path IMAGE_PATH;
+
+	static {
+		try {
+			IMAGE_PATH = Path.of(CraftAccelerationBenchmarkExample.class.getResource("/fixtures/product_placement.jpg").toURI());
+		}
+		catch (java.net.URISyntaxException e) {
+			throw new ExceptionInInitializerError(e);
+		}
+	}
 	private static final int WARMUP_RUNS = 3;
 	private static final int TIMED_RUNS = 10;
 

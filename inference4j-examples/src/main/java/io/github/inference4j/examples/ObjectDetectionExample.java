@@ -32,8 +32,8 @@ import java.util.List;
  */
 public class ObjectDetectionExample {
 
-    public static void main(String[] args) {
-        String imagePath = "assets/images/sample.jpg";
+    public static void main(String[] args) throws Exception {
+        Path imagePath = Path.of(ObjectDetectionExample.class.getResource("/fixtures/sample.jpg").toURI());
 
         // --- YOLOv8n (NMS-based) ---
         System.out.println("=== YOLOv8n Object Detection ===");
@@ -41,7 +41,7 @@ public class ObjectDetectionExample {
             System.out.println("YOLOv8n loaded successfully.");
             System.out.println();
 
-            List<Detection> detections = yolo.detect(Path.of(imagePath));
+            List<Detection> detections = yolo.detect(imagePath);
 
             System.out.println("Detections (default thresholds):");
             printDetections(detections);
@@ -50,7 +50,7 @@ public class ObjectDetectionExample {
 
             // --- Custom thresholds ---
             System.out.println("Detections (confidence=0.5, IoU=0.4):");
-            List<Detection> filtered = yolo.detect(Path.of(imagePath), 0.5f, 0.4f);
+            List<Detection> filtered = yolo.detect(imagePath, 0.5f, 0.4f);
             printDetections(filtered);
         }
 
@@ -62,7 +62,7 @@ public class ObjectDetectionExample {
             System.out.println("YOLO26n loaded successfully.");
             System.out.println();
 
-            List<Detection> detections = yolo.detect(Path.of(imagePath));
+            List<Detection> detections = yolo.detect(imagePath);
 
             System.out.println("Detections (default threshold=0.5):");
             printDetections(detections);
@@ -70,7 +70,7 @@ public class ObjectDetectionExample {
             System.out.println();
 
             System.out.println("Detections (confidence=0.7):");
-            List<Detection> filtered = yolo.detect(Path.of(imagePath), 0.7f, 0f);
+            List<Detection> filtered = yolo.detect(imagePath, 0.7f, 0f);
             printDetections(filtered);
         }
     }

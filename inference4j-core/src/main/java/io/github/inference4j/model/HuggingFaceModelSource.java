@@ -18,6 +18,9 @@ package io.github.inference4j.model;
 
 import io.github.inference4j.exception.ModelDownloadException;
 import io.github.inference4j.exception.ModelSourceException;
+import io.github.inference4j.http.DownloadProgressBar;
+import io.github.inference4j.http.ProgressListener;
+import io.github.inference4j.http.ProgressSubscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -254,8 +257,12 @@ public class HuggingFaceModelSource implements ModelSource {
 
         try {
             logger.debug("Downloading {} ...", remotePath);
+
             HttpResponse<Path> response = httpClient.send(request,
-                    HttpResponse.BodyHandlers.ofFile(tmpFile));
+                    progressBodyHandler(
+                        HttpResponse.BodyHandlers.ofFile(tmpFile),
+                        new DownloadProgressBar(remotePath)
+                    ));
 
             int status = response.statusCode();
             if (status < 200 || status >= 300) {
@@ -278,6 +285,16 @@ public class HuggingFaceModelSource implements ModelSource {
             throw new ModelDownloadException(
                     "Failed to download " + uri + ": " + e.getMessage(), e);
         }
+    }
+
+    static <T> HttpResponse.BodyHandler<T> progressBodyHandler(HttpResponse.BodyHandler<T> delegate, ProgressListener listener) {
+        return responseInfo -> {
+            long contentLength = responseInfo.headers()
+                .firstValueAsLong("Content-Length").orElse(-1L);
+
+            HttpResponse.BodySubscriber<T> delegateSubscriber = delegate.apply(responseInfo);
+            return new ProgressSubscriber<>(delegateSubscriber, contentLength, listener);
+        };
     }
 
     private static boolean isNonEmpty(Path dir) {
