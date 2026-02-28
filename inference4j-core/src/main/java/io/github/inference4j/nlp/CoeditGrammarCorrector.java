@@ -19,8 +19,8 @@ package io.github.inference4j.nlp;
 import io.github.inference4j.generation.GenerationEngine;
 import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.tokenizer.SentencePieceBpeTokenizer;
 import io.github.inference4j.tokenizer.TokenizerProvider;
+import io.github.inference4j.tokenizer.UnigramTokenizer;
 
 import java.util.function.Consumer;
 
@@ -90,7 +90,7 @@ public class CoeditGrammarCorrector implements TextGenerator, GrammarCorrector {
      * <p>Requires at minimum a {@link Builder#modelId(String) modelId} (or
      * {@link Builder#modelSource(ModelSource) modelSource}) pointing to a directory
      * with {@code encoder_model.onnx}, {@code decoder_model.onnx},
-     * {@code decoder_model_with_past.onnx}, and {@code config.json}.
+     * {@code decoder_with_past_model.onnx}, and {@code config.json}.
      */
     public static Builder builder() {
         return new Builder();
@@ -125,7 +125,7 @@ public class CoeditGrammarCorrector implements TextGenerator, GrammarCorrector {
 
         @Override
         protected TokenizerProvider defaultTokenizerProvider() {
-            return SentencePieceBpeTokenizer.provider();
+            return UnigramTokenizer.provider();
         }
 
         @Override

@@ -143,7 +143,7 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
         List<String> files = new ArrayList<>(List.of(
                 "encoder_model.onnx",
                 "decoder_model.onnx",
-                "decoder_model_with_past.onnx",
+                "decoder_with_past_model.onnx",
                 "config.json"));
         files.addAll(provider.requiredFiles());
         files.addAll(extraFiles);
@@ -159,7 +159,7 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
 
         Path encoderPath = dir.resolve("encoder_model.onnx");
         Path decoderPath = dir.resolve("decoder_model.onnx");
-        Path decoderWithPastPath = dir.resolve("decoder_model_with_past.onnx");
+        Path decoderWithPastPath = dir.resolve("decoder_with_past_model.onnx");
         Path configPath = dir.resolve("config.json");
 
         if (!Files.exists(encoderPath)) {
@@ -203,6 +203,7 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
                     .session(generativeSession)
                     .tokenizer(tokenizer)
                     .decoder(decoder)
+                    .appendEosToInput(true)
                     .maxNewTokens(this.maxNewTokens)
                     .temperature(this.temperature)
                     .topK(this.topK)
@@ -220,8 +221,7 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
             if (e instanceof RuntimeException re) {
                 throw re;
             }
-            throw new ModelLoadException(
-                    "Failed to initialize model: " + e.getMessage(), e);
+            throw new ModelLoadException("Failed to initialize model: " + e.getMessage(), e);
         }
     }
 
@@ -237,8 +237,7 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
 
             return new ModelConfig(decoderStartTokenId, eosTokenIds);
         } catch (IOException e) {
-            throw new ModelLoadException(
-                    "Failed to read config.json: " + e.getMessage(), e);
+            throw new ModelLoadException("Failed to read config.json: " + e.getMessage(), e);
         }
     }
 
@@ -276,8 +275,7 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
                 }
             }
         }
-        throw new ModelLoadException(
-                "config.json missing eos_token_id — set it explicitly via eosTokenId()");
+        throw new ModelLoadException("config.json missing eos_token_id — set it explicitly via eosTokenId()");
     }
 
     private InferenceSession createSession(Path modelPath) {
@@ -291,7 +289,6 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
             try {
                 closeable.close();
             } catch (Exception ignored) {
-                // best-effort cleanup
             }
         }
     }
