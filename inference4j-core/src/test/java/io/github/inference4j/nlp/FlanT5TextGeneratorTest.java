@@ -80,23 +80,6 @@ class FlanT5TextGeneratorTest {
     }
 
     @Test
-    void generateSql_prependsSchemaAndQuery() {
-        GenerationEngine engine = mockEngine();
-        FlanT5TextGenerator generator = new FlanT5TextGenerator(engine);
-
-        generator.generateSql("Who are the top employees?",
-                "employees(id, name, salary)", token -> {});
-
-        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(engine).generate(promptCaptor.capture(), any());
-        String prompt = promptCaptor.getValue();
-        assertTrue(prompt.contains("Who are the top employees?"),
-                "Prompt should contain the query but was: " + prompt);
-        assertTrue(prompt.contains("employees(id, name, salary)"),
-                "Prompt should contain the schema but was: " + prompt);
-    }
-
-    @Test
     void correct_prependsGrammarPrefix() {
         GenerationEngine engine = mockEngine();
         FlanT5TextGenerator generator = new FlanT5TextGenerator(engine);

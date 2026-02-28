@@ -44,6 +44,9 @@ public class AllExamplesRunner {
 		examples.put("VoiceActivityDetectionExample", VoiceActivityDetectionExample::main);
 		examples.put("ModelRouterExample", ModelRouterExample::main);
 		examples.put("ModelComparisonExample", ModelComparisonExample::main);
+		examples.put("SummarizationExample", SummarizationExample::main);
+		examples.put("TranslationExample", TranslationExample::main);
+		examples.put("GrammarCorrectionExample", GrammarCorrectionExample::main);
 
 		List<String> failed = new ArrayList<>();
 

@@ -29,9 +29,8 @@ import java.util.function.Consumer;
  *
  * <p>Flan-T5 is a versatile instruction-tuned model that handles multiple NLP tasks
  * via prompt prefixes. This class implements {@link TextGenerator}, {@link Summarizer},
- * {@link Translator}, {@link SqlGenerator}, and {@link GrammarCorrector}, each
- * prepending the appropriate task prefix before delegating to the underlying
- * {@link GenerationEngine}.
+ * {@link Translator}, and {@link GrammarCorrector}, each prepending the appropriate
+ * task prefix before delegating to the underlying {@link GenerationEngine}.
  *
  * <h2>Presets</h2>
  * <pre>{@code
@@ -45,24 +44,16 @@ import java.util.function.Consumer;
  *     String french = gen.translate("Hello world", Language.EN, Language.FR);
  *     System.out.println(french);
  * }
- *
- * // Flan-T5 Large (780M) — best quality
- * try (var gen = FlanT5TextGenerator.flanT5Large().build()) {
- *     String sql = gen.generateSql("Top 5 employees by salary",
- *         "employees(id, name, dept, salary)");
- *     System.out.println(sql);
- * }
  * }</pre>
  *
  * @see TextGenerator
  * @see Summarizer
  * @see Translator
- * @see SqlGenerator
  * @see GrammarCorrector
  * @see GenerationResult
  */
 public class FlanT5TextGenerator implements TextGenerator, Summarizer, Translator,
-        SqlGenerator, GrammarCorrector {
+        GrammarCorrector {
 
     private final GenerationEngine engine;
 
@@ -148,17 +139,6 @@ public class FlanT5TextGenerator implements TextGenerator, Summarizer, Translato
                                        Consumer<String> tokenListener) {
         return engine.generate(
                 "translate " + source.displayName() + " to " + target.displayName() + ": " + text,
-                tokenListener);
-    }
-
-    // --- SqlGenerator ---
-
-    @Override
-    public GenerationResult generateSql(String query, String schema,
-                                         Consumer<String> tokenListener) {
-        return engine.generate(
-                "generate SQL given the question and schema. question: " + query
-                + " schema: " + schema,
                 tokenListener);
     }
 
