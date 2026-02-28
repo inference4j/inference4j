@@ -17,9 +17,9 @@
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
 | `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `ImageEmbedder` |
 | `io.github.inference4j.audio` | `Wav2Vec2Recognizer`, `SileroVadDetector` |
-| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `OnnxTextGenerator`, `TextGenerator` |
+| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
-| `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `ChatTemplate`, `GenerativeModel` |
+| `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `EncoderDecoderSession`, `ChatTemplate`, `GenerativeModel` |
 | `io.github.inference4j.sampling` | `LogitsProcessor`, `LogitsSampler`, `CategoricalSampler`, `GreedySampler` |
 
 ### inference4j-genai
@@ -58,7 +58,12 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 ├── TextEmbedder                        // encode(String) → float[]
 ├── ImageEmbedder                       // encode(BufferedImage/Path) → float[]
 ├── SearchReranker                      // score(String, String) → float
-└── SpeechRecognizer                    // transcribe(Path) → Transcription
+├── SpeechRecognizer                    // transcribe(Path) → Transcription
+├── TextGenerator                       // generate(String) → GenerationResult
+├── Summarizer                          // summarize(String) → String
+├── Translator                          // translate(String) → String
+├── GrammarCorrector                    // correct(String) → String
+└── SqlGenerator                        // generateSql(String, String) → String
 ```
 
 ## AbstractInferenceTask
@@ -101,7 +106,7 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | `BoundingBox` | `x1()`, `y1()`, `x2()`, `y2()` | Embedded in `Detection`, `TextRegion` |
 | `Transcription` | `text()`, `segments()` | `Wav2Vec2Recognizer`, `WhisperSpeechModel` |
 | `VoiceSegment` | `start()`, `end()`, `duration()`, `confidence()` | `SileroVadDetector` |
-| `GenerationResult` | `text()`, `promptTokens()`, `generatedTokens()`, `duration()` | `TextGenerator`, `VisionLanguageModel` |
+| `GenerationResult` | `text()`, `promptTokens()`, `generatedTokens()`, `duration()` | `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `TextGenerator`, `VisionLanguageModel` |
 | `VisionInput` | `imagePath()`, `prompt()` | `VisionLanguageModel` |
 
 ## Builder pattern

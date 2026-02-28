@@ -87,6 +87,38 @@ try (var reranker = MiniLMSearchReranker.builder().build()) {
 }
 ```
 
+### Summarization
+
+```java
+try (var summarizer = BartSummarizer.distilBartCnn().build()) {
+    System.out.println(summarizer.summarize("Long article text here..."));
+}
+```
+
+### Translation
+
+```java
+try (var translator = FlanT5TextGenerator.flanT5Base().build()) {
+    System.out.println(translator.translate("Hello!", Language.EN, Language.FR));
+}
+```
+
+### Grammar Correction
+
+```java
+try (var corrector = CoeditGrammarCorrector.coeditBase().build()) {
+    System.out.println(corrector.correct("She don't likes swimming."));
+}
+```
+
+### Text-to-SQL
+
+```java
+try (var generator = FlanT5TextGenerator.flanT5Base().build()) {
+    System.out.println(generator.generateSql("How many users?", "users(id, name, email)"));
+}
+```
+
 ### Text Generation
 
 ```java

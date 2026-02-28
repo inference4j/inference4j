@@ -60,12 +60,15 @@ nav:
     - Voice Activity Detection: use-cases/voice-activity-detection.md
     - Text Detection: use-cases/text-detection.md
     - Visual Search: use-cases/visual-search.md
-    - Text Generation: generative-ai/gpt2.md
+    - Summarization: use-cases/summarization.md
+    - Translation: use-cases/translation.md
+    - Grammar Correction: use-cases/grammar-correction.md
+    - Text-to-SQL: use-cases/text-to-sql.md
   - Generative AI:
     - Introduction: generative-ai/introduction.md
     - Chat Templates: generative-ai/chat-templates.md
     - Native Generation:
-      - Text Generation: generative-ai/gpt2.md
+      - Text Generation: generative-ai/native-text-generation.md
     - onnxruntime-genai:
       - Text Generation: generative-ai/text-generation.md
       - Phi-3.5 Vision: generative-ai/phi-vision.md
