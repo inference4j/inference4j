@@ -78,7 +78,8 @@ public class BartSummarizer implements TextGenerator, Summarizer {
     public static Builder bartLargeCnn() {
         return builder()
                 .modelId("inference4j/bart-large-cnn")
-                .requiredFile("model.onnx_data");
+                .requiredFile("decoder_model.onnx_data")
+                .requiredFile("encoder_model.onnx_data");
     }
 
     /**

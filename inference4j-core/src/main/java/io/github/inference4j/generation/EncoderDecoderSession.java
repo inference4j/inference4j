@@ -86,13 +86,11 @@ public class EncoderDecoderSession implements GenerativeSession {
         long[] attentionMask = ones(srcLen);
         Map<String, Tensor> encoderInputs = new LinkedHashMap<>();
         encoderInputs.put("input_ids", Tensor.fromLongs(tokenIds, new long[]{1, srcLen}));
-        encoderInputs.put("attention_mask", Tensor.fromLongs(attentionMask, new long[]{1, srcLen}));
+        this.encoderAttentionMask = Tensor.fromLongs(attentionMask, new long[]{1, srcLen});
+        encoderInputs.put("attention_mask", this.encoderAttentionMask);
 
         Map<String, Tensor> encoderOutputs = encoderSession.run(encoderInputs);
         Tensor encoderHiddenStates = encoderOutputs.get("last_hidden_state");
-
-        // Store encoder attention mask for decode steps
-        this.encoderAttentionMask = Tensor.fromLongs(attentionMask, new long[]{1, srcLen});
 
         // Step 2: Run first decoder step
         Map<String, Tensor> decoderInputs = new LinkedHashMap<>();
@@ -135,6 +133,9 @@ public class EncoderDecoderSession implements GenerativeSession {
         // Build inputs
         Map<String, Tensor> inputs = new LinkedHashMap<>();
         inputs.put("input_ids", Tensor.fromLongs(new long[]{tokenId}, new long[]{1, 1}));
+
+        // Add encoder attention mask
+        inputs.put("encoder_attention_mask", this.encoderAttentionMask);
 
         // Add self-attention cache
         inputs.putAll(decoderSelfAttentionCache);

@@ -25,61 +25,61 @@ package io.github.inference4j.nlp;
  */
 public enum Language {
 
-	// Western European
-	EN("English"),
-	FR("French"),
-	DE("German"),
-	ES("Spanish"),
-	PT("Portuguese"),
-	PT_BR("Brazilian Portuguese"),
-	IT("Italian"),
-	NL("Dutch"),
-	CA("Catalan"),
+    // Western European
+    EN("English"),
+    FR("French"),
+    DE("German"),
+    ES("Spanish"),
+    PT("Portuguese"),
+    PT_BR("Brazilian Portuguese"),
+    IT("Italian"),
+    NL("Dutch"),
+    CA("Catalan"),
 
-	// Northern European
-	SV("Swedish"),
-	DA("Danish"),
-	NO("Norwegian"),
-	FI("Finnish"),
+    // Northern European
+    SV("Swedish"),
+    DA("Danish"),
+    NO("Norwegian"),
+    FI("Finnish"),
 
-	// Eastern European
-	PL("Polish"),
-	CS("Czech"),
-	HR("Croatian"),
-	RO("Romanian"),
+    // Eastern European
+    PL("Polish"),
+    CS("Czech"),
+    HR("Croatian"),
+    RO("Romanian"),
 
-	// Other Latin-script
-	TR("Turkish"),
+    // Other Latin-script
+    TR("Turkish"),
 
-	// Non-Latin
-	JA("Japanese"),
-	KO("Korean"),
-	AR("Arabic"),
-	ZH_CN("Chinese Simplified"),
-	ZH_TW("Chinese Traditional"),
-	HI("Hindi");
+    // Non-Latin
+    JA("Japanese"),
+    KO("Korean"),
+    AR("Arabic"),
+    ZH_CN("Chinese Simplified"),
+    ZH_TW("Chinese Traditional"),
+    HI("Hindi");
 
-	private final String displayName;
+    private final String displayName;
 
-	private final String isoCode;
+    private final String isoCode;
 
-	Language(String displayName) {
-		this.displayName = displayName;
-		this.isoCode = name().toLowerCase().replace('_', '-');
-	}
+    Language(String displayName) {
+        this.displayName = displayName;
+        this.isoCode = name().toLowerCase().replace('_', '-');
+    }
 
-	/**
-	 * Returns the human-readable name of this language (e.g. "Brazilian Portuguese").
-	 */
-	public String displayName() {
-		return this.displayName;
-	}
+    /**
+     * Returns the human-readable name of this language (e.g. "Brazilian Portuguese").
+     */
+    public String displayName() {
+        return this.displayName;
+    }
 
-	/**
-	 * Returns the ISO 639-1 code in lowercase with hyphens (e.g. "pt-br").
-	 */
-	public String isoCode() {
-		return this.isoCode;
-	}
+    /**
+     * Returns the ISO 639-1 code in lowercase with hyphens (e.g. "pt-br").
+     */
+    public String isoCode() {
+        return this.isoCode;
+    }
 
 }

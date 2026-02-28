@@ -172,6 +172,28 @@ class EncoderDecoderSessionTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void decode_passesEncoderAttentionMask() {
+        int srcLen = 3;
+        stubEncoderRun(srcLen);
+        stubDecoderRun(srcLen);
+        session.prefill(new long[]{10, 20, 30});
+
+        stubDecoderWithPastRun(srcLen);
+        session.decode(42L);
+
+        ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(decoderWithPastSession).run(captor.capture());
+        Map<String, Tensor> inputs = captor.getValue();
+
+        assertTrue(inputs.containsKey("encoder_attention_mask"),
+                "Decode step should pass encoder_attention_mask");
+        assertArrayEquals(new long[]{1, srcLen},
+                inputs.get("encoder_attention_mask").shape(),
+                "encoder_attention_mask shape should match source length");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void decode_freezesCrossAttentionCache() {
         int srcLen = 2;
         stubEncoderRun(srcLen);
