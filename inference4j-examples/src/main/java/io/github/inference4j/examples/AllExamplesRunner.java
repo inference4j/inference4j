@@ -47,6 +47,7 @@ public class AllExamplesRunner {
 		examples.put("SummarizationExample", SummarizationExample::main);
 		examples.put("TranslationExample", TranslationExample::main);
 		examples.put("GrammarCorrectionExample", GrammarCorrectionExample::main);
+		examples.put("TextToSqlExample", TextToSqlExample::main);
 
 		List<String> failed = new ArrayList<>();
 

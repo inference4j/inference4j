@@ -25,13 +25,15 @@ import java.util.function.Consumer;
  *
  * <p>Example usage:
  * <pre>{@code
- * try (var sqlGen = FlanT5TextGenerator.flanT5Base().build()) {
+ * try (var sqlGen = T5SqlGenerator.t5SmallAwesome().build()) {
  *     String sql = sqlGen.generateSql(
  *         "Who are the top 5 highest paid employees?",
- *         "employees(id, name, dept, salary), departments(id, name)");
- *     // "SELECT name, salary FROM employees ORDER BY salary DESC LIMIT 5"
+ *         "CREATE TABLE employees (id INT, name VARCHAR, salary INT)");
+ *     System.out.println(sql);
  * }
  * }</pre>
+ *
+ * @see T5SqlGenerator
  */
 public interface SqlGenerator extends AutoCloseable {
 

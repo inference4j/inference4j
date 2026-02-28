@@ -15,9 +15,11 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Text Generation | `OnnxTextGenerator.tinyLlama()` | `inference4j/tinyllama-1.1b-chat` | ~2.2 GB | `TextGenerator` |
 | Text Generation | `OnnxTextGenerator.qwen2()` | `inference4j/qwen2.5-1.5b-instruct` | ~3 GB | `TextGenerator` |
 | Text Generation | `OnnxTextGenerator.gemma2()` | Gated — requires manual download | ~5 GB | `TextGenerator` |
-| Summarization / Translation / SQL / Grammar | `FlanT5TextGenerator.flanT5Small()` | `inference4j/flan-t5-small` | ~300 MB | `TextGenerator`, `Summarizer`, `Translator`, `SqlGenerator`, `GrammarCorrector` |
-| Summarization / Translation / SQL / Grammar | `FlanT5TextGenerator.flanT5Base()` | `inference4j/flan-t5-base` | ~900 MB | `TextGenerator`, `Summarizer`, `Translator`, `SqlGenerator`, `GrammarCorrector` |
-| Summarization / Translation / SQL / Grammar | `FlanT5TextGenerator.flanT5Large()` | `inference4j/flan-t5-large` | ~3 GB | `TextGenerator`, `Summarizer`, `Translator`, `SqlGenerator`, `GrammarCorrector` |
+| Summarization / Translation / Grammar | `FlanT5TextGenerator.flanT5Small()` | `inference4j/flan-t5-small` | ~300 MB | `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector` |
+| Summarization / Translation / Grammar | `FlanT5TextGenerator.flanT5Base()` | `inference4j/flan-t5-base` | ~900 MB | `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector` |
+| Summarization / Translation / Grammar | `FlanT5TextGenerator.flanT5Large()` | `inference4j/flan-t5-large` | ~3 GB | `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector` |
+| Text-to-SQL | `T5SqlGenerator.t5SmallAwesome()` | `inference4j/t5-small-awesome-text-to-sql` | ~240 MB | `TextGenerator`, `SqlGenerator` |
+| Text-to-SQL | `T5SqlGenerator.t5LargeSpider()` | `inference4j/T5-LM-Large-text2sql-spider` | ~4.6 GB | `TextGenerator`, `SqlGenerator` |
 | Summarization | `BartSummarizer.distilBartCnn()` | `inference4j/distilbart-cnn-12-6` | ~1.2 GB | `TextGenerator`, `Summarizer` |
 | Summarization | `BartSummarizer.bartLargeCnn()` | `inference4j/bart-large-cnn` | ~1.6 GB | `TextGenerator`, `Summarizer` |
 | Translation | `MarianTranslator.builder()` | User-specified (`inference4j/opus-mt-*`) | varies | `TextGenerator`, `Translator` |
@@ -86,7 +88,9 @@ A comprehensive view of all supported models, organized by architecture:
 
 | Model | Tokenizer | Wrapper | Use Cases |
 |-------|-----------|---------|-----------|
-| Flan-T5 (Small / Base / Large) | SentencePiece | `FlanT5TextGenerator` | Summarization, translation, SQL, grammar |
+| Flan-T5 (Small / Base / Large) | SentencePiece | `FlanT5TextGenerator` | Summarization, translation, grammar |
+| T5-small-awesome-text-to-sql | SentencePiece | `T5SqlGenerator` | Text-to-SQL (lightweight) |
+| T5-LM-Large-text2sql-spider | SentencePiece | `T5SqlGenerator` | Text-to-SQL (high accuracy) |
 | DistilBART CNN 12-6 | BPE | `BartSummarizer` | Summarization |
 | BART Large CNN | BPE | `BartSummarizer` | Summarization |
 | MarianMT (opus-mt-*) | SentencePiece | `MarianTranslator` | Translation (fixed language pair) |

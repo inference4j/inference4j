@@ -157,6 +157,8 @@ In native generation, inference4j handles tokenization, sampling, and decoding i
 | MarianMT | `MarianTranslator` | User-specified (`inference4j/opus-mt-*`) | varies | varies |
 | CoEdIT Base | `CoeditGrammarCorrector` | `inference4j/coedit-base` | 250M | ~900 MB |
 | CoEdIT Large | `CoeditGrammarCorrector` | `inference4j/coedit-large` | 780M | ~3 GB |
+| T5-small-awesome-text-to-sql | `T5SqlGenerator` | `inference4j/t5-small-awesome-text-to-sql` | 60M | ~240 MB |
+| T5-LM-Large-text2sql-spider | `T5SqlGenerator` | `inference4j/T5-LM-Large-text2sql-spider` | 0.8B | ~4.6 GB |
 
 ### onnxruntime-genai (inference4j-genai)
 

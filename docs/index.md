@@ -114,8 +114,9 @@ try (var corrector = CoeditGrammarCorrector.coeditBase().build()) {
 ### Text-to-SQL
 
 ```java
-try (var generator = FlanT5TextGenerator.flanT5Base().build()) {
-    System.out.println(generator.generateSql("How many users?", "users(id, name, email)"));
+try (var sqlGen = T5SqlGenerator.t5SmallAwesome().build()) {
+    System.out.println(sqlGen.generateSql("How many users?",
+            "CREATE TABLE users (id INT, name VARCHAR, email VARCHAR)"));
 }
 ```
 
