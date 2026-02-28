@@ -313,17 +313,9 @@ public class FlanT5TextGenerator implements TextGenerator, Summarizer, Translato
             InferenceSession decoderWithPastSession = null;
 
             try {
-                encoderSession = sessionConfigurer != null
-                        ? InferenceSession.create(encoderPath, sessionConfigurer)
-                        : InferenceSession.create(encoderPath);
-
-                decoderSession = sessionConfigurer != null
-                        ? InferenceSession.create(decoderPath, sessionConfigurer)
-                        : InferenceSession.create(decoderPath);
-
-                decoderWithPastSession = sessionConfigurer != null
-                        ? InferenceSession.create(decoderWithPastPath, sessionConfigurer)
-                        : InferenceSession.create(decoderWithPastPath);
+                encoderSession = createSession(encoderPath);
+                decoderSession = createSession(decoderPath);
+                decoderWithPastSession = createSession(decoderWithPastPath);
 
                 int decoderStartTokenId = readDecoderStartTokenId(configPath);
 
@@ -416,6 +408,12 @@ public class FlanT5TextGenerator implements TextGenerator, Summarizer, Translato
                 throw new ModelLoadException(
                         "Failed to read config.json: " + e.getMessage(), e);
             }
+        }
+
+        private InferenceSession createSession(Path modelPath) {
+            return sessionConfigurer != null
+                    ? InferenceSession.create(modelPath, sessionConfigurer)
+                    : InferenceSession.create(modelPath);
         }
 
         private static void closeQuietly(AutoCloseable closeable) {
