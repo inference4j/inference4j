@@ -26,11 +26,11 @@ import java.util.Map;
 /**
  * A {@link GenerativeSession} for encoder-decoder (seq2seq) models exported
  * via HuggingFace Optimum as three ONNX files: {@code encoder_model.onnx},
- * {@code decoder_model.onnx}, and {@code decoder_model_with_past.onnx}.
+ * {@code decoder_model.onnx}, and {@code decoder_with_past_model.onnx}.
  *
  * <p>The encoder runs once during {@link #prefill(long[])} to produce hidden states.
  * The first decoder step uses {@code decoder_model.onnx} (no past KV cache),
- * and subsequent steps use {@code decoder_model_with_past.onnx} with cached
+ * and subsequent steps use {@code decoder_with_past_model.onnx} with cached
  * key/value tensors to avoid redundant computation.
  *
  * <p>Two types of KV cache are maintained:
@@ -59,7 +59,7 @@ public class EncoderDecoderSession implements GenerativeSession {
      *
      * @param encoderSession        session for {@code encoder_model.onnx}
      * @param decoderSession        session for {@code decoder_model.onnx} (first decode step)
-     * @param decoderWithPastSession session for {@code decoder_model_with_past.onnx} (subsequent steps)
+     * @param decoderWithPastSession session for {@code decoder_with_past_model.onnx} (subsequent steps)
      * @param decoderStartTokenId   the token ID used to start decoder generation
      *                              (e.g., {@code </s>} or {@code <pad>})
      */
@@ -82,7 +82,6 @@ public class EncoderDecoderSession implements GenerativeSession {
     public ForwardResult prefill(long[] tokenIds) {
         int srcLen = tokenIds.length;
 
-        // Step 1: Run encoder
         long[] attentionMask = ones(srcLen);
         Map<String, Tensor> encoderInputs = new LinkedHashMap<>();
         encoderInputs.put("input_ids", Tensor.fromLongs(tokenIds, new long[]{1, srcLen}));
@@ -92,7 +91,6 @@ public class EncoderDecoderSession implements GenerativeSession {
         Map<String, Tensor> encoderOutputs = encoderSession.run(encoderInputs);
         Tensor encoderHiddenStates = encoderOutputs.get("last_hidden_state");
 
-        // Step 2: Run first decoder step
         Map<String, Tensor> decoderInputs = new LinkedHashMap<>();
         decoderInputs.put("input_ids",
                 Tensor.fromLongs(new long[]{decoderStartTokenId}, new long[]{1, 1}));
@@ -101,10 +99,8 @@ public class EncoderDecoderSession implements GenerativeSession {
 
         Map<String, Tensor> decoderOutputs = decoderSession.run(decoderInputs);
 
-        // Step 3: Extract logits
         float[] logits = decoderOutputs.get("logits").slice(0, 0).slice(0, -1).toFloats();
 
-        // Step 4: Store cross-attention cache (frozen from this point on)
         this.crossAttentionCache.clear();
         for (int i = 0; i < numLayers; i++) {
             crossAttentionCache.put("past_key_values." + i + ".encoder.key",
@@ -113,7 +109,6 @@ public class EncoderDecoderSession implements GenerativeSession {
                     decoderOutputs.get("present." + i + ".encoder.value"));
         }
 
-        // Step 5: Store self-attention cache
         this.decoderSelfAttentionCache.clear();
         for (int i = 0; i < numLayers; i++) {
             decoderSelfAttentionCache.put("past_key_values." + i + ".decoder.key",
@@ -122,7 +117,6 @@ public class EncoderDecoderSession implements GenerativeSession {
                     decoderOutputs.get("present." + i + ".decoder.value"));
         }
 
-        // Step 6: Set sequence length
         this.sequenceLength = 1;
 
         return new ForwardResult(logits);
@@ -130,26 +124,19 @@ public class EncoderDecoderSession implements GenerativeSession {
 
     @Override
     public ForwardResult decode(long tokenId) {
-        // Build inputs
         Map<String, Tensor> inputs = new LinkedHashMap<>();
         inputs.put("input_ids", Tensor.fromLongs(new long[]{tokenId}, new long[]{1, 1}));
 
-        // Add encoder attention mask
         inputs.put("encoder_attention_mask", this.encoderAttentionMask);
 
-        // Add self-attention cache
         inputs.putAll(decoderSelfAttentionCache);
 
-        // Add cross-attention cache (frozen)
         inputs.putAll(crossAttentionCache);
 
-        // Run decoder with past
         Map<String, Tensor> outputs = decoderWithPastSession.run(inputs);
 
-        // Extract logits
         float[] logits = outputs.get("logits").slice(0, 0).slice(0, -1).toFloats();
 
-        // Update self-attention cache only (cross-attention stays frozen)
         for (int i = 0; i < numLayers; i++) {
             decoderSelfAttentionCache.put("past_key_values." + i + ".decoder.key",
                     outputs.get("present." + i + ".decoder.key"));
@@ -157,7 +144,6 @@ public class EncoderDecoderSession implements GenerativeSession {
                     outputs.get("present." + i + ".decoder.value"));
         }
 
-        // Increment sequence length
         this.sequenceLength++;
 
         return new ForwardResult(logits);

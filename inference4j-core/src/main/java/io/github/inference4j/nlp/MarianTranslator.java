@@ -70,13 +70,12 @@ public class MarianTranslator implements TextGenerator, Translator {
      * <p>Requires a {@link Builder#modelId(String) modelId} (or
      * {@link Builder#modelSource(ModelSource) modelSource}) pointing to a directory
      * with {@code encoder_model.onnx}, {@code decoder_model.onnx},
-     * {@code decoder_model_with_past.onnx}, and {@code config.json}.
+     * {@code decoder_with_past_model.onnx}, and {@code config.json}.
      */
     public static Builder builder() {
         return new Builder();
     }
 
-    // --- TextGenerator ---
 
     @Override
     public GenerationResult generate(String input) {

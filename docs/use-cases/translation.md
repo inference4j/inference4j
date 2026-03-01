@@ -117,10 +117,51 @@ Each constant provides `displayName()` (e.g., `"Brazilian Portuguese"`) and `iso
 
 The convenience method `translate(text)` returns the translation as a plain `String`.
 
+## Using your own MarianMT model
+
+The pre-exported models under `inference4j/opus-mt-*` work out of the box. If you want to use a different MarianMT language pair (e.g., `Helsinki-NLP/opus-mt-en-ja`), you'll need to export it yourself.
+
+`MarianTranslator` expects the model directory to contain:
+
+| File | Description |
+|------|-------------|
+| `encoder_model.onnx` | Encoder ONNX model |
+| `decoder_model.onnx` | Decoder ONNX model |
+| `decoder_with_past_model.onnx` | Decoder with KV cache |
+| `config.json` | Model configuration |
+| `tokenizer.json` | HuggingFace fast tokenizer format |
+
+!!! warning "MarianMT models require tokenizer conversion"
+
+    MarianMT models on HuggingFace ship with SentencePiece files (`source.spm`, `target.spm`) instead of `tokenizer.json`. You must convert the tokenizer during export. Using Hugging Face Optimum and the `tokenizers` library:
+
+    ```python
+    from optimum.exporters.onnx import main_export
+    from transformers.convert_slow_tokenizer import SentencePieceExtractor
+    from tokenizers import Tokenizer
+    from tokenizers.models import BPE
+
+    model_id = "Helsinki-NLP/opus-mt-en-ja"
+
+    # 1. Export ONNX models
+    main_export(
+        model_name_or_path=model_id,
+        output="my-model/",
+        task="text2text-generation-with-past",
+    )
+
+    # 2. Convert source.spm to tokenizer.json
+    extractor = SentencePieceExtractor("my-model/source.spm")
+    vocab, merges = extractor.extract(None)
+    tokenizer = Tokenizer(BPE(vocab, merges, unk_token="<unk>"))
+    tokenizer.save("my-model/tokenizer.json")
+    ```
+
+    Only standard `opus-mt-*` models are supported. The newer `opus-mt-tc-big-*` variants require target language prefixes (e.g., `>>por<<`) which `MarianTranslator` does not handle.
+
 ## Tips
 
 - **MarianMT** models are specialized for a single language pair (e.g., `opus-mt-en-fr` for English→French). They produce higher quality translations for their specific pair but require a separate model per direction.
 - **Flan-T5** handles any language pair with a single model, making it more flexible but generally lower quality than a dedicated pair-specific model.
-- MarianMT models are available on HuggingFace under the `Helsinki-NLP` organization. Export them to ONNX and host under your own org, or use pre-exported models from `inference4j`.
 - For bidirectional translation, you need two MarianMT models (e.g., `opus-mt-en-fr` and `opus-mt-fr-en`) — or use Flan-T5 which handles both directions.
 - Use greedy decoding (default `temperature=0`) for translation — sampling adds noise without improving quality.
