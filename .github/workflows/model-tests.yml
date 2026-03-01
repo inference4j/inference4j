@@ -11,8 +11,50 @@ on:
     - cron: '0 3 * * 0'  # Sunday 3:00 UTC
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    outputs:
+      core: ${{ steps.filter.outputs.core }}
+      vision: ${{ steps.filter.outputs.vision }}
+      audio: ${{ steps.filter.outputs.audio }}
+      nlp: ${{ steps.filter.outputs.nlp }}
+      multimodal: ${{ steps.filter.outputs.multimodal }}
+      genai: ${{ steps.filter.outputs.genai }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            core:
+              - 'inference4j-core/src/main/java/io/github/inference4j/*.java'
+              - 'inference4j-core/src/main/java/io/github/inference4j/session/**'
+              - 'inference4j-core/src/main/java/io/github/inference4j/model/**'
+              - 'inference4j-core/src/main/java/io/github/inference4j/processing/**'
+              - 'inference4j-core/src/main/java/io/github/inference4j/tokenizer/**'
+              - 'inference4j-core/src/main/java/io/github/inference4j/generation/**'
+              - 'inference4j-core/src/main/java/io/github/inference4j/sampling/**'
+              - 'inference4j-core/src/main/java/io/github/inference4j/exception/**'
+              - 'inference4j-core/src/main/java/io/github/inference4j/http/**'
+              - 'inference4j-core/src/main/java/io/github/inference4j/preprocessing/**'
+              - 'inference4j-core/build.gradle'
+            vision:
+              - 'inference4j-core/src/main/java/io/github/inference4j/vision/**'
+            audio:
+              - 'inference4j-core/src/main/java/io/github/inference4j/audio/**'
+            nlp:
+              - 'inference4j-core/src/main/java/io/github/inference4j/nlp/**'
+            multimodal:
+              - 'inference4j-core/src/main/java/io/github/inference4j/multimodal/**'
+            genai:
+              - 'inference4j-genai/src/main/**'
+
   model-tests:
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: always()
     steps:
       - uses: actions/checkout@v4
 
@@ -30,5 +72,45 @@ jobs:
           key: model-cache-${{ hashFiles('inference4j-core/src/main/**/*.java', 'inference4j-genai/src/main/**/*.java') }}
           restore-keys: model-cache-
 
-      - name: Run model tests
+      - name: Determine run mode
+        id: mode
+        run: |
+          if [[ "${{ github.event_name }}" != "push" ]]; then
+            echo "run_all=true" >> "$GITHUB_OUTPUT"
+            echo "Mode: full suite (event=${{ github.event_name }})"
+          elif [[ "${{ needs.detect-changes.outputs.core }}" == "true" ]]; then
+            echo "run_all=true" >> "$GITHUB_OUTPUT"
+            echo "Mode: full suite (core change detected)"
+          else
+            echo "run_all=false" >> "$GITHUB_OUTPUT"
+            echo "Mode: selective"
+            echo "  vision=${{ needs.detect-changes.outputs.vision }}"
+            echo "  audio=${{ needs.detect-changes.outputs.audio }}"
+            echo "  nlp=${{ needs.detect-changes.outputs.nlp }}"
+            echo "  multimodal=${{ needs.detect-changes.outputs.multimodal }}"
+            echo "  genai=${{ needs.detect-changes.outputs.genai }}"
+          fi
+
+      - name: Run all model tests
+        if: steps.mode.outputs.run_all == 'true'
         run: ./gradlew :inference4j-core:modelTest :inference4j-genai:modelTest
+
+      - name: Run vision model tests
+        if: steps.mode.outputs.run_all != 'true' && needs.detect-changes.outputs.vision == 'true'
+        run: ./gradlew :inference4j-core:modelTest --tests "io.github.inference4j.vision.*"
+
+      - name: Run audio model tests
+        if: steps.mode.outputs.run_all != 'true' && needs.detect-changes.outputs.audio == 'true'
+        run: ./gradlew :inference4j-core:modelTest --tests "io.github.inference4j.audio.*"
+
+      - name: Run NLP model tests
+        if: steps.mode.outputs.run_all != 'true' && needs.detect-changes.outputs.nlp == 'true'
+        run: ./gradlew :inference4j-core:modelTest --tests "io.github.inference4j.nlp.*"
+
+      - name: Run multimodal model tests
+        if: steps.mode.outputs.run_all != 'true' && needs.detect-changes.outputs.multimodal == 'true'
+        run: ./gradlew :inference4j-core:modelTest --tests "io.github.inference4j.multimodal.*"
+
+      - name: Run genai model tests
+        if: steps.mode.outputs.run_all != 'true' && needs.detect-changes.outputs.genai == 'true'
+        run: ./gradlew :inference4j-genai:modelTest
