@@ -6,13 +6,15 @@ inference4j handles tokenization automatically. When you call `classifier.classi
 
 ## Built-in tokenizers
 
-inference4j ships three tokenizer implementations, covering the most common algorithms in production transformer models:
+inference4j ships five tokenizer implementations, covering the most common algorithms in production transformer models:
 
 | Tokenizer | Algorithm | Models | Vocabulary format |
 |-----------|-----------|--------|-------------------|
 | `WordPieceTokenizer` | WordPiece (greedy longest-match subword splitting) | BERT, DistilBERT, MiniLM, SentenceTransformer | `vocab.txt` (one token per line) |
-| `BpeTokenizer` | Byte-level BPE (iterative pair merging) | CLIP, GPT-2, SmolLM2, Qwen2.5 | `vocab.json` + `merges.txt` |
-| `SentencePieceBpeTokenizer` | SentencePiece BPE (Unicode-native, `▁` space prefix) | Gemma, LLaMA, TinyLlama | `tokenizer.json` |
+| `BpeTokenizer` | Byte-level BPE (iterative pair merging) | CLIP | `vocab.json` + `merges.txt` |
+| `DecodingBpeTokenizer` | Byte-level BPE with decode support | GPT-2, SmolLM2, Qwen2.5, BART | `vocab.json` + `merges.txt` |
+| `SentencePieceBpeTokenizer` | SentencePiece BPE (Unicode-native, `▁` space prefix) | Gemma, LLaMA, TinyLlama, MarianMT | `tokenizer.json` |
+| `UnigramTokenizer` | SentencePiece Unigram (Viterbi optimal segmentation) | Flan-T5, CoEdIT, T5SqlGenerator | `tokenizer.json` |
 
 ### WordPiece
 
@@ -65,6 +67,31 @@ EncodedInput encoded = tokenizer.encode("a photo of a cat");
 // encoded.attentionMask() → [1, 1, 1, 1, 1, 1, 1, 0, ...]
 ```
 
+### Decoding BPE
+
+`DecodingBpeTokenizer` extends `BpeTokenizer` with the ability to decode token IDs back to text. This is required by generative models that produce token IDs as output — autoregressive (GPT-2, SmolLM2, Qwen2.5) and encoder-decoder (BART).
+
+The encoding pipeline is the same as BPE. The decoding pipeline:
+
+1. Reverse vocabulary lookup (ID → token string)
+2. Concatenate tokens
+3. Decode GPT-2 byte-to-unicode mapping back to raw bytes
+4. Interpret bytes as UTF-8
+
+```java
+DecodingBpeTokenizer tokenizer = DecodingBpeTokenizer.fromFiles(
+        Path.of("vocab.json"), Path.of("merges.txt"));
+
+// Encode
+EncodedInput encoded = tokenizer.encode("Hello world");
+
+// Decode
+String text = tokenizer.decode(new int[]{15496, 995}); // "Hello world"
+
+// Single token (for streaming)
+String fragment = tokenizer.decode(15496); // "Hello"
+```
+
 ### SentencePiece BPE
 
 SentencePiece BPE operates directly on Unicode text without a pre-tokenization regex. Word boundaries are encoded using the `▁` (U+2581) space prefix, and characters not in the vocabulary fall back to `<0xNN>` byte tokens.
@@ -76,7 +103,7 @@ The encoding pipeline:
 3. Split into characters and apply BPE merges
 4. Characters not in vocab → UTF-8 bytes → `<0xNN>` token IDs
 
-`SentencePieceBpeTokenizer` is used automatically by `OnnxTextGenerator.tinyLlama()` and `OnnxTextGenerator.gemma2()`. For custom SentencePiece models, use the `TokenizerProvider`:
+`SentencePieceBpeTokenizer` is used automatically by `OnnxTextGenerator.tinyLlama()`, `OnnxTextGenerator.gemma2()`, and `MarianTranslator`. For custom SentencePiece models, use the `TokenizerProvider`:
 
 ```java
 try (var gen = OnnxTextGenerator.builder()
@@ -87,6 +114,19 @@ try (var gen = OnnxTextGenerator.builder()
     gen.generate("Hello", token -> System.out.print(token));
 }
 ```
+
+### Unigram
+
+The Unigram algorithm assigns a log-probability score to every token in the vocabulary and uses dynamic programming (Viterbi) to find the segmentation that maximizes the total score. This is used by T5-family models (Flan-T5, CoEdIT, T5SqlGenerator).
+
+The encoding pipeline:
+
+1. Prepend `▁` and replace all spaces with `▁`
+2. Split on added tokens (special tokens preserved atomically)
+3. Run Viterbi to find the optimal segmentation
+4. Unmapped characters → UTF-8 bytes → `<0xNN>` token IDs
+
+`UnigramTokenizer` is used automatically by `FlanT5TextGenerator`, `CoeditGrammarCorrector`, and `T5SqlGenerator`. It reads vocabulary and scores from `tokenizer.json`.
 
 ## Default behavior
 
@@ -164,7 +204,7 @@ Tokenizer stub = text -> new EncodedInput(
 
 ## The `EncodedInput` record
 
-Both tokenizers return an `EncodedInput` containing the three standard tensors that transformer models expect:
+All tokenizers return an `EncodedInput` containing the three standard tensors that transformer models expect:
 
 ```java
 public record EncodedInput(

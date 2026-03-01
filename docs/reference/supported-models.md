@@ -88,13 +88,13 @@ A comprehensive view of all supported models, organized by architecture:
 
 | Model | Tokenizer | Wrapper | Use Cases |
 |-------|-----------|---------|-----------|
-| Flan-T5 (Small / Base / Large) | SentencePiece | `FlanT5TextGenerator` | Summarization, translation, grammar |
-| T5-small-awesome-text-to-sql | SentencePiece | `T5SqlGenerator` | Text-to-SQL (lightweight) |
-| T5-LM-Large-text2sql-spider | SentencePiece | `T5SqlGenerator` | Text-to-SQL (high accuracy) |
+| Flan-T5 (Small / Base / Large) | SentencePiece Unigram | `FlanT5TextGenerator` | Summarization, translation, grammar |
+| T5-small-awesome-text-to-sql | SentencePiece Unigram | `T5SqlGenerator` | Text-to-SQL (lightweight) |
+| T5-LM-Large-text2sql-spider | SentencePiece Unigram | `T5SqlGenerator` | Text-to-SQL (high accuracy) |
 | DistilBART CNN 12-6 | BPE | `BartSummarizer` | Summarization |
 | BART Large CNN | BPE | `BartSummarizer` | Summarization |
-| MarianMT (opus-mt-*) | SentencePiece | `MarianTranslator` | Translation (fixed language pair) |
-| CoEdIT (Base / Large) | SentencePiece | `CoeditGrammarCorrector` | Grammar correction |
+| MarianMT (opus-mt-*) | SentencePiece BPE | `MarianTranslator` | Translation (fixed language pair) |
+| CoEdIT (Base / Large) | SentencePiece Unigram | `CoeditGrammarCorrector` | Grammar correction |
 
 ### Vision
 

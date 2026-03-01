@@ -133,9 +133,13 @@ The pre-exported models under `inference4j/opus-mt-*` work out of the box. If yo
 
 !!! warning "MarianMT models require tokenizer conversion"
 
-    MarianMT models on HuggingFace ship with SentencePiece files (`source.spm`, `target.spm`) instead of `tokenizer.json`. You must convert the tokenizer during export. Using Hugging Face Optimum and the `tokenizers` library:
+    MarianMT models on HuggingFace ship with SentencePiece files (`source.spm`, `target.spm`) instead of `tokenizer.json`. You must build `tokenizer.json` using the model's `vocab.json` for vocabulary IDs and `source.spm` for BPE merges.
+
+    This is important because MarianMT merges source and target SentencePiece vocabularies into a shared `vocab.json` with ~65K entries. The raw `SentencePieceExtractor` produces SPM-internal IDs (0–31999) which differ from the model's actual IDs, so you must use `vocab.json` for the vocabulary mapping and only extract BPE merges from the SPM model.
 
     ```python
+    import json
+    from huggingface_hub import hf_hub_download
     from optimum.exporters.onnx import main_export
     from transformers.convert_slow_tokenizer import SentencePieceExtractor
     from tokenizers import Tokenizer
@@ -150,10 +154,14 @@ The pre-exported models under `inference4j/opus-mt-*` work out of the box. If yo
         task="text2text-generation-with-past",
     )
 
-    # 2. Convert source.spm to tokenizer.json
+    # 2. Build tokenizer.json from vocab.json + source.spm merges
+    with open("my-model/vocab.json") as f:
+        model_vocab = json.load(f)
+
     extractor = SentencePieceExtractor("my-model/source.spm")
-    vocab, merges = extractor.extract(None)
-    tokenizer = Tokenizer(BPE(vocab, merges, unk_token="<unk>"))
+    _, merges = extractor.extract(None)
+
+    tokenizer = Tokenizer(BPE(model_vocab, merges, unk_token="<unk>"))
     tokenizer.save("my-model/tokenizer.json")
     ```
 
