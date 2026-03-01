@@ -47,6 +47,8 @@ public enum Language {
     CS("Czech"),
     HR("Croatian"),
     RO("Romanian"),
+    RU("Russian"),
+    UK("Ukrainian"),
 
     // Other Latin-script
     TR("Turkish"),

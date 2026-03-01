@@ -78,14 +78,36 @@ try (var translator = FlanT5TextGenerator.flanT5Base()
 
 ## Supported languages
 
-The `Language` enum provides 24 language constants:
+The `Language` enum provides constants for the most widely spoken languages. More languages will be added in future releases.
 
-| Category | Languages |
-|----------|-----------|
-| Western European | `EN`, `FR`, `DE`, `ES`, `PT`, `PT_BR`, `IT`, `NL`, `CA` |
-| Northern European | `SV`, `DA`, `NO`, `FI` |
-| Eastern European | `PL`, `CS`, `HR`, `RO` |
-| Other | `TR`, `JA`, `KO`, `AR`, `ZH_CN`, `ZH_TW`, `HI` |
+| Constant | Language |
+|----------|----------|
+| `EN` | English |
+| `FR` | French |
+| `DE` | German |
+| `ES` | Spanish |
+| `PT` | Portuguese |
+| `PT_BR` | Brazilian Portuguese |
+| `IT` | Italian |
+| `NL` | Dutch |
+| `CA` | Catalan |
+| `SV` | Swedish |
+| `DA` | Danish |
+| `NO` | Norwegian |
+| `FI` | Finnish |
+| `PL` | Polish |
+| `CS` | Czech |
+| `HR` | Croatian |
+| `RO` | Romanian |
+| `RU` | Russian |
+| `UK` | Ukrainian |
+| `TR` | Turkish |
+| `JA` | Japanese |
+| `KO` | Korean |
+| `AR` | Arabic |
+| `ZH_CN` | Chinese Simplified |
+| `ZH_TW` | Chinese Traditional |
+| `HI` | Hindi |
 
 Each constant provides `displayName()` (e.g., `"Brazilian Portuguese"`) and `isoCode()` (e.g., `"pt-br"`).
 
