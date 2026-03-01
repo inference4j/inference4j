@@ -73,13 +73,11 @@ public class BartSummarizer implements TextGenerator, Summarizer {
      * BART Large CNN (406M parameters) preset.
      *
      * <p>Best quality summarization. Downloads from {@code inference4j/bart-large-cnn}
-     * on first use. Requires external data files.
+     * on first use.
      */
     public static Builder bartLargeCnn() {
         return builder()
-                .modelId("inference4j/bart-large-cnn")
-                .requiredFile("decoder_model.onnx_data")
-                .requiredFile("encoder_model.onnx_data");
+                .modelId("inference4j/bart-large-cnn");
     }
 
     /**

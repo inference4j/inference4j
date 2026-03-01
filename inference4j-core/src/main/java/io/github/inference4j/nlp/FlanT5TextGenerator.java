@@ -85,13 +85,11 @@ public class FlanT5TextGenerator implements TextGenerator, Summarizer, Translato
      * Flan-T5 Large (780M parameters) preset.
      *
      * <p>Best quality. Downloads from {@code inference4j/flan-t5-large}
-     * on first use. Requires external data files.
+     * on first use.
      */
     public static Builder flanT5Large() {
         return builder()
-                .modelId("inference4j/flan-t5-large")
-                .requiredFile("decoder_model.onnx_data")
-                .requiredFile("encoder_model.onnx_data");
+                .modelId("inference4j/flan-t5-large");
     }
 
     /**

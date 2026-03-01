@@ -95,13 +95,10 @@ public class T5SqlGenerator implements TextGenerator, SqlGenerator {
 	 * datasets. Expects schema in Spider format with quoted identifiers and
 	 * {@code [SEP]} table delimiters. Downloads from
 	 * {@code inference4j/T5-LM-Large-text2sql-spider} on first use.
-	 * Requires external data files.
 	 */
 	public static Builder t5LargeSpider() {
 		return builder()
 				.modelId("inference4j/T5-LM-Large-text2sql-spider")
-				.requiredFile("decoder_model.onnx_data")
-				.requiredFile("encoder_model.onnx_data")
 				.promptFormatter((query, schema) ->
 						"Question: " + query + " Schema: " + schema);
 	}

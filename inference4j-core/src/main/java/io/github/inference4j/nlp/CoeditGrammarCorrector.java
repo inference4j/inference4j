@@ -75,13 +75,11 @@ public class CoeditGrammarCorrector implements TextGenerator, GrammarCorrector {
      * CoEdit Large (780M parameters) preset.
      *
      * <p>Best quality grammar correction. Downloads from {@code inference4j/coedit-large}
-     * on first use. Requires external data files.
+     * on first use.
      */
     public static Builder coeditLarge() {
         return builder()
-                .modelId("inference4j/coedit-large")
-                .requiredFile("decoder_model.onnx_data")
-                .requiredFile("encoder_model.onnx_data");
+                .modelId("inference4j/coedit-large");
     }
 
     /**
