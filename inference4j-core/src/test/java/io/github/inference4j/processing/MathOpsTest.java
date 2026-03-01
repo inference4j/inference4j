@@ -463,4 +463,63 @@ class MathOpsTest {
         assertThat(result[2]).isCloseTo(100f, within(1e-5f));
         assertThat(result[3]).isCloseTo(200f, within(1e-5f));
     }
+
+    @Test
+    void l2Normalize_unitVectorResult() {
+        float[] result = MathOps.l2Normalize(new float[]{3f, 4f});
+
+        float norm = 0f;
+        for (float v : result) {
+            norm += v * v;
+        }
+        norm = (float) Math.sqrt(norm);
+        assertThat(norm).isCloseTo(1.0f, within(1e-5f));
+    }
+
+    @Test
+    void l2Normalize_zeroVector_returnsZeroVector() {
+        float[] result = MathOps.l2Normalize(new float[]{0f, 0f, 0f});
+
+        assertThat(result[0]).isCloseTo(0f, within(1e-5f));
+        assertThat(result[1]).isCloseTo(0f, within(1e-5f));
+        assertThat(result[2]).isCloseTo(0f, within(1e-5f));
+    }
+
+    @Test
+    void l2Normalize_singleElement() {
+        float[] result = MathOps.l2Normalize(new float[]{5f});
+
+        assertThat(result[0]).isCloseTo(1.0f, within(1e-5f));
+    }
+
+    @Test
+    void l2Normalize_preservesDirection() {
+        float[] input = {1f, 2f, 3f};
+        float[] result = MathOps.l2Normalize(input);
+
+        // Ratios between elements should be preserved
+        float ratioOriginal12 = input[0] / input[1];
+        float ratioResult12 = result[0] / result[1];
+        assertThat(ratioResult12).isCloseTo(ratioOriginal12, within(1e-5f));
+
+        float ratioOriginal23 = input[1] / input[2];
+        float ratioResult23 = result[1] / result[2];
+        assertThat(ratioResult23).isCloseTo(ratioOriginal23, within(1e-5f));
+    }
+
+    @Test
+    void l2Normalize_negativeValues() {
+        float[] result = MathOps.l2Normalize(new float[]{-3f, 4f});
+
+        float norm = 0f;
+        for (float v : result) {
+            norm += v * v;
+        }
+        norm = (float) Math.sqrt(norm);
+        assertThat(norm).isCloseTo(1.0f, within(1e-5f));
+
+        // Signs should be preserved
+        assertThat(result[0]).isNegative();
+        assertThat(result[1]).isPositive();
+    }
 }

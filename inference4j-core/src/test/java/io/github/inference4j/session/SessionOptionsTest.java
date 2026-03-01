@@ -70,4 +70,15 @@ class SessionOptionsTest {
         assertThat(builder.intraOpNumThreads(4)).isSameAs(builder);
         assertThat(builder.interOpNumThreads(2)).isSameAs(builder);
     }
+
+    @Test
+    void builder_singleThread() throws OrtException {
+        SessionOptions options = SessionOptions.builder()
+                .intraOpNumThreads(1)
+                .interOpNumThreads(1)
+                .build();
+        try (OrtSession.SessionOptions ortOptions = options.toOrtOptions()) {
+            assertThat(ortOptions).isNotNull();
+        }
+    }
 }
