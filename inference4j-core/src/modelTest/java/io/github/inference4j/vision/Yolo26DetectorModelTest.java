@@ -26,7 +26,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class Yolo26DetectorModelTest {
@@ -49,7 +49,7 @@ class Yolo26DetectorModelTest {
     void detect_catImage_returnsDetections() {
         List<Detection> detections = detector.detect(catImage);
 
-        assertFalse(detections.isEmpty(), "Should detect at least one object in cat image");
+        assertThat(detections.isEmpty()).as("Should detect at least one object in cat image").isFalse();
     }
 
     @Test
@@ -57,15 +57,15 @@ class Yolo26DetectorModelTest {
         List<Detection> detections = detector.detect(catImage);
 
         for (Detection d : detections) {
-            assertNotNull(d.label(), "Detection label should not be null");
-            assertFalse(d.label().isBlank(), "Detection label should not be blank");
-            assertTrue(d.confidence() > 0f, "Confidence should be positive, got: " + d.confidence());
-            assertTrue(d.confidence() <= 1f, "Confidence should be <= 1, got: " + d.confidence());
+            assertThat(d.label()).as("Detection label should not be null").isNotNull();
+            assertThat(d.label().isBlank()).as("Detection label should not be blank").isFalse();
+            assertThat(d.confidence() > 0f).as("Confidence should be positive, got: " + d.confidence()).isTrue();
+            assertThat(d.confidence() <= 1f).as("Confidence should be <= 1, got: " + d.confidence()).isTrue();
 
             BoundingBox box = d.box();
-            assertTrue(box.x2() > box.x1(), "Box x2 should be > x1");
-            assertTrue(box.y2() > box.y1(), "Box y2 should be > y1");
-            assertTrue(box.area() > 0, "Box area should be positive");
+            assertThat(box.x2() > box.x1()).as("Box x2 should be > x1").isTrue();
+            assertThat(box.y2() > box.y1()).as("Box y2 should be > y1").isTrue();
+            assertThat(box.area() > 0).as("Box area should be positive").isTrue();
         }
     }
 }

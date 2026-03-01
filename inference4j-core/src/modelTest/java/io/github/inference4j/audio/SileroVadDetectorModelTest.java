@@ -28,7 +28,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SileroVadDetectorModelTest {
@@ -55,7 +55,7 @@ class SileroVadDetectorModelTest {
     void detect_speechWav_findsVoiceSegments() {
         List<VoiceSegment> segments = vad.detect(speechFixture);
 
-        assertFalse(segments.isEmpty(), "Should detect at least one voice segment in speech audio");
+        assertThat(segments.isEmpty()).as("Should detect at least one voice segment in speech audio").isFalse();
     }
 
     @Test
@@ -63,14 +63,10 @@ class SileroVadDetectorModelTest {
         List<VoiceSegment> segments = vad.detect(speechFixture);
 
         for (VoiceSegment segment : segments) {
-            assertTrue(segment.start() >= 0f,
-                    "Segment start should be >= 0, got: " + segment.start());
-            assertTrue(segment.end() > segment.start(),
-                    "Segment end should be > start: start=" + segment.start() + " end=" + segment.end());
-            assertTrue(segment.duration() > 0f,
-                    "Segment duration should be positive, got: " + segment.duration());
-            assertTrue(segment.confidence() > 0f && segment.confidence() <= 1f,
-                    "Segment confidence should be (0, 1], got: " + segment.confidence());
+            assertThat(segment.start() >= 0f).as("Segment start should be >= 0, got: " + segment.start()).isTrue();
+            assertThat(segment.end() > segment.start()).as("Segment end should be > start: start=" + segment.start() + " end=" + segment.end()).isTrue();
+            assertThat(segment.duration() > 0f).as("Segment duration should be positive, got: " + segment.duration()).isTrue();
+            assertThat(segment.confidence() > 0f && segment.confidence() <= 1f).as("Segment confidence should be (0, 1], got: " + segment.confidence()).isTrue();
         }
     }
 }

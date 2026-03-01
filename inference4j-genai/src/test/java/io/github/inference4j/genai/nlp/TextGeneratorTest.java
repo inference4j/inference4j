@@ -22,9 +22,8 @@ import io.github.inference4j.generation.ChatTemplate;
 import io.github.inference4j.generation.GenerationResult;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -41,9 +40,9 @@ class TextGeneratorTest {
                 100, 1.0, 0, 0.0);
         GenerationResult result = gen.parseOutput("Hello world", "prompt", 5, 120);
 
-        assertEquals("Hello world", result.text());
-        assertEquals(5, result.generatedTokens());
-        assertEquals(java.time.Duration.ofMillis(120), result.duration());
+        assertThat(result.text()).isEqualTo("Hello world");
+        assertThat(result.generatedTokens()).isEqualTo(5);
+        assertThat(result.duration()).isEqualTo(java.time.Duration.ofMillis(120));
     }
 
     @Test
@@ -62,14 +61,14 @@ class TextGeneratorTest {
     @Test
     void builderRequiresModel() {
         TextGenerator.Builder builder = TextGenerator.builder();
-        assertNotNull(builder);
-        assertThrows(IllegalStateException.class, builder::build);
+        assertThat(builder).isNotNull();
+        assertThatThrownBy(builder::build).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
     void builderRequiresChatTemplateWhenModelSourceProvided() {
         TextGenerator.Builder builder = TextGenerator.builder()
                 .modelSource(modelId -> null);
-        assertThrows(IllegalStateException.class, builder::build);
+        assertThatThrownBy(builder::build).isInstanceOf(IllegalStateException.class);
     }
 }

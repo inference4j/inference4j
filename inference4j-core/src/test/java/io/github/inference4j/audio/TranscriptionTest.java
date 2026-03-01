@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class TranscriptionTest {
 
@@ -28,9 +28,9 @@ class TranscriptionTest {
 	void convenienceConstructor_createsEmptySegments() {
 		Transcription transcription = new Transcription("hello world");
 
-		assertEquals("hello world", transcription.text());
-		assertNotNull(transcription.segments());
-		assertTrue(transcription.segments().isEmpty());
+		assertThat(transcription.text()).isEqualTo("hello world");
+		assertThat(transcription.segments()).isNotNull();
+		assertThat(transcription.segments()).isEmpty();
 	}
 
 	@Test
@@ -40,10 +40,10 @@ class TranscriptionTest {
 
 		Transcription transcription = new Transcription("hello world", List.of(seg1, seg2));
 
-		assertEquals("hello world", transcription.text());
-		assertEquals(2, transcription.segments().size());
-		assertEquals(seg1, transcription.segments().get(0));
-		assertEquals(seg2, transcription.segments().get(1));
+		assertThat(transcription.text()).isEqualTo("hello world");
+		assertThat(transcription.segments()).hasSize(2);
+		assertThat(transcription.segments().get(0)).isEqualTo(seg1);
+		assertThat(transcription.segments().get(1)).isEqualTo(seg2);
 	}
 
 	@Test
@@ -51,17 +51,17 @@ class TranscriptionTest {
 		var seg1 = new Transcription.Segment("hello", 0.0f, 1.5f);
 		var seg2 = new Transcription.Segment("hello", 0.0f, 1.5f);
 
-		assertEquals(seg1, seg2);
-		assertEquals(seg1.hashCode(), seg2.hashCode());
+		assertThat(seg2).isEqualTo(seg1);
+		assertThat(seg2.hashCode()).isEqualTo(seg1.hashCode());
 	}
 
 	@Test
 	void convenienceConstructor_segmentsListIsImmutable() {
 		Transcription transcription = new Transcription("hello world");
 
-		assertThrows(UnsupportedOperationException.class, () -> {
+		assertThatThrownBy(() -> {
 			transcription.segments().add(new Transcription.Segment("nope", 0.0f, 1.0f));
-		});
+		}).isInstanceOf(UnsupportedOperationException.class);
 	}
 
 }

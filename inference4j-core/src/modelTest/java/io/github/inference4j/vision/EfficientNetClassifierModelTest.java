@@ -26,7 +26,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class EfficientNetClassifierModelTest {
@@ -49,8 +49,8 @@ class EfficientNetClassifierModelTest {
     void classify_catImage_returnsNonEmptyResults() {
         List<Classification> results = classifier.classify(catImage);
 
-        assertFalse(results.isEmpty(), "Should return at least one classification");
-        assertTrue(results.size() <= 5, "Default topK should be 5 or fewer");
+        assertThat(results.isEmpty()).as("Should return at least one classification").isFalse();
+        assertThat(results.size() <= 5).as("Default topK should be 5 or fewer").isTrue();
     }
 
     @Test
@@ -58,10 +58,9 @@ class EfficientNetClassifierModelTest {
         List<Classification> results = classifier.classify(catImage);
 
         Classification top = results.get(0);
-        assertTrue(top.confidence() > 0.1f,
-                "Top result should have confidence > 0.1, got: " + top.confidence());
-        assertNotNull(top.label(), "Label should not be null");
-        assertFalse(top.label().isBlank(), "Label should not be blank");
+        assertThat(top.confidence() > 0.1f).as("Top result should have confidence > 0.1, got: " + top.confidence()).isTrue();
+        assertThat(top.label()).as("Label should not be null").isNotNull();
+        assertThat(top.label().isBlank()).as("Label should not be blank").isFalse();
     }
 
     @Test
@@ -69,8 +68,7 @@ class EfficientNetClassifierModelTest {
         List<Classification> results = classifier.classify(catImage);
 
         for (int i = 1; i < results.size(); i++) {
-            assertTrue(results.get(i - 1).confidence() >= results.get(i).confidence(),
-                    "Results should be sorted descending at index " + i);
+            assertThat(results.get(i - 1).confidence() >= results.get(i).confidence()).as("Results should be sorted descending at index " + i).isTrue();
         }
     }
 }

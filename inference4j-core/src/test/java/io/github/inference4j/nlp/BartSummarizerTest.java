@@ -25,7 +25,7 @@ import org.mockito.ArgumentCaptor;
 import java.time.Duration;
 import java.util.function.Consumer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -51,8 +51,9 @@ class BartSummarizerTest {
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
         verify(engine).generate(promptCaptor.capture(), any());
-        assertEquals("The quick brown fox jumps over the lazy dog.", promptCaptor.getValue(),
-                "BART should pass text directly without any prefix");
+        assertThat(promptCaptor.getValue())
+                .as("BART should pass text directly without any prefix")
+                .isEqualTo("The quick brown fox jumps over the lazy dog.");
     }
 
     @Test
@@ -63,26 +64,28 @@ class BartSummarizerTest {
         GenerationResult result = summarizer.generate("Hello");
 
         verify(engine).generate("Hello");
-        assertEquals("output", result.text());
+        assertThat(result.text()).isEqualTo("output");
     }
 
     @Test
     void distilBartCnn_preset_returnsBuilder() {
         BartSummarizer.Builder builder = BartSummarizer.distilBartCnn();
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
     void bartLargeCnn_preset_returnsBuilder() {
         BartSummarizer.Builder builder = BartSummarizer.bartLargeCnn();
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
     void builder_noModelIdOrSource_throws() {
-        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                BartSummarizer.builder().build());
-        assertTrue(ex.getMessage().contains("modelId"));
-        assertTrue(ex.getMessage().contains("modelSource"));
+        assertThatThrownBy(() -> BartSummarizer.builder().build())
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> {
+                    assertThat(ex.getMessage()).contains("modelId");
+                    assertThat(ex.getMessage()).contains("modelSource");
+                });
     }
 }

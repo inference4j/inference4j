@@ -18,7 +18,8 @@ package io.github.inference4j.processing;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.within;
 
 class OutputOperatorTest {
 
@@ -27,7 +28,10 @@ class OutputOperatorTest {
         float[] logits = {1.0f, 2.0f, 3.0f};
         float[] result = OutputOperator.softmax().apply(logits);
 
-        assertArrayEquals(MathOps.softmax(logits), result, 1e-6f);
+        float[] expected = MathOps.softmax(logits);
+        for (int i = 0; i < expected.length; i++) {
+            assertThat(result[i]).isCloseTo(expected[i], within(1e-6f));
+        }
     }
 
     @Test
@@ -35,7 +39,10 @@ class OutputOperatorTest {
         float[] values = {-1.0f, 0.0f, 1.0f};
         float[] result = OutputOperator.sigmoid().apply(values);
 
-        assertArrayEquals(MathOps.sigmoid(values), result, 1e-6f);
+        float[] expected = MathOps.sigmoid(values);
+        for (int i = 0; i < expected.length; i++) {
+            assertThat(result[i]).isCloseTo(expected[i], within(1e-6f));
+        }
     }
 
     @Test
@@ -43,7 +50,10 @@ class OutputOperatorTest {
         float[] logits = {1.0f, 2.0f, 3.0f};
         float[] result = OutputOperator.logSoftmax().apply(logits);
 
-        assertArrayEquals(MathOps.logSoftmax(logits), result, 1e-6f);
+        float[] expected = MathOps.logSoftmax(logits);
+        for (int i = 0; i < expected.length; i++) {
+            assertThat(result[i]).isCloseTo(expected[i], within(1e-6f));
+        }
     }
 
     @Test
@@ -51,7 +61,7 @@ class OutputOperatorTest {
         float[] values = {0.1f, 0.5f, 0.4f};
         float[] result = OutputOperator.identity().apply(values);
 
-        assertSame(values, result);
+        assertThat(result).isSameAs(values);
     }
 
     @Test
@@ -71,12 +81,15 @@ class OutputOperatorTest {
 
         // Should equal softmax of doubled values
         float[] expected = MathOps.softmax(new float[]{2.0f, 4.0f, 6.0f});
-        assertArrayEquals(expected, result, 1e-6f);
+        for (int i = 0; i < expected.length; i++) {
+            assertThat(result[i]).isCloseTo(expected[i], within(1e-6f));
+        }
     }
 
     @Test
     void andThen_rejectsNull() {
-        assertThrows(NullPointerException.class, () -> OutputOperator.identity().andThen(null));
+        assertThatThrownBy(() -> OutputOperator.identity().andThen(null))
+                .isInstanceOf(NullPointerException.class);
     }
 
     @Test
@@ -91,6 +104,9 @@ class OutputOperatorTest {
 
         float[] result = clamp.apply(new float[]{-0.5f, 0.5f, 1.5f});
 
-        assertArrayEquals(new float[]{0f, 0.5f, 1f}, result, 1e-6f);
+        float[] expected = new float[]{0f, 0.5f, 1f};
+        for (int i = 0; i < expected.length; i++) {
+            assertThat(result[i]).isCloseTo(expected[i], within(1e-6f));
+        }
     }
 }

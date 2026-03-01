@@ -25,7 +25,7 @@ import org.mockito.ArgumentCaptor;
 import java.time.Duration;
 import java.util.function.Consumer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -55,10 +55,9 @@ class T5SqlGeneratorTest {
 
 		ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
 		verify(engine).generate(promptCaptor.capture(), any());
-		assertEquals(
+		assertThat(promptCaptor.getValue()).isEqualTo(
 				"tables: CREATE TABLE employees (id INT, name VARCHAR) "
-				+ "query for: How many employees?",
-				promptCaptor.getValue());
+				+ "query for: How many employees?");
 	}
 
 	@Test
@@ -74,9 +73,8 @@ class T5SqlGeneratorTest {
 
 		ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
 		verify(engine).generate(promptCaptor.capture(), any());
-		assertEquals(
-				"Question: How many employees? Schema: \"employees\" \"id\" int, \"name\" varchar",
-				promptCaptor.getValue());
+		assertThat(promptCaptor.getValue()).isEqualTo(
+				"Question: How many employees? Schema: \"employees\" \"id\" int, \"name\" varchar");
 	}
 
 	@Test
@@ -89,7 +87,7 @@ class T5SqlGeneratorTest {
 				"How many employees?",
 				"CREATE TABLE employees (id INT)");
 
-		assertEquals("SELECT count(*) FROM employees", sql);
+		assertThat(sql).isEqualTo("SELECT count(*) FROM employees");
 	}
 
 	@Test
@@ -105,8 +103,8 @@ class T5SqlGeneratorTest {
 				listener);
 
 		verify(engine).generate(anyString(), eq(listener));
-		assertNotNull(result);
-		assertEquals("SELECT count(*) FROM employees", result.text());
+		assertThat(result).isNotNull();
+		assertThat(result.text()).isEqualTo("SELECT count(*) FROM employees");
 	}
 
 	@Test
@@ -118,26 +116,28 @@ class T5SqlGeneratorTest {
 		GenerationResult result = generator.generate("raw prompt");
 
 		verify(engine).generate("raw prompt");
-		assertEquals("SELECT count(*) FROM employees", result.text());
+		assertThat(result.text()).isEqualTo("SELECT count(*) FROM employees");
 	}
 
 	@Test
 	void t5SmallAwesome_preset_returnsBuilder() {
 		T5SqlGenerator.Builder builder = T5SqlGenerator.t5SmallAwesome();
-		assertNotNull(builder);
+		assertThat(builder).isNotNull();
 	}
 
 	@Test
 	void t5LargeSpider_preset_returnsBuilder() {
 		T5SqlGenerator.Builder builder = T5SqlGenerator.t5LargeSpider();
-		assertNotNull(builder);
+		assertThat(builder).isNotNull();
 	}
 
 	@Test
 	void builder_noModelIdOrSource_throws() {
-		ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-				T5SqlGenerator.builder().build());
-		assertTrue(ex.getMessage().contains("modelId"));
-		assertTrue(ex.getMessage().contains("modelSource"));
+		assertThatThrownBy(() -> T5SqlGenerator.builder().build())
+				.isInstanceOf(ModelLoadException.class)
+				.satisfies(ex -> {
+					assertThat(ex.getMessage()).contains("modelId");
+					assertThat(ex.getMessage()).contains("modelSource");
+				});
 	}
 }

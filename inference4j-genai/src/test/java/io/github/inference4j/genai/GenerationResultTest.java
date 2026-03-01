@@ -20,23 +20,23 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class GenerationResultTest {
 
     @Test
     void recordFieldsAreAccessible() {
         var result = new GenerationResult("Hello world", 0, 5, Duration.ofMillis(120));
-        assertEquals("Hello world", result.text());
-        assertEquals(0, result.promptTokens());
-        assertEquals(5, result.generatedTokens());
-        assertEquals(Duration.ofMillis(120), result.duration());
+        assertThat(result.text()).isEqualTo("Hello world");
+        assertThat(result.promptTokens()).isEqualTo(0);
+        assertThat(result.generatedTokens()).isEqualTo(5);
+        assertThat(result.duration()).isEqualTo(Duration.ofMillis(120));
     }
 
     @Test
     void recordEquality() {
         var a = new GenerationResult("Hi", 0, 2, Duration.ofMillis(50));
         var b = new GenerationResult("Hi", 0, 2, Duration.ofMillis(50));
-        assertEquals(a, b);
+        assertThat(a).isEqualTo(b);
     }
 }

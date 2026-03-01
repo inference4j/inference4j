@@ -20,7 +20,8 @@ import org.junit.jupiter.api.Test;
 
 import javax.sound.sampled.AudioFormat;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class AudioLoaderTest {
 
@@ -36,9 +37,9 @@ class AudioLoaderTest {
 
         float[] result = io.github.inference4j.preprocessing.audio.AudioLoader.toMonoFloat32(raw, fmt);
 
-        assertEquals(2, result.length);
-        assertEquals(0.0f, result[0], 1e-5f);
-        assertEquals(32767f / 32768f, result[1], 1e-5f);
+        assertThat(result.length).isEqualTo(2);
+        assertThat(result[0]).isCloseTo(0.0f, within(1e-5f));
+        assertThat(result[1]).isCloseTo(32767f / 32768f, within(1e-5f));
     }
 
     @Test
@@ -50,8 +51,8 @@ class AudioLoaderTest {
 
         float[] result = io.github.inference4j.preprocessing.audio.AudioLoader.toMonoFloat32(raw, fmt);
 
-        assertEquals(1, result.length);
-        assertEquals(256f / 32768f, result[0], 1e-5f);
+        assertThat(result.length).isEqualTo(1);
+        assertThat(result[0]).isCloseTo(256f / 32768f, within(1e-5f));
     }
 
     @Test
@@ -67,8 +68,8 @@ class AudioLoaderTest {
 
         float[] result = io.github.inference4j.preprocessing.audio.AudioLoader.toMonoFloat32(raw, fmt);
 
-        assertEquals(1, result.length);
-        assertEquals(0.25f, result[0], 1e-5f);
+        assertThat(result.length).isEqualTo(1);
+        assertThat(result[0]).isCloseTo(0.25f, within(1e-5f));
     }
 
     @Test
@@ -80,10 +81,10 @@ class AudioLoaderTest {
 
         float[] result = io.github.inference4j.preprocessing.audio.AudioLoader.toMonoFloat32(raw, fmt);
 
-        assertEquals(3, result.length);
-        assertEquals(0.0f, result[0], 1e-5f);
-        assertEquals(127f / 128f, result[1], 1e-5f);
-        assertEquals(-1.0f, result[2], 1e-5f);
+        assertThat(result.length).isEqualTo(3);
+        assertThat(result[0]).isCloseTo(0.0f, within(1e-5f));
+        assertThat(result[1]).isCloseTo(127f / 128f, within(1e-5f));
+        assertThat(result[2]).isCloseTo(-1.0f, within(1e-5f));
     }
 
     @Test
@@ -95,7 +96,7 @@ class AudioLoaderTest {
 
         float[] result = io.github.inference4j.preprocessing.audio.AudioLoader.toMonoFloat32(raw, fmt);
 
-        assertEquals(1, result.length);
-        assertEquals(-1f / 32768f, result[0], 1e-5f);
+        assertThat(result.length).isEqualTo(1);
+        assertThat(result[0]).isCloseTo(-1f / 32768f, within(1e-5f));
     }
 }

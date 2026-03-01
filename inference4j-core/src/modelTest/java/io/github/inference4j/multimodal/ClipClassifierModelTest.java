@@ -27,7 +27,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ClipClassifierModelTest {
@@ -53,11 +53,9 @@ class ClipClassifierModelTest {
                 List.of("a photo of a cat", "a photo of a dog", "a photo of a bird",
                         "a photo of a car", "a photo of an airplane"));
 
-        assertFalse(results.isEmpty());
-        assertEquals("a photo of a cat", results.get(0).label(),
-                "Expected 'a photo of a cat' as top label, got: " + results.get(0).label());
-        assertTrue(results.get(0).confidence() > 0.15f,
-                "Expected cat confidence > 0.15, got: " + results.get(0).confidence());
+        assertThat(results.isEmpty()).isFalse();
+        assertThat(results.get(0).label()).as("Expected 'a photo of a cat' as top label, got: " + results.get(0).label()).isEqualTo("a photo of a cat");
+        assertThat(results.get(0).confidence() > 0.15f).as("Expected cat confidence > 0.15, got: " + results.get(0).confidence()).isTrue();
     }
 
     @Test
@@ -68,10 +66,10 @@ class ClipClassifierModelTest {
 
         float sum = 0f;
         for (Classification c : results) {
-            assertTrue(c.confidence() > 0f);
+            assertThat(c.confidence() > 0f).isTrue();
             sum += c.confidence();
         }
-        assertEquals(1.0f, sum, 1e-3f);
+        assertThat(sum).isCloseTo(1.0f, within(1e-3f));
     }
 
     @Test
@@ -82,6 +80,6 @@ class ClipClassifierModelTest {
                         "a photo of a car", "a photo of an airplane"),
                 2);
 
-        assertEquals(2, results.size());
+        assertThat(results.size()).isEqualTo(2);
     }
 }

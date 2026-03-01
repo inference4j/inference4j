@@ -25,9 +25,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Integration test that runs real image generation with Phi-3.5 Vision.
@@ -48,11 +46,11 @@ class VisionLanguageModelModelTest {
             GenerationResult result = vision.generate(
                     new VisionInput(TEST_IMAGE, "Describe this image."));
 
-            assertNotNull(result);
-            assertNotNull(result.text());
-            assertFalse(result.text().isBlank(), "Description should not be blank");
-            assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
-            assertNotNull(result.duration(), "Duration should not be null");
+            assertThat(result).isNotNull();
+            assertThat(result.text()).isNotNull();
+            assertThat(result.text().isBlank()).as("Description should not be blank").isFalse();
+            assertThat(result.generatedTokens()).as("Should generate at least one token").isGreaterThan(0);
+            assertThat(result.duration()).as("Duration should not be null").isNotNull();
         }
     }
 
@@ -65,9 +63,9 @@ class VisionLanguageModelModelTest {
             GenerationResult result = vision.generate(
                     new VisionInput(TEST_IMAGE, "What colors are prominent in this image?"));
 
-            assertNotNull(result);
-            assertFalse(result.text().isBlank(), "Answer should not be blank");
-            assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
+            assertThat(result).isNotNull();
+            assertThat(result.text().isBlank()).as("Answer should not be blank").isFalse();
+            assertThat(result.generatedTokens()).as("Should generate at least one token").isGreaterThan(0);
         }
     }
 
@@ -82,10 +80,10 @@ class VisionLanguageModelModelTest {
                     new VisionInput(TEST_IMAGE, "Describe this image."),
                     streamedTokens::add);
 
-            assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+            assertThat(streamedTokens).as("Should stream at least one token").isNotEmpty();
             String streamed = String.join("", streamedTokens);
-            assertTrue(result.text().contains(streamed) || streamed.contains(result.text()),
-                    "Streamed tokens should match final result");
+            assertThat(result.text().contains(streamed) || streamed.contains(result.text()))
+                    .as("Streamed tokens should match final result").isTrue();
         }
     }
 }

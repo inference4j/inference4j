@@ -23,9 +23,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Integration test that runs real text generation with Phi-3-mini.
@@ -45,11 +43,11 @@ class TextGeneratorModelTest {
 
             GenerationResult result = generator.generate("What is 2 + 2?");
 
-            assertNotNull(result);
-            assertNotNull(result.text());
-            assertFalse(result.text().isBlank(), "Generated text should not be blank");
-            assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
-            assertNotNull(result.duration(), "Duration should not be null");
+            assertThat(result).isNotNull();
+            assertThat(result.text()).isNotNull();
+            assertThat(result.text().isBlank()).as("Generated text should not be blank").isFalse();
+            assertThat(result.generatedTokens()).as("Should generate at least one token").isGreaterThan(0);
+            assertThat(result.duration()).as("Duration should not be null").isNotNull();
         }
     }
 
@@ -65,10 +63,10 @@ class TextGeneratorModelTest {
                     "Say hello.",
                     streamedTokens::add);
 
-            assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+            assertThat(streamedTokens).as("Should stream at least one token").isNotEmpty();
             String streamed = String.join("", streamedTokens);
-            assertTrue(result.text().contains(streamed) || streamed.contains(result.text()),
-                    "Streamed tokens should match final result");
+            assertThat(result.text().contains(streamed) || streamed.contains(result.text()))
+                    .as("Streamed tokens should match final result").isTrue();
         }
     }
 }

@@ -22,7 +22,8 @@ import io.github.inference4j.genai.audio.WhisperSpeechModel;
 import io.github.inference4j.genai.audio.WhisperTask;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 class WhisperSpeechModelTest {
@@ -38,8 +39,8 @@ class WhisperSpeechModelTest {
         Transcription result = whisper.parseOutput(
                 "  Hello world  ", null, 5, 100);
 
-        assertEquals("Hello world", result.text());
-        assertTrue(result.segments().isEmpty());
+        assertThat(result.text()).isEqualTo("Hello world");
+        assertThat(result.segments()).isEmpty();
     }
 
     @Test
@@ -63,8 +64,8 @@ class WhisperSpeechModelTest {
         WhisperSpeechModel whisper = new WhisperSpeechModel(
                 model, processor, "en", WhisperTask.TRANSCRIBE, 448, 1.0, 0, 0.0);
 
-        assertEquals("<|startoftranscript|><|en|><|transcribe|><|notimestamps|>",
-                whisper.buildPrompt());
+        assertThat(whisper.buildPrompt())
+                .isEqualTo("<|startoftranscript|><|en|><|transcribe|><|notimestamps|>");
     }
 
     @Test
@@ -75,14 +76,14 @@ class WhisperSpeechModelTest {
         WhisperSpeechModel whisper = new WhisperSpeechModel(
                 model, processor, "fr", WhisperTask.TRANSLATE, 448, 1.0, 0, 0.0);
 
-        assertEquals("<|startoftranscript|><|fr|><|translate|><|notimestamps|>",
-                whisper.buildPrompt());
+        assertThat(whisper.buildPrompt())
+                .isEqualTo("<|startoftranscript|><|fr|><|translate|><|notimestamps|>");
     }
 
     @Test
     void builderRequiresModelId() {
-        assertThrows(IllegalStateException.class, () ->
-                WhisperSpeechModel.builder().build());
+        assertThatThrownBy(() -> WhisperSpeechModel.builder().build())
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -95,7 +96,7 @@ class WhisperSpeechModelTest {
         builder.processor = processor;
         WhisperSpeechModel whisper = builder.build();
 
-        assertEquals("<|startoftranscript|><|en|><|transcribe|><|notimestamps|>",
-                whisper.buildPrompt());
+        assertThat(whisper.buildPrompt())
+                .isEqualTo("<|startoftranscript|><|en|><|transcribe|><|notimestamps|>");
     }
 }

@@ -28,7 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -48,7 +49,7 @@ class SentenceTransformerEmbedderTest {
         float[] result = io.github.inference4j.nlp.SentenceTransformerEmbedder.applyPooling(flatOutput, shape, attentionMask, PoolingStrategy.MEAN);
 
         // Mean of token 0 and token 1: (1+5)/2, (2+6)/2, (3+7)/2, (4+8)/2
-        assertArrayEquals(new float[]{3f, 4f, 5f, 6f}, result, 0.001f);
+        assertThat(result).containsExactly(new float[]{3f, 4f, 5f, 6f}, within(0.001f));
     }
 
     @Test
@@ -63,7 +64,7 @@ class SentenceTransformerEmbedderTest {
 
         float[] result = SentenceTransformerEmbedder.applyPooling(flatOutput, shape, attentionMask, PoolingStrategy.CLS);
 
-        assertArrayEquals(new float[]{1f, 2f, 3f, 4f}, result);
+        assertThat(result).isEqualTo(new float[]{1f, 2f, 3f, 4f});
     }
 
     @Test
@@ -79,7 +80,7 @@ class SentenceTransformerEmbedderTest {
         float[] result = SentenceTransformerEmbedder.applyPooling(flatOutput, shape, attentionMask, PoolingStrategy.MAX);
 
         // Max of token 0 and 1: max(1,5), max(6,2), max(3,7), max(8,4)
-        assertArrayEquals(new float[]{5f, 6f, 7f, 8f}, result);
+        assertThat(result).isEqualTo(new float[]{5f, 6f, 7f, 8f});
     }
 
     @Test
@@ -90,7 +91,7 @@ class SentenceTransformerEmbedderTest {
 
         float[] result = SentenceTransformerEmbedder.applyPooling(flatOutput, shape, attentionMask, PoolingStrategy.MEAN);
 
-        assertArrayEquals(new float[]{0f, 0f, 0f, 0f}, result);
+        assertThat(result).isEqualTo(new float[]{0f, 0f, 0f, 0f});
     }
 
     // --- Builder validation ---
@@ -98,19 +99,21 @@ class SentenceTransformerEmbedderTest {
     @Test
     void builder_missingSession_throws() {
         Tokenizer tokenizer = mock(Tokenizer.class);
-        assertThrows(IllegalStateException.class, () ->
+        assertThatThrownBy(() ->
                 SentenceTransformerEmbedder.builder()
                         .tokenizer(tokenizer)
-                        .build());
+                        .build())
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
     void builder_missingTokenizer_throws() {
         InferenceSession session = mock(InferenceSession.class);
-        assertThrows(IllegalStateException.class, () ->
+        assertThatThrownBy(() ->
                 SentenceTransformerEmbedder.builder()
                         .session(session)
-                        .build());
+                        .build())
+                .isInstanceOf(IllegalStateException.class);
     }
 
     // --- Inference flow ---
@@ -137,16 +140,16 @@ class SentenceTransformerEmbedderTest {
         float[] embedding = model.encode("hello world");
 
         // MEAN of all 3 tokens (all mask=1): (1+5+9)/3, (2+6+10)/3, (3+7+11)/3, (4+8+12)/3
-        assertEquals(4, embedding.length);
-        assertEquals(5f, embedding[0], 0.001f);
-        assertEquals(6f, embedding[1], 0.001f);
-        assertEquals(7f, embedding[2], 0.001f);
-        assertEquals(8f, embedding[3], 0.001f);
+        assertThat(embedding).hasSize(4);
+        assertThat(embedding[0]).isCloseTo(5f, within(0.001f));
+        assertThat(embedding[1]).isCloseTo(6f, within(0.001f));
+        assertThat(embedding[2]).isCloseTo(7f, within(0.001f));
+        assertThat(embedding[3]).isCloseTo(8f, within(0.001f));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
         verify(session).run(captor.capture());
-        assertTrue(captor.getValue().containsKey("token_type_ids"));
+        assertThat(captor.getValue()).containsKey("token_type_ids");
     }
 
     @Test
@@ -172,7 +175,7 @@ class SentenceTransformerEmbedderTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
         verify(session).run(captor.capture());
-        assertFalse(captor.getValue().containsKey("token_type_ids"));
+        assertThat(captor.getValue()).doesNotContainKey("token_type_ids");
     }
 
     @Test
@@ -197,11 +200,11 @@ class SentenceTransformerEmbedderTest {
 
         List<float[]> results = model.encodeBatch(List.of("text1", "text2"));
 
-        assertEquals(2, results.size());
-        assertEquals(4, results.get(0).length);
-        assertEquals(4, results.get(1).length);
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0)).hasSize(4);
+        assertThat(results.get(1)).hasSize(4);
         // First result: MEAN of [1,5,9],[2,6,10],[3,7,11],[4,8,12] → [5,6,7,8]
-        assertEquals(5f, results.get(0)[0], 0.001f);
+        assertThat(results.get(0)[0]).isCloseTo(5f, within(0.001f));
     }
 
     // --- Builder setters ---
@@ -228,7 +231,7 @@ class SentenceTransformerEmbedderTest {
         float[] embedding = model.encode("hello");
 
         // CLS returns first token: [1, 2, 3, 4]
-        assertArrayEquals(new float[]{1f, 2f, 3f, 4f}, embedding);
+        assertThat(embedding).isEqualTo(new float[]{1f, 2f, 3f, 4f});
     }
 
     @Test
@@ -268,7 +271,7 @@ class SentenceTransformerEmbedderTest {
                 .modelSource(id -> Path.of("/tmp"))
                 .build();
 
-        assertNotNull(model);
+        assertThat(model).isNotNull();
     }
 
     @Test
@@ -282,7 +285,7 @@ class SentenceTransformerEmbedderTest {
                 .sessionOptions(opts -> { })
                 .build();
 
-        assertNotNull(model);
+        assertThat(model).isNotNull();
     }
 
     // --- Close delegation ---

@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class LocalModelSourceTest {
 
@@ -39,18 +39,17 @@ class LocalModelSourceTest {
         LocalModelSource source = new LocalModelSource(tempDir);
         Path resolved = source.resolve("my-model");
 
-        assertEquals(modelDir, resolved);
-        assertTrue(Files.isDirectory(resolved));
+        assertThat(resolved).isEqualTo(modelDir);
+        assertThat(Files.isDirectory(resolved)).isTrue();
     }
 
     @Test
     void resolve_throwsWhenDirectoryNotFound() {
         LocalModelSource source = new LocalModelSource(tempDir);
 
-        ModelSourceException ex = assertThrows(ModelSourceException.class, () ->
-                source.resolve("nonexistent"));
-
-        assertTrue(ex.getMessage().contains("nonexistent"));
+        assertThatThrownBy(() -> source.resolve("nonexistent"))
+                .isInstanceOf(ModelSourceException.class)
+                .satisfies(ex -> assertThat(ex.getMessage()).contains("nonexistent"));
     }
 
     @Test
@@ -59,7 +58,7 @@ class LocalModelSourceTest {
 
         LocalModelSource source = new LocalModelSource(tempDir);
 
-        assertThrows(ModelSourceException.class, () ->
-                source.resolve("not-a-dir"));
+        assertThatThrownBy(() -> source.resolve("not-a-dir"))
+                .isInstanceOf(ModelSourceException.class);
     }
 }

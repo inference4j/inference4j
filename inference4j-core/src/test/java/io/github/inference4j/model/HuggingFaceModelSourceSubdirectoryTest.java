@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.*;
 
 class HuggingFaceModelSourceSubdirectoryTest {
 
@@ -44,7 +44,7 @@ class HuggingFaceModelSourceSubdirectoryTest {
                 "microsoft/Phi-3-mini-4k-instruct-onnx",
                 "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4");
 
-        assertEquals(subDir, resolved);
+        assertThat(resolved).isEqualTo(subDir);
     }
 
     @Test
@@ -53,6 +53,6 @@ class HuggingFaceModelSourceSubdirectoryTest {
         // and appends the subdirectory
         ModelSource local = id -> cacheDir.resolve(id);
         Path result = local.resolve("my-model", "sub/dir");
-        assertEquals(cacheDir.resolve("my-model").resolve("sub/dir"), result);
+        assertThat(result).isEqualTo(cacheDir.resolve("my-model").resolve("sub/dir"));
     }
 }

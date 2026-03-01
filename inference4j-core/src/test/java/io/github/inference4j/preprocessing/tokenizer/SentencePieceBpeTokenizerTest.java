@@ -25,9 +25,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 import java.util.Objects;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class SentencePieceBpeTokenizerTest {
 
@@ -44,23 +42,23 @@ class SentencePieceBpeTokenizerTest {
     void encode_prependsSpacePrefix() {
         // "hello" → "▁hello" → should merge to token 14
         EncodedInput result = tokenizer.encode("hello", 512);
-        assertEquals(14, result.inputIds()[0], "▁hello should be token 14");
-        assertEquals(1, result.inputIds().length, "single merged token");
+        assertThat(result.inputIds()[0]).as("▁hello should be token 14").isEqualTo(14);
+        assertThat(result.inputIds().length).as("single merged token").isEqualTo(1);
     }
 
     @Test
     void encode_handlesSpacesBetweenWords() {
         // "hello world" → "▁hello▁world" → tokens 14, 18
         EncodedInput result = tokenizer.encode("hello world", 512);
-        assertArrayEquals(new long[]{14, 18}, result.inputIds());
+        assertThat(result.inputIds()).isEqualTo(new long[]{14, 18});
     }
 
     @Test
     void encode_addedTokensAtomic() {
         // "<start_of_turn>hello" → special token 300 + ▁hello(14)
         EncodedInput result = tokenizer.encode("<start_of_turn>hello", 512);
-        assertEquals(300, result.inputIds()[0], "<start_of_turn> should be token 300");
-        assertEquals(14, result.inputIds()[1], "▁hello should be token 14");
+        assertThat(result.inputIds()[0]).as("<start_of_turn> should be token 300").isEqualTo(300);
+        assertThat(result.inputIds()[1]).as("▁hello should be token 14").isEqualTo(14);
     }
 
     @Test
@@ -69,8 +67,8 @@ class SentencePieceBpeTokenizerTest {
         // Input: "!" → "▁!" → ▁ (token 4) + byte fallback for '!'
         EncodedInput result = tokenizer.encode("!", 512);
         // ▁ is token 4, ! (0x21) is token 73
-        assertEquals(4, result.inputIds()[0], "▁ should be token 4");
-        assertEquals(73, result.inputIds()[1], "! should be byte fallback <0x21> = 73");
+        assertThat(result.inputIds()[0]).as("▁ should be token 4").isEqualTo(4);
+        assertThat(result.inputIds()[1]).as("! should be byte fallback <0x21> = 73").isEqualTo(73);
     }
 
     @Test
@@ -81,7 +79,7 @@ class SentencePieceBpeTokenizerTest {
             ids[i] = (int) encoded.inputIds()[i];
         }
         String decoded = tokenizer.decode(ids);
-        assertEquals("hello world", decoded);
+        assertThat(decoded).isEqualTo("hello world");
     }
 
     @Test
@@ -90,14 +88,14 @@ class SentencePieceBpeTokenizerTest {
         // But in streaming mode, individual decode returns raw token text with ▁ → space
         String result = tokenizer.decode(14);
         // ▁hello → " hello" (▁ replaced with space)
-        assertEquals(" hello", result);
+        assertThat(result).isEqualTo(" hello");
     }
 
     @Test
     void decode_skipsSpecialTokens() {
         // BOS (2) and EOS (1) are added tokens → should be skipped
         String result = tokenizer.decode(new int[]{2, 14, 18, 1});
-        assertEquals("hello world", result);
+        assertThat(result).isEqualTo("hello world");
     }
 
     @Test
@@ -105,14 +103,14 @@ class SentencePieceBpeTokenizerTest {
         // <0x21> (token 73) is byte 0x21 = '!'
         String result = tokenizer.decode(new int[]{14, 73});
         // ▁hello + ! → "hello!"
-        assertEquals("hello!", result);
+        assertThat(result).isEqualTo("hello!");
     }
 
     @Test
     void encode_attentionMaskAllOnes() {
         EncodedInput result = tokenizer.encode("hello", 512);
         for (long mask : result.attentionMask()) {
-            assertEquals(1L, mask);
+            assertThat(mask).isEqualTo(1L);
         }
     }
 
@@ -120,23 +118,23 @@ class SentencePieceBpeTokenizerTest {
     void encode_tokenTypeIdsAllZeros() {
         EncodedInput result = tokenizer.encode("hello world", 512);
         for (long typeId : result.tokenTypeIds()) {
-            assertEquals(0L, typeId);
+            assertThat(typeId).isEqualTo(0L);
         }
     }
 
     @Test
     void encode_truncatesToMaxLength() {
         EncodedInput result = tokenizer.encode("hello world", 1);
-        assertEquals(1, result.inputIds().length);
+        assertThat(result.inputIds().length).isEqualTo(1);
     }
 
     @Test
     void encode_multipleAddedTokens() {
         // "<start_of_turn>hello<end_of_turn>" → 300, 14, 301
         EncodedInput result = tokenizer.encode("<start_of_turn>hello<end_of_turn>", 512);
-        assertEquals(300, result.inputIds()[0]);
-        assertTrue(result.inputIds().length >= 3);
-        assertEquals(301, result.inputIds()[result.inputIds().length - 1]);
+        assertThat(result.inputIds()[0]).isEqualTo(300);
+        assertThat(result.inputIds().length).isGreaterThanOrEqualTo(3);
+        assertThat(result.inputIds()[result.inputIds().length - 1]).isEqualTo(301);
     }
 
     @Test
@@ -144,6 +142,6 @@ class SentencePieceBpeTokenizerTest {
         // UTF-8 encoding of 'é' is 0xC3 0xA9
         // <0xC3> = token 235, <0xA9> = token 209
         String result = tokenizer.decode(new int[]{235, 209});
-        assertEquals("\u00e9", result, "Two byte-fallback tokens should decode to 'é'");
+        assertThat(result).as("Two byte-fallback tokens should decode to 'é'").isEqualTo("\u00e9");
     }
 }

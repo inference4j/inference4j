@@ -20,20 +20,20 @@ import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class SessionOptionsTest {
 
     @Test
     void defaults_returnsNonNull() {
         SessionOptions options = SessionOptions.defaults();
-        assertNotNull(options);
+        assertThat(options).isNotNull();
     }
 
     @Test
     void builder_returnsNonNull() {
         SessionOptions options = SessionOptions.builder().build();
-        assertNotNull(options);
+        assertThat(options).isNotNull();
     }
 
     @Test
@@ -42,14 +42,14 @@ class SessionOptionsTest {
                 .intraOpNumThreads(4)
                 .interOpNumThreads(2)
                 .build();
-        assertNotNull(options);
+        assertThat(options).isNotNull();
     }
 
     @Test
     void toOrtOptions_returnsNonNull() throws OrtException {
         SessionOptions options = SessionOptions.defaults();
         try (OrtSession.SessionOptions ortOptions = options.toOrtOptions()) {
-            assertNotNull(ortOptions);
+            assertThat(ortOptions).isNotNull();
         }
     }
 
@@ -60,14 +60,14 @@ class SessionOptionsTest {
                 .interOpNumThreads(1)
                 .build();
         try (OrtSession.SessionOptions ortOptions = options.toOrtOptions()) {
-            assertNotNull(ortOptions);
+            assertThat(ortOptions).isNotNull();
         }
     }
 
     @Test
     void builder_fluentApi() {
         SessionOptions.Builder builder = SessionOptions.builder();
-        assertSame(builder, builder.intraOpNumThreads(4));
-        assertSame(builder, builder.interOpNumThreads(2));
+        assertThat(builder.intraOpNumThreads(4)).isSameAs(builder);
+        assertThat(builder.interOpNumThreads(2)).isSameAs(builder);
     }
 }

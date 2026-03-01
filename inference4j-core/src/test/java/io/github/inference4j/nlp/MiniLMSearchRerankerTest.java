@@ -31,7 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -40,19 +41,19 @@ class MiniLMSearchRerankerTest {
     @Test
     void toScore_positiveLogit_highScore() {
         float score = io.github.inference4j.nlp.MiniLMSearchReranker.toScore(5.0f);
-        assertTrue(score > 0.99f);
+        assertThat(score).isGreaterThan(0.99f);
     }
 
     @Test
     void toScore_negativeLogit_lowScore() {
         float score = MiniLMSearchReranker.toScore(-5.0f);
-        assertTrue(score < 0.01f);
+        assertThat(score).isLessThan(0.01f);
     }
 
     @Test
     void toScore_zeroLogit_returnsHalf() {
         float score = MiniLMSearchReranker.toScore(0.0f);
-        assertEquals(0.5f, score, 1e-5f);
+        assertThat(score).isCloseTo(0.5f, within(1e-5f));
     }
 
     @Test
@@ -60,8 +61,10 @@ class MiniLMSearchRerankerTest {
         float[] testLogits = {-10f, -5f, -1f, 0f, 1f, 5f, 10f};
         for (float logit : testLogits) {
             float score = MiniLMSearchReranker.toScore(logit);
-            assertTrue(score > 0f && score < 1f,
-                    "Score " + score + " for logit " + logit + " should be in (0, 1)");
+            assertThat(score)
+                    .as("Score " + score + " for logit " + logit + " should be in (0, 1)")
+                    .isGreaterThan(0f)
+                    .isLessThan(1f);
         }
     }
 
@@ -70,8 +73,9 @@ class MiniLMSearchRerankerTest {
         float prev = MiniLMSearchReranker.toScore(-10f);
         for (float logit = -9f; logit <= 10f; logit += 1f) {
             float current = MiniLMSearchReranker.toScore(logit);
-            assertTrue(current > prev,
-                    "Score should increase monotonically with logit");
+            assertThat(current)
+                    .as("Score should increase monotonically with logit")
+                    .isGreaterThan(prev);
             prev = current;
         }
     }
@@ -80,7 +84,7 @@ class MiniLMSearchRerankerTest {
     void toScore_symmetricAroundZero() {
         float scorePlus = MiniLMSearchReranker.toScore(3.0f);
         float scoreMinus = MiniLMSearchReranker.toScore(-3.0f);
-        assertEquals(1.0f, scorePlus + scoreMinus, 1e-5f);
+        assertThat(scorePlus + scoreMinus).isCloseTo(1.0f, within(1e-5f));
     }
 
     // --- Builder validation ---
@@ -89,20 +93,22 @@ class MiniLMSearchRerankerTest {
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
         Tokenizer tokenizer = mock(Tokenizer.class);
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 MiniLMSearchReranker.builder()
                         .tokenizer(tokenizer)
                         .modelSource(badSource)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
     void builder_missingTokenizer_throws() {
         InferenceSession session = mock(InferenceSession.class);
-        assertThrows(IllegalStateException.class, () ->
+        assertThatThrownBy(() ->
                 MiniLMSearchReranker.builder()
                         .session(session)
-                        .build());
+                        .build())
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -142,7 +148,7 @@ class MiniLMSearchRerankerTest {
                 .modelSource(id -> Path.of("/tmp"))
                 .build();
 
-        assertNotNull(model);
+        assertThat(model).isNotNull();
     }
 
     @Test
@@ -156,7 +162,7 @@ class MiniLMSearchRerankerTest {
                 .sessionOptions(opts -> { })
                 .build();
 
-        assertNotNull(model);
+        assertThat(model).isNotNull();
     }
 
     // --- Inference flow ---
@@ -183,12 +189,12 @@ class MiniLMSearchRerankerTest {
         float score = model.score("query", "document");
 
         float expectedScore = (float) (1.0 / (1.0 + Math.exp(-2.5)));
-        assertEquals(expectedScore, score, 1e-5f);
+        assertThat(score).isCloseTo(expectedScore, within(1e-5f));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
         verify(session).run(captor.capture());
-        assertTrue(captor.getValue().containsKey("token_type_ids"));
+        assertThat(captor.getValue()).containsKey("token_type_ids");
     }
 
     @Test
@@ -215,7 +221,7 @@ class MiniLMSearchRerankerTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
         verify(session).run(captor.capture());
-        assertFalse(captor.getValue().containsKey("token_type_ids"));
+        assertThat(captor.getValue()).doesNotContainKey("token_type_ids");
     }
 
     @Test
@@ -240,9 +246,9 @@ class MiniLMSearchRerankerTest {
 
         float[] scores = model.scoreBatch("query", List.of("doc1", "doc2"));
 
-        assertEquals(2, scores.length);
-        assertTrue(scores[0] > 0.5f);
-        assertTrue(scores[1] < 0.5f);
+        assertThat(scores).hasSize(2);
+        assertThat(scores[0]).isGreaterThan(0.5f);
+        assertThat(scores[1]).isLessThan(0.5f);
     }
 
     // --- Close delegation ---

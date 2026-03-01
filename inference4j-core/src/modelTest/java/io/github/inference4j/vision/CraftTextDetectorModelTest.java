@@ -26,7 +26,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CraftTextDetectorModelTest {
@@ -52,7 +52,7 @@ class CraftTextDetectorModelTest {
     void detect_textImage_findsTextRegions() {
         List<TextRegion> regions = detector.detect(textImage);
 
-        assertFalse(regions.isEmpty(), "Should detect at least one text region");
+        assertThat(regions.isEmpty()).as("Should detect at least one text region").isFalse();
     }
 
     @Test
@@ -61,11 +61,11 @@ class CraftTextDetectorModelTest {
 
         for (TextRegion region : regions) {
             BoundingBox box = region.box();
-            assertTrue(box.x1() >= 0, "x1 should be >= 0, got: " + box.x1());
-            assertTrue(box.y1() >= 0, "y1 should be >= 0, got: " + box.y1());
-            assertTrue(box.x2() > box.x1(), "x2 should be > x1");
-            assertTrue(box.y2() > box.y1(), "y2 should be > y1");
-            assertTrue(region.confidence() > 0f, "Confidence should be positive");
+            assertThat(box.x1() >= 0).as("x1 should be >= 0, got: " + box.x1()).isTrue();
+            assertThat(box.y1() >= 0).as("y1 should be >= 0, got: " + box.y1()).isTrue();
+            assertThat(box.x2() > box.x1()).as("x2 should be > x1").isTrue();
+            assertThat(box.y2() > box.y1()).as("y2 should be > y1").isTrue();
+            assertThat(region.confidence() > 0f).as("Confidence should be positive").isTrue();
         }
     }
 }

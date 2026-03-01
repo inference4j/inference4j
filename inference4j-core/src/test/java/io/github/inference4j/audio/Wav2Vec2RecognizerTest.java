@@ -27,7 +27,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -54,7 +54,7 @@ class Wav2Vec2RecognizerTest {
         Transcription result = io.github.inference4j.audio.Wav2Vec2Recognizer.postProcess(logits, 7, VOCAB_SIZE,
                 VOCAB, BLANK, WORD_DELIM);
 
-        assertEquals("abc", result.text());
+        assertThat(result.text()).isEqualTo("abc");
     }
 
     @Test
@@ -65,7 +65,7 @@ class Wav2Vec2RecognizerTest {
         Transcription result = Wav2Vec2Recognizer.postProcess(logits, 5, VOCAB_SIZE,
                 VOCAB, BLANK, WORD_DELIM);
 
-        assertEquals("a b", result.text());
+        assertThat(result.text()).isEqualTo("a b");
     }
 
     @Test
@@ -75,7 +75,7 @@ class Wav2Vec2RecognizerTest {
         Transcription result = Wav2Vec2Recognizer.postProcess(logits, 4, VOCAB_SIZE,
                 VOCAB, BLANK, WORD_DELIM);
 
-        assertEquals("", result.text());
+        assertThat(result.text()).isEqualTo("");
     }
 
     @Test
@@ -86,7 +86,7 @@ class Wav2Vec2RecognizerTest {
         Transcription result = Wav2Vec2Recognizer.postProcess(logits, 3, VOCAB_SIZE,
                 VOCAB, BLANK, WORD_DELIM);
 
-        assertEquals("a", result.text());
+        assertThat(result.text()).isEqualTo("a");
     }
 
     @Test
@@ -97,7 +97,7 @@ class Wav2Vec2RecognizerTest {
         Transcription result = Wav2Vec2Recognizer.postProcess(logits, 3, VOCAB_SIZE,
                 VOCAB, BLANK, WORD_DELIM);
 
-        assertEquals("aa", result.text());
+        assertThat(result.text()).isEqualTo("aa");
     }
 
     @Test
@@ -108,7 +108,7 @@ class Wav2Vec2RecognizerTest {
         Transcription result = Wav2Vec2Recognizer.postProcess(logits, 4, VOCAB_SIZE,
                 VOCAB, BLANK, WORD_DELIM);
 
-        assertEquals("ab", result.text());
+        assertThat(result.text()).isEqualTo("ab");
     }
 
     // --- Builder validation ---
@@ -116,20 +116,22 @@ class Wav2Vec2RecognizerTest {
     @Test
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 Wav2Vec2Recognizer.builder()
                         .vocabulary(VOCAB)
                         .modelSource(badSource)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
     void builder_missingVocabulary_throws() {
         InferenceSession session = mock(InferenceSession.class);
-        assertThrows(IllegalStateException.class, () ->
+        assertThatThrownBy(() ->
                 Wav2Vec2Recognizer.builder()
                         .session(session)
-                        .build());
+                        .build())
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -142,7 +144,7 @@ class Wav2Vec2RecognizerTest {
                 .vocabulary(VOCAB)
                 .build();
 
-        assertNotNull(model);
+        assertThat(model).isNotNull();
         verify(session).inputNames();
     }
 
@@ -165,7 +167,7 @@ class Wav2Vec2RecognizerTest {
 
         Transcription result = model.transcribe(new float[]{0.1f, 0.2f, 0.3f}, 16000);
 
-        assertEquals("abc", result.text());
+        assertThat(result.text()).isEqualTo("abc");
     }
 
     // --- Close delegation ---

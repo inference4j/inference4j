@@ -18,7 +18,8 @@ package io.github.inference4j.preprocessing.audio;
 import io.github.inference4j.preprocessing.audio.AudioData;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class AudioTransformPipelineTest {
 
@@ -28,8 +29,8 @@ class AudioTransformPipelineTest {
 
         AudioData result = io.github.inference4j.preprocessing.audio.AudioTransformPipeline.builder().build().transform(input);
 
-        assertArrayEquals(input.samples(), result.samples());
-        assertEquals(44100, result.sampleRate());
+        assertThat(result.samples()).isEqualTo(input.samples());
+        assertThat(result.sampleRate()).isEqualTo(44100);
     }
 
     @Test
@@ -42,8 +43,8 @@ class AudioTransformPipelineTest {
                 .build()
                 .transform(input);
 
-        assertEquals(4, result.sampleRate());
-        assertEquals(8, result.samples().length);
+        assertThat(result.sampleRate()).isEqualTo(4);
+        assertThat(result.samples().length).isEqualTo(8);
     }
 
     @Test
@@ -56,8 +57,8 @@ class AudioTransformPipelineTest {
                 .build()
                 .transform(input);
 
-        assertEquals(16000, result.sampleRate());
-        assertSame(samples, result.samples());
+        assertThat(result.sampleRate()).isEqualTo(16000);
+        assertThat(result.samples()).isSameAs(samples);
     }
 
     @Test
@@ -70,19 +71,19 @@ class AudioTransformPipelineTest {
                 .build()
                 .transform(input);
 
-        assertEquals(16000, result.sampleRate());
+        assertThat(result.sampleRate()).isEqualTo(16000);
 
         // Check zero mean
         double mean = 0;
         for (float s : result.samples()) mean += s;
         mean /= result.samples().length;
-        assertEquals(0.0, mean, 1e-5);
+        assertThat(mean).isCloseTo(0.0, within(1e-5));
 
         // Check unit variance
         double variance = 0;
         for (float s : result.samples()) variance += s * s;
         variance /= result.samples().length;
-        assertEquals(1.0, variance, 1e-5);
+        assertThat(variance).isCloseTo(1.0, within(1e-5));
     }
 
     @Test
@@ -97,14 +98,14 @@ class AudioTransformPipelineTest {
                 .build()
                 .transform(input);
 
-        assertEquals(16000, result.sampleRate());
-        assertTrue(result.samples().length > samples.length);
+        assertThat(result.sampleRate()).isEqualTo(16000);
+        assertThat(result.samples().length).isGreaterThan(samples.length);
 
         // Verify normalized (zero mean)
         double mean = 0;
         for (float s : result.samples()) mean += s;
         mean /= result.samples().length;
-        assertEquals(0.0, mean, 1e-5);
+        assertThat(mean).isCloseTo(0.0, within(1e-5));
     }
 
     @Test
@@ -122,9 +123,9 @@ class AudioTransformPipelineTest {
                 .build()
                 .transform(input);
 
-        assertEquals(0.5f, result.samples()[0]);
-        assertEquals(1.0f, result.samples()[1]);
-        assertEquals(1.5f, result.samples()[2]);
+        assertThat(result.samples()[0]).isEqualTo(0.5f);
+        assertThat(result.samples()[1]).isEqualTo(1.0f);
+        assertThat(result.samples()[2]).isEqualTo(1.5f);
     }
 
     @Test
@@ -139,6 +140,6 @@ class AudioTransformPipelineTest {
         AudioData fromProcess = pipeline.process(
                 new AudioData(new float[]{1.0f, 2.0f}, 16000));
 
-        assertArrayEquals(fromTransform.samples(), fromProcess.samples());
+        assertThat(fromProcess.samples()).isEqualTo(fromTransform.samples());
     }
 }

@@ -26,7 +26,7 @@ import org.junit.jupiter.api.TestInstance;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class CoeditGrammarCorrectorModelTest {
 
@@ -52,9 +52,9 @@ class CoeditGrammarCorrectorModelTest {
         void correct_producesNonEmptyText() {
             GenerationResult result = corrector.correct("She go to school yesterday", token -> {});
 
-            assertFalse(result.text().isBlank(), "Corrected text should not be blank");
-            assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
-            assertNotNull(result.duration(), "Duration should not be null");
+            assertThat(result.text().isBlank()).as("Corrected text should not be blank").isFalse();
+            assertThat(result.generatedTokens() > 0).as("Should generate at least one token").isTrue();
+            assertThat(result.duration()).as("Duration should not be null").isNotNull();
         }
 
         @Test
@@ -64,18 +64,16 @@ class CoeditGrammarCorrectorModelTest {
             GenerationResult result = corrector.correct("He don't like the weathers today",
                     streamedTokens::add);
 
-            assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+            assertThat(streamedTokens.isEmpty()).as("Should stream at least one token").isFalse();
             String concatenated = String.join("", streamedTokens);
-            assertEquals(result.text(), concatenated,
-                    "Concatenated streamed tokens should match result text");
+            assertThat(concatenated).as("Concatenated streamed tokens should match result text").isEqualTo(result.text());
         }
 
         @Test
         void correct_respectsMaxNewTokens() {
             GenerationResult result = corrector.correct("She go to school yesterday", token -> {});
 
-            assertTrue(result.generatedTokens() <= 30,
-                    "Should generate at most 30 tokens, got: " + result.generatedTokens());
+            assertThat(result.generatedTokens() <= 30).as("Should generate at most 30 tokens, got: " + result.generatedTokens()).isTrue();
         }
     }
 
@@ -101,8 +99,8 @@ class CoeditGrammarCorrectorModelTest {
         void correct_producesNonEmptyText() {
             GenerationResult result = corrector.correct("She go to school yesterday", token -> {});
 
-            assertFalse(result.text().isBlank(), "Corrected text should not be blank");
-            assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
+            assertThat(result.text().isBlank()).as("Corrected text should not be blank").isFalse();
+            assertThat(result.generatedTokens() > 0).as("Should generate at least one token").isTrue();
         }
 
         @Test
@@ -112,18 +110,16 @@ class CoeditGrammarCorrectorModelTest {
             GenerationResult result = corrector.correct("He don't like the weathers today",
                     streamedTokens::add);
 
-            assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+            assertThat(streamedTokens.isEmpty()).as("Should stream at least one token").isFalse();
             String concatenated = String.join("", streamedTokens);
-            assertEquals(result.text(), concatenated,
-                    "Concatenated streamed tokens should match result text");
+            assertThat(concatenated).as("Concatenated streamed tokens should match result text").isEqualTo(result.text());
         }
 
         @Test
         void correct_respectsMaxNewTokens() {
             GenerationResult result = corrector.correct("She go to school yesterday", token -> {});
 
-            assertTrue(result.generatedTokens() <= 30,
-                    "Should generate at most 30 tokens, got: " + result.generatedTokens());
+            assertThat(result.generatedTokens() <= 30).as("Should generate at most 30 tokens, got: " + result.generatedTokens()).isTrue();
         }
     }
 }

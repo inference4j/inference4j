@@ -27,7 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class Wav2Vec2RecognizerModelTest {
@@ -54,9 +54,9 @@ class Wav2Vec2RecognizerModelTest {
     void transcribe_speechWav_returnsNonEmptyText() {
         Transcription result = recognizer.transcribe(speechFixture);
 
-        assertNotNull(result, "Transcription should not be null");
-        assertNotNull(result.text(), "Transcription text should not be null");
-        assertFalse(result.text().isBlank(), "Transcription should produce non-empty text");
+        assertThat(result).as("Transcription should not be null").isNotNull();
+        assertThat(result.text()).as("Transcription text should not be null").isNotNull();
+        assertThat(result.text().isBlank()).as("Transcription should produce non-empty text").isFalse();
     }
 
     @Test
@@ -65,7 +65,6 @@ class Wav2Vec2RecognizerModelTest {
 
         String text = result.text().toUpperCase();
         // The transcription should contain alphabetic characters (real English words)
-        assertTrue(text.matches(".*[A-Z].*"),
-                "Transcription should contain alphabetic characters, got: " + result.text());
+        assertThat(text.matches(".*[A-Z].*")).as("Transcription should contain alphabetic characters, got: " + result.text()).isTrue();
     }
 }

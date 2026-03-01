@@ -26,7 +26,7 @@ import org.junit.jupiter.api.TestInstance;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class T5SqlGeneratorModelTest {
 
@@ -54,9 +54,9 @@ class T5SqlGeneratorModelTest {
         void generateSql_producesNonEmptyText() {
             GenerationResult result = generator.generateSql("How many users?", SCHEMA, token -> {});
 
-            assertFalse(result.text().isBlank(), "Generated SQL should not be blank");
-            assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
-            assertNotNull(result.duration(), "Duration should not be null");
+            assertThat(result.text().isBlank()).as("Generated SQL should not be blank").isFalse();
+            assertThat(result.generatedTokens() > 0).as("Should generate at least one token").isTrue();
+            assertThat(result.duration()).as("Duration should not be null").isNotNull();
         }
 
         @Test
@@ -66,18 +66,16 @@ class T5SqlGeneratorModelTest {
             GenerationResult result = generator.generateSql("List all user names", SCHEMA,
                     streamedTokens::add);
 
-            assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+            assertThat(streamedTokens.isEmpty()).as("Should stream at least one token").isFalse();
             String concatenated = String.join("", streamedTokens);
-            assertEquals(result.text(), concatenated,
-                    "Concatenated streamed tokens should match result text");
+            assertThat(concatenated).as("Concatenated streamed tokens should match result text").isEqualTo(result.text());
         }
 
         @Test
         void generateSql_respectsMaxNewTokens() {
             GenerationResult result = generator.generateSql("How many users?", SCHEMA, token -> {});
 
-            assertTrue(result.generatedTokens() <= 50,
-                    "Should generate at most 50 tokens, got: " + result.generatedTokens());
+            assertThat(result.generatedTokens() <= 50).as("Should generate at most 50 tokens, got: " + result.generatedTokens()).isTrue();
         }
     }
 
@@ -103,8 +101,8 @@ class T5SqlGeneratorModelTest {
         void generateSql_producesNonEmptyText() {
             GenerationResult result = generator.generateSql("How many users?", SCHEMA, token -> {});
 
-            assertFalse(result.text().isBlank(), "Generated SQL should not be blank");
-            assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
+            assertThat(result.text().isBlank()).as("Generated SQL should not be blank").isFalse();
+            assertThat(result.generatedTokens() > 0).as("Should generate at least one token").isTrue();
         }
 
         @Test
@@ -114,18 +112,16 @@ class T5SqlGeneratorModelTest {
             GenerationResult result = generator.generateSql("List all user names", SCHEMA,
                     streamedTokens::add);
 
-            assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+            assertThat(streamedTokens.isEmpty()).as("Should stream at least one token").isFalse();
             String concatenated = String.join("", streamedTokens);
-            assertEquals(result.text(), concatenated,
-                    "Concatenated streamed tokens should match result text");
+            assertThat(concatenated).as("Concatenated streamed tokens should match result text").isEqualTo(result.text());
         }
 
         @Test
         void generateSql_respectsMaxNewTokens() {
             GenerationResult result = generator.generateSql("How many users?", SCHEMA, token -> {});
 
-            assertTrue(result.generatedTokens() <= 50,
-                    "Should generate at most 50 tokens, got: " + result.generatedTokens());
+            assertThat(result.generatedTokens() <= 50).as("Should generate at most 50 tokens, got: " + result.generatedTokens()).isTrue();
         }
     }
 }

@@ -25,7 +25,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class OnnxTextGeneratorModelTest {
@@ -38,9 +38,9 @@ class OnnxTextGeneratorModelTest {
             try (var gen = OnnxTextGenerator.gpt2().maxNewTokens(20).build()) {
                 GenerationResult result = gen.generate("Once upon a time");
 
-                assertFalse(result.text().isBlank(), "Generated text should not be blank");
-                assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
-                assertNotNull(result.duration(), "Duration should not be null");
+                assertThat(result.text().isBlank()).as("Generated text should not be blank").isFalse();
+                assertThat(result.generatedTokens() > 0).as("Should generate at least one token").isTrue();
+                assertThat(result.duration()).as("Duration should not be null").isNotNull();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -51,8 +51,7 @@ class OnnxTextGeneratorModelTest {
             try (var gen = OnnxTextGenerator.gpt2().maxNewTokens(5).build()) {
                 GenerationResult result = gen.generate("The meaning of life is");
 
-                assertTrue(result.generatedTokens() <= 5,
-                        "Should generate at most 5 tokens, got: " + result.generatedTokens());
+                assertThat(result.generatedTokens() <= 5).as("Should generate at most 5 tokens, got: " + result.generatedTokens()).isTrue();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -65,10 +64,9 @@ class OnnxTextGeneratorModelTest {
 
                 GenerationResult result = gen.generate("The quick brown fox", streamedTokens::add);
 
-                assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+                assertThat(streamedTokens.isEmpty()).as("Should stream at least one token").isFalse();
                 String concatenated = String.join("", streamedTokens);
-                assertEquals(result.text(), concatenated,
-                        "Concatenated streamed tokens should match result text");
+                assertThat(concatenated).as("Concatenated streamed tokens should match result text").isEqualTo(result.text());
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -83,8 +81,8 @@ class OnnxTextGeneratorModelTest {
             try (var gen = OnnxTextGenerator.smolLM2().maxNewTokens(20).build()) {
                 GenerationResult result = gen.generate("What is the capital of France?");
 
-                assertFalse(result.text().isBlank(), "Generated text should not be blank");
-                assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
+                assertThat(result.text().isBlank()).as("Generated text should not be blank").isFalse();
+                assertThat(result.generatedTokens() > 0).as("Should generate at least one token").isTrue();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -95,8 +93,7 @@ class OnnxTextGeneratorModelTest {
             try (var gen = OnnxTextGenerator.smolLM2().maxNewTokens(5).build()) {
                 GenerationResult result = gen.generate("Tell me a joke");
 
-                assertTrue(result.generatedTokens() <= 5,
-                        "Should generate at most 5 tokens, got: " + result.generatedTokens());
+                assertThat(result.generatedTokens() <= 5).as("Should generate at most 5 tokens, got: " + result.generatedTokens()).isTrue();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -109,10 +106,9 @@ class OnnxTextGeneratorModelTest {
 
                 GenerationResult result = gen.generate("Explain gravity", streamedTokens::add);
 
-                assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+                assertThat(streamedTokens.isEmpty()).as("Should stream at least one token").isFalse();
                 String concatenated = String.join("", streamedTokens);
-                assertEquals(result.text(), concatenated,
-                        "Concatenated streamed tokens should match result text");
+                assertThat(concatenated).as("Concatenated streamed tokens should match result text").isEqualTo(result.text());
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -127,8 +123,8 @@ class OnnxTextGeneratorModelTest {
             try (var gen = OnnxTextGenerator.qwen2().maxNewTokens(20).build()) {
                 GenerationResult result = gen.generate("What is 2+2?");
 
-                assertFalse(result.text().isBlank(), "Generated text should not be blank");
-                assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
+                assertThat(result.text().isBlank()).as("Generated text should not be blank").isFalse();
+                assertThat(result.generatedTokens() > 0).as("Should generate at least one token").isTrue();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -139,8 +135,7 @@ class OnnxTextGeneratorModelTest {
             try (var gen = OnnxTextGenerator.qwen2().maxNewTokens(5).build()) {
                 GenerationResult result = gen.generate("Explain gravity");
 
-                assertTrue(result.generatedTokens() <= 5,
-                        "Should generate at most 5 tokens, got: " + result.generatedTokens());
+                assertThat(result.generatedTokens() <= 5).as("Should generate at most 5 tokens, got: " + result.generatedTokens()).isTrue();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -154,10 +149,9 @@ class OnnxTextGeneratorModelTest {
                 GenerationResult result = gen.generate("What is the capital of France?",
                         streamedTokens::add);
 
-                assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+                assertThat(streamedTokens.isEmpty()).as("Should stream at least one token").isFalse();
                 String concatenated = String.join("", streamedTokens);
-                assertEquals(result.text(), concatenated,
-                        "Concatenated streamed tokens should match result text");
+                assertThat(concatenated).as("Concatenated streamed tokens should match result text").isEqualTo(result.text());
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -172,8 +166,8 @@ class OnnxTextGeneratorModelTest {
             try (var gen = OnnxTextGenerator.tinyLlama().maxNewTokens(20).build()) {
                 GenerationResult result = gen.generate("What is the capital of France?");
 
-                assertFalse(result.text().isBlank(), "Generated text should not be blank");
-                assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
+                assertThat(result.text().isBlank()).as("Generated text should not be blank").isFalse();
+                assertThat(result.generatedTokens() > 0).as("Should generate at least one token").isTrue();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -184,8 +178,7 @@ class OnnxTextGeneratorModelTest {
             try (var gen = OnnxTextGenerator.tinyLlama().maxNewTokens(5).build()) {
                 GenerationResult result = gen.generate("Tell me a joke");
 
-                assertTrue(result.generatedTokens() <= 5,
-                        "Should generate at most 5 tokens, got: " + result.generatedTokens());
+                assertThat(result.generatedTokens() <= 5).as("Should generate at most 5 tokens, got: " + result.generatedTokens()).isTrue();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -198,10 +191,9 @@ class OnnxTextGeneratorModelTest {
 
                 GenerationResult result = gen.generate("Explain gravity", streamedTokens::add);
 
-                assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+                assertThat(streamedTokens.isEmpty()).as("Should stream at least one token").isFalse();
                 String concatenated = String.join("", streamedTokens);
-                assertEquals(result.text(), concatenated,
-                        "Concatenated streamed tokens should match result text");
+                assertThat(concatenated).as("Concatenated streamed tokens should match result text").isEqualTo(result.text());
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -224,8 +216,8 @@ class OnnxTextGeneratorModelTest {
                     .maxNewTokens(20).build()) {
                 GenerationResult result = gen.generate("What is the capital of France?");
 
-                assertFalse(result.text().isBlank(), "Generated text should not be blank");
-                assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
+                assertThat(result.text().isBlank()).as("Generated text should not be blank").isFalse();
+                assertThat(result.generatedTokens() > 0).as("Should generate at least one token").isTrue();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -241,8 +233,7 @@ class OnnxTextGeneratorModelTest {
                     .maxNewTokens(5).build()) {
                 GenerationResult result = gen.generate("Explain gravity");
 
-                assertTrue(result.generatedTokens() <= 5,
-                        "Should generate at most 5 tokens, got: " + result.generatedTokens());
+                assertThat(result.generatedTokens() <= 5).as("Should generate at most 5 tokens, got: " + result.generatedTokens()).isTrue();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -261,10 +252,9 @@ class OnnxTextGeneratorModelTest {
                 GenerationResult result = gen.generate("What is 2+2?",
                         streamedTokens::add);
 
-                assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+                assertThat(streamedTokens.isEmpty()).as("Should stream at least one token").isFalse();
                 String concatenated = String.join("", streamedTokens);
-                assertEquals(result.text(), concatenated,
-                        "Concatenated streamed tokens should match result text");
+                assertThat(concatenated).as("Concatenated streamed tokens should match result text").isEqualTo(result.text());
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

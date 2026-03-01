@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class RoundRobinRoutingStrategyTest {
 
@@ -33,11 +33,11 @@ class RoundRobinRoutingStrategyTest {
         Route<String> c = Route.of("c", "model-c", 1);
         List<Route<String>> routes = List.of(a, b, c);
 
-        assertEquals(a, strategy.select(routes));
-        assertEquals(b, strategy.select(routes));
-        assertEquals(c, strategy.select(routes));
-        assertEquals(a, strategy.select(routes));
-        assertEquals(b, strategy.select(routes));
+        assertThat(strategy.select(routes)).isEqualTo(a);
+        assertThat(strategy.select(routes)).isEqualTo(b);
+        assertThat(strategy.select(routes)).isEqualTo(c);
+        assertThat(strategy.select(routes)).isEqualTo(a);
+        assertThat(strategy.select(routes)).isEqualTo(b);
     }
 
     @Test
@@ -48,7 +48,7 @@ class RoundRobinRoutingStrategyTest {
         List<Route<String>> routes = List.of(only);
 
         for (int i = 0; i < 10; i++) {
-            assertEquals(only, strategy.select(routes));
+            assertThat(strategy.select(routes)).isEqualTo(only);
         }
     }
 
@@ -62,8 +62,8 @@ class RoundRobinRoutingStrategyTest {
 
         // Run through multiple full cycles
         for (int cycle = 0; cycle < 5; cycle++) {
-            assertEquals(a, strategy.select(routes), "Cycle " + cycle + " first");
-            assertEquals(b, strategy.select(routes), "Cycle " + cycle + " second");
+            assertThat(strategy.select(routes)).as("Cycle " + cycle + " first").isEqualTo(a);
+            assertThat(strategy.select(routes)).as("Cycle " + cycle + " second").isEqualTo(b);
         }
     }
 }

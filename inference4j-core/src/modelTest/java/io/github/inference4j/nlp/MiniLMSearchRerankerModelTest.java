@@ -23,7 +23,7 @@ import org.junit.jupiter.api.TestInstance;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class MiniLMSearchRerankerModelTest {
@@ -45,16 +45,14 @@ class MiniLMSearchRerankerModelTest {
         float relevantScore = reranker.score("What is Java?", "Java is a programming language.");
         float irrelevantScore = reranker.score("What is Java?", "The weather is sunny today.");
 
-        assertTrue(relevantScore > irrelevantScore,
-                "Relevant pair should score higher: relevant=" + relevantScore + " irrelevant=" + irrelevantScore);
+        assertThat(relevantScore > irrelevantScore).as("Relevant pair should score higher: relevant=" + relevantScore + " irrelevant=" + irrelevantScore).isTrue();
     }
 
     @Test
     void score_returnsValueBetweenZeroAndOne() {
         float score = reranker.score("What is Java?", "Java is a programming language.");
 
-        assertTrue(score >= 0f && score <= 1f,
-                "Score should be between 0 and 1, got: " + score);
+        assertThat(score >= 0f && score <= 1f).as("Score should be between 0 and 1, got: " + score).isTrue();
     }
 
     @Test
@@ -65,10 +63,9 @@ class MiniLMSearchRerankerModelTest {
                 "Java was developed by Sun Microsystems."
         ));
 
-        assertEquals(3, scores.length, "Should return one score per document");
+        assertThat(scores.length).as("Should return one score per document").isEqualTo(3);
         for (float score : scores) {
-            assertTrue(score >= 0f && score <= 1f,
-                    "Each score should be between 0 and 1, got: " + score);
+            assertThat(score >= 0f && score <= 1f).as("Each score should be between 0 and 1, got: " + score).isTrue();
         }
     }
 }

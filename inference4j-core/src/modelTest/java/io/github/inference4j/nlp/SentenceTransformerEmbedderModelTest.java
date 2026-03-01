@@ -23,7 +23,7 @@ import org.junit.jupiter.api.TestInstance;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SentenceTransformerEmbedderModelTest {
@@ -46,10 +46,9 @@ class SentenceTransformerEmbedderModelTest {
     void encode_returnsNonEmptyFiniteEmbedding() {
         float[] embedding = embedder.encode("Hello, world!");
 
-        assertTrue(embedding.length > 0, "Embedding should be non-empty");
+        assertThat(embedding.length > 0).as("Embedding should be non-empty").isTrue();
         for (int i = 0; i < embedding.length; i++) {
-            assertTrue(Float.isFinite(embedding[i]),
-                    "Embedding value at index " + i + " should be finite, got: " + embedding[i]);
+            assertThat(Float.isFinite(embedding[i])).as("Embedding value at index " + i + " should be finite, got: " + embedding[i]).isTrue();
         }
     }
 
@@ -58,10 +57,10 @@ class SentenceTransformerEmbedderModelTest {
         List<String> texts = List.of("Hello, world!", "How are you?", "Good morning.");
         List<float[]> embeddings = embedder.encodeBatch(texts);
 
-        assertEquals(3, embeddings.size(), "Should return one embedding per input text");
+        assertThat(embeddings.size()).as("Should return one embedding per input text").isEqualTo(3);
         int dim = embeddings.get(0).length;
         for (float[] embedding : embeddings) {
-            assertEquals(dim, embedding.length, "All embeddings should have the same dimension");
+            assertThat(embedding.length).as("All embeddings should have the same dimension").isEqualTo(dim);
         }
     }
 
@@ -74,8 +73,7 @@ class SentenceTransformerEmbedderModelTest {
         float simAB = cosineSimilarity(embA, embB);
         float simAC = cosineSimilarity(embA, embC);
 
-        assertTrue(simAB > simAC,
-                "Similar sentences should be closer: simAB=" + simAB + " simAC=" + simAC);
+        assertThat(simAB > simAC).as("Similar sentences should be closer: simAB=" + simAB + " simAC=" + simAC).isTrue();
     }
 
     private static float cosineSimilarity(float[] a, float[] b) {

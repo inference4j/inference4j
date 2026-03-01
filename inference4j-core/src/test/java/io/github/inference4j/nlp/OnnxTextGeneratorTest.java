@@ -28,17 +28,18 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class OnnxTextGeneratorTest {
 
     @Test
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 OnnxTextGenerator.builder()
                         .modelSource(badSource)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
@@ -49,10 +50,11 @@ class OnnxTextGeneratorTest {
 
         ModelSource source = id -> dir;
 
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 OnnxTextGenerator.builder()
                         .modelSource(source)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
@@ -63,10 +65,11 @@ class OnnxTextGeneratorTest {
 
         ModelSource source = id -> dir;
 
-        assertThrows(RuntimeException.class, () ->
+        assertThatThrownBy(() ->
                 OnnxTextGenerator.builder()
                         .modelSource(source)
-                        .build());
+                        .build())
+                .isInstanceOf(RuntimeException.class);
     }
 
     @Test
@@ -77,10 +80,11 @@ class OnnxTextGeneratorTest {
 
         ModelSource source = id -> dir;
 
-        assertThrows(RuntimeException.class, () ->
+        assertThatThrownBy(() ->
                 OnnxTextGenerator.builder()
                         .modelSource(source)
-                        .build());
+                        .build())
+                .isInstanceOf(RuntimeException.class);
     }
 
     @Test
@@ -91,10 +95,11 @@ class OnnxTextGeneratorTest {
 
         ModelSource source = id -> dir;
 
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 OnnxTextGenerator.builder()
                         .modelSource(source)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
@@ -113,7 +118,7 @@ class OnnxTextGeneratorTest {
                 .tokenizerProvider(DecodingBpeTokenizer.provider(OnnxTextGenerator.QWEN2_PATTERN))
                 .chatTemplate(msg -> "<|user|>" + msg);
 
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
@@ -122,51 +127,53 @@ class OnnxTextGeneratorTest {
                 .modelId("custom/model")
                 .tokenizerProvider(SentencePieceBpeTokenizer.provider());
 
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
     void gpt2_preset_returnsBuilder() {
         OnnxTextGenerator.Builder builder = OnnxTextGenerator.gpt2();
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
     void smolLM2_preset_returnsBuilder() {
         OnnxTextGenerator.Builder builder = OnnxTextGenerator.smolLM2();
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
     void qwen2_preset_returnsBuilder() {
         OnnxTextGenerator.Builder builder = OnnxTextGenerator.qwen2();
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
     void gemma2_preset_returnsBuilder() {
         OnnxTextGenerator.Builder builder = OnnxTextGenerator.gemma2();
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
     void tinyLlama_preset_returnsBuilder() {
         OnnxTextGenerator.Builder builder = OnnxTextGenerator.tinyLlama();
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
     void builder_noModelIdOrSource_throws() {
-        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                OnnxTextGenerator.builder().build());
-        assertTrue(ex.getMessage().contains("modelId"));
-        assertTrue(ex.getMessage().contains("modelSource"));
+        assertThatThrownBy(() -> OnnxTextGenerator.builder().build())
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> {
+                    assertThat(ex.getMessage()).contains("modelId");
+                    assertThat(ex.getMessage()).contains("modelSource");
+                });
     }
 
     @Test
     void gemma2_preset_requiresModelSource() {
-        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                OnnxTextGenerator.gemma2().build());
-        assertTrue(ex.getMessage().contains("modelSource"));
+        assertThatThrownBy(() -> OnnxTextGenerator.gemma2().build())
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> assertThat(ex.getMessage()).contains("modelSource"));
     }
 }

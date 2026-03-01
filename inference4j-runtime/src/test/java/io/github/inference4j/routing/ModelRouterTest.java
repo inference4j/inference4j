@@ -22,7 +22,8 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ModelRouterTest {
 
@@ -113,7 +114,7 @@ class ModelRouterTest {
                 .route("primary", model, 1)
                 .build()) {
 
-            assertEquals("result:hello", router.process("hello"));
+            assertThat(router.process("hello")).isEqualTo("result:hello");
         }
     }
 
@@ -130,7 +131,7 @@ class ModelRouterTest {
             router.process("hello");
         }
 
-        assertEquals(List.of("success:test:primary"), metrics.events);
+        assertThat(metrics.events).isEqualTo(List.of("success:test:primary"));
     }
 
     @Test
@@ -143,10 +144,10 @@ class ModelRouterTest {
                 .metrics(metrics)
                 .build()) {
 
-            assertThrows(RuntimeException.class, () -> router.process("hello"));
+            assertThatThrownBy(() -> router.process("hello")).isInstanceOf(RuntimeException.class);
         }
 
-        assertEquals(List.of("failure:test:primary"), metrics.events);
+        assertThat(metrics.events).isEqualTo(List.of("failure:test:primary"));
     }
 
     @Test
@@ -163,12 +164,12 @@ class ModelRouterTest {
                 .build()) {
 
             String result = router.process("hello");
-            assertEquals("primary:hello", result);
+            assertThat(result).isEqualTo("primary:hello");
         }
 
-        assertEquals(2, metrics.events.size());
-        assertEquals("success:test:primary", metrics.events.get(0));
-        assertEquals("shadow:test:shadow:true", metrics.events.get(1));
+        assertThat(metrics.events).hasSize(2);
+        assertThat(metrics.events.get(0)).isEqualTo("success:test:primary");
+        assertThat(metrics.events.get(1)).isEqualTo("shadow:test:shadow:true");
     }
 
     @Test
@@ -184,7 +185,7 @@ class ModelRouterTest {
 
             // Should not throw even though shadow fails
             String result = router.process("hello");
-            assertEquals("ok:hello", result);
+            assertThat(result).isEqualTo("ok:hello");
         }
     }
 
@@ -203,9 +204,9 @@ class ModelRouterTest {
 
         router.close();
 
-        assertTrue(model1.closed);
-        assertTrue(model2.closed);
-        assertTrue(shadowModel.closed);
+        assertThat(model1.closed).isTrue();
+        assertThat(model2.closed).isTrue();
+        assertThat(shadowModel.closed).isTrue();
     }
 
     @Test
@@ -220,23 +221,23 @@ class ModelRouterTest {
 
         router.close();
 
-        assertFalse(model.closed);
+        assertThat(model.closed).isFalse();
     }
 
     @Test
     void throwsWhenNoRoutes() {
-        assertThrows(RoutingException.class, () ->
-                TestModelRouter.builder()
+        assertThatThrownBy(() -> TestModelRouter.builder()
                         .name("test")
-                        .build());
+                        .build())
+                .isInstanceOf(RoutingException.class);
     }
 
     @Test
     void throwsWhenNoName() {
-        assertThrows(NullPointerException.class, () ->
-                TestModelRouter.builder()
+        assertThatThrownBy(() -> TestModelRouter.builder()
                         .route("r", new StubTestModel("a"), 1)
-                        .build());
+                        .build())
+                .isInstanceOf(NullPointerException.class);
     }
 
     @Test
@@ -251,9 +252,9 @@ class ModelRouterTest {
                 .strategy(new RoundRobinRoutingStrategy())
                 .build()) {
 
-            assertEquals("a:x", router.process("x"));
-            assertEquals("b:x", router.process("x"));
-            assertEquals("a:x", router.process("x"));
+            assertThat(router.process("x")).isEqualTo("a:x");
+            assertThat(router.process("x")).isEqualTo("b:x");
+            assertThat(router.process("x")).isEqualTo("a:x");
         }
     }
 }

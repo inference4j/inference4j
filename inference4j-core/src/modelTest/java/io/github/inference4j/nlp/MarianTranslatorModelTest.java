@@ -26,7 +26,7 @@ import org.junit.jupiter.api.TestInstance;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class MarianTranslatorModelTest {
 
@@ -53,9 +53,9 @@ class MarianTranslatorModelTest {
         void translate_producesNonEmptyText() {
             GenerationResult result = translator.translate("Hello, how are you?", token -> {});
 
-            assertFalse(result.text().isBlank(), "Translated text should not be blank");
-            assertTrue(result.generatedTokens() > 0, "Should generate at least one token");
-            assertNotNull(result.duration(), "Duration should not be null");
+            assertThat(result.text().isBlank()).as("Translated text should not be blank").isFalse();
+            assertThat(result.generatedTokens() > 0).as("Should generate at least one token").isTrue();
+            assertThat(result.duration()).as("Duration should not be null").isNotNull();
         }
 
         @Test
@@ -65,10 +65,9 @@ class MarianTranslatorModelTest {
             GenerationResult result = translator.translate("The weather is nice today",
                     streamedTokens::add);
 
-            assertFalse(streamedTokens.isEmpty(), "Should stream at least one token");
+            assertThat(streamedTokens.isEmpty()).as("Should stream at least one token").isFalse();
             String concatenated = String.join("", streamedTokens);
-            assertEquals(result.text(), concatenated,
-                    "Concatenated streamed tokens should match result text");
+            assertThat(concatenated).as("Concatenated streamed tokens should match result text").isEqualTo(result.text());
         }
 
         @Test
@@ -81,8 +80,7 @@ class MarianTranslatorModelTest {
                 GenerationResult result = limited.translate(
                         "Good morning, I hope you have a wonderful day", token -> {});
 
-                assertTrue(result.generatedTokens() <= 5,
-                        "Should generate at most 5 tokens, got: " + result.generatedTokens());
+                assertThat(result.generatedTokens() <= 5).as("Should generate at most 5 tokens, got: " + result.generatedTokens()).isTrue();
             } finally {
                 limited.close();
             }

@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -49,13 +49,13 @@ class ResNetClassifierTest {
 
         List<Classification> results = io.github.inference4j.vision.ResNetClassifier.postProcess(logits, TEST_LABELS, 3, OutputOperator.softmax());
 
-        assertEquals(3, results.size());
-        assertEquals("dog", results.get(0).label());
-        assertEquals(1, results.get(0).index());
-        assertEquals("horse", results.get(1).label());
-        assertEquals(4, results.get(1).index());
-        assertEquals("bird", results.get(2).label());
-        assertEquals(2, results.get(2).index());
+        assertThat(results).hasSize(3);
+        assertThat(results.get(0).label()).isEqualTo("dog");
+        assertThat(results.get(0).index()).isEqualTo(1);
+        assertThat(results.get(1).label()).isEqualTo("horse");
+        assertThat(results.get(1).index()).isEqualTo(4);
+        assertThat(results.get(2).label()).isEqualTo("bird");
+        assertThat(results.get(2).index()).isEqualTo(2);
     }
 
     @Test
@@ -66,11 +66,11 @@ class ResNetClassifierTest {
 
         float sum = 0f;
         for (Classification c : results) {
-            assertTrue(c.confidence() > 0f);
-            assertTrue(c.confidence() <= 1f);
+            assertThat(c.confidence()).isGreaterThan(0f);
+            assertThat(c.confidence()).isLessThanOrEqualTo(1f);
             sum += c.confidence();
         }
-        assertEquals(1.0f, sum, 1e-5f);
+        assertThat(sum).isCloseTo(1.0f, within(1e-5f));
     }
 
     @Test
@@ -80,8 +80,9 @@ class ResNetClassifierTest {
         List<Classification> results = ResNetClassifier.postProcess(logits, TEST_LABELS, 5, OutputOperator.softmax());
 
         for (int i = 1; i < results.size(); i++) {
-            assertTrue(results.get(i - 1).confidence() >= results.get(i).confidence(),
-                    "Results not sorted descending at index " + i);
+            assertThat(results.get(i - 1).confidence())
+                    .as("Results not sorted descending at index " + i)
+                    .isGreaterThanOrEqualTo(results.get(i).confidence());
         }
     }
 
@@ -91,8 +92,8 @@ class ResNetClassifierTest {
 
         List<Classification> results = ResNetClassifier.postProcess(logits, TEST_LABELS, 10, OutputOperator.softmax());
 
-        assertEquals(5, results.size());
-        assertEquals("horse", results.get(0).label());
+        assertThat(results).hasSize(5);
+        assertThat(results.get(0).label()).isEqualTo("horse");
     }
 
     @Test
@@ -101,9 +102,9 @@ class ResNetClassifierTest {
 
         List<Classification> results = ResNetClassifier.postProcess(logits, TEST_LABELS, 1, OutputOperator.softmax());
 
-        assertEquals(1, results.size());
-        assertEquals("dog", results.get(0).label());
-        assertEquals(1, results.get(0).index());
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).label()).isEqualTo("dog");
+        assertThat(results.get(0).index()).isEqualTo(1);
     }
 
     @Test
@@ -112,9 +113,9 @@ class ResNetClassifierTest {
 
         List<Classification> results = ResNetClassifier.postProcess(logits, TEST_LABELS, 1, OutputOperator.softmax());
 
-        assertEquals("cat", results.get(0).label());
-        assertEquals(0, results.get(0).index());
-        assertTrue(results.get(0).confidence() > 0.99f);
+        assertThat(results.get(0).label()).isEqualTo("cat");
+        assertThat(results.get(0).index()).isEqualTo(0);
+        assertThat(results.get(0).confidence()).isGreaterThan(0.99f);
     }
 
     @Test
@@ -125,7 +126,7 @@ class ResNetClassifierTest {
 
         float expected = 1.0f / 5;
         for (Classification c : results) {
-            assertEquals(expected, c.confidence(), 1e-5f);
+            assertThat(c.confidence()).isCloseTo(expected, within(1e-5f));
         }
     }
 
@@ -134,11 +135,12 @@ class ResNetClassifierTest {
     @Test
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 ResNetClassifier.builder()
                         .inputName("input")
                         .modelSource(badSource)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
@@ -150,7 +152,7 @@ class ResNetClassifierTest {
                 .session(session)
                 .build();
 
-        assertNotNull(model);
+        assertThat(model).isNotNull();
         verify(session).inputNames();
     }
 
@@ -179,9 +181,9 @@ class ResNetClassifierTest {
         BufferedImage image = new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB);
         List<Classification> results = model.classify(image);
 
-        assertEquals(5, results.size());
-        assertEquals("dog", results.get(0).label());
-        assertEquals(1, results.get(0).index());
+        assertThat(results).hasSize(5);
+        assertThat(results.get(0).label()).isEqualTo("dog");
+        assertThat(results.get(0).index()).isEqualTo(1);
     }
 
     // --- Close delegation ---

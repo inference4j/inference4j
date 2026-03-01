@@ -25,7 +25,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ClipImageEncoderModelTest {
@@ -48,10 +48,9 @@ class ClipImageEncoderModelTest {
     void encode_catImage_returnsNonEmptyFiniteEmbedding() {
         float[] embedding = encoder.encode(catImage);
 
-        assertTrue(embedding.length > 0, "Embedding should be non-empty");
+        assertThat(embedding.length > 0).as("Embedding should be non-empty").isTrue();
         for (int i = 0; i < embedding.length; i++) {
-            assertTrue(Float.isFinite(embedding[i]),
-                    "Embedding value at index " + i + " should be finite, got: " + embedding[i]);
+            assertThat(Float.isFinite(embedding[i])).as("Embedding value at index " + i + " should be finite, got: " + embedding[i]).isTrue();
         }
     }
 
@@ -59,7 +58,7 @@ class ClipImageEncoderModelTest {
     void encode_catImage_returns512Dimensions() {
         float[] embedding = encoder.encode(catImage);
 
-        assertEquals(512, embedding.length, "CLIP ViT-B/32 should produce 512-dim embeddings");
+        assertThat(embedding.length).as("CLIP ViT-B/32 should produce 512-dim embeddings").isEqualTo(512);
     }
 
     @Test
@@ -72,7 +71,6 @@ class ClipImageEncoderModelTest {
         }
         norm = (float) Math.sqrt(norm);
 
-        assertEquals(1.0f, norm, 1e-3f,
-                "Embedding should be L2-normalized (norm ≈ 1.0), got: " + norm);
+        assertThat(norm).as("Embedding should be L2-normalized (norm ≈ 1.0), got: " + norm).isCloseTo(1.0f, within(1e-3f));
     }
 }

@@ -26,7 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.*;
 
@@ -66,7 +66,7 @@ class EncoderDecoderSessionTest {
 
     @Test
     void cacheSequenceLength_initiallyZero() {
-        assertEquals(0, session.cacheSequenceLength());
+        assertThat(session.cacheSequenceLength()).isEqualTo(0);
     }
 
     @Test
@@ -84,24 +84,24 @@ class EncoderDecoderSessionTest {
         ArgumentCaptor<Map<String, Tensor>> encoderCaptor = ArgumentCaptor.forClass(Map.class);
         verify(encoderSession).run(encoderCaptor.capture());
         Map<String, Tensor> encoderInputs = encoderCaptor.getValue();
-        assertTrue(encoderInputs.containsKey("input_ids"), "Encoder should receive input_ids");
-        assertTrue(encoderInputs.containsKey("attention_mask"), "Encoder should receive attention_mask");
-        assertArrayEquals(new long[]{1, srcLen}, encoderInputs.get("input_ids").shape());
-        assertArrayEquals(inputTokens, encoderInputs.get("input_ids").toLongs());
+        assertThat(encoderInputs.containsKey("input_ids")).as("Encoder should receive input_ids").isTrue();
+        assertThat(encoderInputs.containsKey("attention_mask")).as("Encoder should receive attention_mask").isTrue();
+        assertThat(encoderInputs.get("input_ids").shape()).isEqualTo(new long[]{1, srcLen});
+        assertThat(encoderInputs.get("input_ids").toLongs()).isEqualTo(inputTokens);
 
         // Decoder should be called with encoder_hidden_states
         ArgumentCaptor<Map<String, Tensor>> decoderCaptor = ArgumentCaptor.forClass(Map.class);
         verify(decoderSession).run(decoderCaptor.capture());
         Map<String, Tensor> decoderInputs = decoderCaptor.getValue();
-        assertTrue(decoderInputs.containsKey("input_ids"), "Decoder should receive input_ids");
-        assertTrue(decoderInputs.containsKey("encoder_hidden_states"),
-                "Decoder should receive encoder_hidden_states");
-        assertTrue(decoderInputs.containsKey("encoder_attention_mask"),
-                "Decoder should receive encoder_attention_mask");
+        assertThat(decoderInputs.containsKey("input_ids")).as("Decoder should receive input_ids").isTrue();
+        assertThat(decoderInputs.containsKey("encoder_hidden_states"))
+                .as("Decoder should receive encoder_hidden_states").isTrue();
+        assertThat(decoderInputs.containsKey("encoder_attention_mask"))
+                .as("Decoder should receive encoder_attention_mask").isTrue();
         // Decoder input_ids should be [1,1] with the decoder start token
-        assertArrayEquals(new long[]{1, 1}, decoderInputs.get("input_ids").shape());
-        assertArrayEquals(new long[]{DECODER_START_TOKEN_ID},
-                decoderInputs.get("input_ids").toLongs());
+        assertThat(decoderInputs.get("input_ids").shape()).isEqualTo(new long[]{1, 1});
+        assertThat(decoderInputs.get("input_ids").toLongs())
+                .isEqualTo(new long[]{DECODER_START_TOKEN_ID});
     }
 
     @Test
@@ -112,8 +112,8 @@ class EncoderDecoderSessionTest {
 
         ForwardResult result = session.prefill(new long[]{10, 20, 30});
 
-        assertNotNull(result.logits());
-        assertEquals(VOCAB_SIZE, result.logits().length);
+        assertThat(result.logits()).isNotNull();
+        assertThat(result.logits().length).isEqualTo(VOCAB_SIZE);
     }
 
     @Test
@@ -135,10 +135,10 @@ class EncoderDecoderSessionTest {
 
         // Cross-attention cache keys should be present
         for (int i = 0; i < NUM_LAYERS; i++) {
-            assertTrue(inputs.containsKey("past_key_values." + i + ".encoder.key"),
-                    "Missing cross-attention key for layer " + i);
-            assertTrue(inputs.containsKey("past_key_values." + i + ".encoder.value"),
-                    "Missing cross-attention value for layer " + i);
+            assertThat(inputs.containsKey("past_key_values." + i + ".encoder.key"))
+                    .as("Missing cross-attention key for layer " + i).isTrue();
+            assertThat(inputs.containsKey("past_key_values." + i + ".encoder.value"))
+                    .as("Missing cross-attention value for layer " + i).isTrue();
         }
     }
 
@@ -159,14 +159,14 @@ class EncoderDecoderSessionTest {
 
         // Both self-attention and cross-attention cache entries must be present
         for (int i = 0; i < NUM_LAYERS; i++) {
-            assertTrue(inputs.containsKey("past_key_values." + i + ".decoder.key"),
-                    "Missing self-attention key for layer " + i);
-            assertTrue(inputs.containsKey("past_key_values." + i + ".decoder.value"),
-                    "Missing self-attention value for layer " + i);
-            assertTrue(inputs.containsKey("past_key_values." + i + ".encoder.key"),
-                    "Missing cross-attention key for layer " + i);
-            assertTrue(inputs.containsKey("past_key_values." + i + ".encoder.value"),
-                    "Missing cross-attention value for layer " + i);
+            assertThat(inputs.containsKey("past_key_values." + i + ".decoder.key"))
+                    .as("Missing self-attention key for layer " + i).isTrue();
+            assertThat(inputs.containsKey("past_key_values." + i + ".decoder.value"))
+                    .as("Missing self-attention value for layer " + i).isTrue();
+            assertThat(inputs.containsKey("past_key_values." + i + ".encoder.key"))
+                    .as("Missing cross-attention key for layer " + i).isTrue();
+            assertThat(inputs.containsKey("past_key_values." + i + ".encoder.value"))
+                    .as("Missing cross-attention value for layer " + i).isTrue();
         }
     }
 
@@ -185,11 +185,11 @@ class EncoderDecoderSessionTest {
         verify(decoderWithPastSession).run(captor.capture());
         Map<String, Tensor> inputs = captor.getValue();
 
-        assertTrue(inputs.containsKey("encoder_attention_mask"),
-                "Decode step should pass encoder_attention_mask");
-        assertArrayEquals(new long[]{1, srcLen},
-                inputs.get("encoder_attention_mask").shape(),
-                "encoder_attention_mask shape should match source length");
+        assertThat(inputs.containsKey("encoder_attention_mask"))
+                .as("Decode step should pass encoder_attention_mask").isTrue();
+        assertThat(inputs.get("encoder_attention_mask").shape())
+                .as("encoder_attention_mask shape should match source length")
+                .isEqualTo(new long[]{1, srcLen});
     }
 
     @Test
@@ -219,8 +219,9 @@ class EncoderDecoderSessionTest {
         Tensor crossKey0Second = secondDecodeInputs.get("past_key_values.0.encoder.key");
 
         // Cross-attention cache should be the exact same object (frozen, not updated)
-        assertSame(crossKey0First, crossKey0Second,
-                "Cross-attention cache should be frozen (same object across decode steps)");
+        assertThat(crossKey0Second)
+                .as("Cross-attention cache should be frozen (same object across decode steps)")
+                .isSameAs(crossKey0First);
     }
 
     @Test
@@ -230,15 +231,15 @@ class EncoderDecoderSessionTest {
         stubDecoderRun(srcLen);
         session.prefill(new long[]{10, 20});
 
-        assertEquals(1, session.cacheSequenceLength(), "After prefill, sequence length should be 1");
+        assertThat(session.cacheSequenceLength()).as("After prefill, sequence length should be 1").isEqualTo(1);
 
         stubDecoderWithPastRun(srcLen);
         session.decode(42L);
-        assertEquals(2, session.cacheSequenceLength(), "After first decode, sequence length should be 2");
+        assertThat(session.cacheSequenceLength()).as("After first decode, sequence length should be 2").isEqualTo(2);
 
         stubDecoderWithPastRun(srcLen);
         session.decode(43L);
-        assertEquals(3, session.cacheSequenceLength(), "After second decode, sequence length should be 3");
+        assertThat(session.cacheSequenceLength()).as("After second decode, sequence length should be 3").isEqualTo(3);
     }
 
     @Test
@@ -248,11 +249,11 @@ class EncoderDecoderSessionTest {
         stubDecoderRun(srcLen);
         session.prefill(new long[]{10, 20});
 
-        assertEquals(1, session.cacheSequenceLength());
+        assertThat(session.cacheSequenceLength()).isEqualTo(1);
 
         session.resetCache();
 
-        assertEquals(0, session.cacheSequenceLength());
+        assertThat(session.cacheSequenceLength()).isEqualTo(0);
     }
 
     @Test

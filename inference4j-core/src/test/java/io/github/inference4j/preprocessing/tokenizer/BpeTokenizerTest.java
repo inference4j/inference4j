@@ -26,9 +26,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class BpeTokenizerTest {
 
@@ -69,84 +67,82 @@ class BpeTokenizerTest {
         @Test
         void encode_simpleWord() {
             EncodedInput result = tokenizer.encode("hello", 10);
-            assertEquals(100, result.inputIds()[0], "BOS token");
-            assertEquals(10, result.inputIds()[1], "hell");
-            assertEquals(3, result.inputIds()[2], "o</w>");
-            assertEquals(101, result.inputIds()[3], "EOS token");
+            assertThat(result.inputIds()[0]).as("BOS token").isEqualTo(100);
+            assertThat(result.inputIds()[1]).as("hell").isEqualTo(10);
+            assertThat(result.inputIds()[2]).as("o</w>").isEqualTo(3);
+            assertThat(result.inputIds()[3]).as("EOS token").isEqualTo(101);
         }
 
         @Test
         void encode_multipleWords() {
             EncodedInput result = tokenizer.encode("hello world", 10);
-            assertArrayEquals(
-                    new long[]{100, 10, 3, 4, 13, 101, 0, 0, 0, 0},
-                    result.inputIds());
+            assertThat(result.inputIds())
+                    .isEqualTo(new long[]{100, 10, 3, 4, 13, 101, 0, 0, 0, 0});
         }
 
         @Test
         void encode_singleCharacterWord() {
             EncodedInput result = tokenizer.encode("a", 10);
-            assertEquals(100, result.inputIds()[0]);
-            assertEquals(14, result.inputIds()[1]);
-            assertEquals(101, result.inputIds()[2]);
+            assertThat(result.inputIds()[0]).isEqualTo(100);
+            assertThat(result.inputIds()[1]).isEqualTo(14);
+            assertThat(result.inputIds()[2]).isEqualTo(101);
         }
 
         @Test
         void encode_emptyString() {
             EncodedInput result = tokenizer.encode("", 10);
-            assertEquals(100, result.inputIds()[0]);
-            assertEquals(101, result.inputIds()[1]);
-            assertEquals(0, result.inputIds()[2]);
+            assertThat(result.inputIds()[0]).isEqualTo(100);
+            assertThat(result.inputIds()[1]).isEqualTo(101);
+            assertThat(result.inputIds()[2]).isEqualTo(0);
         }
 
         @Test
         void encode_attentionMask() {
             EncodedInput result = tokenizer.encode("hello", 10);
-            assertArrayEquals(
-                    new long[]{1, 1, 1, 1, 0, 0, 0, 0, 0, 0},
-                    result.attentionMask());
+            assertThat(result.attentionMask())
+                    .isEqualTo(new long[]{1, 1, 1, 1, 0, 0, 0, 0, 0, 0});
         }
 
         @Test
         void encode_tokenTypeIdsAllZeros() {
             EncodedInput result = tokenizer.encode("hello", 10);
-            assertArrayEquals(new long[10], result.tokenTypeIds());
+            assertThat(result.tokenTypeIds()).isEqualTo(new long[10]);
         }
 
         @Test
         void encode_padsToMaxLength() {
             EncodedInput result = tokenizer.encode("a", 10);
-            assertEquals(10, result.inputIds().length);
-            assertEquals(10, result.attentionMask().length);
-            assertEquals(10, result.tokenTypeIds().length);
+            assertThat(result.inputIds().length).isEqualTo(10);
+            assertThat(result.attentionMask().length).isEqualTo(10);
+            assertThat(result.tokenTypeIds().length).isEqualTo(10);
         }
 
         @Test
         void encode_truncatesToMaxLength() {
             EncodedInput result = tokenizer.encode("hello world", 5);
-            assertEquals(5, result.inputIds().length);
-            assertEquals(100, result.inputIds()[0], "BOS preserved");
-            assertEquals(101, result.inputIds()[4], "EOS at end");
+            assertThat(result.inputIds().length).isEqualTo(5);
+            assertThat(result.inputIds()[0]).as("BOS preserved").isEqualTo(100);
+            assertThat(result.inputIds()[4]).as("EOS at end").isEqualTo(101);
         }
 
         @Test
         void encode_lowercasesInput() {
             EncodedInput upper = tokenizer.encode("HELLO", 10);
             EncodedInput lower = tokenizer.encode("hello", 10);
-            assertArrayEquals(upper.inputIds(), lower.inputIds());
+            assertThat(upper.inputIds()).isEqualTo(lower.inputIds());
         }
 
         @Test
         void encode_normalizesWhitespace() {
             EncodedInput doubleSpace = tokenizer.encode("hello  world", 10);
             EncodedInput singleSpace = tokenizer.encode("hello world", 10);
-            assertArrayEquals(doubleSpace.inputIds(), singleSpace.inputIds());
+            assertThat(doubleSpace.inputIds()).isEqualTo(singleSpace.inputIds());
         }
 
         @Test
         void encode_defaultMaxLength() {
             EncodedInput result = tokenizer.encode("hello");
-            assertEquals(77, result.inputIds().length);
+            assertThat(result.inputIds().length).isEqualTo(77);
         }
     }
 
@@ -166,22 +162,22 @@ class BpeTokenizerTest {
         @Test
         void encode_addedTokenAtStart() {
             EncodedInput result = tokenizer.encode("<|im_start|>hello", 512);
-            assertEquals(200, result.inputIds()[0], "<|im_start|> should be token 200");
+            assertThat(result.inputIds()[0]).as("<|im_start|> should be token 200").isEqualTo(200);
         }
 
         @Test
         void encode_addedTokenAtEnd() {
             EncodedInput result = tokenizer.encode("hello<|im_end|>", 512);
             long lastId = result.inputIds()[result.inputIds().length - 1];
-            assertEquals(201, lastId, "<|im_end|> should be token 201");
+            assertThat(lastId).as("<|im_end|> should be token 201").isEqualTo(201);
         }
 
         @Test
         void encode_multipleAddedTokens() {
             EncodedInput result = tokenizer.encode("<|im_start|>hello<|im_end|>", 512);
-            assertEquals(200, result.inputIds()[0], "first token should be <|im_start|>");
+            assertThat(result.inputIds()[0]).as("first token should be <|im_start|>").isEqualTo(200);
             long lastId = result.inputIds()[result.inputIds().length - 1];
-            assertEquals(201, lastId, "last token should be <|im_end|>");
+            assertThat(lastId).as("last token should be <|im_end|>").isEqualTo(201);
         }
 
         @Test
@@ -190,8 +186,9 @@ class BpeTokenizerTest {
             EncodedInput result = noAddedTokens.encode("<|im_start|>", 512);
             // Without added tokens, <|im_start|> is byte-encoded — should NOT produce ID 200
             for (long id : result.inputIds()) {
-                assertNotEquals(200, id,
-                        "Without addedToken(), <|im_start|> should be byte-encoded, not mapped to 200");
+                assertThat(id)
+                        .as("Without addedToken(), <|im_start|> should be byte-encoded, not mapped to 200")
+                        .isNotEqualTo(200);
             }
         }
     }
@@ -212,9 +209,9 @@ class BpeTokenizerTest {
             // No BOS/EOS, no padding — just the raw tokens
             // Without </w> marker the BPE will produce different tokens,
             // but array length should match actual token count, not maxLength
-            assertEquals(result.inputIds().length, result.attentionMask().length);
+            assertThat(result.attentionMask().length).isEqualTo(result.inputIds().length);
             for (long mask : result.attentionMask()) {
-                assertEquals(1L, mask, "all attention mask values should be 1 (no padding)");
+                assertThat(mask).as("all attention mask values should be 1 (no padding)").isEqualTo(1L);
             }
         }
 

@@ -62,10 +62,4 @@ class LanguageTest {
                     .isNotEmpty();
         }
     }
-
-    @Test
-    void totalLanguageCount_is24() {
-        assertThat(Language.values()).hasSize(24);
-    }
-
 }

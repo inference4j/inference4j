@@ -25,7 +25,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ClipTextEncoderModelTest {
@@ -49,10 +49,9 @@ class ClipTextEncoderModelTest {
     void encode_returnsNonEmptyFiniteEmbedding() {
         float[] embedding = textEncoder.encode("a photo of a cat");
 
-        assertTrue(embedding.length > 0, "Embedding should be non-empty");
+        assertThat(embedding.length > 0).as("Embedding should be non-empty").isTrue();
         for (int i = 0; i < embedding.length; i++) {
-            assertTrue(Float.isFinite(embedding[i]),
-                    "Embedding value at index " + i + " should be finite, got: " + embedding[i]);
+            assertThat(Float.isFinite(embedding[i])).as("Embedding value at index " + i + " should be finite, got: " + embedding[i]).isTrue();
         }
     }
 
@@ -60,7 +59,7 @@ class ClipTextEncoderModelTest {
     void encode_returns512Dimensions() {
         float[] embedding = textEncoder.encode("a photo of a cat");
 
-        assertEquals(512, embedding.length, "CLIP ViT-B/32 should produce 512-dim embeddings");
+        assertThat(embedding.length).as("CLIP ViT-B/32 should produce 512-dim embeddings").isEqualTo(512);
     }
 
     @Test
@@ -73,8 +72,7 @@ class ClipTextEncoderModelTest {
         }
         norm = (float) Math.sqrt(norm);
 
-        assertEquals(1.0f, norm, 1e-3f,
-                "Embedding should be L2-normalized (norm ≈ 1.0), got: " + norm);
+        assertThat(norm).as("Embedding should be L2-normalized (norm ≈ 1.0), got: " + norm).isCloseTo(1.0f, within(1e-3f));
     }
 
     @Test
@@ -86,9 +84,8 @@ class ClipTextEncoderModelTest {
         float simCatKitten = dot(embCat, embKitten);
         float simCatCar = dot(embCat, embCar);
 
-        assertTrue(simCatKitten > simCatCar,
-                "Cat-kitten should be more similar than cat-car: " +
-                        "cat-kitten=" + simCatKitten + " cat-car=" + simCatCar);
+        assertThat(simCatKitten > simCatCar).as("Cat-kitten should be more similar than cat-car: " +
+                        "cat-kitten=" + simCatKitten + " cat-car=" + simCatCar).isTrue();
     }
 
     @Test
@@ -103,9 +100,8 @@ class ClipTextEncoderModelTest {
         float catScore = dot(imageEmb, catText);
         float dogScore = dot(imageEmb, dogText);
 
-        assertTrue(catScore > dogScore,
-                "Cat image should match 'cat' text better than 'dog' text: " +
-                        "cat=" + catScore + " dog=" + dogScore);
+        assertThat(catScore > dogScore).as("Cat image should match 'cat' text better than 'dog' text: " +
+                        "cat=" + catScore + " dog=" + dogScore).isTrue();
     }
 
     private static float dot(float[] a, float[] b) {

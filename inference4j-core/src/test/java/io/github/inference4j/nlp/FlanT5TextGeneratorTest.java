@@ -25,7 +25,7 @@ import org.mockito.ArgumentCaptor;
 import java.time.Duration;
 import java.util.function.Consumer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -51,9 +51,10 @@ class FlanT5TextGeneratorTest {
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
         verify(engine).generate(promptCaptor.capture(), any());
-        assertTrue(promptCaptor.getValue().startsWith("summarize: "),
-                "Prompt should start with 'summarize: ' but was: " + promptCaptor.getValue());
-        assertTrue(promptCaptor.getValue().contains("The quick brown fox"));
+        assertThat(promptCaptor.getValue())
+                .as("Prompt should start with 'summarize: ' but was: " + promptCaptor.getValue())
+                .startsWith("summarize: ");
+        assertThat(promptCaptor.getValue()).contains("The quick brown fox");
     }
 
     @Test
@@ -65,9 +66,10 @@ class FlanT5TextGeneratorTest {
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
         verify(engine).generate(promptCaptor.capture(), any());
-        assertTrue(promptCaptor.getValue().startsWith("translate English to French: "),
-                "Prompt should start with 'translate English to French: ' but was: " + promptCaptor.getValue());
-        assertTrue(promptCaptor.getValue().contains("Hello world"));
+        assertThat(promptCaptor.getValue())
+                .as("Prompt should start with 'translate English to French: ' but was: " + promptCaptor.getValue())
+                .startsWith("translate English to French: ");
+        assertThat(promptCaptor.getValue()).contains("Hello world");
     }
 
     @Test
@@ -75,8 +77,8 @@ class FlanT5TextGeneratorTest {
         GenerationEngine engine = mockEngine();
         FlanT5TextGenerator generator = new FlanT5TextGenerator(engine);
 
-        assertThrows(UnsupportedOperationException.class, () ->
-                generator.translate("Hello world", token -> {}));
+        assertThatThrownBy(() -> generator.translate("Hello world", token -> {}))
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
@@ -88,9 +90,10 @@ class FlanT5TextGeneratorTest {
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
         verify(engine).generate(promptCaptor.capture(), any());
-        assertTrue(promptCaptor.getValue().startsWith("correct grammar: "),
-                "Prompt should start with 'correct grammar: ' but was: " + promptCaptor.getValue());
-        assertTrue(promptCaptor.getValue().contains("She don't likes the weathers today"));
+        assertThat(promptCaptor.getValue())
+                .as("Prompt should start with 'correct grammar: ' but was: " + promptCaptor.getValue())
+                .startsWith("correct grammar: ");
+        assertThat(promptCaptor.getValue()).contains("She don't likes the weathers today");
     }
 
     @Test
@@ -102,8 +105,8 @@ class FlanT5TextGeneratorTest {
         GenerationResult result = generator.summarize("Some long article text.", listener);
 
         verify(engine).generate(anyString(), eq(listener));
-        assertNotNull(result);
-        assertEquals("output", result.text());
+        assertThat(result).isNotNull();
+        assertThat(result.text()).isEqualTo("output");
     }
 
     @Test
@@ -114,32 +117,34 @@ class FlanT5TextGeneratorTest {
         GenerationResult result = generator.generate("Hello");
 
         verify(engine).generate("Hello");
-        assertEquals("output", result.text());
+        assertThat(result.text()).isEqualTo("output");
     }
 
     @Test
     void flanT5Small_preset_returnsBuilder() {
         FlanT5TextGenerator.Builder builder = FlanT5TextGenerator.flanT5Small();
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
     void flanT5Base_preset_returnsBuilder() {
         FlanT5TextGenerator.Builder builder = FlanT5TextGenerator.flanT5Base();
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
     void flanT5Large_preset_returnsBuilder() {
         FlanT5TextGenerator.Builder builder = FlanT5TextGenerator.flanT5Large();
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
     void builder_noModelIdOrSource_throws() {
-        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                FlanT5TextGenerator.builder().build());
-        assertTrue(ex.getMessage().contains("modelId"));
-        assertTrue(ex.getMessage().contains("modelSource"));
+        assertThatThrownBy(() -> FlanT5TextGenerator.builder().build())
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> {
+                    assertThat(ex.getMessage()).contains("modelId");
+                    assertThat(ex.getMessage()).contains("modelSource");
+                });
     }
 }

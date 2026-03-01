@@ -25,7 +25,7 @@ import org.mockito.ArgumentCaptor;
 import java.time.Duration;
 import java.util.function.Consumer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -51,11 +51,11 @@ class CoeditGrammarCorrectorTest {
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
         verify(engine).generate(promptCaptor.capture(), any());
-        assertTrue(promptCaptor.getValue().startsWith(
-                        "Fix grammatical errors in this sentence: "),
-                "Prompt should start with 'Fix grammatical errors in this sentence: ' but was: "
-                        + promptCaptor.getValue());
-        assertTrue(promptCaptor.getValue().contains("She don't likes the weathers today"));
+        assertThat(promptCaptor.getValue())
+                .as("Prompt should start with 'Fix grammatical errors in this sentence: ' but was: "
+                        + promptCaptor.getValue())
+                .startsWith("Fix grammatical errors in this sentence: ");
+        assertThat(promptCaptor.getValue()).contains("She don't likes the weathers today");
     }
 
     @Test
@@ -66,26 +66,28 @@ class CoeditGrammarCorrectorTest {
         GenerationResult result = corrector.generate("Hello");
 
         verify(engine).generate("Hello");
-        assertEquals("output", result.text());
+        assertThat(result.text()).isEqualTo("output");
     }
 
     @Test
     void coeditBase_preset_returnsBuilder() {
         CoeditGrammarCorrector.Builder builder = CoeditGrammarCorrector.coeditBase();
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
     void coeditLarge_preset_returnsBuilder() {
         CoeditGrammarCorrector.Builder builder = CoeditGrammarCorrector.coeditLarge();
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
     void builder_noModelIdOrSource_throws() {
-        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                CoeditGrammarCorrector.builder().build());
-        assertTrue(ex.getMessage().contains("modelId"));
-        assertTrue(ex.getMessage().contains("modelSource"));
+        assertThatThrownBy(() -> CoeditGrammarCorrector.builder().build())
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> {
+                    assertThat(ex.getMessage()).contains("modelId");
+                    assertThat(ex.getMessage()).contains("modelSource");
+                });
     }
 }
