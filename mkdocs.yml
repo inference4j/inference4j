@@ -6,6 +6,7 @@ repo_name: inference4j/inference4j
 
 theme:
   name: material
+  custom_dir: docs/overrides
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
