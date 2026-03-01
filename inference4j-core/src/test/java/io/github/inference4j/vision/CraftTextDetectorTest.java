@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -48,15 +48,15 @@ class CraftTextDetectorTest {
 
         int[] labels = CraftTextDetector.connectedComponents(binary, 3, 3);
 
-        assertEquals(1, labels[0]); // (0,0)
-        assertEquals(1, labels[1]); // (1,0)
-        assertEquals(1, labels[3]); // (0,1)
-        assertEquals(1, labels[4]); // (1,1)
-        assertEquals(0, labels[2]); // background
-        assertEquals(0, labels[5]); // background
-        assertEquals(0, labels[6]); // background
-        assertEquals(0, labels[7]); // background
-        assertEquals(0, labels[8]); // background
+        assertThat(labels[0]).isEqualTo(1); // (0,0)
+        assertThat(labels[1]).isEqualTo(1); // (1,0)
+        assertThat(labels[3]).isEqualTo(1); // (0,1)
+        assertThat(labels[4]).isEqualTo(1); // (1,1)
+        assertThat(labels[2]).isEqualTo(0); // background
+        assertThat(labels[5]).isEqualTo(0); // background
+        assertThat(labels[6]).isEqualTo(0); // background
+        assertThat(labels[7]).isEqualTo(0); // background
+        assertThat(labels[8]).isEqualTo(0); // background
     }
 
     @Test
@@ -72,18 +72,18 @@ class CraftTextDetectorTest {
 
         // First component
         int label1 = labels[0];
-        assertTrue(label1 > 0);
-        assertEquals(label1, labels[1]);
-        assertEquals(label1, labels[5]);
-        assertEquals(label1, labels[6]);
+        assertThat(label1).isGreaterThan(0);
+        assertThat(labels[1]).isEqualTo(label1);
+        assertThat(labels[5]).isEqualTo(label1);
+        assertThat(labels[6]).isEqualTo(label1);
 
         // Second component — different label
         int label2 = labels[3];
-        assertTrue(label2 > 0);
-        assertNotEquals(label1, label2);
-        assertEquals(label2, labels[4]);
-        assertEquals(label2, labels[8]);
-        assertEquals(label2, labels[9]);
+        assertThat(label2).isGreaterThan(0);
+        assertThat(label2).isNotEqualTo(label1);
+        assertThat(labels[4]).isEqualTo(label2);
+        assertThat(labels[8]).isEqualTo(label2);
+        assertThat(labels[9]).isEqualTo(label2);
     }
 
     @Test
@@ -93,7 +93,7 @@ class CraftTextDetectorTest {
         int[] labels = CraftTextDetector.connectedComponents(binary, 2, 2);
 
         for (int label : labels) {
-            assertEquals(0, label);
+            assertThat(label).isEqualTo(0);
         }
     }
 
@@ -103,10 +103,10 @@ class CraftTextDetectorTest {
 
         int[] labels = CraftTextDetector.connectedComponents(binary, 2, 2);
 
-        assertEquals(1, labels[0]);
-        assertEquals(1, labels[1]);
-        assertEquals(1, labels[2]);
-        assertEquals(1, labels[3]);
+        assertThat(labels[0]).isEqualTo(1);
+        assertThat(labels[1]).isEqualTo(1);
+        assertThat(labels[2]).isEqualTo(1);
+        assertThat(labels[3]).isEqualTo(1);
     }
 
     @Test
@@ -119,9 +119,9 @@ class CraftTextDetectorTest {
 
         int[] labels = CraftTextDetector.connectedComponents(binary, 2, 2);
 
-        assertTrue(labels[0] > 0);
-        assertTrue(labels[3] > 0);
-        assertNotEquals(labels[0], labels[3], "Diagonal pixels should be separate components with 4-connectivity");
+        assertThat(labels[0]).isGreaterThan(0);
+        assertThat(labels[3]).isGreaterThan(0);
+        assertThat(labels[3]).as("Diagonal pixels should be separate components with 4-connectivity").isNotEqualTo(labels[0]);
     }
 
     @Test
@@ -136,11 +136,11 @@ class CraftTextDetectorTest {
         int[] labels = CraftTextDetector.connectedComponents(binary, 3, 3);
 
         int label = labels[0];
-        assertTrue(label > 0);
-        assertEquals(label, labels[3]); // (0,1)
-        assertEquals(label, labels[6]); // (0,2)
-        assertEquals(label, labels[7]); // (1,2)
-        assertEquals(label, labels[8]); // (2,2)
+        assertThat(label).isGreaterThan(0);
+        assertThat(labels[3]).isEqualTo(label); // (0,1)
+        assertThat(labels[6]).isEqualTo(label); // (0,2)
+        assertThat(labels[7]).isEqualTo(label); // (1,2)
+        assertThat(labels[8]).isEqualTo(label); // (2,2)
     }
 
     // --- Post-processing Tests ---
@@ -155,14 +155,14 @@ class CraftTextDetectorTest {
         List<TextRegion> results = CraftTextDetector.postProcess(region, affinity, 4, 4,
                 0.7f, 0.4f, 1, 1.0f, 8, 8);
 
-        assertEquals(1, results.size());
+        assertThat(results).hasSize(1);
         TextRegion r = results.get(0);
-        assertEquals(0.9f, r.confidence(), 1e-3f);
+        assertThat(r.confidence()).isCloseTo(0.9f, within(1e-3f));
         // Heatmap coords [0,0]-[2,2), scaled: x1=0*2/1=0, y1=0*2/1=0, x2=2*2/1=4, y2=2*2/1=4
-        assertEquals(0f, r.box().x1(), 1e-1f);
-        assertEquals(0f, r.box().y1(), 1e-1f);
-        assertEquals(4f, r.box().x2(), 1e-1f);
-        assertEquals(4f, r.box().y2(), 1e-1f);
+        assertThat(r.box().x1()).isCloseTo(0f, within(1e-1f));
+        assertThat(r.box().y1()).isCloseTo(0f, within(1e-1f));
+        assertThat(r.box().x2()).isCloseTo(4f, within(1e-1f));
+        assertThat(r.box().y2()).isCloseTo(4f, within(1e-1f));
     }
 
     @Test
@@ -174,7 +174,7 @@ class CraftTextDetectorTest {
         List<TextRegion> results = CraftTextDetector.postProcess(region, affinity, 4, 4,
                 0.7f, 0.4f, 2, 1.0f, 8, 8);
 
-        assertTrue(results.isEmpty(), "Single-pixel component should be filtered by minArea=2");
+        assertThat(results).as("Single-pixel component should be filtered by minArea=2").isEmpty();
     }
 
     @Test
@@ -186,7 +186,7 @@ class CraftTextDetectorTest {
         List<TextRegion> results = CraftTextDetector.postProcess(region, affinity, 4, 4,
                 0.7f, 0.4f, 1, 1.0f, 8, 8);
 
-        assertTrue(results.isEmpty(), "Low-confidence component should be filtered");
+        assertThat(results).as("Low-confidence component should be filtered").isEmpty();
     }
 
     @Test
@@ -198,15 +198,15 @@ class CraftTextDetectorTest {
         List<TextRegion> results = CraftTextDetector.postProcess(region, affinity, 4, 4,
                 0.7f, 0.4f, 1, 0.5f, 16, 16);
 
-        assertEquals(1, results.size());
+        assertThat(results).hasSize(1);
         BoundingBox box = results.get(0).box();
         // minX=1, minY=1, maxX=2, maxY=2
         // x1 = 1 * 2 / 0.5 = 4, y1 = 1 * 2 / 0.5 = 4
         // x2 = (2+1) * 2 / 0.5 = 12, y2 = (2+1) * 2 / 0.5 = 12
-        assertEquals(4f, box.x1(), 1e-1f);
-        assertEquals(4f, box.y1(), 1e-1f);
-        assertEquals(12f, box.x2(), 1e-1f);
-        assertEquals(12f, box.y2(), 1e-1f);
+        assertThat(box.x1()).isCloseTo(4f, within(1e-1f));
+        assertThat(box.y1()).isCloseTo(4f, within(1e-1f));
+        assertThat(box.x2()).isCloseTo(12f, within(1e-1f));
+        assertThat(box.y2()).isCloseTo(12f, within(1e-1f));
     }
 
     @Test
@@ -219,10 +219,10 @@ class CraftTextDetectorTest {
         List<TextRegion> results = CraftTextDetector.postProcess(region, affinity, 4, 4,
                 0.7f, 0.4f, 1, 1.0f, 4, 4);
 
-        assertEquals(1, results.size());
+        assertThat(results).hasSize(1);
         BoundingBox box = results.get(0).box();
-        assertTrue(box.x2() <= 4, "x2 should be clipped to origW");
-        assertTrue(box.y2() <= 4, "y2 should be clipped to origH");
+        assertThat(box.x2()).as("x2 should be clipped to origW").isLessThanOrEqualTo(4);
+        assertThat(box.y2()).as("y2 should be clipped to origH").isLessThanOrEqualTo(4);
     }
 
     @Test
@@ -238,11 +238,12 @@ class CraftTextDetectorTest {
         List<TextRegion> results = CraftTextDetector.postProcess(region, affinity, 4, 8,
                 0.7f, 0.4f, 1, 1.0f, 16, 8);
 
-        assertEquals(2, results.size());
-        assertTrue(results.get(0).confidence() >= results.get(1).confidence(),
-                "Results should be sorted by confidence descending");
-        assertEquals(0.95f, results.get(0).confidence(), 1e-3f);
-        assertEquals(0.8f, results.get(1).confidence(), 1e-3f);
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).confidence())
+                .as("Results should be sorted by confidence descending")
+                .isGreaterThanOrEqualTo(results.get(1).confidence());
+        assertThat(results.get(0).confidence()).isCloseTo(0.95f, within(1e-3f));
+        assertThat(results.get(1).confidence()).isCloseTo(0.8f, within(1e-3f));
     }
 
     @Test
@@ -254,7 +255,7 @@ class CraftTextDetectorTest {
         List<TextRegion> results = CraftTextDetector.postProcess(region, affinity, 4, 4,
                 0.7f, 0.4f, 1, 1.0f, 8, 8);
 
-        assertTrue(results.isEmpty());
+        assertThat(results).isEmpty();
     }
 
     // --- Preprocessing Tests ---
@@ -270,19 +271,19 @@ class CraftTextDetectorTest {
 
         float[] data = tensor.toFloats();
         long[] shape = tensor.shape();
-        assertArrayEquals(new long[]{1, 3, 2, 2}, shape);
+        assertThat(shape).isEqualTo(new long[]{1, 3, 2, 2});
 
         // Red channel at (0,0): (1.0 - 0.485) / 0.229 ~ 2.2489
         float expectedR = (1.0f - 0.485f) / 0.229f;
-        assertEquals(expectedR, data[0], 1e-3f);
+        assertThat(data[0]).isCloseTo(expectedR, within(1e-3f));
 
         // Green channel at (0,0): (0.0 - 0.456) / 0.224 ~ -2.0357
         float expectedG = (0.0f - 0.456f) / 0.224f;
-        assertEquals(expectedG, data[4], 1e-3f);
+        assertThat(data[4]).isCloseTo(expectedG, within(1e-3f));
 
         // Blue channel at (0,0): (0.0 - 0.406) / 0.225 ~ -1.8044
         float expectedB = (0.0f - 0.406f) / 0.225f;
-        assertEquals(expectedB, data[8], 1e-3f);
+        assertThat(data[8]).isCloseTo(expectedB, within(1e-3f));
     }
 
     @Test
@@ -292,9 +293,9 @@ class CraftTextDetectorTest {
         CraftTextDetector.ResizeResult result = CraftTextDetector.resizeForCraft(image, 320);
 
         // Long side should be near 320, short side proportional
-        assertTrue(result.image().getWidth() <= 320 + 32, "Width should be near targetSize");
-        assertTrue(result.image().getHeight() <= 320 + 32, "Height should be near targetSize");
-        assertTrue(result.scale() > 0);
+        assertThat(result.image().getWidth()).as("Width should be near targetSize").isLessThanOrEqualTo(320 + 32);
+        assertThat(result.image().getHeight()).as("Height should be near targetSize").isLessThanOrEqualTo(320 + 32);
+        assertThat(result.scale()).isGreaterThan(0);
     }
 
     @Test
@@ -303,21 +304,21 @@ class CraftTextDetectorTest {
 
         CraftTextDetector.ResizeResult result = CraftTextDetector.resizeForCraft(image, 640);
 
-        assertEquals(0, result.image().getWidth() % 32, "Width should be multiple of 32");
-        assertEquals(0, result.image().getHeight() % 32, "Height should be multiple of 32");
+        assertThat(result.image().getWidth() % 32).as("Width should be multiple of 32").isEqualTo(0);
+        assertThat(result.image().getHeight() % 32).as("Height should be multiple of 32").isEqualTo(0);
     }
 
     @Test
     void roundToMultipleOf32_roundsCorrectly() {
-        assertEquals(32, CraftTextDetector.roundToMultipleOf32(1));
-        assertEquals(32, CraftTextDetector.roundToMultipleOf32(16));
-        assertEquals(32, CraftTextDetector.roundToMultipleOf32(17));
-        assertEquals(32, CraftTextDetector.roundToMultipleOf32(32));
-        assertEquals(64, CraftTextDetector.roundToMultipleOf32(33));
-        assertEquals(64, CraftTextDetector.roundToMultipleOf32(48));
-        assertEquals(64, CraftTextDetector.roundToMultipleOf32(49));
-        assertEquals(64, CraftTextDetector.roundToMultipleOf32(64));
-        assertEquals(640, CraftTextDetector.roundToMultipleOf32(640));
+        assertThat(CraftTextDetector.roundToMultipleOf32(1)).isEqualTo(32);
+        assertThat(CraftTextDetector.roundToMultipleOf32(16)).isEqualTo(32);
+        assertThat(CraftTextDetector.roundToMultipleOf32(17)).isEqualTo(32);
+        assertThat(CraftTextDetector.roundToMultipleOf32(32)).isEqualTo(32);
+        assertThat(CraftTextDetector.roundToMultipleOf32(33)).isEqualTo(64);
+        assertThat(CraftTextDetector.roundToMultipleOf32(48)).isEqualTo(64);
+        assertThat(CraftTextDetector.roundToMultipleOf32(49)).isEqualTo(64);
+        assertThat(CraftTextDetector.roundToMultipleOf32(64)).isEqualTo(64);
+        assertThat(CraftTextDetector.roundToMultipleOf32(640)).isEqualTo(640);
     }
 
     // --- Integration Test ---
@@ -358,8 +359,8 @@ class CraftTextDetectorTest {
         BufferedImage image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB);
         List<TextRegion> results = craft.detect(image);
 
-        assertFalse(results.isEmpty(), "Should detect at least one text region");
-        assertEquals(0.9f, results.get(0).confidence(), 1e-2f);
+        assertThat(results).as("Should detect at least one text region").isNotEmpty();
+        assertThat(results.get(0).confidence()).isCloseTo(0.9f, within(1e-2f));
     }
 
     @Test
@@ -402,8 +403,8 @@ class CraftTextDetectorTest {
         BufferedImage image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB);
         List<TextRegion> results = craft.detect(image);
 
-        assertFalse(results.isEmpty(), "Should detect text from score_map output");
-        assertEquals(0.85f, results.get(0).confidence(), 1e-2f);
+        assertThat(results).as("Should detect text from score_map output").isNotEmpty();
+        assertThat(results.get(0).confidence()).isCloseTo(0.85f, within(1e-2f));
     }
 
     // --- Builder Tests ---
@@ -411,11 +412,12 @@ class CraftTextDetectorTest {
     @Test
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 CraftTextDetector.builder()
                         .inputName("input")
                         .modelSource(badSource)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
@@ -427,7 +429,7 @@ class CraftTextDetectorTest {
                 .session(session)
                 .build();
 
-        assertNotNull(model);
+        assertThat(model).isNotNull();
         verify(session).inputNames();
     }
 

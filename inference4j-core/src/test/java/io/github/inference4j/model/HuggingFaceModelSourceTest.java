@@ -25,7 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class HuggingFaceModelSourceTest {
 
@@ -35,7 +35,7 @@ class HuggingFaceModelSourceTest {
     @Test
     void constructor_acceptsCustomCacheDir() {
         HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
-        assertNotNull(source);
+        assertThat(source).isNotNull();
     }
 
     @Test
@@ -48,7 +48,7 @@ class HuggingFaceModelSourceTest {
         HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
         Path resolved = source.resolve("org/model", List.of("model.onnx", "vocab.txt"));
 
-        assertEquals(repoDir, resolved);
+        assertThat(resolved).isEqualTo(repoDir);
     }
 
     @Test
@@ -60,7 +60,7 @@ class HuggingFaceModelSourceTest {
         HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
         Path resolved = source.resolve("org/vision", List.of("vision_model.onnx"));
 
-        assertEquals(repoDir, resolved);
+        assertThat(resolved).isEqualTo(repoDir);
     }
 
     @Test
@@ -72,15 +72,15 @@ class HuggingFaceModelSourceTest {
         HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
         Path resolved = source.resolve("org/model");
 
-        assertEquals(repoDir, resolved);
+        assertThat(resolved).isEqualTo(repoDir);
     }
 
     @Test
     void resolve_singleArg_throwsWhenDirectoryDoesNotExist() {
         HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
 
-        assertThrows(ModelSourceException.class, () ->
-                source.resolve("org/nonexistent"));
+        assertThatThrownBy(() -> source.resolve("org/nonexistent"))
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
@@ -94,7 +94,7 @@ class HuggingFaceModelSourceTest {
             // Expected: network call fails
         }
 
-        assertTrue(Files.exists(tempDir.resolve("org/new-model")));
+        assertThat(Files.exists(tempDir.resolve("org/new-model"))).isTrue();
     }
 
     @Test
@@ -108,13 +108,13 @@ class HuggingFaceModelSourceTest {
 
         // Should return immediately without any HTTP call
         Path resolved = source.resolve("org/cached", List.of("model.onnx", "labels.txt"));
-        assertEquals(repoDir, resolved);
+        assertThat(resolved).isEqualTo(repoDir);
     }
 
     @Test
     void defaultInstance_returnsSameInstance() {
         HuggingFaceModelSource first = HuggingFaceModelSource.defaultInstance();
         HuggingFaceModelSource second = HuggingFaceModelSource.defaultInstance();
-        assertSame(first, second);
+        assertThat(second).isSameAs(first);
     }
 }

@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class ModelMetadataTest {
 
@@ -31,8 +31,8 @@ class ModelMetadataTest {
                 Map.of("eos_token_id", "50256", "vocab_size", "50257")
         );
 
-        assertTrue(metadata.property("eos_token_id").isPresent());
-        assertEquals("50256", metadata.property("eos_token_id").get());
+        assertThat(metadata.property("eos_token_id").isPresent()).isTrue();
+        assertThat(metadata.property("eos_token_id").get()).isEqualTo("50256");
     }
 
     @Test
@@ -42,7 +42,7 @@ class ModelMetadataTest {
                 Map.of("key1", "value1")
         );
 
-        assertTrue(metadata.property("nonexistent").isEmpty());
+        assertThat(metadata.property("nonexistent").isEmpty()).isTrue();
     }
 
     @Test
@@ -57,7 +57,7 @@ class ModelMetadataTest {
         );
 
         for (var entry : props.entrySet()) {
-            assertEquals(entry.getValue(), metadata.property(entry.getKey()).orElse(null));
+            assertThat(metadata.property(entry.getKey()).orElse(null)).isEqualTo(entry.getValue());
         }
     }
 
@@ -68,10 +68,10 @@ class ModelMetadataTest {
                 Map.of()
         );
 
-        assertEquals("onnx-exporter", metadata.producerName());
-        assertEquals("gpt2-graph", metadata.graphName());
-        assertEquals("GPT-2 model", metadata.description());
-        assertEquals(2L, metadata.version());
-        assertTrue(metadata.customProperties().isEmpty());
+        assertThat(metadata.producerName()).isEqualTo("onnx-exporter");
+        assertThat(metadata.graphName()).isEqualTo("gpt2-graph");
+        assertThat(metadata.description()).isEqualTo("GPT-2 model");
+        assertThat(metadata.version()).isEqualTo(2L);
+        assertThat(metadata.customProperties().isEmpty()).isTrue();
     }
 }

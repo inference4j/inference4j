@@ -20,7 +20,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class VocabularyTest {
 
@@ -32,10 +33,10 @@ class VocabularyTest {
 
         Map<Integer, String> map = io.github.inference4j.preprocessing.audio.Vocabulary.parseVocabJson(json);
 
-        assertEquals(3, map.size());
-        assertEquals("a", map.get(1));
-        assertEquals("b", map.get(2));
-        assertEquals("c", map.get(3));
+        assertThat(map.size()).isEqualTo(3);
+        assertThat(map.get(1)).isEqualTo("a");
+        assertThat(map.get(2)).isEqualTo("b");
+        assertThat(map.get(3)).isEqualTo("c");
     }
 
     @Test
@@ -46,10 +47,10 @@ class VocabularyTest {
 
         Map<Integer, String> map = io.github.inference4j.preprocessing.audio.Vocabulary.parseVocabJson(json);
 
-        assertEquals("<pad>", map.get(0));
-        assertEquals("|", map.get(4));
-        assertEquals("<unk>", map.get(5));
-        assertEquals("'", map.get(6));
+        assertThat(map.get(0)).isEqualTo("<pad>");
+        assertThat(map.get(4)).isEqualTo("|");
+        assertThat(map.get(5)).isEqualTo("<unk>");
+        assertThat(map.get(6)).isEqualTo("'");
     }
 
     @Test
@@ -60,23 +61,23 @@ class VocabularyTest {
                 2, "b"
         ));
 
-        assertEquals(3, vocab.size());
-        assertEquals("<pad>", vocab.get(0));
-        assertEquals("a", vocab.get(1));
-        assertEquals("b", vocab.get(2));
+        assertThat(vocab.size()).isEqualTo(3);
+        assertThat(vocab.get(0)).isEqualTo("<pad>");
+        assertThat(vocab.get(1)).isEqualTo("a");
+        assertThat(vocab.get(2)).isEqualTo("b");
     }
 
     @Test
     void get_throwsForUnknownIndex() {
         io.github.inference4j.preprocessing.audio.Vocabulary vocab = io.github.inference4j.preprocessing.audio.Vocabulary.of(Map.of(0, "a"));
 
-        assertThrows(IllegalArgumentException.class, () -> vocab.get(99));
+        assertThatThrownBy(() -> vocab.get(99)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void parseVocabJson_emptyObject() {
         Map<Integer, String> map = io.github.inference4j.preprocessing.audio.Vocabulary.parseVocabJson("{}");
-        assertTrue(map.isEmpty());
+        assertThat(map).isEmpty();
     }
 
     @Test
@@ -90,8 +91,8 @@ class VocabularyTest {
 
         Map<Integer, String> map = io.github.inference4j.preprocessing.audio.Vocabulary.parseVocabJson(json);
 
-        assertEquals(2, map.size());
-        assertEquals("a", map.get(1));
-        assertEquals("b", map.get(2));
+        assertThat(map.size()).isEqualTo(2);
+        assertThat(map.get(1)).isEqualTo("a");
+        assertThat(map.get(2)).isEqualTo("b");
     }
 }

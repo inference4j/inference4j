@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class TextEmbedderRouterTest {
 
@@ -58,7 +58,7 @@ class TextEmbedderRouterTest {
                 .route("primary", model, 1)
                 .build()) {
 
-            assertArrayEquals(new float[]{1.0f, 2.0f, 3.0f}, router.encode("hello"));
+            assertThat(router.encode("hello")).isEqualTo(new float[]{1.0f, 2.0f, 3.0f});
         }
     }
 
@@ -72,9 +72,9 @@ class TextEmbedderRouterTest {
                 .build()) {
 
             List<float[]> results = router.encodeBatch(List.of("a", "b"));
-            assertEquals(2, results.size());
-            assertArrayEquals(new float[]{0.5f, 0.5f}, results.get(0));
-            assertArrayEquals(new float[]{0.5f, 0.5f}, results.get(1));
+            assertThat(results).hasSize(2);
+            assertThat(results.get(0)).isEqualTo(new float[]{0.5f, 0.5f});
+            assertThat(results.get(1)).isEqualTo(new float[]{0.5f, 0.5f});
         }
     }
 
@@ -90,9 +90,9 @@ class TextEmbedderRouterTest {
                 .strategy(new RoundRobinRoutingStrategy())
                 .build()) {
 
-            assertArrayEquals(new float[]{1.0f}, router.encode("x"));
-            assertArrayEquals(new float[]{2.0f}, router.encode("x"));
-            assertArrayEquals(new float[]{1.0f}, router.encode("x"));
+            assertThat(router.encode("x")).isEqualTo(new float[]{1.0f});
+            assertThat(router.encode("x")).isEqualTo(new float[]{2.0f});
+            assertThat(router.encode("x")).isEqualTo(new float[]{1.0f});
         }
     }
 
@@ -106,7 +106,7 @@ class TextEmbedderRouterTest {
                 .build();
 
         // Can be used anywhere a TextEmbedder is expected
-        assertArrayEquals(new float[]{1.0f}, router.encode("hello"));
+        assertThat(router.encode("hello")).isEqualTo(new float[]{1.0f});
         router.close();
     }
 
@@ -125,9 +125,9 @@ class TextEmbedderRouterTest {
 
         router.close();
 
-        assertTrue(modelA.closed);
-        assertTrue(modelB.closed);
-        assertTrue(shadowModel.closed);
+        assertThat(modelA.closed).isTrue();
+        assertThat(modelB.closed).isTrue();
+        assertThat(shadowModel.closed).isTrue();
     }
 
     @Test
@@ -142,7 +142,7 @@ class TextEmbedderRouterTest {
                 .build()) {
 
             // Result should come from primary, not shadow
-            assertArrayEquals(new float[]{1.0f, 2.0f}, router.encode("hello"));
+            assertThat(router.encode("hello")).isEqualTo(new float[]{1.0f, 2.0f});
         }
     }
 }

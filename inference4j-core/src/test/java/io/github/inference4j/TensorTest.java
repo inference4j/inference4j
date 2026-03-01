@@ -19,30 +19,33 @@ package io.github.inference4j;
 import io.github.inference4j.exception.TensorConversionException;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class TensorTest {
 
     @Test
     void fromFloats_createsWithCorrectShapeAndType() {
         Tensor tensor = Tensor.fromFloats(new float[]{1.0f, 2.0f, 3.0f}, new long[]{1, 3});
-        assertArrayEquals(new long[]{1, 3}, tensor.shape());
-        assertEquals(TensorType.FLOAT, tensor.type());
+        assertThat(tensor.shape()).isEqualTo(new long[]{1, 3});
+        assertThat(tensor.type()).isEqualTo(TensorType.FLOAT);
     }
 
     @Test
     void fromLongs_createsWithCorrectShapeAndType() {
         Tensor tensor = Tensor.fromLongs(new long[]{10, 20, 30}, new long[]{3});
-        assertArrayEquals(new long[]{3}, tensor.shape());
-        assertEquals(TensorType.LONG, tensor.type());
+        assertThat(tensor.shape()).isEqualTo(new long[]{3});
+        assertThat(tensor.type()).isEqualTo(TensorType.LONG);
     }
 
     @Test
     void fromFloats_throwsOnShapeMismatch() {
-        TensorConversionException ex = assertThrows(TensorConversionException.class, () ->
-                Tensor.fromFloats(new float[]{1.0f, 2.0f}, new long[]{1, 3}));
-        assertTrue(ex.getMessage().contains("3"));
-        assertTrue(ex.getMessage().contains("2"));
+        assertThatThrownBy(() ->
+                Tensor.fromFloats(new float[]{1.0f, 2.0f}, new long[]{1, 3}))
+                .isInstanceOf(TensorConversionException.class)
+                .satisfies(ex -> {
+                    assertThat(ex.getMessage()).contains("3");
+                    assertThat(ex.getMessage()).contains("2");
+                });
     }
 
     @Test
@@ -50,9 +53,9 @@ class TensorTest {
         float[] original = {1.0f, 2.0f, 3.0f};
         Tensor tensor = Tensor.fromFloats(original, new long[]{3});
         float[] result = tensor.toFloats();
-        assertArrayEquals(original, result);
+        assertThat(result).isEqualTo(original);
         result[0] = 999f;
-        assertArrayEquals(new float[]{1.0f, 2.0f, 3.0f}, tensor.toFloats(), "should return defensive copy");
+        assertThat(tensor.toFloats()).as("should return defensive copy").isEqualTo(new float[]{1.0f, 2.0f, 3.0f});
     }
 
     @Test
@@ -60,25 +63,31 @@ class TensorTest {
         long[] original = {10, 20, 30};
         Tensor tensor = Tensor.fromLongs(original, new long[]{3});
         long[] result = tensor.toLongs();
-        assertArrayEquals(original, result);
+        assertThat(result).isEqualTo(original);
         result[0] = 999;
-        assertArrayEquals(new long[]{10, 20, 30}, tensor.toLongs(), "should return defensive copy");
+        assertThat(tensor.toLongs()).as("should return defensive copy").isEqualTo(new long[]{10, 20, 30});
     }
 
     @Test
     void toFloats_throwsOnTypeMismatch() {
         Tensor tensor = Tensor.fromLongs(new long[]{1, 2, 3}, new long[]{3});
-        TensorConversionException ex = assertThrows(TensorConversionException.class, tensor::toFloats);
-        assertTrue(ex.getMessage().contains("LONG"));
-        assertTrue(ex.getMessage().contains("FLOAT"));
+        assertThatThrownBy(tensor::toFloats)
+                .isInstanceOf(TensorConversionException.class)
+                .satisfies(ex -> {
+                    assertThat(ex.getMessage()).contains("LONG");
+                    assertThat(ex.getMessage()).contains("FLOAT");
+                });
     }
 
     @Test
     void toLongs_throwsOnTypeMismatch() {
         Tensor tensor = Tensor.fromFloats(new float[]{1.0f}, new long[]{1});
-        TensorConversionException ex = assertThrows(TensorConversionException.class, tensor::toLongs);
-        assertTrue(ex.getMessage().contains("FLOAT"));
-        assertTrue(ex.getMessage().contains("LONG"));
+        assertThatThrownBy(tensor::toLongs)
+                .isInstanceOf(TensorConversionException.class)
+                .satisfies(ex -> {
+                    assertThat(ex.getMessage()).contains("FLOAT");
+                    assertThat(ex.getMessage()).contains("LONG");
+                });
     }
 
     @Test
@@ -86,15 +95,16 @@ class TensorTest {
         float[] flat = {1f, 2f, 3f, 4f, 5f, 6f};
         Tensor tensor = Tensor.fromFloats(flat, new long[]{2, 3});
         float[][] result = tensor.toFloats2D();
-        assertArrayEquals(new float[]{1f, 2f, 3f}, result[0]);
-        assertArrayEquals(new float[]{4f, 5f, 6f}, result[1]);
+        assertThat(result[0]).isEqualTo(new float[]{1f, 2f, 3f});
+        assertThat(result[1]).isEqualTo(new float[]{4f, 5f, 6f});
     }
 
     @Test
     void toFloats2D_throwsOnNon2DShape() {
         Tensor tensor = Tensor.fromFloats(new float[]{1f, 2f, 3f}, new long[]{3});
-        TensorConversionException ex = assertThrows(TensorConversionException.class, tensor::toFloats2D);
-        assertTrue(ex.getMessage().contains("2D"));
+        assertThatThrownBy(tensor::toFloats2D)
+                .isInstanceOf(TensorConversionException.class)
+                .satisfies(ex -> assertThat(ex.getMessage()).contains("2D"));
     }
 
     @Test
@@ -102,7 +112,7 @@ class TensorTest {
         long[] shape = {2, 3};
         Tensor tensor = Tensor.fromFloats(new float[6], shape);
         tensor.shape()[0] = 999;
-        assertArrayEquals(new long[]{2, 3}, tensor.shape());
+        assertThat(tensor.shape()).isEqualTo(new long[]{2, 3});
     }
 
     @Test
@@ -110,22 +120,25 @@ class TensorTest {
         float[] data = {1f, 2f, 3f};
         Tensor tensor = Tensor.fromFloats(data, new long[]{3});
         data[0] = 999f;
-        assertArrayEquals(new float[]{1f, 2f, 3f}, tensor.toFloats());
+        assertThat(tensor.toFloats()).isEqualTo(new float[]{1f, 2f, 3f});
     }
 
     @Test
     void fromStrings_createsWithCorrectShapeAndType() {
         Tensor tensor = Tensor.fromStrings(new String[]{"hello", "world"}, new long[]{1, 2});
-        assertArrayEquals(new long[]{1, 2}, tensor.shape());
-        assertEquals(TensorType.STRING, tensor.type());
+        assertThat(tensor.shape()).isEqualTo(new long[]{1, 2});
+        assertThat(tensor.type()).isEqualTo(TensorType.STRING);
     }
 
     @Test
     void fromStrings_throwsOnShapeMismatch() {
-        TensorConversionException ex = assertThrows(TensorConversionException.class, () ->
-                Tensor.fromStrings(new String[]{"a", "b"}, new long[]{1, 3}));
-        assertTrue(ex.getMessage().contains("3"));
-        assertTrue(ex.getMessage().contains("2"));
+        assertThatThrownBy(() ->
+                Tensor.fromStrings(new String[]{"a", "b"}, new long[]{1, 3}))
+                .isInstanceOf(TensorConversionException.class)
+                .satisfies(ex -> {
+                    assertThat(ex.getMessage()).contains("3");
+                    assertThat(ex.getMessage()).contains("2");
+                });
     }
 
     @Test
@@ -133,17 +146,20 @@ class TensorTest {
         String[] original = {"hello", "world", "test"};
         Tensor tensor = Tensor.fromStrings(original, new long[]{3});
         String[] result = tensor.toStrings();
-        assertArrayEquals(original, result);
+        assertThat(result).isEqualTo(original);
         result[0] = "modified";
-        assertArrayEquals(new String[]{"hello", "world", "test"}, tensor.toStrings(), "should return defensive copy");
+        assertThat(tensor.toStrings()).as("should return defensive copy").isEqualTo(new String[]{"hello", "world", "test"});
     }
 
     @Test
     void toStrings_throwsOnTypeMismatch() {
         Tensor tensor = Tensor.fromFloats(new float[]{1.0f}, new long[]{1});
-        TensorConversionException ex = assertThrows(TensorConversionException.class, tensor::toStrings);
-        assertTrue(ex.getMessage().contains("FLOAT"));
-        assertTrue(ex.getMessage().contains("STRING"));
+        assertThatThrownBy(tensor::toStrings)
+                .isInstanceOf(TensorConversionException.class)
+                .satisfies(ex -> {
+                    assertThat(ex.getMessage()).contains("FLOAT");
+                    assertThat(ex.getMessage()).contains("STRING");
+                });
     }
 
     @Test
@@ -151,6 +167,6 @@ class TensorTest {
         String[] data = {"hello", "world"};
         Tensor tensor = Tensor.fromStrings(data, new long[]{2});
         data[0] = "modified";
-        assertArrayEquals(new String[]{"hello", "world"}, tensor.toStrings());
+        assertThat(tensor.toStrings()).isEqualTo(new String[]{"hello", "world"});
     }
 }

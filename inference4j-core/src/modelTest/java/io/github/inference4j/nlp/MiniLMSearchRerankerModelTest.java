@@ -16,47 +16,56 @@
 
 package io.github.inference4j.nlp;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
-import static org.junit.jupiter.api.Assertions.*;
+import java.util.List;
 
+import static org.assertj.core.api.Assertions.*;
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class MiniLMSearchRerankerModelTest {
+
+    private MiniLMSearchReranker reranker;
+
+    @BeforeAll
+    void setUp() {
+        reranker = MiniLMSearchReranker.builder().build();
+    }
+
+    @AfterAll
+    void tearDown() throws Exception {
+        if (reranker != null) reranker.close();
+    }
 
     @Test
     void score_relevantPairHigherThanIrrelevant() {
-        try (var reranker = io.github.inference4j.nlp.MiniLMSearchReranker.builder().build()) {
-            float relevantScore = reranker.score("What is Java?", "Java is a programming language.");
-            float irrelevantScore = reranker.score("What is Java?", "The weather is sunny today.");
+        float relevantScore = reranker.score("What is Java?", "Java is a programming language.");
+        float irrelevantScore = reranker.score("What is Java?", "The weather is sunny today.");
 
-            assertTrue(relevantScore > irrelevantScore,
-                    "Relevant pair should score higher: relevant=" + relevantScore + " irrelevant=" + irrelevantScore);
-        }
+        assertThat(relevantScore > irrelevantScore).as("Relevant pair should score higher: relevant=" + relevantScore + " irrelevant=" + irrelevantScore).isTrue();
     }
 
     @Test
     void score_returnsValueBetweenZeroAndOne() {
-        try (var reranker = MiniLMSearchReranker.builder().build()) {
-            float score = reranker.score("What is Java?", "Java is a programming language.");
+        float score = reranker.score("What is Java?", "Java is a programming language.");
 
-            assertTrue(score >= 0f && score <= 1f,
-                    "Score should be between 0 and 1, got: " + score);
-        }
+        assertThat(score >= 0f && score <= 1f).as("Score should be between 0 and 1, got: " + score).isTrue();
     }
 
     @Test
     void scoreBatch_returnsScorePerDocument() {
-        try (var reranker = MiniLMSearchReranker.builder().build()) {
-            float[] scores = reranker.scoreBatch("What is Java?", java.util.List.of(
-                    "Java is a programming language.",
-                    "The weather is sunny today.",
-                    "Java was developed by Sun Microsystems."
-            ));
+        float[] scores = reranker.scoreBatch("What is Java?", List.of(
+                "Java is a programming language.",
+                "The weather is sunny today.",
+                "Java was developed by Sun Microsystems."
+        ));
 
-            assertEquals(3, scores.length, "Should return one score per document");
-            for (float score : scores) {
-                assertTrue(score >= 0f && score <= 1f,
-                        "Each score should be between 0 and 1, got: " + score);
-            }
+        assertThat(scores.length).as("Should return one score per document").isEqualTo(3);
+        for (float score : scores) {
+            assertThat(score >= 0f && score <= 1f).as("Each score should be between 0 and 1, got: " + score).isTrue();
         }
     }
 }

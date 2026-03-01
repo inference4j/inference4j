@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -84,8 +84,8 @@ class YoloV8DetectorTest {
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 
-        assertEquals(1, results.size());
-        assertEquals("person", results.get(0).label());
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).label()).isEqualTo("person");
     }
 
     @Test
@@ -99,12 +99,12 @@ class YoloV8DetectorTest {
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 
-        assertEquals(1, results.size());
+        assertThat(results).hasSize(1);
         BoundingBox box = results.get(0).box();
-        assertEquals(220f, box.x1(), 1e-3f);
-        assertEquals(190f, box.y1(), 1e-3f);
-        assertEquals(420f, box.x2(), 1e-3f);
-        assertEquals(290f, box.y2(), 1e-3f);
+        assertThat(box.x1()).isCloseTo(220f, within(1e-3f));
+        assertThat(box.y1()).isCloseTo(190f, within(1e-3f));
+        assertThat(box.x2()).isCloseTo(420f, within(1e-3f));
+        assertThat(box.y2()).isCloseTo(290f, within(1e-3f));
     }
 
     @Test
@@ -127,17 +127,17 @@ class YoloV8DetectorTest {
                 TEST_LABELS, 0.25f, 0.45f,
                 scale, padX, padY, origW, origH);
 
-        assertEquals(1, results.size());
+        assertThat(results).hasSize(1);
         BoundingBox box = results.get(0).box();
         // cx=320, w=100 → x1=270, x2=370 in letterbox coords
         // rescaled: x1=(270-0)/0.5=540, x2=(370-0)/0.5=740
-        assertEquals(540f, box.x1(), 1e-1f);
-        assertEquals(740f, box.x2(), 1e-1f);
+        assertThat(box.x1()).isCloseTo(540f, within(1e-1f));
+        assertThat(box.x2()).isCloseTo(740f, within(1e-1f));
         // cy=320, h=60 → y1=290, y2=350 in letterbox coords
         // rescaled: y1=(290-140)/0.5=300, y2=(350-140)/0.5=420
-        assertEquals(300f, box.y1(), 1e-1f);
-        assertEquals(420f, box.y2(), 1e-1f);
-        assertEquals("car", results.get(0).label());
+        assertThat(box.y1()).isCloseTo(300f, within(1e-1f));
+        assertThat(box.y2()).isCloseTo(420f, within(1e-1f));
+        assertThat(results.get(0).label()).isEqualTo("car");
     }
 
     @Test
@@ -152,8 +152,8 @@ class YoloV8DetectorTest {
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 
-        assertEquals(1, results.size());
-        assertEquals(0.9f, results.get(0).confidence(), 1e-5f);
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).confidence()).isCloseTo(0.9f, within(1e-5f));
     }
 
     @Test
@@ -169,10 +169,10 @@ class YoloV8DetectorTest {
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 
-        assertEquals(3, results.size());
-        assertEquals(0.9f, results.get(0).confidence(), 1e-5f);
-        assertEquals(0.7f, results.get(1).confidence(), 1e-5f);
-        assertEquals(0.5f, results.get(2).confidence(), 1e-5f);
+        assertThat(results).hasSize(3);
+        assertThat(results.get(0).confidence()).isCloseTo(0.9f, within(1e-5f));
+        assertThat(results.get(1).confidence()).isCloseTo(0.7f, within(1e-5f));
+        assertThat(results.get(2).confidence()).isCloseTo(0.5f, within(1e-5f));
     }
 
     @Test
@@ -186,7 +186,7 @@ class YoloV8DetectorTest {
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 
-        assertTrue(results.isEmpty());
+        assertThat(results).isEmpty();
     }
 
     @Test
@@ -200,10 +200,10 @@ class YoloV8DetectorTest {
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 
-        assertEquals(1, results.size());
-        assertEquals("motorcycle", results.get(0).label());
-        assertEquals(3, results.get(0).classIndex());
-        assertEquals(0.8f, results.get(0).confidence(), 1e-5f);
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).label()).isEqualTo("motorcycle");
+        assertThat(results.get(0).classIndex()).isEqualTo(3);
+        assertThat(results.get(0).confidence()).isCloseTo(0.8f, within(1e-5f));
     }
 
     @Test
@@ -217,12 +217,12 @@ class YoloV8DetectorTest {
                 TEST_LABELS, 0.25f, 0.45f,
                 SCALE, PAD_X, PAD_Y, ORIG_W, ORIG_H);
 
-        assertEquals(1, results.size());
+        assertThat(results).hasSize(1);
         BoundingBox box = results.get(0).box();
-        assertTrue(box.x1() >= 0, "x1 should be >= 0, was " + box.x1());
-        assertTrue(box.y1() >= 0, "y1 should be >= 0, was " + box.y1());
-        assertTrue(box.x2() <= ORIG_W, "x2 should be <= " + ORIG_W + ", was " + box.x2());
-        assertTrue(box.y2() <= ORIG_H, "y2 should be <= " + ORIG_H + ", was " + box.y2());
+        assertThat(box.x1()).as("x1 should be >= 0, was " + box.x1()).isGreaterThanOrEqualTo(0);
+        assertThat(box.y1()).as("y1 should be >= 0, was " + box.y1()).isGreaterThanOrEqualTo(0);
+        assertThat(box.x2()).as("x2 should be <= " + ORIG_W + ", was " + box.x2()).isLessThanOrEqualTo(ORIG_W);
+        assertThat(box.y2()).as("y2 should be <= " + ORIG_H + ", was " + box.y2()).isLessThanOrEqualTo(ORIG_H);
     }
 
     // --- Builder validation ---
@@ -230,11 +230,12 @@ class YoloV8DetectorTest {
     @Test
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 YoloV8Detector.builder()
                         .inputName("images")
                         .modelSource(badSource)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
@@ -246,7 +247,7 @@ class YoloV8DetectorTest {
                 .session(session)
                 .build();
 
-        assertNotNull(model);
+        assertThat(model).isNotNull();
         verify(session).inputNames();
     }
 
@@ -273,9 +274,9 @@ class YoloV8DetectorTest {
         BufferedImage image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB);
         List<Detection> results = model.detect(image);
 
-        assertEquals(1, results.size());
-        assertEquals("person", results.get(0).label());
-        assertEquals(0.9f, results.get(0).confidence(), 1e-5f);
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).label()).isEqualTo("person");
+        assertThat(results.get(0).confidence()).isCloseTo(0.9f, within(1e-5f));
     }
 
     // --- Close delegation ---

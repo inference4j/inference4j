@@ -29,7 +29,7 @@ import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -50,13 +50,13 @@ class ClipClassifierTest {
 
         List<Classification> results = io.github.inference4j.multimodal.ClipClassifier.toClassifications(imageEmb, labelEmbs, labels, 3);
 
-        assertEquals(3, results.size());
-        assertEquals("cat", results.get(0).label());
-        assertEquals(0, results.get(0).index());
-        assertEquals("dog", results.get(1).label());
-        assertEquals(1, results.get(1).index());
-        assertEquals("car", results.get(2).label());
-        assertEquals(2, results.get(2).index());
+        assertThat(results).hasSize(3);
+        assertThat(results.get(0).label()).isEqualTo("cat");
+        assertThat(results.get(0).index()).isEqualTo(0);
+        assertThat(results.get(1).label()).isEqualTo("dog");
+        assertThat(results.get(1).index()).isEqualTo(1);
+        assertThat(results.get(2).label()).isEqualTo("car");
+        assertThat(results.get(2).index()).isEqualTo(2);
     }
 
     @Test
@@ -71,8 +71,8 @@ class ClipClassifierTest {
 
         List<Classification> results = ClipClassifier.toClassifications(imageEmb, labelEmbs, labels, 1);
 
-        assertEquals(1, results.size());
-        assertEquals("cat", results.get(0).label());
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).label()).isEqualTo("cat");
     }
 
     @Test
@@ -89,11 +89,11 @@ class ClipClassifierTest {
 
         float sum = 0f;
         for (Classification c : results) {
-            assertTrue(c.confidence() > 0f);
-            assertTrue(c.confidence() <= 1f);
+            assertThat(c.confidence()).isGreaterThan(0f);
+            assertThat(c.confidence()).isLessThanOrEqualTo(1f);
             sum += c.confidence();
         }
-        assertEquals(1.0f, sum, 1e-5f);
+        assertThat(sum).isCloseTo(1.0f, within(1e-5f));
     }
 
     @Test
@@ -110,8 +110,9 @@ class ClipClassifierTest {
         List<Classification> results = ClipClassifier.toClassifications(imageEmb, labelEmbs, labels, 4);
 
         for (int i = 1; i < results.size(); i++) {
-            assertTrue(results.get(i - 1).confidence() >= results.get(i).confidence(),
-                    "Results not sorted descending at index " + i);
+            assertThat(results.get(i - 1).confidence())
+                    .as("Results not sorted descending at index " + i)
+                    .isGreaterThanOrEqualTo(results.get(i).confidence());
         }
     }
 
@@ -160,8 +161,8 @@ class ClipClassifierTest {
         BufferedImage image = new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB);
         List<Classification> results = classifier.classify(image, List.of("cat", "dog"));
 
-        assertEquals(2, results.size());
-        assertEquals("cat", results.get(0).label());
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).label()).isEqualTo("cat");
     }
 
     @Test
@@ -190,7 +191,7 @@ class ClipClassifierTest {
         BufferedImage image = new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB);
         List<Classification> results = classifier.classify(image, List.of());
 
-        assertTrue(results.isEmpty());
+        assertThat(results).isEmpty();
     }
 
     @Test

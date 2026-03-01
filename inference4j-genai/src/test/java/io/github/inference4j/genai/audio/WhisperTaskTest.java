@@ -18,18 +18,18 @@ package io.github.inference4j.genai.audio;
 import io.github.inference4j.genai.audio.WhisperTask;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class WhisperTaskTest {
 
 	@Test
 	void transcribeToken() {
-		assertEquals("<|transcribe|>", WhisperTask.TRANSCRIBE.token());
+		assertThat(WhisperTask.TRANSCRIBE.token()).isEqualTo("<|transcribe|>");
 	}
 
 	@Test
 	void translateToken() {
-		assertEquals("<|translate|>", WhisperTask.TRANSLATE.token());
+		assertThat(WhisperTask.TRANSLATE.token()).isEqualTo("<|translate|>");
 	}
 
 }

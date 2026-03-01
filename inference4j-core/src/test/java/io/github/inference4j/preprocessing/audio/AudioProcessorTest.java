@@ -21,7 +21,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class AudioProcessorTest {
 
@@ -30,7 +31,7 @@ class AudioProcessorTest {
         float[] samples = {0.1f, 0.2f, 0.3f, 0.4f};
         float[] result = io.github.inference4j.preprocessing.audio.AudioProcessor.resample(samples, 16000, 16000);
 
-        assertSame(samples, result);
+        assertThat(result).isSameAs(samples);
     }
 
     @Test
@@ -38,9 +39,9 @@ class AudioProcessorTest {
         float[] samples = {0.0f, 1.0f};
         float[] result = io.github.inference4j.preprocessing.audio.AudioProcessor.resample(samples, 8000, 16000);
 
-        assertEquals(4, result.length);
-        assertEquals(0.0f, result[0], 1e-5f);
-        assertEquals(1.0f, result[result.length - 1], 1e-2f);
+        assertThat(result.length).isEqualTo(4);
+        assertThat(result[0]).isCloseTo(0.0f, within(1e-5f));
+        assertThat(result[result.length - 1]).isCloseTo(1.0f, within(1e-2f));
     }
 
     @Test
@@ -48,8 +49,8 @@ class AudioProcessorTest {
         float[] samples = {0.0f, 0.25f, 0.5f, 0.75f};
         float[] result = io.github.inference4j.preprocessing.audio.AudioProcessor.resample(samples, 16000, 8000);
 
-        assertEquals(2, result.length);
-        assertEquals(0.0f, result[0], 1e-5f);
+        assertThat(result.length).isEqualTo(2);
+        assertThat(result[0]).isCloseTo(0.0f, within(1e-5f));
     }
 
     @Test
@@ -58,8 +59,8 @@ class AudioProcessorTest {
         float[] samples = {0.0f, 1.0f, 0.0f, 1.0f};
         float[] result = io.github.inference4j.preprocessing.audio.AudioProcessor.resample(samples, 4000, 2000);
 
-        assertEquals(2, result.length);
-        assertEquals(0.0f, result[0], 1e-5f);
+        assertThat(result.length).isEqualTo(2);
+        assertThat(result[0]).isCloseTo(0.0f, within(1e-5f));
     }
 
     @Test
@@ -67,19 +68,19 @@ class AudioProcessorTest {
         float[] samples = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
         float[] result = io.github.inference4j.preprocessing.audio.AudioProcessor.normalize(samples);
 
-        assertEquals(samples.length, result.length);
+        assertThat(result.length).isEqualTo(samples.length);
 
         // Check mean ≈ 0
         double mean = 0;
         for (float v : result) mean += v;
         mean /= result.length;
-        assertEquals(0.0, mean, 1e-5);
+        assertThat(mean).isCloseTo(0.0, within(1e-5));
 
         // Check std ≈ 1
         double sumSq = 0;
         for (float v : result) sumSq += (v - mean) * (v - mean);
         double std = Math.sqrt(sumSq / result.length);
-        assertEquals(1.0, std, 1e-5);
+        assertThat(std).isCloseTo(1.0, within(1e-5));
     }
 
     @Test
@@ -88,21 +89,21 @@ class AudioProcessorTest {
         float[] result = io.github.inference4j.preprocessing.audio.AudioProcessor.normalize(samples);
 
         for (float v : result) {
-            assertEquals(0.0f, v, 1e-6f);
+            assertThat(v).isCloseTo(0.0f, within(1e-6f));
         }
     }
 
     @Test
     void normalize_emptyArray_returnsEmpty() {
         float[] result = io.github.inference4j.preprocessing.audio.AudioProcessor.normalize(new float[0]);
-        assertEquals(0, result.length);
+        assertThat(result.length).isEqualTo(0);
     }
 
     @Test
     void normalize_singleValue_returnsZero() {
         // Single value → std=0, should return zero
         float[] result = io.github.inference4j.preprocessing.audio.AudioProcessor.normalize(new float[]{42.0f});
-        assertEquals(0.0f, result[0], 1e-6f);
+        assertThat(result[0]).isCloseTo(0.0f, within(1e-6f));
     }
 
     // --- chunk() tests ---
@@ -115,14 +116,14 @@ class AudioProcessorTest {
 
         List<AudioData> chunks = io.github.inference4j.preprocessing.audio.AudioProcessor.chunk(audio, 2);
 
-        assertEquals(1, chunks.size());
-        assertEquals(6, chunks.get(0).samples().length);
-        assertEquals(0.1f, chunks.get(0).samples()[0], 1e-6f);
-        assertEquals(0.2f, chunks.get(0).samples()[1], 1e-6f);
-        assertEquals(0.3f, chunks.get(0).samples()[2], 1e-6f);
-        assertEquals(0.0f, chunks.get(0).samples()[3], 1e-6f);
-        assertEquals(0.0f, chunks.get(0).samples()[4], 1e-6f);
-        assertEquals(0.0f, chunks.get(0).samples()[5], 1e-6f);
+        assertThat(chunks.size()).isEqualTo(1);
+        assertThat(chunks.get(0).samples().length).isEqualTo(6);
+        assertThat(chunks.get(0).samples()[0]).isCloseTo(0.1f, within(1e-6f));
+        assertThat(chunks.get(0).samples()[1]).isCloseTo(0.2f, within(1e-6f));
+        assertThat(chunks.get(0).samples()[2]).isCloseTo(0.3f, within(1e-6f));
+        assertThat(chunks.get(0).samples()[3]).isCloseTo(0.0f, within(1e-6f));
+        assertThat(chunks.get(0).samples()[4]).isCloseTo(0.0f, within(1e-6f));
+        assertThat(chunks.get(0).samples()[5]).isCloseTo(0.0f, within(1e-6f));
     }
 
     @Test
@@ -133,9 +134,9 @@ class AudioProcessorTest {
 
         List<AudioData> chunks = io.github.inference4j.preprocessing.audio.AudioProcessor.chunk(audio, 2);
 
-        assertEquals(1, chunks.size());
-        assertEquals(4, chunks.get(0).samples().length);
-        assertArrayEquals(samples, chunks.get(0).samples(), 1e-6f);
+        assertThat(chunks.size()).isEqualTo(1);
+        assertThat(chunks.get(0).samples().length).isEqualTo(4);
+        assertThat(chunks.get(0).samples()).containsExactly(samples, within(1e-6f));
     }
 
     @Test
@@ -149,17 +150,17 @@ class AudioProcessorTest {
 
         List<AudioData> chunks = io.github.inference4j.preprocessing.audio.AudioProcessor.chunk(audio, 3);
 
-        assertEquals(4, chunks.size());
+        assertThat(chunks.size()).isEqualTo(4);
         for (AudioData chunk : chunks) {
-            assertEquals(30, chunk.samples().length);
+            assertThat(chunk.samples().length).isEqualTo(30);
         }
         // First sample of first chunk
-        assertEquals(0.0f, chunks.get(0).samples()[0], 1e-6f);
+        assertThat(chunks.get(0).samples()[0]).isCloseTo(0.0f, within(1e-6f));
         // First sample of second chunk
-        assertEquals(0.30f, chunks.get(1).samples()[0], 1e-6f);
+        assertThat(chunks.get(1).samples()[0]).isCloseTo(0.30f, within(1e-6f));
         // Last chunk should have 10 real samples + 20 zero-padded
-        assertEquals(0.90f, chunks.get(3).samples()[0], 1e-6f);
-        assertEquals(0.0f, chunks.get(3).samples()[10], 1e-6f);
+        assertThat(chunks.get(3).samples()[0]).isCloseTo(0.90f, within(1e-6f));
+        assertThat(chunks.get(3).samples()[10]).isCloseTo(0.0f, within(1e-6f));
     }
 
     @Test
@@ -170,7 +171,7 @@ class AudioProcessorTest {
         List<AudioData> chunks = io.github.inference4j.preprocessing.audio.AudioProcessor.chunk(audio, 30);
 
         for (AudioData chunk : chunks) {
-            assertEquals(16000, chunk.sampleRate());
+            assertThat(chunk.sampleRate()).isEqualTo(16000);
         }
     }
 
@@ -181,10 +182,10 @@ class AudioProcessorTest {
 
         List<AudioData> chunks = io.github.inference4j.preprocessing.audio.AudioProcessor.chunk(audio, 30);
 
-        assertEquals(1, chunks.size());
-        assertEquals(480000, chunks.get(0).samples().length);
+        assertThat(chunks.size()).isEqualTo(1);
+        assertThat(chunks.get(0).samples().length).isEqualTo(480000);
         for (float s : chunks.get(0).samples()) {
-            assertEquals(0.0f, s, 1e-6f);
+            assertThat(s).isCloseTo(0.0f, within(1e-6f));
         }
     }
 }

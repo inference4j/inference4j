@@ -22,7 +22,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class MicrometerRouterMetricsTest {
 
@@ -45,8 +45,8 @@ class MicrometerRouterMetricsTest {
                 .tag("outcome", "success")
                 .timer();
 
-        assertNotNull(timer);
-        assertEquals(1, timer.count());
+        assertThat(timer).isNotNull();
+        assertThat(timer.count()).isEqualTo(1);
     }
 
     @Test
@@ -59,8 +59,8 @@ class MicrometerRouterMetricsTest {
                 .tag("outcome", "failure")
                 .timer();
 
-        assertNotNull(timer);
-        assertEquals(1, timer.count());
+        assertThat(timer).isNotNull();
+        assertThat(timer.count()).isEqualTo(1);
     }
 
     @Test
@@ -73,8 +73,8 @@ class MicrometerRouterMetricsTest {
                 .tag("outcome", "shadow")
                 .timer();
 
-        assertNotNull(timer);
-        assertEquals(1, timer.count());
+        assertThat(timer).isNotNull();
+        assertThat(timer.count()).isEqualTo(1);
 
         Counter counter = registry.find("inference4j.router.shadow")
                 .tag("router", "my-router")
@@ -82,8 +82,8 @@ class MicrometerRouterMetricsTest {
                 .tag("success", "true")
                 .counter();
 
-        assertNotNull(counter);
-        assertEquals(1.0, counter.count());
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
     }
 
     @Test
@@ -96,8 +96,8 @@ class MicrometerRouterMetricsTest {
                 .tag("success", "false")
                 .counter();
 
-        assertNotNull(counter);
-        assertEquals(1.0, counter.count());
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
     }
 
     @Test
@@ -116,9 +116,9 @@ class MicrometerRouterMetricsTest {
                 .tag("outcome", "success")
                 .timer();
 
-        assertNotNull(timerA);
-        assertNotNull(timerB);
-        assertEquals(2, timerA.count());
-        assertEquals(1, timerB.count());
+        assertThat(timerA).isNotNull();
+        assertThat(timerB).isNotNull();
+        assertThat(timerA.count()).isEqualTo(2);
+        assertThat(timerB.count()).isEqualTo(1);
     }
 }

@@ -24,7 +24,9 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
@@ -38,7 +40,7 @@ class GenerationEngineTest {
                 .decoder(mock(TokenDecoder.class))
                 .eosTokenId(0);
 
-        assertThrows(NullPointerException.class, builder::build);
+        assertThatThrownBy(builder::build).isInstanceOf(NullPointerException.class);
     }
 
     @Test
@@ -48,7 +50,7 @@ class GenerationEngineTest {
                 .decoder(mock(TokenDecoder.class))
                 .eosTokenId(0);
 
-        assertThrows(NullPointerException.class, builder::build);
+        assertThatThrownBy(builder::build).isInstanceOf(NullPointerException.class);
     }
 
     @Test
@@ -58,7 +60,7 @@ class GenerationEngineTest {
                 .tokenizer(mock(Tokenizer.class))
                 .eosTokenId(0);
 
-        assertThrows(NullPointerException.class, builder::build);
+        assertThatThrownBy(builder::build).isInstanceOf(NullPointerException.class);
     }
 
     @Test
@@ -68,7 +70,7 @@ class GenerationEngineTest {
                 .tokenizer(mock(Tokenizer.class))
                 .decoder(mock(TokenDecoder.class));
 
-        assertThrows(IllegalStateException.class, builder::build);
+        assertThatThrownBy(builder::build).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -106,10 +108,10 @@ class GenerationEngineTest {
 
             GenerationResult result = engine.generate("Hello");
 
-            assertEquals(" is world", result.text());
-            assertEquals(1, result.promptTokens());
-            assertEquals(2, result.generatedTokens());
-            assertNotNull(result.duration());
+            assertThat(result.text()).isEqualTo(" is world");
+            assertThat(result.promptTokens()).isEqualTo(1);
+            assertThat(result.generatedTokens()).isEqualTo(2);
+            assertThat(result.duration()).isNotNull();
         } catch (Exception e) {
             fail(e);
         }
@@ -152,7 +154,7 @@ class GenerationEngineTest {
             fail(e);
         }
 
-        assertEquals(List.of("A", "B"), streamed);
+        assertThat(streamed).isEqualTo(List.of("A", "B"));
     }
 
     @Test
@@ -179,8 +181,8 @@ class GenerationEngineTest {
 
             GenerationResult result = engine.generate("x");
 
-            assertEquals("xxx", result.text());
-            assertEquals(3, result.generatedTokens());
+            assertThat(result.text()).isEqualTo("xxx");
+            assertThat(result.generatedTokens()).isEqualTo(3);
         } catch (Exception e) {
             fail(e);
         }
@@ -217,9 +219,9 @@ class GenerationEngineTest {
 
             GenerationResult result = engine.generate("prompt", streamed::add);
 
-            assertEquals("Hello", result.text());
+            assertThat(result.text()).isEqualTo("Hello");
             // Streamed output must match final result — listener never sees stop sequence
-            assertEquals(result.text(), String.join("", streamed));
+            assertThat(String.join("", streamed)).isEqualTo(result.text());
         } catch (Exception e) {
             fail(e);
         }
@@ -259,8 +261,8 @@ class GenerationEngineTest {
 
             GenerationResult result = engine.generate("prompt", streamed::add);
 
-            assertEquals("The quick brown fox", result.text());
-            assertEquals(result.text(), String.join("", streamed));
+            assertThat(result.text()).isEqualTo("The quick brown fox");
+            assertThat(String.join("", streamed)).isEqualTo(result.text());
         } catch (Exception e) {
             fail(e);
         }
@@ -290,8 +292,8 @@ class GenerationEngineTest {
 
             GenerationResult result = engine.generate("Hi");
 
-            assertEquals("", result.text());
-            assertEquals(3, result.promptTokens());
+            assertThat(result.text()).isEqualTo("");
+            assertThat(result.promptTokens()).isEqualTo(3);
         } catch (Exception e) {
             fail(e);
         }
@@ -371,8 +373,8 @@ class GenerationEngineTest {
 
             GenerationResult result = engine.generate("x");
 
-            assertEquals("A", result.text());
-            assertEquals(1, result.generatedTokens());
+            assertThat(result.text()).isEqualTo("A");
+            assertThat(result.generatedTokens()).isEqualTo(1);
         } catch (Exception e) {
             fail(e);
         }

@@ -25,7 +25,8 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 class VisionLanguageModelTest {
@@ -46,9 +47,9 @@ class VisionLanguageModelTest {
 				new VisionInput(Path.of("cat.jpg"), "Describe this image."),
 				10, 250);
 
-		assertEquals("A cat sitting on a mat.", result.text());
-		assertEquals(10, result.generatedTokens());
-		assertEquals(java.time.Duration.ofMillis(250), result.duration());
+		assertThat(result.text()).isEqualTo("A cat sitting on a mat.");
+		assertThat(result.generatedTokens()).isEqualTo(10);
+		assertThat(result.duration()).isEqualTo(java.time.Duration.ofMillis(250));
 	}
 
 	@Test
@@ -66,16 +67,16 @@ class VisionLanguageModelTest {
 
 	@Test
 	void builderRequiresModelOrModelSource() {
-		assertThrows(IllegalStateException.class, () ->
-				VisionLanguageModel.builder().build());
+		assertThatThrownBy(() -> VisionLanguageModel.builder().build())
+				.isInstanceOf(IllegalStateException.class);
 	}
 
 	@Test
 	void builderRequiresChatTemplateWhenModelIdProvided() {
-		assertThrows(IllegalStateException.class, () ->
-				VisionLanguageModel.builder()
+		assertThatThrownBy(() -> VisionLanguageModel.builder()
 						.modelId("some/model")
-						.build());
+						.build())
+				.isInstanceOf(IllegalStateException.class);
 	}
 
 	@Test
@@ -89,7 +90,7 @@ class VisionLanguageModelTest {
 		builder.processor = processor;
 
 		VisionLanguageModel vlm = builder.build();
-		assertNotNull(vlm);
+		assertThat(vlm).isNotNull();
 	}
 
 	@Test
@@ -97,7 +98,7 @@ class VisionLanguageModelTest {
 		Path path = Path.of("photo.jpg");
 		VisionInput input = new VisionInput(path, "What is this?");
 
-		assertEquals(path, input.imagePath());
-		assertEquals("What is this?", input.prompt());
+		assertThat(input.imagePath()).isEqualTo(path);
+		assertThat(input.prompt()).isEqualTo("What is this?");
 	}
 }

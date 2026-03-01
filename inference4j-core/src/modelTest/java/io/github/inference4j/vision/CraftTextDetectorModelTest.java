@@ -16,49 +16,56 @@
 
 package io.github.inference4j.vision;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CraftTextDetectorModelTest {
 
-    private static BufferedImage loadTextImage() throws IOException {
-        return ImageIO.read(CraftTextDetectorModelTest.class.getResourceAsStream("/fixtures/text.jpg"));
+    private CraftTextDetector detector;
+    private BufferedImage textImage;
+
+    @BeforeAll
+    void setUp() throws IOException {
+        detector = CraftTextDetector.builder()
+                .textThreshold(0.4f)
+                .lowTextThreshold(0.3f)
+                .build();
+        textImage = ImageIO.read(CraftTextDetectorModelTest.class.getResourceAsStream("/fixtures/text.jpg"));
+    }
+
+    @AfterAll
+    void tearDown() throws Exception {
+        if (detector != null) detector.close();
     }
 
     @Test
-    void detect_textImage_findsTextRegions() throws IOException {
-        try (var detector = CraftTextDetector.builder()
-                .textThreshold(0.4f)
-                .lowTextThreshold(0.3f)
-                .build()) {
-            List<TextRegion> regions = detector.detect(loadTextImage());
+    void detect_textImage_findsTextRegions() {
+        List<TextRegion> regions = detector.detect(textImage);
 
-            assertFalse(regions.isEmpty(), "Should detect at least one text region");
-        }
+        assertThat(regions.isEmpty()).as("Should detect at least one text region").isFalse();
     }
 
     @Test
-    void detect_textImage_regionsHaveValidCoordinates() throws IOException {
-        try (var detector = CraftTextDetector.builder()
-                .textThreshold(0.4f)
-                .lowTextThreshold(0.3f)
-                .build()) {
-            List<TextRegion> regions = detector.detect(loadTextImage());
+    void detect_textImage_regionsHaveValidCoordinates() {
+        List<TextRegion> regions = detector.detect(textImage);
 
-            for (TextRegion region : regions) {
-                BoundingBox box = region.box();
-                assertTrue(box.x1() >= 0, "x1 should be >= 0, got: " + box.x1());
-                assertTrue(box.y1() >= 0, "y1 should be >= 0, got: " + box.y1());
-                assertTrue(box.x2() > box.x1(), "x2 should be > x1");
-                assertTrue(box.y2() > box.y1(), "y2 should be > y1");
-                assertTrue(region.confidence() > 0f, "Confidence should be positive");
-            }
+        for (TextRegion region : regions) {
+            BoundingBox box = region.box();
+            assertThat(box.x1() >= 0).as("x1 should be >= 0, got: " + box.x1()).isTrue();
+            assertThat(box.y1() >= 0).as("y1 should be >= 0, got: " + box.y1()).isTrue();
+            assertThat(box.x2() > box.x1()).as("x2 should be > x1").isTrue();
+            assertThat(box.y2() > box.y1()).as("y2 should be > y1").isTrue();
+            assertThat(region.confidence() > 0f).as("Confidence should be positive").isTrue();
         }
     }
 }

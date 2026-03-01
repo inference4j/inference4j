@@ -26,7 +26,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -41,31 +41,32 @@ class SileroVadDetectorTest {
     @Test
     void voiceSegment_duration() {
         VoiceSegment segment = new VoiceSegment(1.0f, 3.5f, 0.8f);
-        assertEquals(2.5f, segment.duration(), 0.001f);
+        assertThat(segment.duration()).isCloseTo(2.5f, within(0.001f));
     }
 
     @Test
     void voiceSegment_recordProperties() {
         VoiceSegment segment = new VoiceSegment(0.5f, 2.0f, 0.95f);
-        assertEquals(0.5f, segment.start());
-        assertEquals(2.0f, segment.end());
-        assertEquals(0.95f, segment.confidence());
+        assertThat(segment.start()).isEqualTo(0.5f);
+        assertThat(segment.end()).isEqualTo(2.0f);
+        assertThat(segment.confidence()).isEqualTo(0.95f);
     }
 
     @Test
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 io.github.inference4j.audio.SileroVadDetector.builder()
                         .modelSource(badSource)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
     void builder_customThreshold_acceptsValues() {
         // Validates builder pattern accepts all values without error
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 SileroVadDetector.builder()
                         .threshold(0.7f)
                         .minSpeechDuration(0.5f)
@@ -73,7 +74,8 @@ class SileroVadDetectorTest {
                         .sampleRate(8000)
                         .windowSizeSamples(256)
                         .modelSource(badSource)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     // --- Inference flow ---
@@ -103,7 +105,7 @@ class SileroVadDetectorTest {
         List<VoiceSegment> segments = vad.detect(audioData, 16000);
 
         // Should detect speech since all frames return 0.9 probability
-        assertFalse(segments.isEmpty());
+        assertThat(segments).isNotEmpty();
         verify(session, atLeastOnce()).run(any());
     }
 
@@ -130,7 +132,7 @@ class SileroVadDetectorTest {
         List<VoiceSegment> segments = vad.detect(audioData, 16000);
 
         // Should not detect speech since all frames are below threshold
-        assertTrue(segments.isEmpty());
+        assertThat(segments).isEmpty();
     }
 
     @Test
@@ -154,9 +156,9 @@ class SileroVadDetectorTest {
         float[] audioData = new float[1024]; // 2 frames at 512 samples per frame
         float[] probs = vad.probabilities(audioData, 16000);
 
-        assertEquals(2, probs.length);
-        assertEquals(0.3f, probs[0], 0.001f);
-        assertEquals(0.8f, probs[1], 0.001f);
+        assertThat(probs).hasSize(2);
+        assertThat(probs[0]).isCloseTo(0.3f, within(0.001f));
+        assertThat(probs[1]).isCloseTo(0.8f, within(0.001f));
     }
 
     // --- Close delegation ---

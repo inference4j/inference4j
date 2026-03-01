@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -49,10 +49,10 @@ class EfficientNetClassifierTest {
 
         List<Classification> results = EfficientNetClassifier.postProcess(probs, TEST_LABELS, 3, OutputOperator.identity());
 
-        assertEquals(3, results.size());
-        assertEquals("dog", results.get(0).label());
-        assertEquals(1, results.get(0).index());
-        assertEquals(0.50f, results.get(0).confidence(), 1e-5f);
+        assertThat(results).hasSize(3);
+        assertThat(results.get(0).label()).isEqualTo("dog");
+        assertThat(results.get(0).index()).isEqualTo(1);
+        assertThat(results.get(0).confidence()).isCloseTo(0.50f, within(1e-5f));
     }
 
     @Test
@@ -63,11 +63,11 @@ class EfficientNetClassifierTest {
 
         float sum = 0f;
         for (Classification c : results) {
-            assertTrue(c.confidence() > 0f);
-            assertTrue(c.confidence() <= 1f);
+            assertThat(c.confidence()).isGreaterThan(0f);
+            assertThat(c.confidence()).isLessThanOrEqualTo(1f);
             sum += c.confidence();
         }
-        assertEquals(1.0f, sum, 1e-5f);
+        assertThat(sum).isCloseTo(1.0f, within(1e-5f));
     }
 
     @Test
@@ -77,8 +77,9 @@ class EfficientNetClassifierTest {
         List<Classification> results = EfficientNetClassifier.postProcess(probs, TEST_LABELS, 5, OutputOperator.identity());
 
         for (int i = 1; i < results.size(); i++) {
-            assertTrue(results.get(i - 1).confidence() >= results.get(i).confidence(),
-                    "Results not sorted descending at index " + i);
+            assertThat(results.get(i - 1).confidence())
+                    .as("Results not sorted descending at index " + i)
+                    .isGreaterThanOrEqualTo(results.get(i).confidence());
         }
     }
 
@@ -88,8 +89,8 @@ class EfficientNetClassifierTest {
 
         List<Classification> results = EfficientNetClassifier.postProcess(probs, TEST_LABELS, 10, OutputOperator.identity());
 
-        assertEquals(5, results.size());
-        assertEquals("horse", results.get(0).label());
+        assertThat(results).hasSize(5);
+        assertThat(results.get(0).label()).isEqualTo("horse");
     }
 
     @Test
@@ -98,9 +99,9 @@ class EfficientNetClassifierTest {
 
         List<Classification> results = EfficientNetClassifier.postProcess(probs, TEST_LABELS, 1, OutputOperator.identity());
 
-        assertEquals(1, results.size());
-        assertEquals("dog", results.get(0).label());
-        assertEquals(1, results.get(0).index());
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).label()).isEqualTo("dog");
+        assertThat(results.get(0).index()).isEqualTo(1);
     }
 
     @Test
@@ -109,9 +110,9 @@ class EfficientNetClassifierTest {
 
         List<Classification> results = EfficientNetClassifier.postProcess(probs, TEST_LABELS, 1, OutputOperator.identity());
 
-        assertEquals("cat", results.get(0).label());
-        assertEquals(0, results.get(0).index());
-        assertTrue(results.get(0).confidence() > 0.90f);
+        assertThat(results.get(0).label()).isEqualTo("cat");
+        assertThat(results.get(0).index()).isEqualTo(0);
+        assertThat(results.get(0).confidence()).isGreaterThan(0.90f);
     }
 
     @Test
@@ -121,7 +122,7 @@ class EfficientNetClassifierTest {
         List<Classification> results = EfficientNetClassifier.postProcess(probs, TEST_LABELS, 5, OutputOperator.identity());
 
         for (Classification c : results) {
-            assertEquals(0.2f, c.confidence(), 1e-5f);
+            assertThat(c.confidence()).isCloseTo(0.2f, within(1e-5f));
         }
     }
 
@@ -130,11 +131,12 @@ class EfficientNetClassifierTest {
     @Test
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 EfficientNetClassifier.builder()
                         .inputName("images:0")
                         .modelSource(badSource)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
@@ -146,7 +148,7 @@ class EfficientNetClassifierTest {
                 .session(session)
                 .build();
 
-        assertNotNull(model);
+        assertThat(model).isNotNull();
         verify(session).inputNames();
     }
 
@@ -176,9 +178,9 @@ class EfficientNetClassifierTest {
         BufferedImage image = new BufferedImage(280, 280, BufferedImage.TYPE_INT_RGB);
         List<Classification> results = model.classify(image);
 
-        assertEquals(5, results.size());
-        assertEquals("dog", results.get(0).label());
-        assertEquals(0.50f, results.get(0).confidence(), 1e-5f);
+        assertThat(results).hasSize(5);
+        assertThat(results.get(0).label()).isEqualTo("dog");
+        assertThat(results.get(0).confidence()).isCloseTo(0.50f, within(1e-5f));
     }
 
     // --- Close delegation ---

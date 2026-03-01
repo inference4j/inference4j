@@ -28,7 +28,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -53,9 +53,9 @@ class ClipTextEncoderTest {
 
         float[] embedding = encoder.encode("a photo of a cat");
 
-        assertEquals(2, embedding.length);
-        assertEquals(0.6f, embedding[0], 1e-5f);
-        assertEquals(0.8f, embedding[1], 1e-5f);
+        assertThat(embedding).hasSize(2);
+        assertThat(embedding[0]).isCloseTo(0.6f, within(1e-5f));
+        assertThat(embedding[1]).isCloseTo(0.8f, within(1e-5f));
     }
 
     @Test
@@ -79,10 +79,10 @@ class ClipTextEncoderTest {
         encoder.encode("hello");
 
         verify(session).run(argThat(inputs -> {
-            assertTrue(inputs.containsKey("input_ids"));
-            assertTrue(inputs.containsKey("attention_mask"));
-            assertArrayEquals(inputIds, inputs.get("input_ids").toLongs());
-            assertArrayEquals(attentionMask, inputs.get("attention_mask").toLongs());
+            assertThat(inputs).containsKey("input_ids");
+            assertThat(inputs).containsKey("attention_mask");
+            assertThat(inputs.get("input_ids").toLongs()).isEqualTo(inputIds);
+            assertThat(inputs.get("attention_mask").toLongs()).isEqualTo(attentionMask);
             return true;
         }));
     }
@@ -104,26 +104,28 @@ class ClipTextEncoderTest {
                 .build();
 
         List<float[]> results = encoder.encodeBatch(List.of("cat", "dog", "bird"));
-        assertEquals(3, results.size());
+        assertThat(results).hasSize(3);
     }
 
     @Test
     void builder_missingTokenizer_throws() {
         InferenceSession session = mock(InferenceSession.class);
 
-        assertThrows(IllegalStateException.class, () ->
+        assertThatThrownBy(() ->
                 ClipTextEncoder.builder()
                         .session(session)
-                        .build());
+                        .build())
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 ClipTextEncoder.builder()
                         .modelSource(badSource)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test

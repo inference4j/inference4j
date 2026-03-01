@@ -57,6 +57,17 @@
 - [x] `inference4j-genai` — onnxruntime-genai backed generation for larger models (Phi-3, DeepSeek-R1, Phi-3.5 Vision)
 - [x] Streaming generation API — token-by-token callbacks via `Consumer<String>`
 
+### Phase 6: Encoder-Decoder Generation
+
+- [x] `EncoderDecoderSession` — encoder-decoder autoregressive loop with cross-attention and self-attention KV caches
+- [x] `AbstractEncoderDecoderBuilder` — shared builder for encoder-decoder wrappers
+- [x] `FlanT5TextGenerator` — multi-task text generation (summarization, translation, SQL, grammar) with Flan-T5
+- [x] `BartSummarizer` — text summarization with BART / DistilBART
+- [x] `MarianTranslator` — machine translation with MarianMT (Helsinki-NLP opus-mt models)
+- [x] `CoeditGrammarCorrector` — grammar correction with CoEdIT
+- [x] Task interfaces — `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`
+- [x] `Language` enum — 24 languages for typed translation APIs
+
 ### Architecture & Ecosystem
 
 - [x] `AbstractInferenceTask` — enforced preprocess → infer → postprocess pipeline with `final run()`
@@ -72,7 +83,7 @@
 
 ## Next Up
 
-- [ ] **TrOCR** — text recognition (handwriting, printed text)
+- [ ] **TrOCR** — text recognition (handwriting, printed text) — enabled by encoder-decoder infrastructure
 - [ ] OCR Pipeline — CRAFT detection + TrOCR recognition composed end-to-end
 - [ ] **Whisper** — autoregressive speech-to-text via pure ONNX Runtime (mel spectrogram / FFT preprocessing)
 - [ ] Mel spectrogram / FFT preprocessing (unlocks Whisper)
@@ -94,6 +105,10 @@
 | Text | GPT-2 (text generation) | Done |
 | Text | SmolLM2-360M-Instruct (text generation) | Done |
 | Text | Qwen2.5-1.5B-Instruct (text generation) | Done |
+| Text | Flan-T5 (summarization, translation, SQL, grammar) | Done |
+| Text | BART / DistilBART (summarization) | Done |
+| Text | MarianMT (translation) | Done |
+| Text | CoEdIT (grammar correction) | Done |
 | Vision | ResNet | Done |
 | Vision | EfficientNet | Done |
 | Vision | YOLOv8 / YOLO11 | Done |

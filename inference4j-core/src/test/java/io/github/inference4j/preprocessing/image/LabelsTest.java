@@ -24,38 +24,39 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LabelsTest {
 
     @Test
     void imagenet_has1000Labels() {
         io.github.inference4j.preprocessing.image.Labels labels = io.github.inference4j.preprocessing.image.Labels.imagenet();
-        assertEquals(1000, labels.size());
+        assertThat(labels.size()).isEqualTo(1000);
     }
 
     @Test
     void imagenet_firstLabelIsTench() {
         io.github.inference4j.preprocessing.image.Labels labels = io.github.inference4j.preprocessing.image.Labels.imagenet();
-        assertEquals("tench", labels.get(0));
+        assertThat(labels.get(0)).isEqualTo("tench");
     }
 
     @Test
     void imagenet_lastLabelIsToiletTissue() {
         io.github.inference4j.preprocessing.image.Labels labels = io.github.inference4j.preprocessing.image.Labels.imagenet();
-        assertEquals("toilet tissue", labels.get(999));
+        assertThat(labels.get(999)).isEqualTo("toilet tissue");
     }
 
     @Test
     void coco_has80Labels() {
         io.github.inference4j.preprocessing.image.Labels labels = io.github.inference4j.preprocessing.image.Labels.coco();
-        assertEquals(80, labels.size());
+        assertThat(labels.size()).isEqualTo(80);
     }
 
     @Test
     void coco_firstLabelIsPerson() {
         io.github.inference4j.preprocessing.image.Labels labels = io.github.inference4j.preprocessing.image.Labels.coco();
-        assertEquals("person", labels.get(0));
+        assertThat(labels.get(0)).isEqualTo("person");
     }
 
     @Test
@@ -65,26 +66,26 @@ class LabelsTest {
 
         io.github.inference4j.preprocessing.image.Labels labels = io.github.inference4j.preprocessing.image.Labels.fromFile(labelsFile);
 
-        assertEquals(3, labels.size());
-        assertEquals("alpha", labels.get(0));
-        assertEquals("beta", labels.get(1));
-        assertEquals("gamma", labels.get(2));
+        assertThat(labels.size()).isEqualTo(3);
+        assertThat(labels.get(0)).isEqualTo("alpha");
+        assertThat(labels.get(1)).isEqualTo("beta");
+        assertThat(labels.get(2)).isEqualTo("gamma");
     }
 
     @Test
     void of_createsFromList() {
         io.github.inference4j.preprocessing.image.Labels labels = io.github.inference4j.preprocessing.image.Labels.of(List.of("x", "y", "z"));
 
-        assertEquals(3, labels.size());
-        assertEquals("x", labels.get(0));
-        assertEquals("z", labels.get(2));
+        assertThat(labels.size()).isEqualTo(3);
+        assertThat(labels.get(0)).isEqualTo("x");
+        assertThat(labels.get(2)).isEqualTo("z");
     }
 
     @Test
     void get_throwsOnInvalidIndex() {
         io.github.inference4j.preprocessing.image.Labels labels = io.github.inference4j.preprocessing.image.Labels.of(List.of("a", "b"));
 
-        assertThrows(IndexOutOfBoundsException.class, () -> labels.get(2));
-        assertThrows(IndexOutOfBoundsException.class, () -> labels.get(-1));
+        assertThatThrownBy(() -> labels.get(2)).isInstanceOf(IndexOutOfBoundsException.class);
+        assertThatThrownBy(() -> labels.get(-1)).isInstanceOf(IndexOutOfBoundsException.class);
     }
 }

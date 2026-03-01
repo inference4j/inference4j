@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class TokenStreamerTest {
 
@@ -34,9 +34,9 @@ class TokenStreamerTest {
         streamer.accept("Hello");
         streamer.accept(" world");
 
-        assertEquals(List.of("Hello", " world"), streamed);
-        assertFalse(streamer.isStopped());
-        assertEquals("Hello world", streamer.getText());
+        assertThat(streamed).isEqualTo(List.of("Hello", " world"));
+        assertThat(streamer.isStopped()).isFalse();
+        assertThat(streamer.getText()).isEqualTo("Hello world");
     }
 
     @Test
@@ -48,11 +48,11 @@ class TokenStreamerTest {
         streamer.accept(" world");
         streamer.accept("<|end|>");
 
-        assertTrue(streamer.isStopped());
-        assertEquals("Hello world", streamer.getText());
+        assertThat(streamer.isStopped()).isTrue();
+        assertThat(streamer.getText()).isEqualTo("Hello world");
         // Listener should never receive the stop sequence
         String joined = String.join("", streamed);
-        assertEquals("Hello world", joined);
+        assertThat(joined).isEqualTo("Hello world");
     }
 
     @Test
@@ -63,10 +63,10 @@ class TokenStreamerTest {
         streamer.accept("Hello wor");
         streamer.accept("ld");
 
-        assertTrue(streamer.isStopped());
-        assertEquals("Hello ", streamer.getText());
+        assertThat(streamer.isStopped()).isTrue();
+        assertThat(streamer.getText()).isEqualTo("Hello ");
         String joined = String.join("", streamed);
-        assertEquals("Hello ", joined);
+        assertThat(joined).isEqualTo("Hello ");
     }
 
     @Test
@@ -76,16 +76,16 @@ class TokenStreamerTest {
 
         streamer.accept("Hello wor");
         // "wor" is a partial match for "world" — should be held in buffer
-        assertFalse(streamer.isStopped());
+        assertThat(streamer.isStopped()).isFalse();
 
         // Now the rest doesn't form the stop sequence
         streamer.accept("k!");
-        assertFalse(streamer.isStopped());
+        assertThat(streamer.isStopped()).isFalse();
 
         streamer.flush();
-        assertEquals("Hello work!", streamer.getText());
+        assertThat(streamer.getText()).isEqualTo("Hello work!");
         String joined = String.join("", streamed);
-        assertEquals("Hello work!", joined);
+        assertThat(joined).isEqualTo("Hello work!");
     }
 
     @Test
@@ -96,8 +96,8 @@ class TokenStreamerTest {
         streamer.accept("Hello\n");
         streamer.accept("\nmore text");
 
-        assertTrue(streamer.isStopped());
-        assertEquals("Hello", streamer.getText());
+        assertThat(streamer.isStopped()).isTrue();
+        assertThat(streamer.getText()).isEqualTo("Hello");
     }
 
     @Test
@@ -107,12 +107,12 @@ class TokenStreamerTest {
 
         streamer.accept("abc");
         // "abc" fits within maxStopLength (3), so it's held
-        assertEquals("", streamer.getText());
+        assertThat(streamer.getText()).isEqualTo("");
 
         streamer.flush();
-        assertEquals("abc", streamer.getText());
+        assertThat(streamer.getText()).isEqualTo("abc");
         String joined = String.join("", streamed);
-        assertEquals("abc", joined);
+        assertThat(joined).isEqualTo("abc");
     }
 
     @Test
@@ -124,9 +124,9 @@ class TokenStreamerTest {
         streamer.accept("second ");
         streamer.accept("third");
 
-        assertFalse(streamer.isStopped());
+        assertThat(streamer.isStopped()).isFalse();
         streamer.flush();
-        assertEquals("first second third", streamer.getText());
+        assertThat(streamer.getText()).isEqualTo("first second third");
     }
 
     @Test
@@ -136,9 +136,9 @@ class TokenStreamerTest {
 
         streamer.accept("Hello world");
 
-        assertTrue(streamer.isStopped());
-        assertEquals("", streamer.getText());
-        assertTrue(streamed.isEmpty());
+        assertThat(streamer.isStopped()).isTrue();
+        assertThat(streamer.getText()).isEqualTo("");
+        assertThat(streamed).isEmpty();
     }
 
     @Test
@@ -148,10 +148,10 @@ class TokenStreamerTest {
 
         streamer.accept("beforeSTOPafter");
 
-        assertTrue(streamer.isStopped());
-        assertEquals("before", streamer.getText());
+        assertThat(streamer.isStopped()).isTrue();
+        assertThat(streamer.getText()).isEqualTo("before");
         String joined = String.join("", streamed);
-        assertEquals("before", joined);
+        assertThat(joined).isEqualTo("before");
     }
 
     @Test
@@ -163,7 +163,7 @@ class TokenStreamerTest {
         streamer.accept("Hello");
         streamer.accept("");
 
-        assertEquals("Hello", streamer.getText());
+        assertThat(streamer.getText()).isEqualTo("Hello");
     }
 
     @Test
@@ -173,10 +173,10 @@ class TokenStreamerTest {
 
         streamer.accept("the end");
 
-        assertTrue(streamer.isStopped());
+        assertThat(streamer.isStopped()).isTrue();
         String textBefore = streamer.getText();
 
         streamer.flush();
-        assertEquals(textBefore, streamer.getText());
+        assertThat(streamer.getText()).isEqualTo(textBefore);
     }
 }

@@ -16,7 +16,10 @@
 
 package io.github.inference4j.audio;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,43 +28,45 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SileroVadDetectorModelTest {
 
-    private static Path extractSpeechFixture() throws IOException {
-        Path tempFile = Files.createTempFile("speech-fixture-", ".wav");
-        tempFile.toFile().deleteOnExit();
+    private SileroVadDetector vad;
+    private Path speechFixture;
+
+    @BeforeAll
+    void setUp() throws IOException {
+        vad = SileroVadDetector.builder().build();
+        speechFixture = Files.createTempFile("speech-fixture-", ".wav");
+        speechFixture.toFile().deleteOnExit();
         try (InputStream is = SileroVadDetectorModelTest.class.getResourceAsStream("/fixtures/speech.wav")) {
-            Files.copy(is, tempFile, StandardCopyOption.REPLACE_EXISTING);
-        }
-        return tempFile;
-    }
-
-    @Test
-    void detect_speechWav_findsVoiceSegments() throws IOException {
-        try (var vad = io.github.inference4j.audio.SileroVadDetector.builder().build()) {
-            List<VoiceSegment> segments = vad.detect(extractSpeechFixture());
-
-            assertFalse(segments.isEmpty(), "Should detect at least one voice segment in speech audio");
+            Files.copy(is, speechFixture, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
-    @Test
-    void detect_speechWav_segmentsHaveValidTimestamps() throws IOException {
-        try (var vad = SileroVadDetector.builder().build()) {
-            List<VoiceSegment> segments = vad.detect(extractSpeechFixture());
+    @AfterAll
+    void tearDown() throws Exception {
+        if (vad != null) vad.close();
+    }
 
-            for (VoiceSegment segment : segments) {
-                assertTrue(segment.start() >= 0f,
-                        "Segment start should be >= 0, got: " + segment.start());
-                assertTrue(segment.end() > segment.start(),
-                        "Segment end should be > start: start=" + segment.start() + " end=" + segment.end());
-                assertTrue(segment.duration() > 0f,
-                        "Segment duration should be positive, got: " + segment.duration());
-                assertTrue(segment.confidence() > 0f && segment.confidence() <= 1f,
-                        "Segment confidence should be (0, 1], got: " + segment.confidence());
-            }
+    @Test
+    void detect_speechWav_findsVoiceSegments() {
+        List<VoiceSegment> segments = vad.detect(speechFixture);
+
+        assertThat(segments.isEmpty()).as("Should detect at least one voice segment in speech audio").isFalse();
+    }
+
+    @Test
+    void detect_speechWav_segmentsHaveValidTimestamps() {
+        List<VoiceSegment> segments = vad.detect(speechFixture);
+
+        for (VoiceSegment segment : segments) {
+            assertThat(segment.start() >= 0f).as("Segment start should be >= 0, got: " + segment.start()).isTrue();
+            assertThat(segment.end() > segment.start()).as("Segment end should be > start: start=" + segment.start() + " end=" + segment.end()).isTrue();
+            assertThat(segment.duration() > 0f).as("Segment duration should be positive, got: " + segment.duration()).isTrue();
+            assertThat(segment.confidence() > 0f && segment.confidence() <= 1f).as("Segment confidence should be (0, 1], got: " + segment.confidence()).isTrue();
         }
     }
 }

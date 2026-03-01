@@ -16,68 +16,76 @@
 
 package io.github.inference4j.multimodal;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ClipTextEncoderModelTest {
+
+    private ClipTextEncoder textEncoder;
+    private ClipImageEncoder imageEncoder;
+
+    @BeforeAll
+    void setUp() throws IOException {
+        textEncoder = ClipTextEncoder.builder().build();
+        imageEncoder = ClipImageEncoder.builder().build();
+    }
+
+    @AfterAll
+    void tearDown() throws Exception {
+        if (textEncoder != null) textEncoder.close();
+        if (imageEncoder != null) imageEncoder.close();
+    }
 
     @Test
     void encode_returnsNonEmptyFiniteEmbedding() {
-        try (var encoder = io.github.inference4j.multimodal.ClipTextEncoder.builder().build()) {
-            float[] embedding = encoder.encode("a photo of a cat");
+        float[] embedding = textEncoder.encode("a photo of a cat");
 
-            assertTrue(embedding.length > 0, "Embedding should be non-empty");
-            for (int i = 0; i < embedding.length; i++) {
-                assertTrue(Float.isFinite(embedding[i]),
-                        "Embedding value at index " + i + " should be finite, got: " + embedding[i]);
-            }
+        assertThat(embedding.length > 0).as("Embedding should be non-empty").isTrue();
+        for (int i = 0; i < embedding.length; i++) {
+            assertThat(Float.isFinite(embedding[i])).as("Embedding value at index " + i + " should be finite, got: " + embedding[i]).isTrue();
         }
     }
 
     @Test
     void encode_returns512Dimensions() {
-        try (var encoder = ClipTextEncoder.builder().build()) {
-            float[] embedding = encoder.encode("a photo of a cat");
+        float[] embedding = textEncoder.encode("a photo of a cat");
 
-            assertEquals(512, embedding.length, "CLIP ViT-B/32 should produce 512-dim embeddings");
-        }
+        assertThat(embedding.length).as("CLIP ViT-B/32 should produce 512-dim embeddings").isEqualTo(512);
     }
 
     @Test
     void encode_isL2Normalized() {
-        try (var encoder = ClipTextEncoder.builder().build()) {
-            float[] embedding = encoder.encode("a photo of a cat");
+        float[] embedding = textEncoder.encode("a photo of a cat");
 
-            float norm = 0f;
-            for (float v : embedding) {
-                norm += v * v;
-            }
-            norm = (float) Math.sqrt(norm);
-
-            assertEquals(1.0f, norm, 1e-3f,
-                    "Embedding should be L2-normalized (norm ≈ 1.0), got: " + norm);
+        float norm = 0f;
+        for (float v : embedding) {
+            norm += v * v;
         }
+        norm = (float) Math.sqrt(norm);
+
+        assertThat(norm).as("Embedding should be L2-normalized (norm ≈ 1.0), got: " + norm).isCloseTo(1.0f, within(1e-3f));
     }
 
     @Test
     void encode_similarTextsProduceCloserEmbeddings() {
-        try (var encoder = ClipTextEncoder.builder().build()) {
-            float[] embCat = encoder.encode("a photo of a cat");
-            float[] embKitten = encoder.encode("a picture of a kitten");
-            float[] embCar = encoder.encode("a photo of a sports car");
+        float[] embCat = textEncoder.encode("a photo of a cat");
+        float[] embKitten = textEncoder.encode("a picture of a kitten");
+        float[] embCar = textEncoder.encode("a photo of a sports car");
 
-            float simCatKitten = dot(embCat, embKitten);
-            float simCatCar = dot(embCat, embCar);
+        float simCatKitten = dot(embCat, embKitten);
+        float simCatCar = dot(embCat, embCar);
 
-            assertTrue(simCatKitten > simCatCar,
-                    "Cat-kitten should be more similar than cat-car: " +
-                            "cat-kitten=" + simCatKitten + " cat-car=" + simCatCar);
-        }
+        assertThat(simCatKitten > simCatCar).as("Cat-kitten should be more similar than cat-car: " +
+                        "cat-kitten=" + simCatKitten + " cat-car=" + simCatCar).isTrue();
     }
 
     @Test
@@ -85,20 +93,15 @@ class ClipTextEncoderModelTest {
         BufferedImage catImage = ImageIO.read(
                 ClipTextEncoderModelTest.class.getResourceAsStream("/fixtures/cat.jpg"));
 
-        try (var imageEncoder = ClipImageEncoder.builder().build();
-             var textEncoder = ClipTextEncoder.builder().build()) {
+        float[] imageEmb = imageEncoder.encode(catImage);
+        float[] catText = textEncoder.encode("a photo of a cat");
+        float[] dogText = textEncoder.encode("a photo of a dog");
 
-            float[] imageEmb = imageEncoder.encode(catImage);
-            float[] catText = textEncoder.encode("a photo of a cat");
-            float[] dogText = textEncoder.encode("a photo of a dog");
+        float catScore = dot(imageEmb, catText);
+        float dogScore = dot(imageEmb, dogText);
 
-            float catScore = dot(imageEmb, catText);
-            float dogScore = dot(imageEmb, dogText);
-
-            assertTrue(catScore > dogScore,
-                    "Cat image should match 'cat' text better than 'dog' text: " +
-                            "cat=" + catScore + " dog=" + dogScore);
-        }
+        assertThat(catScore > dogScore).as("Cat image should match 'cat' text better than 'dog' text: " +
+                        "cat=" + catScore + " dog=" + dogScore).isTrue();
     }
 
     private static float dot(float[] a, float[] b) {

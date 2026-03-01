@@ -33,7 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -57,10 +58,10 @@ class DistilBertTextClassifierTest {
         List<TextClassification> results = io.github.inference4j.nlp.DistilBertTextClassifier.postProcess(
                 logits, SENTIMENT_CONFIG, 2, OutputOperator.softmax());
 
-        assertEquals(2, results.size());
-        assertEquals("POSITIVE", results.get(0).label());
-        assertEquals(1, results.get(0).index());
-        assertTrue(results.get(0).confidence() > 0.99f);
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).label()).isEqualTo("POSITIVE");
+        assertThat(results.get(0).index()).isEqualTo(1);
+        assertThat(results.get(0).confidence()).isGreaterThan(0.99f);
     }
 
     @Test
@@ -70,9 +71,9 @@ class DistilBertTextClassifierTest {
         List<TextClassification> results = DistilBertTextClassifier.postProcess(
                 logits, SENTIMENT_CONFIG, 2, OutputOperator.softmax());
 
-        assertEquals("NEGATIVE", results.get(0).label());
-        assertEquals(0, results.get(0).index());
-        assertTrue(results.get(0).confidence() > 0.99f);
+        assertThat(results.get(0).label()).isEqualTo("NEGATIVE");
+        assertThat(results.get(0).index()).isEqualTo(0);
+        assertThat(results.get(0).confidence()).isGreaterThan(0.99f);
     }
 
     @Test
@@ -82,13 +83,13 @@ class DistilBertTextClassifierTest {
         List<TextClassification> results = DistilBertTextClassifier.postProcess(
                 logits, MULTI_CLASS_CONFIG, 3, OutputOperator.softmax());
 
-        assertEquals(3, results.size());
-        assertEquals("joy", results.get(0).label());
-        assertEquals(1, results.get(0).index());
-        assertEquals("fear", results.get(1).label());
-        assertEquals(4, results.get(1).index());
-        assertEquals("sadness", results.get(2).label());
-        assertEquals(2, results.get(2).index());
+        assertThat(results).hasSize(3);
+        assertThat(results.get(0).label()).isEqualTo("joy");
+        assertThat(results.get(0).index()).isEqualTo(1);
+        assertThat(results.get(1).label()).isEqualTo("fear");
+        assertThat(results.get(1).index()).isEqualTo(4);
+        assertThat(results.get(2).label()).isEqualTo("sadness");
+        assertThat(results.get(2).index()).isEqualTo(2);
     }
 
     @Test
@@ -100,11 +101,11 @@ class DistilBertTextClassifierTest {
 
         float sum = 0f;
         for (TextClassification c : results) {
-            assertTrue(c.confidence() > 0f);
-            assertTrue(c.confidence() <= 1f);
+            assertThat(c.confidence()).isGreaterThan(0f);
+            assertThat(c.confidence()).isLessThanOrEqualTo(1f);
             sum += c.confidence();
         }
-        assertEquals(1.0f, sum, 1e-5f);
+        assertThat(sum).isCloseTo(1.0f, within(1e-5f));
     }
 
     @Test
@@ -114,8 +115,8 @@ class DistilBertTextClassifierTest {
         List<TextClassification> results = DistilBertTextClassifier.postProcess(
                 logits, SENTIMENT_CONFIG, 1, OutputOperator.softmax());
 
-        assertEquals(1, results.size());
-        assertEquals("POSITIVE", results.get(0).label());
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).label()).isEqualTo("POSITIVE");
     }
 
     @Test
@@ -126,10 +127,10 @@ class DistilBertTextClassifierTest {
                 logits, MULTI_CLASS_CONFIG, 5, OutputOperator.sigmoid());
 
         // Sigmoid doesn't sum to 1 — each class is independent
-        assertEquals("anger", results.get(0).label());
-        assertTrue(results.get(0).confidence() > 0.9f);
-        assertEquals("sadness", results.get(1).label());
-        assertTrue(results.get(1).confidence() > 0.8f);
+        assertThat(results.get(0).label()).isEqualTo("anger");
+        assertThat(results.get(0).confidence()).isGreaterThan(0.9f);
+        assertThat(results.get(1).label()).isEqualTo("sadness");
+        assertThat(results.get(1).confidence()).isGreaterThan(0.8f);
     }
 
     @Test
@@ -139,8 +140,8 @@ class DistilBertTextClassifierTest {
         List<TextClassification> results = DistilBertTextClassifier.postProcess(
                 logits, SENTIMENT_CONFIG, 2, OutputOperator.softmax());
 
-        assertEquals(results.get(0).confidence(), results.get(1).confidence(), 1e-5f);
-        assertEquals(0.5f, results.get(0).confidence(), 1e-5f);
+        assertThat(results.get(0).confidence()).isCloseTo(results.get(1).confidence(), within(1e-5f));
+        assertThat(results.get(0).confidence()).isCloseTo(0.5f, within(1e-5f));
     }
 
     @Test
@@ -151,8 +152,9 @@ class DistilBertTextClassifierTest {
                 logits, MULTI_CLASS_CONFIG, 5, OutputOperator.softmax());
 
         for (int i = 1; i < results.size(); i++) {
-            assertTrue(results.get(i - 1).confidence() >= results.get(i).confidence(),
-                    "Results not sorted descending at index " + i);
+            assertThat(results.get(i - 1).confidence())
+                    .as("Results not sorted descending at index " + i)
+                    .isGreaterThanOrEqualTo(results.get(i).confidence());
         }
     }
 
@@ -162,33 +164,36 @@ class DistilBertTextClassifierTest {
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
         Tokenizer tokenizer = mock(Tokenizer.class);
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 DistilBertTextClassifier.builder()
                         .tokenizer(tokenizer)
                         .config(SENTIMENT_CONFIG)
                         .modelSource(badSource)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
     void builder_missingTokenizer_throws() {
         InferenceSession session = mock(InferenceSession.class);
-        assertThrows(IllegalStateException.class, () ->
+        assertThatThrownBy(() ->
                 DistilBertTextClassifier.builder()
                         .session(session)
                         .config(SENTIMENT_CONFIG)
-                        .build());
+                        .build())
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
     void builder_missingConfig_throws() {
         InferenceSession session = mock(InferenceSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
-        assertThrows(IllegalStateException.class, () ->
+        assertThatThrownBy(() ->
                 DistilBertTextClassifier.builder()
                         .session(session)
                         .tokenizer(tokenizer)
-                        .build());
+                        .build())
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -235,8 +240,8 @@ class DistilBertTextClassifierTest {
         List<TextClassification> results = model.classify("test");
 
         // Sigmoid: each class is independent (doesn't sum to 1)
-        assertEquals(2, results.size());
-        assertTrue(results.get(0).confidence() > 0.9f);
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).confidence()).isGreaterThan(0.9f);
     }
 
     @Test
@@ -252,7 +257,7 @@ class DistilBertTextClassifierTest {
                 .modelSource(id -> Path.of("/tmp"))
                 .build();
 
-        assertNotNull(model);
+        assertThat(model).isNotNull();
     }
 
     @Test
@@ -267,7 +272,7 @@ class DistilBertTextClassifierTest {
                 .sessionOptions(opts -> { })
                 .build();
 
-        assertNotNull(model);
+        assertThat(model).isNotNull();
     }
 
     // --- Inference flow ---
@@ -291,14 +296,14 @@ class DistilBertTextClassifierTest {
 
         List<TextClassification> results = model.classify("great movie");
 
-        assertEquals(2, results.size());
-        assertEquals("POSITIVE", results.get(0).label());
-        assertTrue(results.get(0).confidence() > 0.99f);
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).label()).isEqualTo("POSITIVE");
+        assertThat(results.get(0).confidence()).isGreaterThan(0.99f);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
         verify(session).run(captor.capture());
-        assertTrue(captor.getValue().containsKey("token_type_ids"));
+        assertThat(captor.getValue()).containsKey("token_type_ids");
     }
 
     @Test
@@ -323,7 +328,7 @@ class DistilBertTextClassifierTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
         verify(session).run(captor.capture());
-        assertFalse(captor.getValue().containsKey("token_type_ids"));
+        assertThat(captor.getValue()).doesNotContainKey("token_type_ids");
     }
 
     // --- Close delegation ---

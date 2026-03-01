@@ -28,7 +28,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -55,16 +55,16 @@ class ClipImageEncoderTest {
         BufferedImage image = new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB);
         float[] embedding = encoder.encode(image);
 
-        assertEquals(2, embedding.length);
-        assertEquals(0.6f, embedding[0], 1e-5f);
-        assertEquals(0.8f, embedding[1], 1e-5f);
+        assertThat(embedding).hasSize(2);
+        assertThat(embedding[0]).isCloseTo(0.6f, within(1e-5f));
+        assertThat(embedding[1]).isCloseTo(0.8f, within(1e-5f));
 
         // Verify L2 norm ≈ 1.0
         float norm = 0f;
         for (float v : embedding) {
             norm += v * v;
         }
-        assertEquals(1.0f, (float) Math.sqrt(norm), 1e-5f);
+        assertThat((float) Math.sqrt(norm)).isCloseTo(1.0f, within(1e-5f));
     }
 
     @Test
@@ -89,19 +89,20 @@ class ClipImageEncoderTest {
                 new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB));
         List<float[]> results = encoder.encodeBatch(images);
 
-        assertEquals(2, results.size());
+        assertThat(results).hasSize(2);
         for (float[] emb : results) {
-            assertEquals(2, emb.length);
+            assertThat(emb).hasSize(2);
         }
     }
 
     @Test
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 ClipImageEncoder.builder()
                         .modelSource(badSource)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
@@ -122,11 +123,11 @@ class ClipImageEncoderTest {
 
     @Test
     void clipNormalization_usesCorrectMeanAndStd() {
-        assertArrayEquals(
+        assertThat(ClipImageEncoder.CLIP_MEAN).containsExactly(
                 new float[]{0.48145466f, 0.4578275f, 0.40821073f},
-                ClipImageEncoder.CLIP_MEAN, 1e-7f);
-        assertArrayEquals(
+                within(1e-7f));
+        assertThat(ClipImageEncoder.CLIP_STD).containsExactly(
                 new float[]{0.26862954f, 0.26130258f, 0.27577711f},
-                ClipImageEncoder.CLIP_STD, 1e-7f);
+                within(1e-7f));
     }
 }

@@ -25,9 +25,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 import java.util.Objects;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class TokenizerJsonParserTest {
 
@@ -42,7 +40,7 @@ class TokenizerJsonParserTest {
     @Test
     void parse_returnsNonNullBuilder() {
         SentencePieceBpeTokenizer.Builder builder = TokenizerJsonParser.parse(tokenizerJson);
-        assertNotNull(builder);
+        assertThat(builder).isNotNull();
     }
 
     @Test
@@ -50,7 +48,7 @@ class TokenizerJsonParserTest {
         SentencePieceBpeTokenizer tokenizer = TokenizerJsonParser.parse(tokenizerJson).build();
 
         EncodedInput encoded = tokenizer.encode("hello", 512);
-        assertTrue(encoded.inputIds().length > 0, "Should produce at least one token");
+        assertThat(encoded.inputIds().length).as("Should produce at least one token").isGreaterThan(0);
     }
 
     @Test
@@ -60,7 +58,7 @@ class TokenizerJsonParserTest {
         // Added tokens from the fixture include <start_of_turn> (300), <end_of_turn> (301)
         // They should be treated as special tokens (skipped during decode)
         String decoded = tokenizer.decode(new int[]{300, 14, 301});
-        assertEquals("hello", decoded, "Special tokens should be skipped during decode");
+        assertThat(decoded).as("Special tokens should be skipped during decode").isEqualTo("hello");
     }
 
     @Test
@@ -74,7 +72,7 @@ class TokenizerJsonParserTest {
             ids[i] = (int) encoded.inputIds()[i];
         }
         String decoded = tokenizer.decode(ids);
-        assertEquals(input, decoded);
+        assertThat(decoded).isEqualTo(input);
     }
 
     @Test
@@ -92,6 +90,6 @@ class TokenizerJsonParserTest {
             ids[i] = (int) encoded.inputIds()[i];
         }
         String decoded = tokenizer.decode(ids);
-        assertEquals(input, decoded);
+        assertThat(decoded).isEqualTo(input);
     }
 }

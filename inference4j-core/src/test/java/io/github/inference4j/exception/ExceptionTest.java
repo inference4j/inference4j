@@ -18,7 +18,7 @@ package io.github.inference4j.exception;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class ExceptionTest {
 
@@ -27,21 +27,21 @@ class ExceptionTest {
     @Test
     void inferenceException_messageOnly() {
         InferenceException ex = new InferenceException("inference failed");
-        assertEquals("inference failed", ex.getMessage());
-        assertNull(ex.getCause());
+        assertThat(ex.getMessage()).isEqualTo("inference failed");
+        assertThat(ex.getCause()).isNull();
     }
 
     @Test
     void inferenceException_messageAndCause() {
         RuntimeException cause = new RuntimeException("root cause");
         InferenceException ex = new InferenceException("inference failed", cause);
-        assertEquals("inference failed", ex.getMessage());
-        assertSame(cause, ex.getCause());
+        assertThat(ex.getMessage()).isEqualTo("inference failed");
+        assertThat(ex.getCause()).isSameAs(cause);
     }
 
     @Test
     void inferenceException_isRuntimeException() {
-        assertInstanceOf(RuntimeException.class, new InferenceException("test"));
+        assertThat(new InferenceException("test")).isInstanceOf(RuntimeException.class);
     }
 
     // --- ModelLoadException ---
@@ -49,21 +49,21 @@ class ExceptionTest {
     @Test
     void modelLoadException_messageOnly() {
         ModelLoadException ex = new ModelLoadException("cannot load model");
-        assertEquals("cannot load model", ex.getMessage());
-        assertNull(ex.getCause());
+        assertThat(ex.getMessage()).isEqualTo("cannot load model");
+        assertThat(ex.getCause()).isNull();
     }
 
     @Test
     void modelLoadException_messageAndCause() {
         Exception cause = new Exception("io error");
         ModelLoadException ex = new ModelLoadException("cannot load model", cause);
-        assertEquals("cannot load model", ex.getMessage());
-        assertSame(cause, ex.getCause());
+        assertThat(ex.getMessage()).isEqualTo("cannot load model");
+        assertThat(ex.getCause()).isSameAs(cause);
     }
 
     @Test
     void modelLoadException_extendsInferenceException() {
-        assertInstanceOf(InferenceException.class, new ModelLoadException("test"));
+        assertThat(new ModelLoadException("test")).isInstanceOf(InferenceException.class);
     }
 
     // --- ModelSourceException ---
@@ -71,21 +71,21 @@ class ExceptionTest {
     @Test
     void modelSourceException_messageOnly() {
         ModelSourceException ex = new ModelSourceException("source not found");
-        assertEquals("source not found", ex.getMessage());
-        assertNull(ex.getCause());
+        assertThat(ex.getMessage()).isEqualTo("source not found");
+        assertThat(ex.getCause()).isNull();
     }
 
     @Test
     void modelSourceException_messageAndCause() {
         Exception cause = new Exception("disk error");
         ModelSourceException ex = new ModelSourceException("source not found", cause);
-        assertEquals("source not found", ex.getMessage());
-        assertSame(cause, ex.getCause());
+        assertThat(ex.getMessage()).isEqualTo("source not found");
+        assertThat(ex.getCause()).isSameAs(cause);
     }
 
     @Test
     void modelSourceException_extendsInferenceException() {
-        assertInstanceOf(InferenceException.class, new ModelSourceException("test"));
+        assertThat(new ModelSourceException("test")).isInstanceOf(InferenceException.class);
     }
 
     // --- ModelDownloadException ---
@@ -93,30 +93,30 @@ class ExceptionTest {
     @Test
     void modelDownloadException_withStatusCode() {
         ModelDownloadException ex = new ModelDownloadException("404 not found", 404);
-        assertEquals("404 not found", ex.getMessage());
-        assertEquals(404, ex.statusCode());
-        assertNull(ex.getCause());
+        assertThat(ex.getMessage()).isEqualTo("404 not found");
+        assertThat(ex.statusCode()).isEqualTo(404);
+        assertThat(ex.getCause()).isNull();
     }
 
     @Test
     void modelDownloadException_withCause() {
         Exception cause = new Exception("connection refused");
         ModelDownloadException ex = new ModelDownloadException("download failed", cause);
-        assertEquals("download failed", ex.getMessage());
-        assertSame(cause, ex.getCause());
-        assertEquals(-1, ex.statusCode());
+        assertThat(ex.getMessage()).isEqualTo("download failed");
+        assertThat(ex.getCause()).isSameAs(cause);
+        assertThat(ex.statusCode()).isEqualTo(-1);
     }
 
     @Test
     void modelDownloadException_extendsModelSourceException() {
-        assertInstanceOf(ModelSourceException.class, new ModelDownloadException("test", 500));
+        assertThat(new ModelDownloadException("test", 500)).isInstanceOf(ModelSourceException.class);
     }
 
     @Test
     void modelDownloadException_statusCodeVariousValues() {
-        assertEquals(200, new ModelDownloadException("ok", 200).statusCode());
-        assertEquals(403, new ModelDownloadException("forbidden", 403).statusCode());
-        assertEquals(500, new ModelDownloadException("server error", 500).statusCode());
+        assertThat(new ModelDownloadException("ok", 200).statusCode()).isEqualTo(200);
+        assertThat(new ModelDownloadException("forbidden", 403).statusCode()).isEqualTo(403);
+        assertThat(new ModelDownloadException("server error", 500).statusCode()).isEqualTo(500);
     }
 
     // --- TensorConversionException ---
@@ -124,20 +124,20 @@ class ExceptionTest {
     @Test
     void tensorConversionException_messageOnly() {
         TensorConversionException ex = new TensorConversionException("bad tensor");
-        assertEquals("bad tensor", ex.getMessage());
-        assertNull(ex.getCause());
+        assertThat(ex.getMessage()).isEqualTo("bad tensor");
+        assertThat(ex.getCause()).isNull();
     }
 
     @Test
     void tensorConversionException_messageAndCause() {
         Exception cause = new Exception("buffer overflow");
         TensorConversionException ex = new TensorConversionException("bad tensor", cause);
-        assertEquals("bad tensor", ex.getMessage());
-        assertSame(cause, ex.getCause());
+        assertThat(ex.getMessage()).isEqualTo("bad tensor");
+        assertThat(ex.getCause()).isSameAs(cause);
     }
 
     @Test
     void tensorConversionException_extendsInferenceException() {
-        assertInstanceOf(InferenceException.class, new TensorConversionException("test"));
+        assertThat(new TensorConversionException("test")).isInstanceOf(InferenceException.class);
     }
 }

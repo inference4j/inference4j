@@ -16,63 +16,64 @@
 
 package io.github.inference4j.nlp;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SentenceTransformerEmbedderModelTest {
+
+    private SentenceTransformerEmbedder embedder;
+
+    @BeforeAll
+    void setUp() {
+        embedder = SentenceTransformerEmbedder.builder()
+                .modelId("inference4j/all-MiniLM-L6-v2")
+                .build();
+    }
+
+    @AfterAll
+    void tearDown() throws Exception {
+        if (embedder != null) embedder.close();
+    }
 
     @Test
     void encode_returnsNonEmptyFiniteEmbedding() {
-        try (var embedder = io.github.inference4j.nlp.SentenceTransformerEmbedder.builder()
-                .modelId("inference4j/all-MiniLM-L6-v2")
-                .build()) {
+        float[] embedding = embedder.encode("Hello, world!");
 
-            float[] embedding = embedder.encode("Hello, world!");
-
-            assertTrue(embedding.length > 0, "Embedding should be non-empty");
-            for (int i = 0; i < embedding.length; i++) {
-                assertTrue(Float.isFinite(embedding[i]),
-                        "Embedding value at index " + i + " should be finite, got: " + embedding[i]);
-            }
+        assertThat(embedding.length > 0).as("Embedding should be non-empty").isTrue();
+        for (int i = 0; i < embedding.length; i++) {
+            assertThat(Float.isFinite(embedding[i])).as("Embedding value at index " + i + " should be finite, got: " + embedding[i]).isTrue();
         }
     }
 
     @Test
     void encodeBatch_returnsMatchingBatchSize() {
-        try (var embedder = SentenceTransformerEmbedder.builder()
-                .modelId("inference4j/all-MiniLM-L6-v2")
-                .build()) {
+        List<String> texts = List.of("Hello, world!", "How are you?", "Good morning.");
+        List<float[]> embeddings = embedder.encodeBatch(texts);
 
-            List<String> texts = List.of("Hello, world!", "How are you?", "Good morning.");
-            List<float[]> embeddings = embedder.encodeBatch(texts);
-
-            assertEquals(3, embeddings.size(), "Should return one embedding per input text");
-            int dim = embeddings.get(0).length;
-            for (float[] embedding : embeddings) {
-                assertEquals(dim, embedding.length, "All embeddings should have the same dimension");
-            }
+        assertThat(embeddings.size()).as("Should return one embedding per input text").isEqualTo(3);
+        int dim = embeddings.get(0).length;
+        for (float[] embedding : embeddings) {
+            assertThat(embedding.length).as("All embeddings should have the same dimension").isEqualTo(dim);
         }
     }
 
     @Test
     void encode_similarTextProducesCloserEmbeddings() {
-        try (var embedder = SentenceTransformerEmbedder.builder()
-                .modelId("inference4j/all-MiniLM-L6-v2")
-                .build()) {
+        float[] embA = embedder.encode("The cat sat on the mat.");
+        float[] embB = embedder.encode("A cat is sitting on a mat.");
+        float[] embC = embedder.encode("Stock prices rose sharply today.");
 
-            float[] embA = embedder.encode("The cat sat on the mat.");
-            float[] embB = embedder.encode("A cat is sitting on a mat.");
-            float[] embC = embedder.encode("Stock prices rose sharply today.");
+        float simAB = cosineSimilarity(embA, embB);
+        float simAC = cosineSimilarity(embA, embC);
 
-            float simAB = cosineSimilarity(embA, embB);
-            float simAC = cosineSimilarity(embA, embC);
-
-            assertTrue(simAB > simAC,
-                    "Similar sentences should be closer: simAB=" + simAB + " simAC=" + simAC);
-        }
+        assertThat(simAB > simAC).as("Similar sentences should be closer: simAB=" + simAB + " simAC=" + simAC).isTrue();
     }
 
     private static float cosineSimilarity(float[] a, float[] b) {

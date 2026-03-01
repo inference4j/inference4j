@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -101,8 +101,8 @@ class Yolo26DetectorTest {
         List<Detection> results = Yolo26Detector.postProcess(logits, logitsShape(),
                 boxes, boxesShape(), TEST_LABELS, 0.5f, ORIG_W, ORIG_H);
 
-        assertEquals(1, results.size());
-        assertEquals("person", results.get(0).label());
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).label()).isEqualTo("person");
     }
 
     @Test
@@ -119,14 +119,14 @@ class Yolo26DetectorTest {
         List<Detection> results = Yolo26Detector.postProcess(logits, logitsShape(),
                 boxes, boxesShape(), TEST_LABELS, 0.49f, ORIG_W, ORIG_H);
 
-        assertEquals(1, results.size());
-        assertEquals(0.5f, results.get(0).confidence(), 1e-5f);
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).confidence()).isCloseTo(0.5f, within(1e-5f));
 
         // With threshold just above 0.5, should be filtered
         List<Detection> filtered = Yolo26Detector.postProcess(logits, logitsShape(),
                 boxes, boxesShape(), TEST_LABELS, 0.51f, ORIG_W, ORIG_H);
 
-        assertTrue(filtered.isEmpty());
+        assertThat(filtered).isEmpty();
     }
 
     @Test
@@ -144,12 +144,12 @@ class Yolo26DetectorTest {
         List<Detection> results = Yolo26Detector.postProcess(logits, logitsShape(),
                 boxes, boxesShape(), TEST_LABELS, 0.5f, ORIG_W, ORIG_H);
 
-        assertEquals(1, results.size());
+        assertThat(results).hasSize(1);
         BoundingBox box = results.get(0).box();
-        assertEquals(480f, box.x1(), 1e-1f);
-        assertEquals(180f, box.y1(), 1e-1f);
-        assertEquals(800f, box.x2(), 1e-1f);
-        assertEquals(540f, box.y2(), 1e-1f);
+        assertThat(box.x1()).isCloseTo(480f, within(1e-1f));
+        assertThat(box.y1()).isCloseTo(180f, within(1e-1f));
+        assertThat(box.x2()).isCloseTo(800f, within(1e-1f));
+        assertThat(box.y2()).isCloseTo(540f, within(1e-1f));
     }
 
     @Test
@@ -170,9 +170,9 @@ class Yolo26DetectorTest {
         List<Detection> results = Yolo26Detector.postProcess(logits, logitsShape(),
                 boxes, boxesShape(), TEST_LABELS, 0.5f, ORIG_W, ORIG_H);
 
-        assertEquals(3, results.size());
-        assertTrue(results.get(0).confidence() > results.get(1).confidence());
-        assertTrue(results.get(1).confidence() > results.get(2).confidence());
+        assertThat(results).hasSize(3);
+        assertThat(results.get(0).confidence()).isGreaterThan(results.get(1).confidence());
+        assertThat(results.get(1).confidence()).isGreaterThan(results.get(2).confidence());
     }
 
     @Test
@@ -189,7 +189,7 @@ class Yolo26DetectorTest {
         List<Detection> results = Yolo26Detector.postProcess(logits, logitsShape(),
                 boxes, boxesShape(), TEST_LABELS, 0.5f, ORIG_W, ORIG_H);
 
-        assertTrue(results.isEmpty());
+        assertThat(results).isEmpty();
     }
 
     @Test
@@ -205,9 +205,9 @@ class Yolo26DetectorTest {
         List<Detection> results = Yolo26Detector.postProcess(logits, logitsShape(),
                 boxes, boxesShape(), TEST_LABELS, 0.5f, ORIG_W, ORIG_H);
 
-        assertEquals(1, results.size());
-        assertEquals("motorcycle", results.get(0).label());
-        assertEquals(3, results.get(0).classIndex());
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).label()).isEqualTo("motorcycle");
+        assertThat(results.get(0).classIndex()).isEqualTo(3);
     }
 
     @Test
@@ -224,12 +224,12 @@ class Yolo26DetectorTest {
         List<Detection> results = Yolo26Detector.postProcess(logits, logitsShape(),
                 boxes, boxesShape(), TEST_LABELS, 0.5f, ORIG_W, ORIG_H);
 
-        assertEquals(1, results.size());
+        assertThat(results).hasSize(1);
         BoundingBox box = results.get(0).box();
-        assertTrue(box.x1() >= 0, "x1 should be >= 0, was " + box.x1());
-        assertTrue(box.y1() >= 0, "y1 should be >= 0, was " + box.y1());
-        assertTrue(box.x2() <= ORIG_W, "x2 should be <= " + ORIG_W + ", was " + box.x2());
-        assertTrue(box.y2() <= ORIG_H, "y2 should be <= " + ORIG_H + ", was " + box.y2());
+        assertThat(box.x1()).as("x1 should be >= 0, was " + box.x1()).isGreaterThanOrEqualTo(0);
+        assertThat(box.y1()).as("y1 should be >= 0, was " + box.y1()).isGreaterThanOrEqualTo(0);
+        assertThat(box.x2()).as("x2 should be <= " + ORIG_W + ", was " + box.x2()).isLessThanOrEqualTo(ORIG_W);
+        assertThat(box.y2()).as("y2 should be <= " + ORIG_H + ", was " + box.y2()).isLessThanOrEqualTo(ORIG_H);
     }
 
     // --- Builder validation ---
@@ -237,11 +237,12 @@ class Yolo26DetectorTest {
     @Test
     void builder_invalidModelSource_throws() {
         ModelSource badSource = id -> Path.of("/nonexistent/path/" + id);
-        assertThrows(ModelSourceException.class, () ->
+        assertThatThrownBy(() ->
                 Yolo26Detector.builder()
                         .inputName("images")
                         .modelSource(badSource)
-                        .build());
+                        .build())
+                .isInstanceOf(ModelSourceException.class);
     }
 
     @Test
@@ -253,7 +254,7 @@ class Yolo26DetectorTest {
                 .session(session)
                 .build();
 
-        assertNotNull(model);
+        assertThat(model).isNotNull();
         verify(session).inputNames();
     }
 
@@ -283,9 +284,9 @@ class Yolo26DetectorTest {
         BufferedImage image = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
         List<Detection> results = model.detect(image);
 
-        assertEquals(1, results.size());
-        assertEquals("person", results.get(0).label());
-        assertTrue(results.get(0).confidence() > 0.9f);
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).label()).isEqualTo("person");
+        assertThat(results.get(0).confidence()).isGreaterThan(0.9f);
     }
 
     // --- Close delegation ---

@@ -22,7 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class WeightedRoutingStrategyTest {
 
@@ -34,7 +34,7 @@ class WeightedRoutingStrategyTest {
         List<Route<String>> routes = List.of(route);
 
         for (int i = 0; i < 100; i++) {
-            assertEquals(route, strategy.select(routes));
+            assertThat(strategy.select(routes)).isEqualTo(route);
         }
     }
 
@@ -54,8 +54,8 @@ class WeightedRoutingStrategyTest {
 
         double heavyRatio = counts.getOrDefault("heavy", 0) / (double) iterations;
         // Should be roughly 0.8 — allow wide tolerance for randomness
-        assertTrue(heavyRatio > 0.7 && heavyRatio < 0.9,
-                "Expected ~80% heavy, got " + (heavyRatio * 100) + "%");
+        assertThat(heavyRatio).as("Expected ~80%% heavy, got " + (heavyRatio * 100) + "%%")
+                .isBetween(0.7, 0.9);
     }
 
     @Test
@@ -76,8 +76,8 @@ class WeightedRoutingStrategyTest {
         // Each should get roughly 1/3
         for (String name : List.of("a", "b", "c")) {
             double ratio = counts.getOrDefault(name, 0) / (double) iterations;
-            assertTrue(ratio > 0.25 && ratio < 0.42,
-                    "Expected ~33% for " + name + ", got " + (ratio * 100) + "%");
+            assertThat(ratio).as("Expected ~33%% for " + name + ", got " + (ratio * 100) + "%%")
+                    .isBetween(0.25, 0.42);
         }
     }
 }

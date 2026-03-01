@@ -25,7 +25,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 class InferenceSessionTest {
 
@@ -36,10 +36,9 @@ class InferenceSessionTest {
     void create_throwsModelLoadExceptionForNonexistentFile() {
         Path badPath = Path.of("/nonexistent/model.onnx");
 
-        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                InferenceSession.create(badPath));
-
-        assertTrue(ex.getMessage().contains("/nonexistent/model.onnx"));
+        assertThatThrownBy(() -> InferenceSession.create(badPath))
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> assertThat(ex.getMessage()).contains("/nonexistent/model.onnx"));
     }
 
     @Test
@@ -47,10 +46,9 @@ class InferenceSessionTest {
         Path tempFile = tempDir.resolve("not-a-model.onnx");
         Files.writeString(tempFile, "this is not an onnx model");
 
-        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                InferenceSession.create(tempFile));
-
-        assertTrue(ex.getMessage().contains(tempFile.toString()));
+        assertThatThrownBy(() -> InferenceSession.create(tempFile))
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> assertThat(ex.getMessage()).contains(tempFile.toString()));
     }
 
     @Test
@@ -58,10 +56,9 @@ class InferenceSessionTest {
         Path badPath = Path.of("/nonexistent/model.onnx");
         SessionOptions options = SessionOptions.defaults();
 
-        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                InferenceSession.create(badPath, options));
-
-        assertTrue(ex.getMessage().contains("/nonexistent/model.onnx"));
+        assertThatThrownBy(() -> InferenceSession.create(badPath, options))
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> assertThat(ex.getMessage()).contains("/nonexistent/model.onnx"));
     }
 
     @Test
@@ -70,20 +67,18 @@ class InferenceSessionTest {
         Files.writeString(tempFile, "garbage data");
         SessionOptions options = SessionOptions.defaults();
 
-        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                InferenceSession.create(tempFile, options));
-
-        assertTrue(ex.getMessage().contains(tempFile.toString()));
+        assertThatThrownBy(() -> InferenceSession.create(tempFile, options))
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> assertThat(ex.getMessage()).contains(tempFile.toString()));
     }
 
     @Test
     void create_withConfigurer_throwsForNonexistentFile() {
         Path badPath = Path.of("/nonexistent/model.onnx");
 
-        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                InferenceSession.create(badPath, opts -> { }));
-
-        assertTrue(ex.getMessage().contains("/nonexistent/model.onnx"));
+        assertThatThrownBy(() -> InferenceSession.create(badPath, opts -> { }))
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> assertThat(ex.getMessage()).contains("/nonexistent/model.onnx"));
     }
 
     @Test
@@ -91,20 +86,18 @@ class InferenceSessionTest {
         Path tempFile = tempDir.resolve("invalid.onnx");
         Files.writeString(tempFile, "not valid onnx");
 
-        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                InferenceSession.create(tempFile, opts -> { }));
-
-        assertTrue(ex.getMessage().contains(tempFile.toString()));
+        assertThatThrownBy(() -> InferenceSession.create(tempFile, opts -> { }))
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> assertThat(ex.getMessage()).contains(tempFile.toString()));
     }
 
     @Test
     void create_modelLoadExceptionHasCause() {
         Path badPath = Path.of("/nonexistent/model.onnx");
 
-        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                InferenceSession.create(badPath));
-
-        assertNotNull(ex.getCause());
+        assertThatThrownBy(() -> InferenceSession.create(badPath))
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> assertThat(ex.getCause()).isNotNull());
     }
 
     @Test
@@ -117,9 +110,8 @@ class InferenceSessionTest {
                 .interOpNumThreads(1)
                 .build();
 
-        ModelLoadException ex = assertThrows(ModelLoadException.class, () ->
-                InferenceSession.create(tempFile, options));
-
-        assertTrue(ex.getMessage().contains(tempFile.toString()));
+        assertThatThrownBy(() -> InferenceSession.create(tempFile, options))
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> assertThat(ex.getMessage()).contains(tempFile.toString()));
     }
 }

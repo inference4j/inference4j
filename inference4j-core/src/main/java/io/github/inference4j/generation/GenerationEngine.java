@@ -25,6 +25,7 @@ import io.github.inference4j.tokenizer.TokenDecoder;
 import io.github.inference4j.tokenizer.Tokenizer;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -63,6 +64,7 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
     private final Set<Integer> eosTokenIds;
     private final int maxNewTokens;
     private final Set<String> stopSequences;
+    private final boolean appendEosToInput;
 
     private GenerationEngine(Builder builder) {
         this.session = builder.session;
@@ -72,6 +74,7 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         this.eosTokenIds = Set.copyOf(builder.eosTokenIds);
         this.maxNewTokens = builder.maxNewTokens;
         this.stopSequences = Set.copyOf(builder.stopSequences);
+        this.appendEosToInput = builder.appendEosToInput;
         this.logitsProcessor = builder.buildLogitsProcessor();
         this.sampler = builder.buildSampler();
     }
@@ -91,6 +94,11 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
 
         String prompt = chatTemplate != null ? chatTemplate.format(input) : input;
         long[] inputIds = tokenizer.encode(prompt).inputIds();
+        if (appendEosToInput) {
+            int eosId = eosTokenIds.iterator().next();
+            inputIds = Arrays.copyOf(inputIds, inputIds.length + 1);
+            inputIds[inputIds.length - 1] = eosId;
+        }
         int promptTokens = inputIds.length;
 
         session.resetCache();
@@ -141,6 +149,7 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         private int maxNewTokens = 256;
         private final Set<String> stopSequences = new LinkedHashSet<>();
 
+        private boolean appendEosToInput = false;
         private float temperature = 0f;
         private int topK = 0;
         private float topP = 0f;
@@ -177,6 +186,11 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
 
         public Builder stopSequence(String stopSequence) {
             this.stopSequences.add(stopSequence);
+            return this;
+        }
+
+        public Builder appendEosToInput(boolean appendEos) {
+            this.appendEosToInput = appendEos;
             return this;
         }
 

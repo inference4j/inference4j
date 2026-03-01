@@ -18,7 +18,8 @@ package io.github.inference4j.preprocessing.text;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ModelConfigTest {
 
@@ -36,11 +37,11 @@ class ModelConfigTest {
 
         io.github.inference4j.preprocessing.text.ModelConfig config = io.github.inference4j.preprocessing.text.ModelConfig.parse(json);
 
-        assertEquals(2, config.numLabels());
-        assertEquals("NEGATIVE", config.label(0));
-        assertEquals("POSITIVE", config.label(1));
-        assertEquals("single_label_classification", config.problemType());
-        assertFalse(config.isMultiLabel());
+        assertThat(config.numLabels()).isEqualTo(2);
+        assertThat(config.label(0)).isEqualTo("NEGATIVE");
+        assertThat(config.label(1)).isEqualTo("POSITIVE");
+        assertThat(config.problemType()).isEqualTo("single_label_classification");
+        assertThat(config.isMultiLabel()).isFalse();
     }
 
     @Test
@@ -58,9 +59,9 @@ class ModelConfigTest {
 
         io.github.inference4j.preprocessing.text.ModelConfig config = io.github.inference4j.preprocessing.text.ModelConfig.parse(json);
 
-        assertEquals(3, config.numLabels());
-        assertEquals("admiration", config.label(0));
-        assertTrue(config.isMultiLabel());
+        assertThat(config.numLabels()).isEqualTo(3);
+        assertThat(config.label(0)).isEqualTo("admiration");
+        assertThat(config.isMultiLabel()).isTrue();
     }
 
     @Test
@@ -76,8 +77,8 @@ class ModelConfigTest {
 
         io.github.inference4j.preprocessing.text.ModelConfig config = io.github.inference4j.preprocessing.text.ModelConfig.parse(json);
 
-        assertNull(config.problemType());
-        assertFalse(config.isMultiLabel());
+        assertThat(config.problemType()).isNull();
+        assertThat(config.isMultiLabel()).isFalse();
     }
 
     @Test
@@ -90,7 +91,7 @@ class ModelConfigTest {
 
         io.github.inference4j.preprocessing.text.ModelConfig config = io.github.inference4j.preprocessing.text.ModelConfig.parse(json);
 
-        assertEquals(0, config.numLabels());
+        assertThat(config.numLabels()).isEqualTo(0);
     }
 
     @Test
@@ -114,9 +115,9 @@ class ModelConfigTest {
 
         io.github.inference4j.preprocessing.text.ModelConfig config = io.github.inference4j.preprocessing.text.ModelConfig.parse(json);
 
-        assertEquals(2, config.numLabels());
-        assertEquals("NEGATIVE", config.label(0));
-        assertEquals("POSITIVE", config.label(1));
+        assertThat(config.numLabels()).isEqualTo(2);
+        assertThat(config.label(0)).isEqualTo("NEGATIVE");
+        assertThat(config.label(1)).isEqualTo("POSITIVE");
     }
 
     @Test
@@ -125,7 +126,7 @@ class ModelConfigTest {
                 {"id2label": {"0": "A", "1": "B"}}
                 """);
 
-        assertThrows(IllegalArgumentException.class, () -> config.label(5));
+        assertThatThrownBy(() -> config.label(5)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -135,8 +136,8 @@ class ModelConfigTest {
                 "single_label_classification"
         );
 
-        assertEquals(2, config.numLabels());
-        assertEquals("NEG", config.label(0));
-        assertFalse(config.isMultiLabel());
+        assertThat(config.numLabels()).isEqualTo(2);
+        assertThat(config.label(0)).isEqualTo("NEG");
+        assertThat(config.isMultiLabel()).isFalse();
     }
 }

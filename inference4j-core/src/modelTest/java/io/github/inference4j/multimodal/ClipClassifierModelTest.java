@@ -17,63 +17,69 @@
 package io.github.inference4j.multimodal;
 
 import io.github.inference4j.vision.Classification;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ClipClassifierModelTest {
 
-    private static BufferedImage loadCatImage() throws IOException {
-        return ImageIO.read(ClipClassifierModelTest.class.getResourceAsStream("/fixtures/cat.jpg"));
+    private ClipClassifier classifier;
+    private BufferedImage catImage;
+
+    @BeforeAll
+    void setUp() throws IOException {
+        classifier = ClipClassifier.builder().build();
+        catImage = ImageIO.read(ClipClassifierModelTest.class.getResourceAsStream("/fixtures/cat.jpg"));
+    }
+
+    @AfterAll
+    void tearDown() throws Exception {
+        if (classifier != null) classifier.close();
     }
 
     @Test
-    void classify_catImage_catIsTopLabel() throws IOException {
-        try (io.github.inference4j.multimodal.ClipClassifier classifier = ClipClassifier.builder().build()) {
-            List<Classification> results = classifier.classify(
-                    loadCatImage(),
-                    List.of("a photo of a cat", "a photo of a dog", "a photo of a bird",
-                            "a photo of a car", "a photo of an airplane"));
+    void classify_catImage_catIsTopLabel() {
+        List<Classification> results = classifier.classify(
+                catImage,
+                List.of("a photo of a cat", "a photo of a dog", "a photo of a bird",
+                        "a photo of a car", "a photo of an airplane"));
 
-            assertFalse(results.isEmpty());
-            assertEquals("a photo of a cat", results.get(0).label(),
-                    "Expected 'a photo of a cat' as top label, got: " + results.get(0).label());
-            assertTrue(results.get(0).confidence() > 0.15f,
-                    "Expected cat confidence > 0.15, got: " + results.get(0).confidence());
-        }
+        assertThat(results.isEmpty()).isFalse();
+        assertThat(results.get(0).label()).as("Expected 'a photo of a cat' as top label, got: " + results.get(0).label()).isEqualTo("a photo of a cat");
+        assertThat(results.get(0).confidence() > 0.15f).as("Expected cat confidence > 0.15, got: " + results.get(0).confidence()).isTrue();
     }
 
     @Test
-    void classify_catImage_confidencesSumToOne() throws IOException {
-        try (ClipClassifier classifier = ClipClassifier.builder().build()) {
-            List<Classification> results = classifier.classify(
-                    loadCatImage(),
-                    List.of("a photo of a cat", "a photo of a dog", "a photo of a bird"));
+    void classify_catImage_confidencesSumToOne() {
+        List<Classification> results = classifier.classify(
+                catImage,
+                List.of("a photo of a cat", "a photo of a dog", "a photo of a bird"));
 
-            float sum = 0f;
-            for (Classification c : results) {
-                assertTrue(c.confidence() > 0f);
-                sum += c.confidence();
-            }
-            assertEquals(1.0f, sum, 1e-3f);
+        float sum = 0f;
+        for (Classification c : results) {
+            assertThat(c.confidence() > 0f).isTrue();
+            sum += c.confidence();
         }
+        assertThat(sum).isCloseTo(1.0f, within(1e-3f));
     }
 
     @Test
-    void classify_catImage_withTopK() throws IOException {
-        try (ClipClassifier classifier = ClipClassifier.builder().build()) {
-            List<Classification> results = classifier.classify(
-                    loadCatImage(),
-                    List.of("a photo of a cat", "a photo of a dog", "a photo of a bird",
-                            "a photo of a car", "a photo of an airplane"),
-                    2);
+    void classify_catImage_withTopK() {
+        List<Classification> results = classifier.classify(
+                catImage,
+                List.of("a photo of a cat", "a photo of a dog", "a photo of a bird",
+                        "a photo of a car", "a photo of an airplane"),
+                2);
 
-            assertEquals(2, results.size());
-        }
+        assertThat(results.size()).isEqualTo(2);
     }
 }

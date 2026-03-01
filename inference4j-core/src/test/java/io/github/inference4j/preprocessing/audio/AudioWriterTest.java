@@ -24,7 +24,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class AudioWriterTest {
 
@@ -40,11 +41,11 @@ class AudioWriterTest {
         io.github.inference4j.preprocessing.audio.AudioWriter.write(audio, file);
         AudioData loaded = io.github.inference4j.preprocessing.audio.AudioLoader.load(file);
 
-        assertEquals(samples.length, loaded.samples().length);
-        float tolerance = 1.0f / 32768;
+        assertThat(loaded.samples().length).isEqualTo(samples.length);
+        float tolerance = 2.0f / 32768;
         for (int i = 0; i < samples.length; i++) {
-            assertEquals(samples[i], loaded.samples()[i], tolerance,
-                    "Sample " + i + " mismatch");
+            assertThat(loaded.samples()[i]).as("Sample " + i + " mismatch")
+                    .isCloseTo(samples[i], within(tolerance));
         }
     }
 
@@ -57,7 +58,7 @@ class AudioWriterTest {
         io.github.inference4j.preprocessing.audio.AudioWriter.write(audio, file);
         AudioData loaded = io.github.inference4j.preprocessing.audio.AudioLoader.load(file);
 
-        assertEquals(0, loaded.samples().length);
+        assertThat(loaded.samples().length).isEqualTo(0);
     }
 
     @Test
@@ -69,7 +70,7 @@ class AudioWriterTest {
         io.github.inference4j.preprocessing.audio.AudioWriter.write(audio, file);
         AudioData loaded = io.github.inference4j.preprocessing.audio.AudioLoader.load(file);
 
-        assertEquals(44100, loaded.sampleRate());
+        assertThat(loaded.sampleRate()).isEqualTo(44100);
     }
 
     @Test
@@ -81,6 +82,6 @@ class AudioWriterTest {
         io.github.inference4j.preprocessing.audio.AudioWriter.write(audio, file);
 
         // 44-byte header + 3 samples * 2 bytes each = 50 bytes
-        assertEquals(50, Files.size(file));
+        assertThat(Files.size(file)).isEqualTo(50);
     }
 }

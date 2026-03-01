@@ -23,7 +23,8 @@ import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class ImageTransformPipelineTest {
 
@@ -34,8 +35,8 @@ class ImageTransformPipelineTest {
 
         BufferedImage result = resize.apply(image);
 
-        assertEquals(50, result.getWidth());
-        assertEquals(40, result.getHeight());
+        assertThat(result.getWidth()).isEqualTo(50);
+        assertThat(result.getHeight()).isEqualTo(40);
     }
 
     @Test
@@ -45,8 +46,8 @@ class ImageTransformPipelineTest {
 
         BufferedImage result = crop.apply(image);
 
-        assertEquals(50, result.getWidth());
-        assertEquals(50, result.getHeight());
+        assertThat(result.getWidth()).isEqualTo(50);
+        assertThat(result.getHeight()).isEqualTo(50);
     }
 
     @Test
@@ -61,11 +62,11 @@ class ImageTransformPipelineTest {
         Tensor tensor = pipeline.transform(image);
         long[] shape = tensor.shape();
 
-        assertEquals(4, shape.length);
-        assertEquals(1, shape[0]); // batch
-        assertEquals(3, shape[1]); // channels
-        assertEquals(32, shape[2]); // height
-        assertEquals(32, shape[3]); // width
+        assertThat(shape.length).isEqualTo(4);
+        assertThat(shape[0]).isEqualTo(1); // batch
+        assertThat(shape[1]).isEqualTo(3); // channels
+        assertThat(shape[2]).isEqualTo(32); // height
+        assertThat(shape[3]).isEqualTo(32); // width
     }
 
     @Test
@@ -89,9 +90,9 @@ class ImageTransformPipelineTest {
 
         // Red channel = 1.0, Green = 0.0, Blue = 0.0
         // NCHW: [R_00, R_01, R_10, R_11, G_00, ..., B_00, ...]
-        assertEquals(1.0f, data[0], 1e-5f); // R
-        assertEquals(0.0f, data[4], 1e-5f); // G
-        assertEquals(0.0f, data[8], 1e-5f); // B
+        assertThat(data[0]).isCloseTo(1.0f, within(1e-5f)); // R
+        assertThat(data[4]).isCloseTo(0.0f, within(1e-5f)); // G
+        assertThat(data[8]).isCloseTo(0.0f, within(1e-5f)); // B
     }
 
     @Test
@@ -102,7 +103,7 @@ class ImageTransformPipelineTest {
         Tensor tensor = pipeline.transform(image);
         long[] shape = tensor.shape();
 
-        assertArrayEquals(new long[]{1, 3, 224, 224}, shape);
+        assertThat(shape).isEqualTo(new long[]{1, 3, 224, 224});
     }
 
     @Test
@@ -122,7 +123,7 @@ class ImageTransformPipelineTest {
         float[] data = tensor.toFloats();
 
         float expectedR = (1.0f - 0.485f) / 0.229f;
-        assertEquals(expectedR, data[0], 0.01f);
+        assertThat(data[0]).isCloseTo(expectedR, within(0.01f));
     }
 
     @Test
@@ -138,7 +139,7 @@ class ImageTransformPipelineTest {
         Tensor tensor = pipeline.transform(image);
         long[] shape = tensor.shape();
 
-        assertArrayEquals(new long[]{1, 3, 50, 50}, shape);
+        assertThat(shape).isEqualTo(new long[]{1, 3, 50, 50});
     }
 
     @Test
@@ -154,7 +155,7 @@ class ImageTransformPipelineTest {
         Tensor tensor = pipeline.transform(image);
         long[] shape = tensor.shape();
 
-        assertArrayEquals(new long[]{1, 32, 32, 3}, shape);
+        assertThat(shape).isEqualTo(new long[]{1, 32, 32, 3});
     }
 
     @Test
@@ -177,9 +178,9 @@ class ImageTransformPipelineTest {
         float[] data = tensor.toFloats();
 
         // NHWC: [R, G, B, R, G, B, ...]
-        assertEquals(1.0f, data[0], 1e-5f); // R of pixel (0,0)
-        assertEquals(0.0f, data[1], 1e-5f); // G of pixel (0,0)
-        assertEquals(0.0f, data[2], 1e-5f); // B of pixel (0,0)
+        assertThat(data[0]).isCloseTo(1.0f, within(1e-5f)); // R of pixel (0,0)
+        assertThat(data[1]).isCloseTo(0.0f, within(1e-5f)); // G of pixel (0,0)
+        assertThat(data[2]).isCloseTo(0.0f, within(1e-5f)); // B of pixel (0,0)
     }
 
     @Test
@@ -196,7 +197,7 @@ class ImageTransformPipelineTest {
         Tensor tensor = pipeline.transform(image);
         long[] shape = tensor.shape();
 
-        assertArrayEquals(new long[]{1, 224, 224, 3}, shape);
+        assertThat(shape).isEqualTo(new long[]{1, 224, 224, 3});
     }
 
     @Test
@@ -220,7 +221,7 @@ class ImageTransformPipelineTest {
         float[] data = tensor.toFloats();
 
         float expected = (1.0f - 127f / 255f) / (128f / 255f);
-        assertEquals(expected, data[0], 0.01f);
+        assertThat(data[0]).isCloseTo(expected, within(0.01f));
     }
 
     private static BufferedImage createTestImage(int width, int height) {

@@ -1,0 +1,93 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.github.inference4j.nlp;
+
+import io.github.inference4j.exception.ModelLoadException;
+import io.github.inference4j.generation.GenerationEngine;
+import io.github.inference4j.generation.GenerationResult;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+
+import java.time.Duration;
+import java.util.function.Consumer;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
+class CoeditGrammarCorrectorTest {
+
+    private static final GenerationResult DUMMY_RESULT =
+            new GenerationResult("output", 10, 5, Duration.ZERO);
+
+    private GenerationEngine mockEngine() {
+        GenerationEngine engine = mock(GenerationEngine.class);
+        when(engine.generate(anyString(), any())).thenReturn(DUMMY_RESULT);
+        when(engine.generate(anyString())).thenReturn(DUMMY_RESULT);
+        return engine;
+    }
+
+    @Test
+    void correct_prependsGrammarPrefix() {
+        GenerationEngine engine = mockEngine();
+        CoeditGrammarCorrector corrector = new CoeditGrammarCorrector(engine);
+
+        corrector.correct("She don't likes the weathers today", token -> {});
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(engine).generate(promptCaptor.capture(), any());
+        assertThat(promptCaptor.getValue())
+                .as("Prompt should start with 'Fix grammatical errors in this sentence: ' but was: "
+                        + promptCaptor.getValue())
+                .startsWith("Fix grammatical errors in this sentence: ");
+        assertThat(promptCaptor.getValue()).contains("She don't likes the weathers today");
+    }
+
+    @Test
+    void generate_delegatesToEngine() {
+        GenerationEngine engine = mockEngine();
+        CoeditGrammarCorrector corrector = new CoeditGrammarCorrector(engine);
+
+        GenerationResult result = corrector.generate("Hello");
+
+        verify(engine).generate("Hello");
+        assertThat(result.text()).isEqualTo("output");
+    }
+
+    @Test
+    void coeditBase_preset_returnsBuilder() {
+        CoeditGrammarCorrector.Builder builder = CoeditGrammarCorrector.coeditBase();
+        assertThat(builder).isNotNull();
+    }
+
+    @Test
+    void coeditLarge_preset_returnsBuilder() {
+        CoeditGrammarCorrector.Builder builder = CoeditGrammarCorrector.coeditLarge();
+        assertThat(builder).isNotNull();
+    }
+
+    @Test
+    void builder_noModelIdOrSource_throws() {
+        assertThatThrownBy(() -> CoeditGrammarCorrector.builder().build())
+                .isInstanceOf(ModelLoadException.class)
+                .satisfies(ex -> {
+                    assertThat(ex.getMessage()).contains("modelId");
+                    assertThat(ex.getMessage()).contains("modelSource");
+                });
+    }
+}

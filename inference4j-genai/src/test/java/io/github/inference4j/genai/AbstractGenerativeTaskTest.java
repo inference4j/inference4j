@@ -22,7 +22,7 @@ import ai.onnxruntime.genai.TokenizerStream;
 import io.github.inference4j.generation.GenerationResult;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -45,8 +45,8 @@ class AbstractGenerativeTaskTest {
         var task = new TestGenerativeTask(model);
         task.close();
 
-        assertTrue(task.closeResourcesCalled,
-                "closeResources() should be called during close()");
+        assertThat(task.closeResourcesCalled)
+                .as("closeResources() should be called during close()").isTrue();
         verify(model).close();
     }
 

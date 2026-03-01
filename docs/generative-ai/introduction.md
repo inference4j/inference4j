@@ -21,7 +21,6 @@ inference4j implements the full autoregressive loop in Java on top of standard O
 **Cons:**
 
 - The generation loop runs in Java rather than optimized C++, so it's slightly slower per token
-- Currently supports GPT-2, SmolLM2, and Qwen2.5; more model families will follow
 
 ### onnxruntime-genai (inference4j-genai)
 
@@ -47,7 +46,7 @@ inference4j implements the full autoregressive loop in Java on top of standard O
 
 ### Where we're heading
 
-The native generation approach is the future. It unlocks any ONNX model on HuggingFace that exports with KV cache support — hundreds of models — without depending on a third-party native library. `OnnxTextGenerator` already supports GPT-2, SmolLM2-360M, and Qwen2.5-1.5B, with more model families to follow.
+The native generation approach is the future. It unlocks any ONNX model on HuggingFace that exports with KV cache support — hundreds of models — without depending on a third-party native library. It supports both **decoder-only** models (GPT-2, SmolLM2, Qwen2.5, Gemma 2, TinyLlama) and **encoder-decoder** models (Flan-T5, BART, MarianMT, CoEdIT).
 
 The onnxruntime-genai path remains valuable for models that need native multimodal preprocessing (like Phi-3.5 Vision) and for users who prefer the optimized C++ loop.
 
@@ -84,6 +83,38 @@ pass, only the new token's attention needs to be computed — everything from pr
 tokens is read from the cache. This turns generation from O(n^2^) to O(n) in
 sequence length.
 
+### Encoder-decoder models
+
+The models described above (GPT-2, SmolLM2, Qwen2.5) are **decoder-only** — they process the entire input and output as a single sequence. **Encoder-decoder** models split the work into two parts:
+
+1. **Encoder**: processes the full input in a single forward pass, producing a rich representation of the input text
+2. **Decoder**: generates the output one token at a time, attending to the encoder's representation via **cross-attention**
+
+This architecture is a natural fit for tasks where the input and output are structurally different — summarization (long article → short summary), translation (English → French), and grammar correction (broken text → fixed text).
+
+```mermaid
+flowchart TD
+    A["Input text"] --> B["Encoder<br><small>single forward pass</small>"]
+    B --> C["Encoder output<br><small>frozen representation</small>"]
+    C --> D["Decoder step 1<br><small>cross-attention to encoder</small>"]
+    D --> E["Token 1"]
+    E --> F["Decoder step 2"]
+    F --> G["Token 2"]
+    G --> H["..."]
+    H --> I{"Stop token?"}
+    I -- No --> J["Decoder step N"]
+    I -- Yes --> K["Complete output"]
+```
+
+#### Two types of KV cache
+
+Encoder-decoder models maintain two separate caches:
+
+- **Cross-attention cache** — computed once from the encoder output after the first decoder step, then **frozen** for the rest of generation. This is what lets the decoder "look at" the input without recomputing it.
+- **Self-attention cache** — grows with each decoder step, just like in decoder-only models. This cache stores the decoder's own previous states.
+
+This split is the key architectural difference from decoder-only models, where there is only one KV cache that grows throughout generation.
+
 ### How the two approaches differ
 
 ```mermaid
@@ -114,6 +145,21 @@ In native generation, inference4j handles tokenization, sampling, and decoding i
 | SmolLM2-360M-Instruct | `OnnxTextGenerator.smolLM2()` | `inference4j/smollm2-360m-instruct` | 360M | ~700 MB |
 | Qwen2.5-1.5B-Instruct | `OnnxTextGenerator.qwen2()` | `inference4j/qwen2.5-1.5b-instruct` | 1.5B | ~3 GB |
 
+### Native encoder-decoder (inference4j-core)
+
+| Model | Wrapper | Default Model ID | Parameters | Size |
+|-------|---------|-------------------|-----------|------|
+| Flan-T5 Small | `FlanT5TextGenerator` | `inference4j/flan-t5-small` | 77M | ~300 MB |
+| Flan-T5 Base | `FlanT5TextGenerator` | `inference4j/flan-t5-base` | 250M | ~900 MB |
+| Flan-T5 Large | `FlanT5TextGenerator` | `inference4j/flan-t5-large` | 780M | ~3 GB |
+| DistilBART CNN 12-6 | `BartSummarizer` | `inference4j/distilbart-cnn-12-6` | 306M | ~1.2 GB |
+| BART Large CNN | `BartSummarizer` | `inference4j/bart-large-cnn` | 406M | ~1.6 GB |
+| MarianMT | `MarianTranslator` | User-specified (`inference4j/opus-mt-*`) | varies | varies |
+| CoEdIT Base | `CoeditGrammarCorrector` | `inference4j/coedit-base` | 250M | ~900 MB |
+| CoEdIT Large | `CoeditGrammarCorrector` | `inference4j/coedit-large` | 780M | ~3 GB |
+| T5-small-awesome-text-to-sql | `T5SqlGenerator` | `inference4j/t5-small-awesome-text-to-sql` | 60M | ~240 MB |
+| T5-LM-Large-text2sql-spider | `T5SqlGenerator` | `inference4j/T5-LM-Large-text2sql-spider` | 0.8B | ~4.6 GB |
+
 ### onnxruntime-genai (inference4j-genai)
 
 | Model | Wrapper | Model ID | Parameters | Size |
@@ -129,7 +175,11 @@ and downloaded automatically on first use.
 
 ## Next steps
 
-- [Native Text Generation](gpt2.md) — GPT-2, SmolLM2, Qwen2.5 via OnnxTextGenerator (no extra dependencies)
+- [Native Text Generation](native-text-generation.md) — GPT-2, SmolLM2, Qwen2.5 via OnnxTextGenerator (decoder-only)
+- [Summarization](../use-cases/summarization.md) — BartSummarizer, FlanT5TextGenerator (encoder-decoder)
+- [Translation](../use-cases/translation.md) — MarianTranslator, FlanT5TextGenerator (encoder-decoder)
+- [Grammar Correction](../use-cases/grammar-correction.md) — CoeditGrammarCorrector, FlanT5TextGenerator (encoder-decoder)
+- [Text-to-SQL](../use-cases/text-to-sql.md) — FlanT5TextGenerator (encoder-decoder)
 - [Chat Templates](chat-templates.md) — how prompt formatting works across models
 - [Text Generation (onnxruntime-genai)](text-generation.md) — Phi-3, DeepSeek-R1 via onnxruntime-genai
 - [Whisper Speech-to-Text](whisper.md) — transcription and translation via onnxruntime-genai

@@ -25,7 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.*;
 
@@ -53,7 +53,7 @@ class OnnxGenerativeSessionTest {
 
     @Test
     void cacheSequenceLength_initiallyZero() {
-        assertEquals(0, session.cacheSequenceLength());
+        assertThat(session.cacheSequenceLength()).isEqualTo(0);
     }
 
     @Test
@@ -62,7 +62,7 @@ class OnnxGenerativeSessionTest {
 
         session.prefill(new long[]{1, 2, 3});
 
-        assertEquals(3, session.cacheSequenceLength());
+        assertThat(session.cacheSequenceLength()).isEqualTo(3);
     }
 
     @Test
@@ -72,7 +72,7 @@ class OnnxGenerativeSessionTest {
 
         session.resetCache();
 
-        assertEquals(0, session.cacheSequenceLength());
+        assertThat(session.cacheSequenceLength()).isEqualTo(0);
     }
 
     @Test

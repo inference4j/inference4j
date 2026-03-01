@@ -18,7 +18,8 @@ package io.github.inference4j.processing;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.within;
 
 class MathOpsTest {
 
@@ -31,7 +32,7 @@ class MathOpsTest {
         for (float v : result) {
             sum += v;
         }
-        assertEquals(1.0f, sum, 1e-5f);
+        assertThat(sum).isCloseTo(1.0f, within(1e-5f));
     }
 
     @Test
@@ -39,8 +40,8 @@ class MathOpsTest {
         float[] logits = {1.0f, 5.0f, 2.0f};
         float[] result = MathOps.softmax(logits);
 
-        assertTrue(result[1] > result[0]);
-        assertTrue(result[1] > result[2]);
+        assertThat(result[1]).isGreaterThan(result[0]);
+        assertThat(result[1]).isGreaterThan(result[2]);
     }
 
     @Test
@@ -48,9 +49,9 @@ class MathOpsTest {
         float[] logits = {3.0f, 3.0f, 3.0f};
         float[] result = MathOps.softmax(logits);
 
-        assertEquals(result[0], result[1], 1e-6f);
-        assertEquals(result[1], result[2], 1e-6f);
-        assertEquals(1.0f / 3, result[0], 1e-5f);
+        assertThat(result[1]).isCloseTo(result[0], within(1e-6f));
+        assertThat(result[2]).isCloseTo(result[1], within(1e-6f));
+        assertThat(result[0]).isCloseTo(1.0f / 3, within(1e-5f));
     }
 
     @Test
@@ -60,20 +61,20 @@ class MathOpsTest {
 
         float sum = 0f;
         for (float v : result) {
-            assertFalse(Float.isNaN(v), "softmax produced NaN");
-            assertFalse(Float.isInfinite(v), "softmax produced Inf");
+            assertThat(Float.isNaN(v)).as("softmax produced NaN").isFalse();
+            assertThat(Float.isInfinite(v)).as("softmax produced Inf").isFalse();
             sum += v;
         }
-        assertEquals(1.0f, sum, 1e-5f);
-        assertTrue(result[2] > result[1]);
-        assertTrue(result[1] > result[0]);
+        assertThat(sum).isCloseTo(1.0f, within(1e-5f));
+        assertThat(result[2]).isGreaterThan(result[1]);
+        assertThat(result[1]).isGreaterThan(result[0]);
     }
 
     @Test
     void softmax_singleElement() {
         float[] result = MathOps.softmax(new float[]{42f});
-        assertEquals(1, result.length);
-        assertEquals(1.0f, result[0], 1e-6f);
+        assertThat(result.length).isEqualTo(1);
+        assertThat(result[0]).isCloseTo(1.0f, within(1e-6f));
     }
 
     @Test
@@ -83,12 +84,12 @@ class MathOpsTest {
 
         float sum = 0f;
         for (float v : result) {
-            assertTrue(v > 0f);
+            assertThat(v).isGreaterThan(0f);
             sum += v;
         }
-        assertEquals(1.0f, sum, 1e-5f);
-        assertTrue(result[0] > result[1]);
-        assertTrue(result[1] > result[2]);
+        assertThat(sum).isCloseTo(1.0f, within(1e-5f));
+        assertThat(result[0]).isGreaterThan(result[1]);
+        assertThat(result[1]).isGreaterThan(result[2]);
     }
 
     @Test
@@ -97,32 +98,32 @@ class MathOpsTest {
         float[] result = MathOps.sigmoid(values);
 
         for (float v : result) {
-            assertTrue(v > 0f && v < 1f);
+            assertThat(v > 0f && v < 1f).isTrue();
         }
     }
 
     @Test
     void sigmoid_zeroInputGivesHalf() {
         float[] result = MathOps.sigmoid(new float[]{0f});
-        assertEquals(0.5f, result[0], 1e-6f);
+        assertThat(result[0]).isCloseTo(0.5f, within(1e-6f));
     }
 
     @Test
     void sigmoid_symmetricAroundZero() {
         float[] result = MathOps.sigmoid(new float[]{-2f, 2f});
-        assertEquals(1.0f, result[0] + result[1], 1e-5f);
+        assertThat(result[0] + result[1]).isCloseTo(1.0f, within(1e-5f));
     }
 
     @Test
     void sigmoid_largePositiveCloseToOne() {
         float[] result = MathOps.sigmoid(new float[]{100f});
-        assertEquals(1.0f, result[0], 1e-5f);
+        assertThat(result[0]).isCloseTo(1.0f, within(1e-5f));
     }
 
     @Test
     void sigmoid_largeNegativeCloseToZero() {
         float[] result = MathOps.sigmoid(new float[]{-100f});
-        assertEquals(0.0f, result[0], 1e-5f);
+        assertThat(result[0]).isCloseTo(0.0f, within(1e-5f));
     }
 
     @Test
@@ -131,7 +132,7 @@ class MathOpsTest {
         float[] result = MathOps.logSoftmax(logits);
 
         for (float v : result) {
-            assertTrue(v <= 0f, "logSoftmax value should be <= 0, got " + v);
+            assertThat(v).as("logSoftmax value should be <= 0, got " + v).isLessThanOrEqualTo(0f);
         }
     }
 
@@ -144,7 +145,7 @@ class MathOpsTest {
         for (float v : result) {
             sum += (float) Math.exp(v);
         }
-        assertEquals(1.0f, sum, 1e-5f);
+        assertThat(sum).isCloseTo(1.0f, within(1e-5f));
     }
 
     @Test
@@ -154,7 +155,7 @@ class MathOpsTest {
         float[] logSoftmax = MathOps.logSoftmax(logits);
 
         for (int i = 0; i < logits.length; i++) {
-            assertEquals(Math.log(softmax[i]), logSoftmax[i], 1e-5f);
+            assertThat(logSoftmax[i]).isCloseTo((float) Math.log(softmax[i]), within(1e-5f));
         }
     }
 
@@ -164,15 +165,15 @@ class MathOpsTest {
         float[] result = MathOps.logSoftmax(logits);
 
         for (float v : result) {
-            assertFalse(Float.isNaN(v), "logSoftmax produced NaN");
-            assertFalse(Float.isInfinite(v), "logSoftmax produced Inf");
+            assertThat(Float.isNaN(v)).as("logSoftmax produced NaN").isFalse();
+            assertThat(Float.isInfinite(v)).as("logSoftmax produced Inf").isFalse();
         }
 
         float sum = 0f;
         for (float v : result) {
             sum += (float) Math.exp(v);
         }
-        assertEquals(1.0f, sum, 1e-3f);
+        assertThat(sum).isCloseTo(1.0f, within(1e-3f));
     }
 
     @Test
@@ -186,8 +187,8 @@ class MathOpsTest {
 
         int[] kept = MathOps.nms(boxes, scores, 0.5f);
 
-        assertEquals(1, kept.length);
-        assertEquals(0, kept[0]); // higher score wins
+        assertThat(kept.length).isEqualTo(1);
+        assertThat(kept[0]).isEqualTo(0); // higher score wins
     }
 
     @Test
@@ -200,9 +201,9 @@ class MathOpsTest {
 
         int[] kept = MathOps.nms(boxes, scores, 0.5f);
 
-        assertEquals(2, kept.length);
-        assertEquals(0, kept[0]);
-        assertEquals(1, kept[1]);
+        assertThat(kept.length).isEqualTo(2);
+        assertThat(kept[0]).isEqualTo(0);
+        assertThat(kept[1]).isEqualTo(1);
     }
 
     @Test
@@ -216,16 +217,16 @@ class MathOpsTest {
 
         int[] kept = MathOps.nms(boxes, scores, 0.5f);
 
-        assertEquals(3, kept.length);
-        assertEquals(1, kept[0]); // 0.9
-        assertEquals(2, kept[1]); // 0.7
-        assertEquals(0, kept[2]); // 0.5
+        assertThat(kept.length).isEqualTo(3);
+        assertThat(kept[0]).isEqualTo(1); // 0.9
+        assertThat(kept[1]).isEqualTo(2); // 0.7
+        assertThat(kept[2]).isEqualTo(0); // 0.5
     }
 
     @Test
     void nms_emptyInput_returnsEmpty() {
         int[] kept = MathOps.nms(new float[0], new float[0], 0.5f);
-        assertEquals(0, kept.length);
+        assertThat(kept.length).isEqualTo(0);
     }
 
     @Test
@@ -235,8 +236,8 @@ class MathOpsTest {
 
         int[] kept = MathOps.nms(boxes, scores, 0.5f);
 
-        assertEquals(1, kept.length);
-        assertEquals(0, kept[0]);
+        assertThat(kept.length).isEqualTo(1);
+        assertThat(kept[0]).isEqualTo(0);
     }
 
     @Test
@@ -250,7 +251,7 @@ class MathOpsTest {
 
         int[] kept = MathOps.nms(boxes, scores, 0.5f);
 
-        assertEquals(2, kept.length);
+        assertThat(kept.length).isEqualTo(2);
     }
 
     @Test
@@ -265,8 +266,8 @@ class MathOpsTest {
 
         int[] kept = MathOps.nms(boxes, scores, 0.5f);
 
-        assertEquals(1, kept.length);
-        assertEquals(0, kept[0]);
+        assertThat(kept.length).isEqualTo(1);
+        assertThat(kept[0]).isEqualTo(0);
     }
 
     @Test
@@ -274,10 +275,10 @@ class MathOpsTest {
         float[] values = {0.1f, 0.9f, 0.3f, 0.7f, 0.5f};
         int[] top3 = MathOps.topK(values, 3);
 
-        assertEquals(3, top3.length);
-        assertEquals(1, top3[0]); // 0.9
-        assertEquals(3, top3[1]); // 0.7
-        assertEquals(4, top3[2]); // 0.5
+        assertThat(top3.length).isEqualTo(3);
+        assertThat(top3[0]).isEqualTo(1); // 0.9
+        assertThat(top3[1]).isEqualTo(3); // 0.7
+        assertThat(top3[2]).isEqualTo(4); // 0.5
     }
 
     @Test
@@ -286,8 +287,9 @@ class MathOpsTest {
         int[] top = MathOps.topK(values, 4);
 
         for (int i = 1; i < top.length; i++) {
-            assertTrue(values[top[i - 1]] >= values[top[i]],
-                    "topK result not sorted descending at index " + i);
+            assertThat(values[top[i - 1]] >= values[top[i]])
+                    .as("topK result not sorted descending at index " + i)
+                    .isTrue();
         }
     }
 
@@ -296,9 +298,9 @@ class MathOpsTest {
         float[] values = {0.3f, 0.1f};
         int[] top = MathOps.topK(values, 10);
 
-        assertEquals(2, top.length);
-        assertEquals(0, top[0]); // 0.3
-        assertEquals(1, top[1]); // 0.1
+        assertThat(top.length).isEqualTo(2);
+        assertThat(top[0]).isEqualTo(0); // 0.3
+        assertThat(top[1]).isEqualTo(1); // 0.1
     }
 
     @Test
@@ -306,8 +308,8 @@ class MathOpsTest {
         float[] values = {0.5f};
         int[] top = MathOps.topK(values, 1);
 
-        assertEquals(1, top.length);
-        assertEquals(0, top[0]);
+        assertThat(top.length).isEqualTo(1);
+        assertThat(top[0]).isEqualTo(0);
     }
 
     @Test
@@ -315,7 +317,7 @@ class MathOpsTest {
         float[] values = {0.1f, 0.2f};
         int[] top = MathOps.topK(values, 0);
 
-        assertEquals(0, top.length);
+        assertThat(top.length).isEqualTo(0);
     }
 
     @Test
@@ -328,7 +330,7 @@ class MathOpsTest {
 
         int[] result = MathOps.ctcGreedyDecode(logits, 9, vocabSize, 0);
 
-        assertArrayEquals(new int[]{1, 2, 3, 4}, result);
+        assertThat(result).isEqualTo(new int[]{1, 2, 3, 4});
     }
 
     @Test
@@ -338,7 +340,7 @@ class MathOpsTest {
 
         int[] result = MathOps.ctcGreedyDecode(logits, 3, vocabSize, 0);
 
-        assertEquals(0, result.length);
+        assertThat(result.length).isEqualTo(0);
     }
 
     @Test
@@ -349,7 +351,7 @@ class MathOpsTest {
 
         int[] result = MathOps.ctcGreedyDecode(logits, 3, vocabSize, 0);
 
-        assertArrayEquals(new int[]{3, 3}, result);
+        assertThat(result).isEqualTo(new int[]{3, 3});
     }
 
     @Test
@@ -359,7 +361,7 @@ class MathOpsTest {
 
         int[] result = MathOps.ctcGreedyDecode(logits, 1, vocabSize, 0);
 
-        assertEquals(0, result.length);
+        assertThat(result.length).isEqualTo(0);
     }
 
     @Test
@@ -369,7 +371,7 @@ class MathOpsTest {
 
         int[] result = MathOps.ctcGreedyDecode(logits, 1, vocabSize, 0);
 
-        assertArrayEquals(new int[]{2}, result);
+        assertThat(result).isEqualTo(new int[]{2});
     }
 
     /**
@@ -388,27 +390,28 @@ class MathOpsTest {
     @Test
     void dotProduct_identicalNormalizedVectors_returnsOne() {
         float[] v = MathOps.l2Normalize(new float[]{3f, 4f});
-        assertEquals(1.0f, MathOps.dotProduct(v, v), 1e-5f);
+        assertThat(MathOps.dotProduct(v, v)).isCloseTo(1.0f, within(1e-5f));
     }
 
     @Test
     void dotProduct_orthogonalVectors_returnsZero() {
         float[] a = {1f, 0f};
         float[] b = {0f, 1f};
-        assertEquals(0f, MathOps.dotProduct(a, b), 1e-6f);
+        assertThat(MathOps.dotProduct(a, b)).isCloseTo(0f, within(1e-6f));
     }
 
     @Test
     void dotProduct_oppositeVectors_returnsNegativeOne() {
         float[] a = MathOps.l2Normalize(new float[]{1f, 0f});
         float[] b = MathOps.l2Normalize(new float[]{-1f, 0f});
-        assertEquals(-1.0f, MathOps.dotProduct(a, b), 1e-5f);
+        assertThat(MathOps.dotProduct(a, b)).isCloseTo(-1.0f, within(1e-5f));
     }
 
     @Test
     void dotProduct_mismatchedLengths_throws() {
-        assertThrows(IllegalArgumentException.class, () ->
-                MathOps.dotProduct(new float[]{1f, 2f}, new float[]{1f}));
+        assertThatThrownBy(() ->
+                MathOps.dotProduct(new float[]{1f, 2f}, new float[]{1f}))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -417,10 +420,10 @@ class MathOpsTest {
         float[] boxes = {50f, 50f, 20f, 30f};
         float[] result = MathOps.cxcywh2xyxy(boxes);
 
-        assertEquals(40f, result[0], 1e-5f);
-        assertEquals(35f, result[1], 1e-5f);
-        assertEquals(60f, result[2], 1e-5f);
-        assertEquals(65f, result[3], 1e-5f);
+        assertThat(result[0]).isCloseTo(40f, within(1e-5f));
+        assertThat(result[1]).isCloseTo(35f, within(1e-5f));
+        assertThat(result[2]).isCloseTo(60f, within(1e-5f));
+        assertThat(result[3]).isCloseTo(65f, within(1e-5f));
     }
 
     @Test
@@ -431,23 +434,23 @@ class MathOpsTest {
         };
         float[] result = MathOps.cxcywh2xyxy(boxes);
 
-        assertEquals(8, result.length);
+        assertThat(result.length).isEqualTo(8);
         // box 0
-        assertEquals(8f, result[0], 1e-5f);
-        assertEquals(7f, result[1], 1e-5f);
-        assertEquals(12f, result[2], 1e-5f);
-        assertEquals(13f, result[3], 1e-5f);
+        assertThat(result[0]).isCloseTo(8f, within(1e-5f));
+        assertThat(result[1]).isCloseTo(7f, within(1e-5f));
+        assertThat(result[2]).isCloseTo(12f, within(1e-5f));
+        assertThat(result[3]).isCloseTo(13f, within(1e-5f));
         // box 1
-        assertEquals(40f, result[4], 1e-5f);
-        assertEquals(40f, result[5], 1e-5f);
-        assertEquals(60f, result[6], 1e-5f);
-        assertEquals(60f, result[7], 1e-5f);
+        assertThat(result[4]).isCloseTo(40f, within(1e-5f));
+        assertThat(result[5]).isCloseTo(40f, within(1e-5f));
+        assertThat(result[6]).isCloseTo(60f, within(1e-5f));
+        assertThat(result[7]).isCloseTo(60f, within(1e-5f));
     }
 
     @Test
     void cxcywh2xyxy_emptyInput() {
         float[] result = MathOps.cxcywh2xyxy(new float[0]);
-        assertEquals(0, result.length);
+        assertThat(result.length).isEqualTo(0);
     }
 
     @Test
@@ -455,9 +458,68 @@ class MathOpsTest {
         float[] boxes = {100f, 200f, 0f, 0f};
         float[] result = MathOps.cxcywh2xyxy(boxes);
 
-        assertEquals(100f, result[0], 1e-5f);
-        assertEquals(200f, result[1], 1e-5f);
-        assertEquals(100f, result[2], 1e-5f);
-        assertEquals(200f, result[3], 1e-5f);
+        assertThat(result[0]).isCloseTo(100f, within(1e-5f));
+        assertThat(result[1]).isCloseTo(200f, within(1e-5f));
+        assertThat(result[2]).isCloseTo(100f, within(1e-5f));
+        assertThat(result[3]).isCloseTo(200f, within(1e-5f));
+    }
+
+    @Test
+    void l2Normalize_unitVectorResult() {
+        float[] result = MathOps.l2Normalize(new float[]{3f, 4f});
+
+        float norm = 0f;
+        for (float v : result) {
+            norm += v * v;
+        }
+        norm = (float) Math.sqrt(norm);
+        assertThat(norm).isCloseTo(1.0f, within(1e-5f));
+    }
+
+    @Test
+    void l2Normalize_zeroVector_returnsZeroVector() {
+        float[] result = MathOps.l2Normalize(new float[]{0f, 0f, 0f});
+
+        assertThat(result[0]).isCloseTo(0f, within(1e-5f));
+        assertThat(result[1]).isCloseTo(0f, within(1e-5f));
+        assertThat(result[2]).isCloseTo(0f, within(1e-5f));
+    }
+
+    @Test
+    void l2Normalize_singleElement() {
+        float[] result = MathOps.l2Normalize(new float[]{5f});
+
+        assertThat(result[0]).isCloseTo(1.0f, within(1e-5f));
+    }
+
+    @Test
+    void l2Normalize_preservesDirection() {
+        float[] input = {1f, 2f, 3f};
+        float[] result = MathOps.l2Normalize(input);
+
+        // Ratios between elements should be preserved
+        float ratioOriginal12 = input[0] / input[1];
+        float ratioResult12 = result[0] / result[1];
+        assertThat(ratioResult12).isCloseTo(ratioOriginal12, within(1e-5f));
+
+        float ratioOriginal23 = input[1] / input[2];
+        float ratioResult23 = result[1] / result[2];
+        assertThat(ratioResult23).isCloseTo(ratioOriginal23, within(1e-5f));
+    }
+
+    @Test
+    void l2Normalize_negativeValues() {
+        float[] result = MathOps.l2Normalize(new float[]{-3f, 4f});
+
+        float norm = 0f;
+        for (float v : result) {
+            norm += v * v;
+        }
+        norm = (float) Math.sqrt(norm);
+        assertThat(norm).isCloseTo(1.0f, within(1e-5f));
+
+        // Signs should be preserved
+        assertThat(result[0]).isNegative();
+        assertThat(result[1]).isPositive();
     }
 }
