@@ -16,7 +16,10 @@
 
 package io.github.inference4j.vision;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -25,44 +28,49 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ResNetClassifierModelTest {
 
-    private static BufferedImage loadCatImage() throws IOException {
-        return ImageIO.read(ResNetClassifierModelTest.class.getResourceAsStream("/fixtures/cat.jpg"));
+    private ResNetClassifier classifier;
+    private BufferedImage catImage;
+
+    @BeforeAll
+    void setUp() throws IOException {
+        classifier = ResNetClassifier.builder().build();
+        catImage = ImageIO.read(ResNetClassifierModelTest.class.getResourceAsStream("/fixtures/cat.jpg"));
+    }
+
+    @AfterAll
+    void tearDown() throws Exception {
+        if (classifier != null) classifier.close();
     }
 
     @Test
-    void classify_catImage_returnsNonEmptyResults() throws IOException {
-        try (var classifier = io.github.inference4j.vision.ResNetClassifier.builder().build()) {
-            List<Classification> results = classifier.classify(loadCatImage());
+    void classify_catImage_returnsNonEmptyResults() {
+        List<Classification> results = classifier.classify(catImage);
 
-            assertFalse(results.isEmpty(), "Should return at least one classification");
-            assertTrue(results.size() <= 5, "Default topK should be 5 or fewer");
-        }
+        assertFalse(results.isEmpty(), "Should return at least one classification");
+        assertTrue(results.size() <= 5, "Default topK should be 5 or fewer");
     }
 
     @Test
-    void classify_catImage_topResultHasReasonableConfidence() throws IOException {
-        try (var classifier = ResNetClassifier.builder().build()) {
-            List<Classification> results = classifier.classify(loadCatImage());
+    void classify_catImage_topResultHasReasonableConfidence() {
+        List<Classification> results = classifier.classify(catImage);
 
-            Classification top = results.get(0);
-            assertTrue(top.confidence() > 0.1f,
-                    "Top result should have confidence > 0.1, got: " + top.confidence());
-            assertNotNull(top.label(), "Label should not be null");
-            assertFalse(top.label().isBlank(), "Label should not be blank");
-        }
+        Classification top = results.get(0);
+        assertTrue(top.confidence() > 0.1f,
+                "Top result should have confidence > 0.1, got: " + top.confidence());
+        assertNotNull(top.label(), "Label should not be null");
+        assertFalse(top.label().isBlank(), "Label should not be blank");
     }
 
     @Test
-    void classify_catImage_resultsAreSortedDescending() throws IOException {
-        try (var classifier = ResNetClassifier.builder().build()) {
-            List<Classification> results = classifier.classify(loadCatImage());
+    void classify_catImage_resultsAreSortedDescending() {
+        List<Classification> results = classifier.classify(catImage);
 
-            for (int i = 1; i < results.size(); i++) {
-                assertTrue(results.get(i - 1).confidence() >= results.get(i).confidence(),
-                        "Results should be sorted descending at index " + i);
-            }
+        for (int i = 1; i < results.size(); i++) {
+            assertTrue(results.get(i - 1).confidence() >= results.get(i).confidence(),
+                    "Results should be sorted descending at index " + i);
         }
     }
 }

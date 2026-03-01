@@ -16,7 +16,10 @@
 
 package io.github.inference4j.multimodal;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -24,47 +27,52 @@ import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ClipImageEncoderModelTest {
 
-    private static BufferedImage loadCatImage() throws IOException {
-        return ImageIO.read(ClipImageEncoderModelTest.class.getResourceAsStream("/fixtures/cat.jpg"));
+    private ClipImageEncoder encoder;
+    private BufferedImage catImage;
+
+    @BeforeAll
+    void setUp() throws IOException {
+        encoder = ClipImageEncoder.builder().build();
+        catImage = ImageIO.read(ClipImageEncoderModelTest.class.getResourceAsStream("/fixtures/cat.jpg"));
+    }
+
+    @AfterAll
+    void tearDown() throws Exception {
+        if (encoder != null) encoder.close();
     }
 
     @Test
-    void encode_catImage_returnsNonEmptyFiniteEmbedding() throws IOException {
-        try (var encoder = ClipImageEncoder.builder().build()) {
-            float[] embedding = encoder.encode(loadCatImage());
+    void encode_catImage_returnsNonEmptyFiniteEmbedding() {
+        float[] embedding = encoder.encode(catImage);
 
-            assertTrue(embedding.length > 0, "Embedding should be non-empty");
-            for (int i = 0; i < embedding.length; i++) {
-                assertTrue(Float.isFinite(embedding[i]),
-                        "Embedding value at index " + i + " should be finite, got: " + embedding[i]);
-            }
+        assertTrue(embedding.length > 0, "Embedding should be non-empty");
+        for (int i = 0; i < embedding.length; i++) {
+            assertTrue(Float.isFinite(embedding[i]),
+                    "Embedding value at index " + i + " should be finite, got: " + embedding[i]);
         }
     }
 
     @Test
-    void encode_catImage_returns512Dimensions() throws IOException {
-        try (var encoder = ClipImageEncoder.builder().build()) {
-            float[] embedding = encoder.encode(loadCatImage());
+    void encode_catImage_returns512Dimensions() {
+        float[] embedding = encoder.encode(catImage);
 
-            assertEquals(512, embedding.length, "CLIP ViT-B/32 should produce 512-dim embeddings");
-        }
+        assertEquals(512, embedding.length, "CLIP ViT-B/32 should produce 512-dim embeddings");
     }
 
     @Test
-    void encode_catImage_isL2Normalized() throws IOException {
-        try (var encoder = ClipImageEncoder.builder().build()) {
-            float[] embedding = encoder.encode(loadCatImage());
+    void encode_catImage_isL2Normalized() {
+        float[] embedding = encoder.encode(catImage);
 
-            float norm = 0f;
-            for (float v : embedding) {
-                norm += v * v;
-            }
-            norm = (float) Math.sqrt(norm);
-
-            assertEquals(1.0f, norm, 1e-3f,
-                    "Embedding should be L2-normalized (norm ≈ 1.0), got: " + norm);
+        float norm = 0f;
+        for (float v : embedding) {
+            norm += v * v;
         }
+        norm = (float) Math.sqrt(norm);
+
+        assertEquals(1.0f, norm, 1e-3f,
+                "Embedding should be L2-normalized (norm ≈ 1.0), got: " + norm);
     }
 }

@@ -16,7 +16,10 @@
 
 package io.github.inference4j.audio;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,37 +29,43 @@ import java.nio.file.StandardCopyOption;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class Wav2Vec2RecognizerModelTest {
 
-    private static Path extractSpeechFixture() throws IOException {
-        Path tempFile = Files.createTempFile("speech-fixture-", ".wav");
-        tempFile.toFile().deleteOnExit();
+    private Wav2Vec2Recognizer recognizer;
+    private Path speechFixture;
+
+    @BeforeAll
+    void setUp() throws IOException {
+        recognizer = Wav2Vec2Recognizer.builder().build();
+        speechFixture = Files.createTempFile("speech-fixture-", ".wav");
+        speechFixture.toFile().deleteOnExit();
         try (InputStream is = Wav2Vec2RecognizerModelTest.class.getResourceAsStream("/fixtures/speech.wav")) {
-            Files.copy(is, tempFile, StandardCopyOption.REPLACE_EXISTING);
-        }
-        return tempFile;
-    }
-
-    @Test
-    void transcribe_speechWav_returnsNonEmptyText() throws IOException {
-        try (var recognizer = io.github.inference4j.audio.Wav2Vec2Recognizer.builder().build()) {
-            Transcription result = recognizer.transcribe(extractSpeechFixture());
-
-            assertNotNull(result, "Transcription should not be null");
-            assertNotNull(result.text(), "Transcription text should not be null");
-            assertFalse(result.text().isBlank(), "Transcription should produce non-empty text");
+            Files.copy(is, speechFixture, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
-    @Test
-    void transcribe_speechWav_containsRecognizableWords() throws IOException {
-        try (var recognizer = Wav2Vec2Recognizer.builder().build()) {
-            Transcription result = recognizer.transcribe(extractSpeechFixture());
+    @AfterAll
+    void tearDown() throws Exception {
+        if (recognizer != null) recognizer.close();
+    }
 
-            String text = result.text().toUpperCase();
-            // The transcription should contain alphabetic characters (real English words)
-            assertTrue(text.matches(".*[A-Z].*"),
-                    "Transcription should contain alphabetic characters, got: " + result.text());
-        }
+    @Test
+    void transcribe_speechWav_returnsNonEmptyText() {
+        Transcription result = recognizer.transcribe(speechFixture);
+
+        assertNotNull(result, "Transcription should not be null");
+        assertNotNull(result.text(), "Transcription text should not be null");
+        assertFalse(result.text().isBlank(), "Transcription should produce non-empty text");
+    }
+
+    @Test
+    void transcribe_speechWav_containsRecognizableWords() {
+        Transcription result = recognizer.transcribe(speechFixture);
+
+        String text = result.text().toUpperCase();
+        // The transcription should contain alphabetic characters (real English words)
+        assertTrue(text.matches(".*[A-Z].*"),
+                "Transcription should contain alphabetic characters, got: " + result.text());
     }
 }

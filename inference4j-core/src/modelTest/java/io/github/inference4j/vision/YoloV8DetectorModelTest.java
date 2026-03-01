@@ -16,7 +16,10 @@
 
 package io.github.inference4j.vision;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -25,37 +28,44 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class YoloV8DetectorModelTest {
 
-    private static BufferedImage loadCatImage() throws IOException {
-        return ImageIO.read(YoloV8DetectorModelTest.class.getResourceAsStream("/fixtures/cat.jpg"));
+    private YoloV8Detector detector;
+    private BufferedImage catImage;
+
+    @BeforeAll
+    void setUp() throws IOException {
+        detector = YoloV8Detector.builder().build();
+        catImage = ImageIO.read(YoloV8DetectorModelTest.class.getResourceAsStream("/fixtures/cat.jpg"));
+    }
+
+    @AfterAll
+    void tearDown() throws Exception {
+        if (detector != null) detector.close();
     }
 
     @Test
-    void detect_catImage_returnsDetections() throws IOException {
-        try (var detector = YoloV8Detector.builder().build()) {
-            List<Detection> detections = detector.detect(loadCatImage());
+    void detect_catImage_returnsDetections() {
+        List<Detection> detections = detector.detect(catImage);
 
-            assertFalse(detections.isEmpty(), "Should detect at least one object in cat image");
-        }
+        assertFalse(detections.isEmpty(), "Should detect at least one object in cat image");
     }
 
     @Test
-    void detect_catImage_detectionsHaveValidFields() throws IOException {
-        try (var detector = YoloV8Detector.builder().build()) {
-            List<Detection> detections = detector.detect(loadCatImage());
+    void detect_catImage_detectionsHaveValidFields() {
+        List<Detection> detections = detector.detect(catImage);
 
-            for (Detection d : detections) {
-                assertNotNull(d.label(), "Detection label should not be null");
-                assertFalse(d.label().isBlank(), "Detection label should not be blank");
-                assertTrue(d.confidence() > 0f, "Confidence should be positive, got: " + d.confidence());
-                assertTrue(d.confidence() <= 1f, "Confidence should be <= 1, got: " + d.confidence());
+        for (Detection d : detections) {
+            assertNotNull(d.label(), "Detection label should not be null");
+            assertFalse(d.label().isBlank(), "Detection label should not be blank");
+            assertTrue(d.confidence() > 0f, "Confidence should be positive, got: " + d.confidence());
+            assertTrue(d.confidence() <= 1f, "Confidence should be <= 1, got: " + d.confidence());
 
-                BoundingBox box = d.box();
-                assertTrue(box.x2() > box.x1(), "Box x2 should be > x1");
-                assertTrue(box.y2() > box.y1(), "Box y2 should be > y1");
-                assertTrue(box.area() > 0, "Box area should be positive");
-            }
+            BoundingBox box = d.box();
+            assertTrue(box.x2() > box.x1(), "Box x2 should be > x1");
+            assertTrue(box.y2() > box.y1(), "Box y2 should be > y1");
+            assertTrue(box.area() > 0, "Box area should be positive");
         }
     }
 }
