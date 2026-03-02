@@ -17,6 +17,8 @@ package io.github.inference4j.autoconfigure;
 
 import java.util.List;
 
+import io.github.inference4j.nlp.NamedEntity;
+import io.github.inference4j.nlp.NamedEntityRecognizer;
 import io.github.inference4j.nlp.QueryDocumentPair;
 import io.github.inference4j.nlp.SearchReranker;
 import io.github.inference4j.nlp.TextClassification;
@@ -42,6 +44,7 @@ class Inference4jNlpAutoConfigurationTest {
 			assertThat(ctx).doesNotHaveBean(TextClassifier.class);
 			assertThat(ctx).doesNotHaveBean(TextEmbedder.class);
 			assertThat(ctx).doesNotHaveBean(SearchReranker.class);
+			assertThat(ctx).doesNotHaveBean(NamedEntityRecognizer.class);
 		});
 	}
 
@@ -50,11 +53,13 @@ class Inference4jNlpAutoConfigurationTest {
 		runner.withPropertyValues(
 				"inference4j.nlp.text-classifier.enabled=false",
 				"inference4j.nlp.text-embedder.enabled=false",
-				"inference4j.nlp.search-reranker.enabled=false")
+				"inference4j.nlp.search-reranker.enabled=false",
+				"inference4j.nlp.named-entity-recognizer.enabled=false")
 			.run(ctx -> {
 				assertThat(ctx).doesNotHaveBean(TextClassifier.class);
 				assertThat(ctx).doesNotHaveBean(TextEmbedder.class);
 				assertThat(ctx).doesNotHaveBean(SearchReranker.class);
+				assertThat(ctx).doesNotHaveBean(NamedEntityRecognizer.class);
 			});
 	}
 
@@ -64,11 +69,13 @@ class Inference4jNlpAutoConfigurationTest {
 				"inference4j.nlp.text-classifier.enabled=true",
 				"inference4j.nlp.text-embedder.enabled=true",
 				"inference4j.nlp.text-embedder.model-id=test/model",
-				"inference4j.nlp.search-reranker.enabled=true")
+				"inference4j.nlp.search-reranker.enabled=true",
+				"inference4j.nlp.named-entity-recognizer.enabled=true")
 			.run(ctx -> {
 				assertThat(ctx.getBeanFactory().getBeanDefinition("textClassifier").isLazyInit()).isTrue();
 				assertThat(ctx.getBeanFactory().getBeanDefinition("textEmbedder").isLazyInit()).isTrue();
 				assertThat(ctx.getBeanFactory().getBeanDefinition("searchReranker").isLazyInit()).isTrue();
+				assertThat(ctx.getBeanFactory().getBeanDefinition("namedEntityRecognizer").isLazyInit()).isTrue();
 			});
 	}
 
@@ -100,6 +107,37 @@ class Inference4jNlpAutoConfigurationTest {
 				assertThat(ctx).hasSingleBean(SearchReranker.class);
 				assertThat(ctx).getBean(SearchReranker.class).isSameAs(CustomSearchRerankerConfig.INSTANCE);
 			});
+	}
+
+	@Test
+	void userBeanOverridesAutoConfiguredNamedEntityRecognizer() {
+		runner.withPropertyValues("inference4j.nlp.named-entity-recognizer.enabled=true")
+			.withUserConfiguration(CustomNamedEntityRecognizerConfig.class)
+			.run(ctx -> {
+				assertThat(ctx).hasSingleBean(NamedEntityRecognizer.class);
+				assertThat(ctx).getBean(NamedEntityRecognizer.class).isSameAs(CustomNamedEntityRecognizerConfig.INSTANCE);
+			});
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	static class CustomNamedEntityRecognizerConfig {
+
+		static final NamedEntityRecognizer INSTANCE = new NamedEntityRecognizer() {
+			@Override
+			public List<NamedEntity> recognize(String text) {
+				return List.of();
+			}
+
+			@Override
+			public void close() {
+			}
+		};
+
+		@Bean
+		NamedEntityRecognizer namedEntityRecognizer() {
+			return INSTANCE;
+		}
+
 	}
 
 	@Configuration(proxyBeanMethods = false)

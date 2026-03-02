@@ -65,11 +65,12 @@ import java.util.Map;
  * line number (0-indexed) is the token's integer ID. This is the standard format
  * used by HuggingFace BERT checkpoints.
  *
- * <h2>Limitations</h2>
- * <p>This tokenizer applies unconditional lowercasing, matching the behavior of
- * {@code bert-base-uncased} and {@code distilbert-base-uncased}. It is not suitable
- * for cased models without modification. Models that use BPE (RoBERTa, GPT-2) or
- * SentencePiece (DeBERTa v3) require different tokenizer implementations.
+ * <h2>Cased vs uncased</h2>
+ * <p>By default, the tokenizer applies lowercasing, matching the behavior of
+ * {@code bert-base-uncased} and {@code distilbert-base-uncased}. For cased models
+ * (e.g., NER), use {@link #fromVocabFile(Path, boolean)} with {@code lowercase=false}.
+ * Models that use BPE (RoBERTa, GPT-2) or SentencePiece (DeBERTa v3) require
+ * different tokenizer implementations.
  *
  * <h2>Usage</h2>
  * <pre>{@code
@@ -95,15 +96,32 @@ public class WordPieceTokenizer implements Tokenizer {
     private final int clsId;
     private final int sepId;
     private final int unkId;
+    private final boolean lowercase;
 
-    private WordPieceTokenizer(Map<String, Integer> vocab) {
+    private WordPieceTokenizer(Map<String, Integer> vocab, boolean lowercase) {
         this.vocab = vocab;
         this.clsId = vocab.getOrDefault(CLS_TOKEN, 0);
         this.sepId = vocab.getOrDefault(SEP_TOKEN, 0);
         this.unkId = vocab.getOrDefault(UNK_TOKEN, 0);
+        this.lowercase = lowercase;
     }
 
+    /**
+     * Creates a tokenizer from a vocabulary file with unconditional lowercasing
+     * (suitable for uncased models like {@code bert-base-uncased}).
+     */
     public static WordPieceTokenizer fromVocabFile(Path vocabPath) {
+        return fromVocabFile(vocabPath, true);
+    }
+
+    /**
+     * Creates a tokenizer from a vocabulary file with configurable casing.
+     *
+     * @param vocabPath path to {@code vocab.txt}
+     * @param lowercase {@code true} to lowercase input (uncased models),
+     *                  {@code false} to preserve original casing (cased models like NER)
+     */
+    public static WordPieceTokenizer fromVocabFile(Path vocabPath, boolean lowercase) {
         try {
             List<String> lines = Files.readAllLines(vocabPath);
             Map<String, Integer> vocab = new LinkedHashMap<>();
@@ -113,7 +131,7 @@ public class WordPieceTokenizer implements Tokenizer {
                     vocab.put(token, i);
                 }
             }
-            return new WordPieceTokenizer(vocab);
+            return new WordPieceTokenizer(vocab, lowercase);
         } catch (IOException e) {
             throw new ModelSourceException(
                     "Failed to load vocabulary from " + vocabPath + ": " + e.getMessage(), e);
@@ -130,17 +148,26 @@ public class WordPieceTokenizer implements Tokenizer {
         List<String> basicTokens = basicTokenize(text);
 
         List<Integer> tokenIds = new ArrayList<>();
+        List<Integer> wordIdList = new ArrayList<>();
         tokenIds.add(clsId);
+        wordIdList.add(-1);
 
-        for (String token : basicTokens) {
-            tokenIds.addAll(wordPieceTokenize(token));
+        for (int wordIdx = 0; wordIdx < basicTokens.size(); wordIdx++) {
+            List<Integer> subIds = wordPieceTokenize(basicTokens.get(wordIdx));
+            tokenIds.addAll(subIds);
+            for (int s = 0; s < subIds.size(); s++) {
+                wordIdList.add(wordIdx);
+            }
         }
 
         tokenIds.add(sepId);
+        wordIdList.add(-1);
 
         if (tokenIds.size() > maxLength) {
             tokenIds = new ArrayList<>(tokenIds.subList(0, maxLength - 1));
+            wordIdList = new ArrayList<>(wordIdList.subList(0, maxLength - 1));
             tokenIds.add(sepId);
+            wordIdList.add(-1);
         }
 
         int length = tokenIds.size();
@@ -148,8 +175,9 @@ public class WordPieceTokenizer implements Tokenizer {
         long[] attentionMask = new long[length];
         Arrays.fill(attentionMask, 1);
         long[] tokenTypeIds = new long[length];
+        int[] wordIds = wordIdList.stream().mapToInt(Integer::intValue).toArray();
 
-        return new EncodedInput(inputIds, attentionMask, tokenTypeIds);
+        return new EncodedInput(inputIds, attentionMask, tokenTypeIds, wordIds);
     }
 
     @Override
@@ -208,7 +236,7 @@ public class WordPieceTokenizer implements Tokenizer {
     }
 
     private List<String> basicTokenize(String text) {
-        text = text.toLowerCase().strip();
+        text = (lowercase ? text.toLowerCase() : text).strip();
         List<String> tokens = new ArrayList<>();
         StringBuilder current = new StringBuilder();
 

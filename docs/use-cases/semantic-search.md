@@ -64,11 +64,13 @@ public class SemanticSearch {
 
 | Method | Type | Default | Description |
 |--------|------|---------|-------------|
-| `.modelId(String)` | `String` | `inference4j/all-MiniLM-L6-v2` | HuggingFace model ID |
+| `.modelId(String)` | `String` | — (required) | HuggingFace model ID |
 | `.modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Model resolution strategy |
 | `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | default | ONNX Runtime session config |
 | `.tokenizer(Tokenizer)` | `Tokenizer` | auto-loaded `WordPieceTokenizer` | Custom tokenizer |
 | `.poolingStrategy(PoolingStrategy)` | `PoolingStrategy` | `MEAN` | Pooling method: `CLS`, `MEAN`, or `MAX` |
+| `.normalize()` | — | disabled | Enables L2 normalization of output embeddings |
+| `.textPrefix(String)` | `String` | `null` | Text prefix to prepend before encoding |
 | `.maxLength(int)` | `int` | `512` | Maximum token sequence length |
 
 ## Reranker builder options
@@ -115,8 +117,45 @@ The embedder supports three pooling strategies for converting token-level repres
 | `CLS` | Uses only the `[CLS]` token embedding |
 | `MAX` | Element-wise maximum across all token embeddings |
 
+## Available embedding models
+
+| Model | Dim | Pooling | Normalize | Text Prefix | MTEB Avg |
+|-------|-----|---------|-----------|-------------|----------|
+| `inference4j/all-MiniLM-L6-v2` | 384 | MEAN | Optional | — | 56.26 |
+| `inference4j/all-mpnet-base-v2` | 768 | MEAN | Optional | — | 57.78 |
+| `inference4j/bge-base-en-v1.5` | 768 | CLS | Recommended | — | 63.55 |
+| `inference4j/gte-base` | 768 | CLS | Recommended | — | 61.36 |
+
+### BGE example
+
+```java
+try (var embedder = SentenceTransformerEmbedder.builder()
+        .modelId("inference4j/bge-base-en-v1.5")
+        .poolingStrategy(PoolingStrategy.CLS)
+        .normalize()
+        .build()) {
+    float[] embedding = embedder.encode("What is machine learning?");
+}
+```
+
+### E5 example (with text prefix)
+
+E5 models require a text prefix: `"query: "` for queries, `"passage: "` for documents.
+
+```java
+try (var queryEncoder = SentenceTransformerEmbedder.builder()
+        .modelId("inference4j/e5-base-v2")
+        .textPrefix("query: ")
+        .normalize()
+        .build()) {
+    float[] queryEmbedding = queryEncoder.encode("What is Java?");
+}
+```
+
 ## Tips
 
 - **Two-stage pipeline**: Use embeddings for fast top-K retrieval (cheap cosine similarity), then rerank the top candidates with the cross-encoder (expensive but more accurate).
 - **Batch encoding**: Use `encodeBatch()` when encoding multiple texts — more efficient than calling `encode()` in a loop.
-- Embedding dimension depends on the model: all-MiniLM-L6-v2 produces 384-dimensional vectors.
+- **L2 normalization**: Enable `.normalize()` when comparing embeddings with cosine similarity. BGE, GTE, and E5 models all recommend normalization.
+- **Text prefix**: Some models (E5, Nomic) require a text prefix. Check the model card for the correct prefix.
+- Embedding dimension depends on the model: all-MiniLM-L6-v2 produces 384-dimensional vectors, while BGE/GTE/mpnet produce 768-dimensional vectors.

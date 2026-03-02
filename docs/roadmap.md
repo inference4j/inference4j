@@ -81,13 +81,15 @@
 - [x] Model test suite — `./gradlew modelTest` with real model downloads and inference verification
 - [x] Module consolidation — `inference4j-tasks` and `inference4j-preprocessing` merged into `inference4j-core`
 
-## Next Up
-
 ### v0.10.0 — NER & Embeddings
 
-- [ ] **Named Entity Recognition** — NER via BERT-based token classification models (e.g., `bert-base-NER`, `dslim/bert-base-NER`)
-- [ ] `TokenClassifier` interface, `NamedEntity` result type (entity text, label, span, confidence)
-- [ ] **Improved embeddings** — support for larger, more capable embedding models (e.g., `bge-base`, `gte-base`, `e5-base-v2`) beyond MiniLM
+- [x] **Named Entity Recognition** — `BertNerRecognizer` with IOB2 tagging, cased WordPiece tokenizer, subword-to-word alignment via wordIds
+- [x] `NamedEntityRecognizer` interface, `NamedEntity` result type (entity text, label, character offsets, confidence)
+- [x] **Improved embeddings** — L2 normalization (`.normalize()`), text prefix (`.textPrefix()`), support for BGE, GTE, mpnet models
+- [x] **Cased tokenizer** — `WordPieceTokenizer.fromVocabFile(path, lowercase)` for cased models
+- [x] Spring Boot auto-configuration for `NamedEntityRecognizer`
+
+## Next Up
 
 ### v0.11.0 — Tiktoken & LLM Support
 

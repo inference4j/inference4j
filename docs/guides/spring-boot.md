@@ -43,6 +43,8 @@ inference4j:
 | `inference4j.nlp.text-embedder.model-id` | `String` | *(required)* | Model ID (no default — must be specified) |
 | `inference4j.nlp.search-reranker.enabled` | `boolean` | `false` | Enable MiniLM cross-encoder reranker |
 | `inference4j.nlp.search-reranker.model-id` | `String` | `inference4j/ms-marco-MiniLM-L-6-v2` | Model ID |
+| `inference4j.nlp.named-entity-recognizer.enabled` | `boolean` | `false` | Enable BERT NER recognizer |
+| `inference4j.nlp.named-entity-recognizer.model-id` | `String` | `inference4j/distilbert-NER` | Model ID |
 | `inference4j.vision.image-classifier.enabled` | `boolean` | `false` | Enable ResNet image classifier |
 | `inference4j.vision.image-classifier.model-id` | `String` | `inference4j/resnet50-v1-7` | Model ID |
 | `inference4j.vision.object-detector.enabled` | `boolean` | `false` | Enable YOLOv8 object detector |

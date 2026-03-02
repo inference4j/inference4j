@@ -7,7 +7,12 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Capability | Wrapper | Default Model ID | Size | API |
 |------------|---------|-------------------|------|-----|
 | Text Classification | `DistilBertTextClassifier` | `inference4j/distilbert-base-uncased-finetuned-sst-2-english` | ~260 MB | `TextClassifier` |
+| Named Entity Recognition | `BertNerRecognizer` | `inference4j/distilbert-NER` | ~260 MB | `NamedEntityRecognizer` |
+| Named Entity Recognition | `BertNerRecognizer` | `inference4j/bert-base-NER` | ~431 MB | `NamedEntityRecognizer` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/all-MiniLM-L6-v2` | ~90 MB | `TextEmbedder` |
+| Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/all-mpnet-base-v2` | ~430 MB | `TextEmbedder` |
+| Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/bge-base-en-v1.5` | ~430 MB | `TextEmbedder` |
+| Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/gte-base` | ~430 MB | `TextEmbedder` |
 | Search Reranking | `MiniLMSearchReranker` | `inference4j/ms-marco-MiniLM-L-6-v2` | ~90 MB | `SearchReranker` |
 | Text Generation | `OnnxTextGenerator.gpt2()` | `inference4j/gpt2` | ~500 MB | `TextGenerator` |
 | Text Generation | `OnnxTextGenerator.smolLM2()` | `inference4j/smollm2-360m-instruct` | ~700 MB | `TextGenerator` |
@@ -71,7 +76,12 @@ A comprehensive view of all supported models, organized by architecture:
 | Model | Tokenizer | Wrapper | Use Cases |
 |-------|-----------|---------|-----------|
 | DistilBERT SST-2 | WordPiece | `DistilBertTextClassifier` | Sentiment analysis, text classification |
+| DistilBERT NER | WordPiece (cased) | `BertNerRecognizer` | Named entity recognition |
+| BERT Base NER | WordPiece (cased) | `BertNerRecognizer` | Named entity recognition |
 | all-MiniLM-L6-v2 | WordPiece | `SentenceTransformerEmbedder` | Semantic search, embeddings |
+| all-mpnet-base-v2 | WordPiece | `SentenceTransformerEmbedder` | Semantic search, embeddings |
+| BGE Base EN v1.5 | WordPiece | `SentenceTransformerEmbedder` | Semantic search, embeddings |
+| GTE Base | WordPiece | `SentenceTransformerEmbedder` | Semantic search, embeddings |
 | MiniLM-L-6 MS MARCO | WordPiece | `MiniLMSearchReranker` | Search reranking |
 
 ### Decoder-only (autoregressive)

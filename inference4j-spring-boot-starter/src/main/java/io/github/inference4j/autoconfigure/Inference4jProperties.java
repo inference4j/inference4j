@@ -65,6 +65,8 @@ public class Inference4jProperties {
 
 		private TaskProperties searchReranker = new TaskProperties("inference4j/ms-marco-MiniLM-L-6-v2");
 
+		private TaskProperties namedEntityRecognizer = new TaskProperties("inference4j/distilbert-NER");
+
 		public TaskProperties getTextClassifier() {
 			return textClassifier;
 		}
@@ -87,6 +89,14 @@ public class Inference4jProperties {
 
 		public void setSearchReranker(TaskProperties searchReranker) {
 			this.searchReranker = searchReranker;
+		}
+
+		public TaskProperties getNamedEntityRecognizer() {
+			return namedEntityRecognizer;
+		}
+
+		public void setNamedEntityRecognizer(TaskProperties namedEntityRecognizer) {
+			this.namedEntityRecognizer = namedEntityRecognizer;
 		}
 
 	}

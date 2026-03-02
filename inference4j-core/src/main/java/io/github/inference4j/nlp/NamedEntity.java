@@ -14,19 +14,22 @@
  * limitations under the License.
  */
 
-package io.github.inference4j.tokenizer;
+package io.github.inference4j.nlp;
 
-public record EncodedInput(
-        long[] inputIds,
-        long[] attentionMask,
-        long[] tokenTypeIds,
-        int[] wordIds
+/**
+ * A named entity extracted from text.
+ *
+ * @param text  the span text (e.g., "London")
+ * @param label the entity type (e.g., "LOC", "PER", "ORG", "MISC")
+ * @param start character offset start in the original string
+ * @param end   character offset end in the original string (exclusive)
+ * @param score mean confidence of the constituent tokens
+ */
+public record NamedEntity(
+        String text,
+        String label,
+        int start,
+        int end,
+        float score
 ) {
-
-    /**
-     * Backward-compatible constructor without word IDs.
-     */
-    public EncodedInput(long[] inputIds, long[] attentionMask, long[] tokenTypeIds) {
-        this(inputIds, attentionMask, tokenTypeIds, null);
-    }
 }
