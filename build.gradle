@@ -6,7 +6,6 @@ plugins {
 
 allprojects {
     group = 'io.github.inference4j'
-    version = '0.1.0-SNAPSHOT'
 
     repositories {
         mavenCentral()

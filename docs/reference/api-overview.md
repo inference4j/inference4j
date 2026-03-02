@@ -15,9 +15,9 @@
 | `io.github.inference4j.preprocessing.text` | `ModelConfig` (HuggingFace config.json parser) |
 | `io.github.inference4j.preprocessing.image` | Image transforms pipeline: `ImageTransformPipeline`, `ResizeTransform`, `CenterCropTransform`, `ImageLayout`, `Labels` |
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
-| `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `ImageEmbedder` |
+| `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `ImageEmbedder`, `ImageAnnotator` |
 | `io.github.inference4j.audio` | `Wav2Vec2Recognizer`, `SileroVadDetector` |
-| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language` |
+| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
 | `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `EncoderDecoderSession`, `ChatTemplate`, `GenerativeModel` |
 | `io.github.inference4j.sampling` | `LogitsProcessor`, `LogitsSampler`, `CategoricalSampler`, `GreedySampler` |
@@ -107,6 +107,7 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | `Transcription` | `text()`, `segments()` | `Wav2Vec2Recognizer`, `WhisperSpeechModel` |
 | `VoiceSegment` | `start()`, `end()`, `duration()`, `confidence()` | `SileroVadDetector` |
 | `GenerationResult` | `text()`, `promptTokens()`, `generatedTokens()`, `duration()` | `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `TextGenerator`, `VisionLanguageModel` |
+| `QueryDocumentPair` | `query()`, `document()` | `MiniLMSearchReranker`, `SearchReranker` |
 | `VisionInput` | `imagePath()`, `prompt()` | `VisionLanguageModel` |
 
 ## Builder pattern

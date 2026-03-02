@@ -21,12 +21,8 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Set release version
-        run: sed -i "s/version = .*/version = '${{ steps.version.outputs.VERSION }}'/" build.gradle
+      - name: Set release version from tag
+        run: echo "version=${GITHUB_REF_NAME#v}" > gradle.properties
 
       - name: Publish to Maven Central
         run: ./gradlew publishAndReleaseToMavenCentral
