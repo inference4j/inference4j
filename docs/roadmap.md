@@ -83,10 +83,29 @@
 
 ## Next Up
 
-- [ ] **TrOCR** — text recognition (handwriting, printed text) — enabled by encoder-decoder infrastructure
-- [ ] OCR Pipeline — CRAFT detection + TrOCR recognition composed end-to-end
-- [ ] **Whisper** — autoregressive speech-to-text via pure ONNX Runtime (mel spectrogram / FFT preprocessing)
-- [ ] Mel spectrogram / FFT preprocessing (unlocks Whisper)
+### v0.10.0 — NER & Embeddings
+
+- [ ] **Named Entity Recognition** — NER via BERT-based token classification models (e.g., `bert-base-NER`, `dslim/bert-base-NER`)
+- [ ] `TokenClassifier` interface, `NamedEntity` result type (entity text, label, span, confidence)
+- [ ] **Improved embeddings** — support for larger, more capable embedding models (e.g., `bge-base`, `gte-base`, `e5-base-v2`) beyond MiniLM
+
+### v0.11.0 — Tiktoken & LLM Support
+
+- [ ] **Tiktoken tokenizer** — `cl100k_base` / `o200k_base` encoding for OpenAI-family models
+- [ ] At least one LLM that uses Tiktoken (e.g., Llama 3, Phi-4)
+
+### v0.12.0 — Text-to-Speech
+
+- [ ] **Piper TTS** — text-to-speech via Piper ONNX models
+- [ ] `SpeechSynthesizer` interface, audio output generation
+
+### Beyond
+
+- [ ] **OCR Pipeline** — CRAFT detection + TrOCR recognition composed end-to-end; study viability of full TrOCR models
+- [ ] **CRAFT improvements** — test and improve support for vertical text and mixed orientation
+- [ ] **Whisper** — study cost of mel spectrogram / FFT preprocessing; native autoregressive speech-to-text
+- [ ] **Stable Diffusion** — study feasibility of text-to-image models on ONNX Runtime, including lightweight variants with GPU acceleration
+- [ ] **More ViT models** — additional Vision Transformer variants (low effort, reuse existing image classification infrastructure)
 
 ## Dropped
 
@@ -101,7 +120,6 @@
 | Text | Cross-encoder reranker (ms-marco-MiniLM) | Done |
 | Text | Text classification (DistilBERT, sentiment, moderation) | Done |
 | Text | CRAFT (text detection) | Done |
-| Text | TrOCR (text recognition) | Next |
 | Text | GPT-2 (text generation) | Done |
 | Text | SmolLM2-360M-Instruct (text generation) | Done |
 | Text | Qwen2.5-1.5B-Instruct (text generation) | Done |
@@ -109,12 +127,19 @@
 | Text | BART / DistilBART (summarization) | Done |
 | Text | MarianMT (translation) | Done |
 | Text | CoEdIT (grammar correction) | Done |
+| Text | BERT NER (named entity recognition) | v0.10.0 |
+| Text | BGE / GTE / E5 (improved embeddings) | v0.10.0 |
+| Text | Tiktoken LLM | v0.11.0 |
 | Vision | ResNet | Done |
 | Vision | EfficientNet | Done |
 | Vision | YOLOv8 / YOLO11 | Done |
 | Vision | YOLO26 | Done |
 | Vision | CLIP (visual search, zero-shot classification) | Done |
 | Vision | Phi-3.5 Vision (captioning, VQA) | Done |
+| Vision | Additional ViT models | Beyond |
+| Vision | TrOCR + OCR Pipeline | Beyond |
+| Vision | Stable Diffusion (text-to-image) | Beyond — feasibility study |
 | Audio | Wav2Vec2-CTC (speech-to-text) | Done |
 | Audio | Silero VAD (voice activity detection) | Done |
-| Audio | Whisper (autoregressive speech-to-text) | Next |
+| Audio | Piper TTS (text-to-speech) | v0.12.0 |
+| Audio | Whisper (autoregressive speech-to-text) | Beyond — feasibility study |
