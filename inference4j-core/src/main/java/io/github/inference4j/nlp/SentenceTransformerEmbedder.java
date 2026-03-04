@@ -17,6 +17,7 @@
 package io.github.inference4j.nlp;
 
 import io.github.inference4j.AbstractInferenceTask;
+import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
@@ -187,7 +188,7 @@ public class SentenceTransformerEmbedder
         };
     }
 
-    private static io.github.inference4j.processing.Preprocessor<String, Map<String, Tensor>> createPreprocessor(
+    private static io.github.inference4j.processing.Preprocessor<String, PreprocessResult> createPreprocessor(
             Tokenizer tokenizer, int maxLength, Set<String> expectedInputs, String textPrefix) {
         return text -> {
             String input = textPrefix != null ? textPrefix + text : text;
@@ -199,7 +200,7 @@ public class SentenceTransformerEmbedder
             if (expectedInputs.contains("token_type_ids")) {
                 inputs.put("token_type_ids", Tensor.fromLongs(encoded.tokenTypeIds(), shape));
             }
-            return inputs;
+            return PreprocessResult.of(inputs);
         };
     }
 

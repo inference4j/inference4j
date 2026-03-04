@@ -17,6 +17,7 @@
 package io.github.inference4j.nlp;
 
 import io.github.inference4j.AbstractInferenceTask;
+import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.processing.MathOps;
@@ -116,8 +117,8 @@ public class DistilBertTextClassifier
 
     @Override
     public List<TextClassification> classify(String text, int topK) {
-        Map<String, Tensor> inputs = preprocessor.process(text);
-        Map<String, Tensor> outputs = session.run(inputs);
+        PreprocessResult result = preprocessor.process(text);
+        Map<String, Tensor> outputs = session.run(result.tensors());
         Tensor outputTensor = outputs.values().iterator().next();
         float[] logits = outputTensor.toFloats();
         return postProcess(logits, config, topK, outputOperator);
@@ -135,7 +136,7 @@ public class DistilBertTextClassifier
         return results;
     }
 
-    private static io.github.inference4j.processing.Preprocessor<String, Map<String, Tensor>> createPreprocessor(
+    private static io.github.inference4j.processing.Preprocessor<String, PreprocessResult> createPreprocessor(
             Tokenizer tokenizer, int maxLength, Set<String> expectedInputs) {
         return text -> {
             EncodedInput encoded = tokenizer.encode(text, maxLength);
@@ -146,7 +147,7 @@ public class DistilBertTextClassifier
             if (expectedInputs.contains("token_type_ids")) {
                 inputs.put("token_type_ids", Tensor.fromLongs(encoded.tokenTypeIds(), shape));
             }
-            return inputs;
+            return PreprocessResult.of(inputs);
         };
     }
 

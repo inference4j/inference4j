@@ -17,6 +17,7 @@
 package io.github.inference4j.nlp;
 
 import io.github.inference4j.AbstractInferenceTask;
+import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.InferenceContext;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
@@ -79,12 +80,13 @@ public class BertNerRecognizer
     private final ModelConfig config;
     private final int maxLength;
 
+    static final String WORD_IDS_KEY = "wordIds";
+
     private BertNerRecognizer(InferenceSession session, Tokenizer tokenizer,
-                              ModelConfig config, int maxLength,
-                              ThreadLocal<int[]> wordIdsHolder) {
+                              ModelConfig config, int maxLength) {
         super(session,
-                createPreprocessor(tokenizer, maxLength, session.inputNames(), wordIdsHolder),
-                ctx -> postProcess(ctx, config, wordIdsHolder));
+                createPreprocessor(tokenizer, maxLength, session.inputNames()),
+                ctx -> postProcess(ctx, config));
         this.tokenizer = tokenizer;
         this.config = config;
         this.maxLength = maxLength;
@@ -99,16 +101,13 @@ public class BertNerRecognizer
         return run(text);
     }
 
-    static List<NamedEntity> postProcess(InferenceContext<String> ctx, ModelConfig config,
-                                         ThreadLocal<int[]> wordIdsHolder) {
+    static List<NamedEntity> postProcess(InferenceContext<String> ctx, ModelConfig config) {
         String originalText = ctx.input();
         Tensor outputTensor = ctx.outputs().values().iterator().next();
 
-        // Output shape: [1, seqLen, numLabels] → squeeze to [seqLen, numLabels]
         float[][] tokenLogits = outputTensor.squeeze(0).toFloats2D();
 
-        int[] wordIds = wordIdsHolder.get();
-        wordIdsHolder.remove();
+        int[] wordIds = (int[]) ctx.metadata().get(WORD_IDS_KEY);
 
         int seqLen = tokenLogits.length;
 
@@ -232,12 +231,10 @@ public class BertNerRecognizer
         return bestIdx;
     }
 
-    private static io.github.inference4j.processing.Preprocessor<String, Map<String, Tensor>> createPreprocessor(
-            Tokenizer tokenizer, int maxLength, Set<String> expectedInputs,
-            ThreadLocal<int[]> wordIdsHolder) {
+    private static io.github.inference4j.processing.Preprocessor<String, PreprocessResult> createPreprocessor(
+            Tokenizer tokenizer, int maxLength, Set<String> expectedInputs) {
         return text -> {
             EncodedInput encoded = tokenizer.encode(text, maxLength);
-            wordIdsHolder.set(encoded.wordIds());
             long[] shape = {1, encoded.inputIds().length};
             Map<String, Tensor> inputs = new LinkedHashMap<>();
             inputs.put("input_ids", Tensor.fromLongs(encoded.inputIds(), shape));
@@ -245,7 +242,7 @@ public class BertNerRecognizer
             if (expectedInputs.contains("token_type_ids")) {
                 inputs.put("token_type_ids", Tensor.fromLongs(encoded.tokenTypeIds(), shape));
             }
-            return inputs;
+            return PreprocessResult.of(inputs, Map.of(WORD_IDS_KEY, encoded.wordIds()));
         };
     }
 
@@ -300,7 +297,6 @@ public class BertNerRecognizer
         }
 
         public BertNerRecognizer build() {
-            ThreadLocal<int[]> wordIdsHolder = new ThreadLocal<>();
             if (session == null) {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
@@ -314,7 +310,7 @@ public class BertNerRecognizer
             if (config == null) {
                 throw new IllegalStateException("ModelConfig is required");
             }
-            return new BertNerRecognizer(session, tokenizer, config, maxLength, wordIdsHolder);
+            return new BertNerRecognizer(session, tokenizer, config, maxLength);
         }
 
         private void loadFromDirectory(Path dir) {

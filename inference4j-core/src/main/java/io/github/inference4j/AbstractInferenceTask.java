@@ -35,7 +35,7 @@ import java.util.Map;
  * {@code detect(image, conf, iou)}) can access the {@code protected} fields directly
  * and compose the same building blocks with custom parameters.
  *
- * <h2>Example — adding a new task</h2>
+ * <h2>Example — simple task (no metadata)</h2>
  * <pre>{@code
  * public class MyClassifier
  *         extends AbstractInferenceTask<BufferedImage, List<Classification>>
@@ -43,13 +43,36 @@ import java.util.Map;
  *
  *     public MyClassifier(InferenceSession session, ...) {
  *         super(session,
- *               image -> Map.of("input", preprocess(image)),
+ *               image -> PreprocessResult.of(Map.of("input", preprocess(image))),
  *               ctx -> postprocess(ctx.outputs()));
  *     }
  *
  *     @Override
  *     public List<Classification> classify(BufferedImage image) {
  *         return run(image);
+ *     }
+ * }
+ * }</pre>
+ *
+ * <h2>Example — passing metadata from preprocessor to postprocessor</h2>
+ * <pre>{@code
+ * public class MyNerModel
+ *         extends AbstractInferenceTask<String, List<Entity>> {
+ *
+ *     public MyNerModel(InferenceSession session, Tokenizer tokenizer) {
+ *         super(session,
+ *               text -> {
+ *                   EncodedInput encoded = tokenizer.encode(text, 512);
+ *                   Map<String, Tensor> tensors = Map.of(
+ *                           "input_ids", Tensor.fromLongs(encoded.inputIds(), shape));
+ *                   // Pass word IDs as metadata — not sent to ONNX session
+ *                   return PreprocessResult.of(tensors, Map.of("wordIds", encoded.wordIds()));
+ *               },
+ *               ctx -> {
+ *                   int[] wordIds = (int[]) ctx.metadata().get("wordIds");
+ *                   // Use wordIds for subword-to-word alignment in postprocessing
+ *                   return buildEntities(ctx.outputs(), wordIds, ctx.input());
+ *               });
  *     }
  * }
  * }</pre>
@@ -63,11 +86,11 @@ import java.util.Map;
 public abstract class AbstractInferenceTask<I, O> implements InferenceTask<I, O> {
 
     protected final InferenceSession session;
-    protected final Preprocessor<I, Map<String, Tensor>> preprocessor;
+    protected final Preprocessor<I, PreprocessResult> preprocessor;
     protected final Postprocessor<InferenceContext<I>, O> postprocessor;
 
     protected AbstractInferenceTask(InferenceSession session,
-                                    Preprocessor<I, Map<String, Tensor>> preprocessor,
+                                    Preprocessor<I, PreprocessResult> preprocessor,
                                     Postprocessor<InferenceContext<I>, O> postprocessor) {
         this.session = session;
         this.preprocessor = preprocessor;
@@ -76,9 +99,10 @@ public abstract class AbstractInferenceTask<I, O> implements InferenceTask<I, O>
 
     @Override
     public final O run(I input) {
-        Map<String, Tensor> inputs = preprocessor.process(input);
-        Map<String, Tensor> outputs = session.run(inputs);
-        return postprocessor.process(new InferenceContext<>(input, inputs, outputs));
+        PreprocessResult result = preprocessor.process(input);
+        Map<String, Tensor> outputs = session.run(result.tensors());
+        return postprocessor.process(
+                new InferenceContext<>(input, result.tensors(), outputs, result.metadata()));
     }
 
     @Override

@@ -48,6 +48,8 @@ public class AllExamplesRunner {
 		examples.put("TranslationExample", TranslationExample::main);
 		examples.put("GrammarCorrectionExample", GrammarCorrectionExample::main);
 		examples.put("TextToSqlExample", TextToSqlExample::main);
+		examples.put("NamedEntityRecognitionExample", NamedEntityRecognitionExample::main);
+		examples.put("BgeEmbeddingExample", BgeEmbeddingExample::main);
 
 		List<String> failed = new ArrayList<>();
 

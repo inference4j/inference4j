@@ -17,6 +17,7 @@
 package io.github.inference4j.vision;
 
 import io.github.inference4j.AbstractInferenceTask;
+import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.processing.MathOps;
@@ -142,8 +143,8 @@ public class YoloV8Detector
 
     @Override
     public List<Detection> detect(BufferedImage image, float confidenceThreshold, float iouThreshold) {
-        Map<String, Tensor> inputs = preprocessor.process(image);
-        Map<String, Tensor> outputs = session.run(inputs);
+        PreprocessResult result = preprocessor.process(image);
+        Map<String, Tensor> outputs = session.run(result.tensors());
         return decodeDetections(outputs, labels, confidenceThreshold, iouThreshold,
                 inputSize, image.getWidth(), image.getHeight());
     }
@@ -160,12 +161,12 @@ public class YoloV8Detector
 
     // --- Preprocessing ---
 
-    private static io.github.inference4j.processing.Preprocessor<BufferedImage, Map<String, Tensor>> createPreprocessor(
+    private static io.github.inference4j.processing.Preprocessor<BufferedImage, PreprocessResult> createPreprocessor(
             String inputName, int inputSize) {
         return image -> {
             LetterboxResult lb = letterbox(image, inputSize);
             Tensor tensor = imageToTensor(lb.image);
-            return Map.of(inputName, tensor);
+            return PreprocessResult.of(Map.of(inputName, tensor));
         };
     }
 
