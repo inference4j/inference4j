@@ -288,6 +288,110 @@ class SentenceTransformerEmbedderTest {
         assertThat(model).isNotNull();
     }
 
+    // --- Normalize ---
+
+    @Test
+    void normalize_producesUnitVector() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
+
+        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f};
+        when(session.run(any())).thenReturn(
+                Map.of("output", Tensor.fromFloats(output, new long[]{1, 3, 4})));
+
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .normalize()
+                .build();
+
+        float[] embedding = model.encode("hello");
+
+        // Verify unit norm
+        float norm = 0f;
+        for (float v : embedding) {
+            norm += v * v;
+        }
+        assertThat((double) Math.sqrt(norm)).isCloseTo(1.0, within(1e-4));
+    }
+
+    @Test
+    void withoutNormalize_doesNotNormalize() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
+
+        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f};
+        when(session.run(any())).thenReturn(
+                Map.of("output", Tensor.fromFloats(output, new long[]{1, 3, 4})));
+
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .build();
+
+        float[] embedding = model.encode("hello");
+
+        // Without normalize, result is raw MEAN pooling (not unit norm)
+        assertThat(embedding[0]).isCloseTo(5f, within(0.001f));
+    }
+
+    // --- Text prefix ---
+
+    @Test
+    void textPrefix_prependedBeforeEncoding() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{101, 102}, new long[]{1, 1}, new long[]{0, 0}));
+
+        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f};
+        when(session.run(any())).thenReturn(
+                Map.of("output", Tensor.fromFloats(output, new long[]{1, 2, 4})));
+
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .textPrefix("query: ")
+                .build();
+
+        model.encode("hello");
+
+        verify(tokenizer).encode("query: hello", 512);
+    }
+
+    @Test
+    void withoutTextPrefix_encodesAsIs() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{101, 102}, new long[]{1, 1}, new long[]{0, 0}));
+
+        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f};
+        when(session.run(any())).thenReturn(
+                Map.of("output", Tensor.fromFloats(output, new long[]{1, 2, 4})));
+
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .build();
+
+        model.encode("hello");
+
+        verify(tokenizer).encode("hello", 512);
+    }
+
     // --- Close delegation ---
 
     @Test

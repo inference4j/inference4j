@@ -17,6 +17,7 @@
 package io.github.inference4j.nlp;
 
 import io.github.inference4j.AbstractInferenceTask;
+import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
@@ -91,7 +92,7 @@ public class MiniLMSearchReranker
         return (float) (1.0 / (1.0 + Math.exp(-logit)));
     }
 
-    private static Preprocessor<QueryDocumentPair, Map<String, Tensor>> createPreprocessor(
+    private static Preprocessor<QueryDocumentPair, PreprocessResult> createPreprocessor(
             Tokenizer tokenizer, int maxLength, Set<String> expectedInputs) {
         return pair -> {
             EncodedInput encoded = tokenizer.encode(pair.query(), pair.document(), maxLength);
@@ -103,7 +104,7 @@ public class MiniLMSearchReranker
             if (expectedInputs.contains("token_type_ids")) {
                 inputs.put("token_type_ids", Tensor.fromLongs(encoded.tokenTypeIds(), shape));
             }
-            return inputs;
+            return PreprocessResult.of(inputs);
         };
     }
 

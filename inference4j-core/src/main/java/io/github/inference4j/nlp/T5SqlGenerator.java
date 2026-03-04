@@ -136,7 +136,13 @@ public class T5SqlGenerator implements TextGenerator, SqlGenerator {
 	@Override
 	public GenerationResult generateSql(String query, String schema,
 										  Consumer<String> tokenListener) {
-		return engine.generate(promptFormatter.apply(query, schema), tokenListener);
+		Consumer<String> sanitizing = token ->
+				tokenListener.accept(token.replace('"', '\''));
+		GenerationResult result = engine.generate(
+				promptFormatter.apply(query, schema), sanitizing);
+		String fixedText = result.text().replace('"', '\'');
+		return new GenerationResult(fixedText, result.promptTokens(),
+				result.generatedTokens(), result.duration());
 	}
 
 	@Override

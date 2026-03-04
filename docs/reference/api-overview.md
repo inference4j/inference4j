@@ -17,7 +17,7 @@
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
 | `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `ImageEmbedder`, `ImageAnnotator` |
 | `io.github.inference4j.audio` | `Wav2Vec2Recognizer`, `SileroVadDetector` |
-| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
+| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `NamedEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
 | `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `EncoderDecoderSession`, `ChatTemplate`, `GenerativeModel` |
 | `io.github.inference4j.sampling` | `LogitsProcessor`, `LogitsSampler`, `CategoricalSampler`, `GreedySampler` |
@@ -55,6 +55,7 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 │   ├── ObjectDetector                  // detect(BufferedImage/Path) → List<Detection>
 │   ├── TextDetector                    // detect(BufferedImage/Path) → List<TextRegion>
 │   └── VoiceActivityDetector           // detect(Path/float[]) → List<VoiceSegment>
+├── NamedEntityRecognizer                // recognize(String) → List<NamedEntity>
 ├── TextEmbedder                        // encode(String) → float[]
 ├── ImageEmbedder                       // encode(BufferedImage/Path) → float[]
 ├── SearchReranker                      // score(String, String) → float
@@ -101,6 +102,7 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 |------|--------|---------|
 | `Classification` | `label()`, `index()`, `confidence()` | `ResNetClassifier`, `EfficientNetClassifier`, `ClipClassifier` |
 | `TextClassification` | `label()`, `classIndex()`, `confidence()` | `DistilBertTextClassifier` |
+| `NamedEntity` | `text()`, `label()`, `start()`, `end()`, `score()` | `BertNerRecognizer` |
 | `Detection` | `label()`, `classIndex()`, `confidence()`, `box()` | `YoloV8Detector`, `Yolo26Detector` |
 | `TextRegion` | `box()`, `confidence()` | `CraftTextDetector` |
 | `BoundingBox` | `x1()`, `y1()`, `x2()`, `y2()` | Embedded in `Detection`, `TextRegion` |

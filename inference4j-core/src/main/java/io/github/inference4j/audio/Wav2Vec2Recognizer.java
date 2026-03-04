@@ -17,6 +17,7 @@
 package io.github.inference4j.audio;
 
 import io.github.inference4j.AbstractInferenceTask;
+import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.preprocessing.audio.AudioData;
@@ -125,14 +126,14 @@ public class Wav2Vec2Recognizer
                 vocabulary, blankIndex, wordDelimiter);
     }
 
-    private static io.github.inference4j.processing.Preprocessor<Path, Map<String, Tensor>> createPreprocessor(
+    private static io.github.inference4j.processing.Preprocessor<Path, PreprocessResult> createPreprocessor(
             String inputName, io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline) {
         return audioPath -> {
             AudioData audio = io.github.inference4j.preprocessing.audio.AudioLoader.load(audioPath);
             AudioData processed = pipeline.transform(audio);
             float[] samples = processed.samples();
             Tensor inputTensor = Tensor.fromFloats(samples, new long[]{1, samples.length});
-            return Map.of(inputName, inputTensor);
+            return PreprocessResult.of(Map.of(inputName, inputTensor));
         };
     }
 

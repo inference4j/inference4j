@@ -50,6 +50,11 @@ public class Translation {
 }
 ```
 
+<figure markdown="span">
+  ![Screenshot from showcase app](../assets/images/Translation.png)
+  <figcaption>Screenshot from showcase app</figcaption>
+</figure>
+
 ## Flexible translation with Flan-T5
 
 `FlanT5TextGenerator` implements the `Translator` interface and can translate between any pair of languages using a single model:

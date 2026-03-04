@@ -48,6 +48,11 @@ public class TextToSql {
 }
 ```
 
+<figure markdown="span">
+  ![Screenshot from showcase app](../assets/images/Text2SQL.png)
+  <figcaption>Screenshot from showcase app</figcaption>
+</figure>
+
 ## Model presets
 
 | Preset | Model | Parameters | Size | Schema format |

@@ -28,13 +28,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class WordPieceTokenizerTest {
 
-    private static io.github.inference4j.tokenizer.WordPieceTokenizer tokenizer;
+    private static WordPieceTokenizer tokenizer;
+    private static WordPieceTokenizer casedTokenizer;
 
     @BeforeAll
     static void setUp() {
         Path vocabPath = Path.of(Objects.requireNonNull(
                 WordPieceTokenizerTest.class.getResource("/test-vocab.txt")).getPath());
         tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
+        casedTokenizer = WordPieceTokenizer.fromVocabFile(vocabPath, false);
     }
 
     @Test
@@ -163,5 +165,83 @@ class WordPieceTokenizerTest {
         EncodedInput result = tokenizer.encode("hello", "hello world good", 6);
         // [CLS]=2, hello=5, [SEP]=3, hello=5, world=6, [SEP]=3
         assertThat(result.inputIds()).isEqualTo(new long[]{2, 5, 3, 5, 6, 3});
+    }
+
+    // --- Cased mode ---
+
+    @Test
+    void casedMode_preservesCase() {
+        // "HELLO" in cased mode — vocab only has lowercase "hello", so "HELLO" → [UNK]
+        EncodedInput result = casedTokenizer.encode("HELLO");
+        // [CLS]=2, [UNK]=1, [SEP]=3
+        assertThat(result.inputIds()).isEqualTo(new long[]{2, 1, 3});
+    }
+
+    @Test
+    void casedMode_lowercaseMatchesVocab() {
+        // "hello" in cased mode matches vocab entry
+        EncodedInput result = casedTokenizer.encode("hello");
+        assertThat(result.inputIds()).isEqualTo(new long[]{2, 5, 3});
+    }
+
+    @Test
+    void defaultMode_lowercasesInput() {
+        // Default (uncased) mode lowercases, so "HELLO" matches "hello" in vocab
+        EncodedInput result = tokenizer.encode("HELLO");
+        assertThat(result.inputIds()).isEqualTo(new long[]{2, 5, 3});
+    }
+
+    // --- Word IDs ---
+
+    @Test
+    void wordIds_simpleTokens() {
+        EncodedInput result = tokenizer.encode("hello world");
+        // [CLS](-1), hello(0), world(1), [SEP](-1)
+        assertThat(result.wordIds()).isEqualTo(new int[]{-1, 0, 1, -1});
+    }
+
+    @Test
+    void wordIds_subwordsSameWordId() {
+        EncodedInput result = tokenizer.encode("testing");
+        // [CLS](-1), test(0), ##ing(0), [SEP](-1)
+        assertThat(result.wordIds()).isEqualTo(new int[]{-1, 0, 0, -1});
+    }
+
+    @Test
+    void wordIds_multipleSubwords() {
+        EncodedInput result = tokenizer.encode("unbelievable");
+        // [CLS](-1), un(0), ##believ(0), ##able(0), [SEP](-1)
+        assertThat(result.wordIds()).isEqualTo(new int[]{-1, 0, 0, 0, -1});
+    }
+
+    @Test
+    void wordIds_withPunctuation() {
+        EncodedInput result = tokenizer.encode("hello!");
+        // [CLS](-1), hello(0), !(1), [SEP](-1)
+        assertThat(result.wordIds()).isEqualTo(new int[]{-1, 0, 1, -1});
+    }
+
+    @Test
+    void wordIds_mixedSubwordsAndWholeWords() {
+        EncodedInput result = tokenizer.encode("hello testing world");
+        // [CLS](-1), hello(0), test(1), ##ing(1), world(2), [SEP](-1)
+        assertThat(result.wordIds()).isEqualTo(new int[]{-1, 0, 1, 1, 2, -1});
+    }
+
+    @Test
+    void wordIds_emptyString() {
+        EncodedInput result = tokenizer.encode("");
+        // [CLS](-1), [SEP](-1)
+        assertThat(result.wordIds()).isEqualTo(new int[]{-1, -1});
+    }
+
+    @Test
+    void wordIds_truncated() {
+        // "hello world test good morning" → truncated to maxLength=5
+        EncodedInput result = tokenizer.encode("hello world test good morning", 5);
+        // [CLS](-1), hello(0), world(1), test(2), [SEP](-1) — truncated at 5
+        assertThat(result.wordIds()).hasSize(5);
+        assertThat(result.wordIds()[0]).isEqualTo(-1);
+        assertThat(result.wordIds()[4]).isEqualTo(-1);
     }
 }

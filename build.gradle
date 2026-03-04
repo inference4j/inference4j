@@ -82,7 +82,9 @@ configure(subprojects.findAll { it.name in publishedModules }) {
 
     mavenPublishing {
         publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
-        signAllPublications()
+        if (project.findProperty('signing.gnupg.keyName') || project.findProperty('signingInMemoryKey')) {
+            signAllPublications()
+        }
 
         coordinates(project.group.toString(), project.name, project.version.toString())
 

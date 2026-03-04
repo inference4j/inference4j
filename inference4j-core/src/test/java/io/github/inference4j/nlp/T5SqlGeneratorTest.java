@@ -95,16 +95,52 @@ class T5SqlGeneratorTest {
 		GenerationEngine engine = mockEngine();
 		T5SqlGenerator generator = new T5SqlGenerator(engine,
 				(query, schema) -> "tables: " + schema + " query for: " + query);
-		Consumer<String> listener = token -> {};
 
 		GenerationResult result = generator.generateSql(
 				"List all departments",
 				"CREATE TABLE departments (id INT, name VARCHAR)",
-				listener);
+				token -> {});
 
-		verify(engine).generate(anyString(), eq(listener));
+		verify(engine).generate(anyString(), any());
 		assertThat(result).isNotNull();
 		assertThat(result.text()).isEqualTo("SELECT count(*) FROM employees");
+	}
+
+	@Test
+	void generateSql_normalizesDoubleQuotesToSingleQuotes() {
+		GenerationEngine engine = mock(GenerationEngine.class);
+		GenerationResult rawResult = new GenerationResult(
+				"SELECT * FROM Genre WHERE Name = \"Rock\"", 10, 8, Duration.ZERO);
+		when(engine.generate(anyString(), any())).thenReturn(rawResult);
+
+		T5SqlGenerator generator = new T5SqlGenerator(engine,
+				(query, schema) -> "tables: " + schema + " query for: " + query);
+
+		GenerationResult result = generator.generateSql("...", "...", token -> {});
+		assertThat(result.text()).isEqualTo("SELECT * FROM Genre WHERE Name = 'Rock'");
+	}
+
+	@Test
+	void generateSql_streaming_normalizesDoubleQuotesInTokens() {
+		GenerationEngine engine = mock(GenerationEngine.class);
+		GenerationResult rawResult = new GenerationResult(
+				"SELECT * FROM Genre WHERE Name = \"Rock\"", 10, 8, Duration.ZERO);
+		when(engine.generate(anyString(), any())).thenAnswer(invocation -> {
+			Consumer<String> listener = invocation.getArgument(1);
+			listener.accept("SELECT * FROM Genre WHERE Name = ");
+			listener.accept("\"Rock\"");
+			return rawResult;
+		});
+
+		T5SqlGenerator generator = new T5SqlGenerator(engine,
+				(query, schema) -> "tables: " + schema + " query for: " + query);
+
+		java.util.List<String> receivedTokens = new java.util.ArrayList<>();
+		generator.generateSql("...", "...", receivedTokens::add);
+
+		assertThat(receivedTokens).containsExactly(
+				"SELECT * FROM Genre WHERE Name = ",
+				"'Rock'");
 	}
 
 	@Test

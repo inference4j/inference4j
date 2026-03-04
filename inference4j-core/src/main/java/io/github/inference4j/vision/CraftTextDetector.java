@@ -17,6 +17,7 @@
 package io.github.inference4j.vision;
 
 import io.github.inference4j.AbstractInferenceTask;
+import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
@@ -126,8 +127,8 @@ public class CraftTextDetector
 
     @Override
     public List<TextRegion> detect(BufferedImage image, float textThreshold, float lowTextThreshold) {
-        Map<String, Tensor> inputs = preprocessor.process(image);
-        Map<String, Tensor> outputs = session.run(inputs);
+        PreprocessResult result = preprocessor.process(image);
+        Map<String, Tensor> outputs = session.run(result.tensors());
         return decodeTextRegions(outputs, textThreshold, lowTextThreshold,
                 minComponentArea, targetSize, image.getWidth(), image.getHeight());
     }
@@ -144,12 +145,12 @@ public class CraftTextDetector
 
     // --- Preprocessing ---
 
-    private static io.github.inference4j.processing.Preprocessor<BufferedImage, Map<String, Tensor>> createPreprocessor(
+    private static io.github.inference4j.processing.Preprocessor<BufferedImage, PreprocessResult> createPreprocessor(
             String inputName, int targetSize) {
         return image -> {
             ResizeResult resize = resizeForCraft(image, targetSize);
             Tensor tensor = imageToTensor(resize.image);
-            return Map.of(inputName, tensor);
+            return PreprocessResult.of(Map.of(inputName, tensor));
         };
     }
 

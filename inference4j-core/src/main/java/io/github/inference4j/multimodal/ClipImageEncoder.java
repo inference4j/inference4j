@@ -17,6 +17,7 @@
 package io.github.inference4j.multimodal;
 
 import io.github.inference4j.AbstractInferenceTask;
+import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
@@ -83,7 +84,7 @@ public class ClipImageEncoder
     private ClipImageEncoder(InferenceSession session, String inputName,
                              Preprocessor<BufferedImage, Tensor> imagePreprocessor) {
         super(session,
-                image -> Map.of(inputName, imagePreprocessor.process(image)),
+                image -> PreprocessResult.of(Map.of(inputName, imagePreprocessor.process(image))),
                 ctx -> {
                     Tensor outputTensor = ctx.outputs().values().iterator().next();
                     float[] embedding = outputTensor.toFloats();

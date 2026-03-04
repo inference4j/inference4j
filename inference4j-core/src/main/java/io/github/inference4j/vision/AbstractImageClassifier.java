@@ -17,6 +17,7 @@
 package io.github.inference4j.vision;
 
 import io.github.inference4j.AbstractInferenceTask;
+import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.model.ModelSource;
@@ -63,7 +64,7 @@ public abstract class AbstractImageClassifier
                                       Labels labels, String inputName, int defaultTopK,
                                       OutputOperator outputOperator) {
         super(session,
-                image -> Map.of(inputName, imagePreprocessor.process(image)),
+                image -> PreprocessResult.of(Map.of(inputName, imagePreprocessor.process(image))),
                 ctx -> {
                     Tensor outputTensor = ctx.outputs().values().iterator().next();
                     float[] logits = outputTensor.toFloats();

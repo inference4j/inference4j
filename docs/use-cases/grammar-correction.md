@@ -41,6 +41,11 @@ public class GrammarCorrection {
 }
 ```
 
+<figure markdown="span">
+  ![Screenshot from showcase app](../assets/images/Grammar.png)
+  <figcaption>Screenshot from showcase app</figcaption>
+</figure>
+
 ## Using Flan-T5 as an alternative
 
 `FlanT5TextGenerator` can also correct grammar. It implements the same `GrammarCorrector` interface:

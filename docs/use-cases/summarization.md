@@ -43,6 +43,11 @@ public class Summarization {
 }
 ```
 
+<figure markdown="span">
+  ![Screenshot from showcase app](../assets/images/Summary.png)
+  <figcaption>Screenshot from showcase app</figcaption>
+</figure>
+
 ## Using Flan-T5 as an alternative
 
 `FlanT5TextGenerator` can also summarize text. It uses a different architecture but implements the same `Summarizer` interface:

@@ -15,8 +15,10 @@
  */
 package io.github.inference4j.autoconfigure;
 
+import io.github.inference4j.nlp.BertNerRecognizer;
 import io.github.inference4j.nlp.DistilBertTextClassifier;
 import io.github.inference4j.nlp.MiniLMSearchReranker;
+import io.github.inference4j.nlp.NamedEntityRecognizer;
 import io.github.inference4j.nlp.SearchReranker;
 import io.github.inference4j.nlp.SentenceTransformerEmbedder;
 import io.github.inference4j.nlp.TextClassifier;
@@ -65,6 +67,16 @@ public class Inference4jNlpAutoConfiguration {
 	public SearchReranker searchReranker(Inference4jProperties properties) {
 		return MiniLMSearchReranker.builder()
 			.modelId(properties.getNlp().getSearchReranker().getModelId())
+			.build();
+	}
+
+	@Bean
+	@Lazy
+	@ConditionalOnMissingBean(NamedEntityRecognizer.class)
+	@ConditionalOnProperty(prefix = "inference4j.nlp.named-entity-recognizer", name = "enabled", havingValue = "true")
+	public NamedEntityRecognizer namedEntityRecognizer(Inference4jProperties properties) {
+		return BertNerRecognizer.builder()
+			.modelId(properties.getNlp().getNamedEntityRecognizer().getModelId())
 			.build();
 	}
 

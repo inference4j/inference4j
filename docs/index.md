@@ -190,5 +190,14 @@ Java has great tools for building AI-powered applications. [Spring AI](https://s
 
 Learn more about the pipeline architecture in [How It Works](getting-started/how-it-works.md).
 
+## Try the showcase
+
+Want to see inference4j in action before writing any code? The [inference4j-showcase](https://github.com/inference4j/inference4j-showcase) is a local demo app with interactive demos for every capability — sentiment analysis, NER, translation, text-to-SQL, grammar correction, object detection, and more. Clone, run, and explore.
+
+<figure markdown="span">
+  ![inference4j showcase](assets/images/showcase.png)
+  <figcaption>inference4j-showcase — interactive demos running locally</figcaption>
+</figure>
+
 [Get started](getting-started/installation.md){ .md-button .md-button--primary }
 [Browse use cases](use-cases/sentiment-analysis.md){ .md-button }
