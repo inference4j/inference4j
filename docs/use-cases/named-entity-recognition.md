@@ -37,6 +37,11 @@ public class NerExample {
 }
 ```
 
+<figure markdown="span">
+  ![Screenshot from showcase app](../assets/images/NamedEntityRecognition.png)
+  <figcaption>Screenshot from showcase app</figcaption>
+</figure>
+
 ## Builder options
 
 | Method | Type | Default | Description |
