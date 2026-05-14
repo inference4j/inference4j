@@ -49,8 +49,8 @@ public class EncoderDecoderSession implements GenerativeSession {
     private final int decoderStartTokenId;
     private final int numLayers;
 
-    private Map<String, Tensor> decoderSelfAttentionCache;
-    private Map<String, Tensor> crossAttentionCache;
+    private final Map<String, Tensor> decoderSelfAttentionCache;
+    private final Map<String, Tensor> crossAttentionCache;
     private Tensor encoderAttentionMask;
     private int sequenceLength;
 
