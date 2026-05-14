@@ -96,7 +96,7 @@ public class OnnxGenerativeSession implements GenerativeSession {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         this.session.close();
     }
 

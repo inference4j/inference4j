@@ -163,7 +163,7 @@ public class EncoderDecoderSession implements GenerativeSession {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         encoderSession.close();
         decoderSession.close();
         decoderWithPastSession.close();

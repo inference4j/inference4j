@@ -25,4 +25,7 @@ public interface GenerativeSession extends AutoCloseable {
     int cacheSequenceLength();
 
     void resetCache();
+
+    @Override
+    void close();
 }
