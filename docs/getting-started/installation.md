@@ -82,7 +82,9 @@ tasks.withType(Test).configureEach {
 
 ## Spring Boot
 
-For Spring Boot applications, use the starter instead:
+For Spring Boot applications, use the starter instead. It requires **Spring Boot 4.0 or
+later** as of inference4j 0.11.0 — see the [Spring Boot guide](../guides/spring-boot.md#requirements)
+if you are still on Boot 3.
 
 === "Gradle"
 

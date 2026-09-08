@@ -99,17 +99,54 @@
 - [x] Documented the ONNX Runtime version contract between `inference4j-core` and
       `inference4j-genai`
 
+### v0.11.0 — Spring Boot 4
+
+- [x] **Spring Boot 4 starter** — the starter now targets Spring Boot 4.0+ / Spring Framework 7
+- [x] Actuator health types moved to `org.springframework.boot.health.contributor`
+- [x] [Migration guide](guides/spring-boot.md#migrating-from-010x) for existing users
+
+Spring Boot 3.x left open-source support on 30 June 2026, and Spring AI 2.0 (GA June 2026)
+requires Boot 4 and cannot load in a 3.x context. Boot 4 is also binary-incompatible with
+Boot 3 for the actuator health types the starter uses, so a single artifact cannot serve
+both — 0.10.1 is the final Boot 3 release and remains on Maven Central, frozen.
+
+Only the starter is affected. `inference4j-core` and every other module have no Spring
+dependency.
+
 ## Next Up
 
-### v0.11.0 — Tiktoken & LLM Support
+### Tokenizers & LLMs
 
-- [ ] **Tiktoken tokenizer** — `cl100k_base` / `o200k_base` encoding for OpenAI-family models
-- [ ] At least one LLM that uses Tiktoken (e.g., Llama 3, Phi-4)
+- [ ] **Tiktoken tokenizer** — deferred. No small, ONNX-viable model currently requires it;
+      the realistic near-term targets use byte-level BPE or SentencePiece Unigram, both of
+      which are already implemented. Revisit when a concrete model needs it.
 
-### v0.12.0 — Text-to-Speech
+### Speech
 
-- [ ] **Piper TTS** — text-to-speech via Piper ONNX models
+- [ ] **Moonshine speech-to-text** — raw-waveform ASR (MIT, 27M/62M) that performs feature
+      extraction inside the ONNX graph, so it needs no mel-spectrogram/FFT work in Java.
+      Reuses the existing raw-waveform audio pipeline.
+
+### Embeddings & reranking
+
+- [ ] **Qwen3-Embedding / Qwen3-Reranker (0.6B)** — Apache 2.0 with existing ONNX exports.
+      Uses byte-level BPE we already support; the reranker scores via decoder tokens rather
+      than a cross-encoder head, so it needs a new `OutputOperator`.
+
+### Text-to-Speech
+
+- [ ] **Kokoro TTS** — replaces Piper as the TTS target. Apache 2.0 end to end, versus
+      Piper's development having moved to a GPL-3.0 fork.
+- [ ] **Java phonemizer** — Kokoro needs grapheme-to-phoneme conversion, and the usual
+      fallback (espeak-ng) is GPL-3.0. Needs a dictionary-based phonemizer over a
+      permissively licensed lexicon. This is the real cost of the TTS milestone.
 - [ ] `SpeechSynthesizer` interface, audio output generation
+
+### Pixel-level tasks
+
+- [ ] **`Tensor.toFloats3D()` + tensor-to-image utility** — one prerequisite unlocking depth
+      estimation (Depth Anything V2), semantic segmentation (SegFormer) and super-resolution
+      (Real-ESRGAN)
 
 ### Beyond
 
