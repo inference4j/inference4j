@@ -3,7 +3,7 @@
 ## Requirements
 
 - **Java 17** or higher
-- ONNX Runtime (included transitively)
+- ONNX Runtime 1.26.0 (included transitively via `inference4j-core`)
 
 ## Add the dependency
 
@@ -45,6 +45,14 @@ For text generation (Phi-3, DeepSeek-R1, etc.), add `inference4j-genai` instead:
     ```
 
 This is a separate module backed by onnxruntime-genai. See the [Generative AI guide](../generative-ai/introduction.md) for details.
+
+!!! warning "Don't override the ONNX Runtime version alongside `inference4j-genai`"
+
+    `inference4j-genai` pulls in a fat JAR that bundles ONNX Runtime's native
+    libraries under the same resource path the official ONNX Runtime JAR uses.
+    `inference4j-core` pins the version those natives were built against, so
+    forcing a different ONNX Runtime version can silently load the wrong native
+    library. See [Generative AI &rarr; Versions](../generative-ai/introduction.md#versions).
 
 ## JVM flags
 
