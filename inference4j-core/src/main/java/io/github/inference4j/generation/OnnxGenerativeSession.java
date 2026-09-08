@@ -27,7 +27,7 @@ import java.util.Map;
 public class OnnxGenerativeSession implements GenerativeSession {
 
     private final InferenceSession session;
-    private Map<String, Tensor> cache;
+    private final Map<String, Tensor> cache;
     private final int numLayers;
     private final int numHeads;
     private final int headDim;
@@ -96,7 +96,7 @@ public class OnnxGenerativeSession implements GenerativeSession {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         this.session.close();
     }
 
