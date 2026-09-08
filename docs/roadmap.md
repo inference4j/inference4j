@@ -89,6 +89,16 @@
 - [x] **Cased tokenizer** — `WordPieceTokenizer.fromVocabFile(path, lowercase)` for cased models
 - [x] Spring Boot auto-configuration for `NamedEntityRecognizer`
 
+### v0.10.1 — Dependency refresh
+
+- [x] **onnxruntime-genai 0.12.0 &rarr; 0.15.2** — refreshed our
+      [shadow build](https://github.com/inference4j/onnxruntime-genai); picks up upstream
+      security fixes and Gemma 4 / int8 support
+- [x] **ONNX Runtime 1.23.0 &rarr; 1.26.0** — matches the version the genai natives are
+      built against, so both modules load the same native library
+- [x] Documented the ONNX Runtime version contract between `inference4j-core` and
+      `inference4j-genai`
+
 ## Next Up
 
 ### v0.11.0 — Tiktoken & LLM Support

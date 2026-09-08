@@ -34,7 +34,7 @@ inference4j implements the full autoregressive loop in Java on top of standard O
 **Cons:**
 
 - Models must be exported in onnxruntime-genai's specific format — few are available today
-- The library is in preview and community support is limited; Microsoft's investment appears to have slowed
+- The library is still in preview and community support is limited
 - Requires a separate native dependency (`onnxruntime-genai`) that we build and publish ourselves since Microsoft does not currently publish Java bindings to Maven Central
 - GPU support is not available in the Java bindings
 
@@ -43,6 +43,25 @@ inference4j implements the full autoregressive loop in Java on top of standard O
     The `inference4j-genai` module wraps a library in preview. We maintain the
     [onnxruntime-genai Java build](https://github.com/inference4j/onnxruntime-genai)
     ourselves. The API may change between releases.
+
+### Versions
+
+`inference4j-genai` tracks upstream onnxruntime-genai releases through our shadow
+build, published as `io.github.inference4j:onnxruntime-genai`:
+
+| inference4j | onnxruntime-genai | ONNX Runtime |
+|-------------|-------------------|--------------|
+| 0.10.1      | 0.15.2            | 1.26.0       |
+| 0.10.0      | 0.12.0            | 1.23.0       |
+
+!!! note "Keep ONNX Runtime versions aligned"
+
+    The shadow build ships a fat JAR that bundles ONNX Runtime's native libraries
+    under the same resource path (`ai/onnxruntime/native/`) that the official
+    `com.microsoft.onnxruntime:onnxruntime` JAR uses. `inference4j-core` therefore
+    pins the ONNX Runtime version the genai natives were built against. If you
+    override the ONNX Runtime version yourself, keep it matched to the table above
+    — otherwise which native library gets loaded depends on classpath order.
 
 ### Where we're heading
 
