@@ -2,6 +2,30 @@
 
 inference4j provides a Spring Boot starter with opt-in auto-configuration for all supported models.
 
+## Requirements
+
+| | |
+|---|---|
+| **Spring Boot** | 4.0 or later |
+| **Spring Framework** | 7.0 or later |
+| **Java** | 17 or later |
+
+!!! warning "Spring Boot 4 required as of inference4j 0.11.0"
+
+    The starter targets Spring Boot 4. It will not load in a Spring Boot 3
+    application — Boot 4 relocated the actuator health types, so the two lines are
+    binary-incompatible and cannot be served by one artifact.
+
+    If you are still on Spring Boot 3, stay on
+    **`inference4j-spring-boot-starter:0.10.1`**, which is the last release built
+    against Boot 3.4. It is frozen, not maintained — Spring Boot 3.x itself left
+    open-source support on 30 June 2026, so migrating to Boot 4 is the recommended
+    path. See [Migrating from 0.10.x](#migrating-from-010x) below.
+
+    Only the starter is affected. `inference4j-core` and every other module are
+    plain Java libraries with no Spring dependency, and work unchanged on any
+    Spring version or none at all.
+
 ## Setup
 
 Add the starter dependency:
@@ -193,6 +217,65 @@ public class ModelWarmup {
 ```
 
 This triggers the lazy bean initialization during startup, so the model is ready when the first real request arrives.
+
+## Migrating from 0.10.x
+
+inference4j 0.11.0 moved the starter from Spring Boot 3 to Spring Boot 4. There is no
+Boot 3 branch — 0.10.1 is the last Boot 3 release and stays available on Maven Central.
+
+**1. Upgrade your application to Spring Boot 4.** Spring's own
+[migration guide](https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Migration-Guide)
+recommends going to 3.5 first, then to 4.0. Boot 4 requires Java 17 or later.
+
+**2. Update the health indicator import, if you override it.** The actuator health types
+moved modules in Boot 4. If you replace inference4j's default indicator with your own bean,
+change:
+
+```java
+// Before (Spring Boot 3)
+import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.actuate.health.HealthIndicator;
+
+// After (Spring Boot 4)
+import org.springframework.boot.health.contributor.Health;
+import org.springframework.boot.health.contributor.HealthIndicator;
+```
+
+The interface itself is unchanged — `HealthIndicator` is still a `@FunctionalInterface`
+returning `Health`, so an existing lambda keeps working once the import is fixed.
+
+**3. Nothing else changes.** Every `inference4j.*` property, bean name and default is
+identical to 0.10.x. If you do not override the health indicator, upgrading your Boot
+version is the only step.
+
+### If you cannot move to Spring Boot 4 yet
+
+Pin the starter to the last Boot 3 release and let it float independently of the rest:
+
+=== "Gradle"
+
+    ```groovy
+    implementation 'io.github.inference4j:inference4j-spring-boot-starter:0.10.1'
+    implementation 'io.github.inference4j:inference4j-core:${inference4jVersion}'
+    ```
+
+=== "Maven"
+
+    ```xml
+    <dependency>
+        <groupId>io.github.inference4j</groupId>
+        <artifactId>inference4j-spring-boot-starter</artifactId>
+        <version>0.10.1</version>
+    </dependency>
+    <dependency>
+        <groupId>io.github.inference4j</groupId>
+        <artifactId>inference4j-core</artifactId>
+        <version>${inference4jVersion}</version>
+    </dependency>
+    ```
+
+`inference4j-core` has no Spring dependency, so you can keep it current while the starter
+stays pinned. The 0.10.1 starter will not receive fixes.
 
 ## Tips
 
