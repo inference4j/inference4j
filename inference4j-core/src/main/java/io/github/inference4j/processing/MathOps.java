@@ -295,4 +295,55 @@ public final class MathOps {
         System.arraycopy(indices, 0, result, 0, k);
         return result;
     }
+
+    /**
+     * Returns the minimum and maximum of an array in a single pass.
+     *
+     * <p>Useful for dense outputs such as depth maps, where the value range is
+     * model-dependent and must be measured before it can be normalized for display.
+     *
+     * @param values the values to scan (must not be empty)
+     * @return a two-element array {@code {min, max}}
+     * @throws IllegalArgumentException if {@code values} is empty
+     */
+    public static float[] minMax(float[] values) {
+        if (values.length == 0) {
+            throw new IllegalArgumentException("Cannot compute min/max of an empty array");
+        }
+        float min = values[0];
+        float max = values[0];
+        for (int i = 1; i < values.length; i++) {
+            float v = values[i];
+            if (v < min) {
+                min = v;
+            }
+            else if (v > max) {
+                max = v;
+            }
+        }
+        return new float[]{min, max};
+    }
+
+    /**
+     * Rescales values linearly into the range {@code [0, 1]}.
+     *
+     * <p>When every value is identical the range is zero and there is no meaningful
+     * scaling, so all outputs are {@code 0}.
+     *
+     * @param values the values to normalize (must not be empty)
+     * @return a new array scaled to {@code [0, 1]}
+     * @throws IllegalArgumentException if {@code values} is empty
+     */
+    public static float[] minMaxNormalize(float[] values) {
+        float[] bounds = minMax(values);
+        float min = bounds[0];
+        float range = bounds[1] - min;
+        float[] result = new float[values.length];
+        if (range > 0f) {
+            for (int i = 0; i < values.length; i++) {
+                result[i] = (values[i] - min) / range;
+            }
+        }
+        return result;
+    }
 }

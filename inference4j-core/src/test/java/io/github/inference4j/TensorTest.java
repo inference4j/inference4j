@@ -108,6 +108,56 @@ class TensorTest {
     }
 
     @Test
+    void toFloats3D_reshapesCorrectly() {
+        float[] flat = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f};
+        Tensor tensor = Tensor.fromFloats(flat, new long[]{2, 2, 3});
+        float[][][] result = tensor.toFloats3D();
+        assertThat(result[0][0]).isEqualTo(new float[]{1f, 2f, 3f});
+        assertThat(result[0][1]).isEqualTo(new float[]{4f, 5f, 6f});
+        assertThat(result[1][0]).isEqualTo(new float[]{7f, 8f, 9f});
+        assertThat(result[1][1]).isEqualTo(new float[]{10f, 11f, 12f});
+    }
+
+    @Test
+    void toFloats3D_preservesDimensionOrder() {
+        // A [3][1][2] tensor and a [2][1][3] tensor hold the same flat data
+        // but must reshape differently — dimension order is not interpreted.
+        float[] flat = {1f, 2f, 3f, 4f, 5f, 6f};
+        assertThat(Tensor.fromFloats(flat, new long[]{3, 1, 2}).toFloats3D()[2][0])
+                .isEqualTo(new float[]{5f, 6f});
+        assertThat(Tensor.fromFloats(flat, new long[]{2, 1, 3}).toFloats3D()[1][0])
+                .isEqualTo(new float[]{4f, 5f, 6f});
+    }
+
+    @Test
+    void toFloats3D_composesWithSqueezeForBatchedOutput() {
+        // Model outputs carry a leading batch dimension: [1, 2, 3] → [2][3]
+        float[] flat = {1f, 2f, 3f, 4f, 5f, 6f};
+        Tensor batched = Tensor.fromFloats(flat, new long[]{1, 1, 2, 3});
+        float[][][] result = batched.squeeze(0).toFloats3D();
+        assertThat(result.length).isEqualTo(1);
+        assertThat(result[0].length).isEqualTo(2);
+        assertThat(result[0][0].length).isEqualTo(3);
+        assertThat(result[0][1]).isEqualTo(new float[]{4f, 5f, 6f});
+    }
+
+    @Test
+    void toFloats3D_throwsOnNon3DShape() {
+        Tensor tensor = Tensor.fromFloats(new float[]{1f, 2f, 3f, 4f}, new long[]{2, 2});
+        assertThatThrownBy(tensor::toFloats3D)
+                .isInstanceOf(TensorConversionException.class)
+                .satisfies(ex -> assertThat(ex.getMessage()).contains("3D"));
+    }
+
+    @Test
+    void toFloats3D_throwsOnNonFloatTensor() {
+        Tensor tensor = Tensor.fromLongs(new long[]{1L, 2L, 3L, 4L}, new long[]{1, 2, 2});
+        assertThatThrownBy(tensor::toFloats3D)
+                .isInstanceOf(TensorConversionException.class)
+                .satisfies(ex -> assertThat(ex.getMessage()).contains("FLOAT"));
+    }
+
+    @Test
     void shape_returnsDefensiveCopy() {
         long[] shape = {2, 3};
         Tensor tensor = Tensor.fromFloats(new float[6], shape);

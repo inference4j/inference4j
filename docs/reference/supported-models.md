@@ -40,6 +40,7 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Object Detection | `YoloV8Detector` | `inference4j/yolov8n` | ~25 MB | `ObjectDetector` |
 | Object Detection | `Yolo26Detector` | `inference4j/yolo26n` | ~25 MB | `ObjectDetector` |
 | Text Detection | `CraftTextDetector` | `inference4j/craft-mlt-25k` | ~80 MB | `TextDetector` |
+| Depth Estimation | `DepthAnythingEstimator` | `inference4j/depth-anything-v2-small` | ~95 MB | `DepthEstimator` |
 
 ## Multimodal
 
@@ -115,6 +116,7 @@ A comprehensive view of all supported models, organized by architecture:
 | YOLOv8n | N/A | `YoloV8Detector` | Object detection |
 | YOLO26n | N/A | `Yolo26Detector` | Object detection |
 | CRAFT | N/A | `CraftTextDetector` | Text detection in images |
+| Depth Anything V2 Small | N/A | `DepthAnythingEstimator` | Monocular depth estimation |
 
 ### Multimodal
 

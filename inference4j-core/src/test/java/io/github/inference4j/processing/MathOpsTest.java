@@ -522,4 +522,45 @@ class MathOpsTest {
         assertThat(result[0]).isNegative();
         assertThat(result[1]).isPositive();
     }
+
+    @Test
+    void minMax_findsBounds() {
+        assertThat(MathOps.minMax(new float[]{3f, -1f, 7f, 0f}))
+                .isEqualTo(new float[]{-1f, 7f});
+    }
+
+    @Test
+    void minMax_singleElement() {
+        assertThat(MathOps.minMax(new float[]{5f})).isEqualTo(new float[]{5f, 5f});
+    }
+
+    @Test
+    void minMax_throwsOnEmpty() {
+        assertThatThrownBy(() -> MathOps.minMax(new float[0]))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("empty");
+    }
+
+    @Test
+    void minMaxNormalize_scalesToUnitRange() {
+        float[] result = MathOps.minMaxNormalize(new float[]{10f, 20f, 30f});
+        assertThat(result[0]).isCloseTo(0f, within(1e-6f));
+        assertThat(result[1]).isCloseTo(0.5f, within(1e-6f));
+        assertThat(result[2]).isCloseTo(1f, within(1e-6f));
+    }
+
+    @Test
+    void minMaxNormalize_handlesNegativeValues() {
+        float[] result = MathOps.minMaxNormalize(new float[]{-4f, 0f, 4f});
+        assertThat(result[0]).isCloseTo(0f, within(1e-6f));
+        assertThat(result[1]).isCloseTo(0.5f, within(1e-6f));
+        assertThat(result[2]).isCloseTo(1f, within(1e-6f));
+    }
+
+    @Test
+    void minMaxNormalize_zeroRangeReturnsZeros() {
+        // Every value identical — there is no meaningful scaling to apply
+        assertThat(MathOps.minMaxNormalize(new float[]{7f, 7f, 7f}))
+                .containsExactly(0f, 0f, 0f);
+    }
 }

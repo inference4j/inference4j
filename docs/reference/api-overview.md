@@ -15,7 +15,7 @@
 | `io.github.inference4j.preprocessing.text` | `ModelConfig` (HuggingFace config.json parser) |
 | `io.github.inference4j.preprocessing.image` | Image transforms pipeline: `ImageTransformPipeline`, `ResizeTransform`, `CenterCropTransform`, `ImageLayout`, `Labels` |
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
-| `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `ImageEmbedder`, `ImageAnnotator` |
+| `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `DepthAnythingEstimator`, `ImageEmbedder`, `ImageAnnotator`, `TensorImages`, `Colormap` |
 | `io.github.inference4j.audio` | `Wav2Vec2Recognizer`, `SileroVadDetector` |
 | `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `NamedEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
@@ -56,6 +56,7 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 │   ├── TextDetector                    // detect(BufferedImage/Path) → List<TextRegion>
 │   └── VoiceActivityDetector           // detect(Path/float[]) → List<VoiceSegment>
 ├── NamedEntityRecognizer                // recognize(String) → List<NamedEntity>
+├── DepthEstimator                      // estimate(BufferedImage/Path) → DepthMap
 ├── TextEmbedder                        // encode(String) → float[]
 ├── ImageEmbedder                       // encode(BufferedImage/Path) → float[]
 ├── SearchReranker                      // score(String, String) → float
@@ -106,6 +107,7 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | `Detection` | `label()`, `classIndex()`, `confidence()`, `box()` | `YoloV8Detector`, `Yolo26Detector` |
 | `TextRegion` | `box()`, `confidence()` | `CraftTextDetector` |
 | `BoundingBox` | `x1()`, `y1()`, `x2()`, `y2()` | Embedded in `Detection`, `TextRegion` |
+| `DepthMap` | `values()`, `width()`, `height()`, `at()`, `min()`, `max()`, `toImage()` | `DepthAnythingEstimator` |
 | `Transcription` | `text()`, `segments()` | `Wav2Vec2Recognizer`, `WhisperSpeechModel` |
 | `VoiceSegment` | `start()`, `end()`, `duration()`, `confidence()` | `SileroVadDetector` |
 | `GenerationResult` | `text()`, `promptTokens()`, `generatedTokens()`, `duration()` | `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `TextGenerator`, `VisionLanguageModel` |

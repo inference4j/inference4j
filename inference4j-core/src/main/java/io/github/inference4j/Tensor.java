@@ -181,6 +181,47 @@ public class Tensor {
     }
 
     /**
+     * Returns this tensor's data as a 3D float array, reshaped according to the tensor's shape.
+     *
+     * <p>The returned array follows the tensor's dimension order exactly — no layout
+     * interpretation is applied. A {@code [3, 224, 224]} CHW tensor yields
+     * {@code [channel][row][col]}, while a {@code [224, 224, 3]} HWC tensor yields
+     * {@code [row][col][channel]}.
+     *
+     * <p>Model outputs usually carry a leading batch dimension, so combine this with
+     * {@link #squeeze(int)}:
+     * <pre>{@code
+     * // segmentation logits [1, numClasses, H, W] → [numClasses][H][W]
+     * float[][][] logits = outputs.get("logits").squeeze(0).toFloats3D();
+     * }</pre>
+     *
+     * @return a {@code [d0][d1][d2]} array
+     * @throws TensorConversionException if this is not a {@link TensorType#FLOAT} tensor
+     *                                   or the shape is not 3-dimensional
+     */
+    public float[][][] toFloats3D() {
+        if (type != TensorType.FLOAT) {
+            throw new TensorConversionException(
+                    "Cannot convert " + type + " tensor to FLOAT");
+        }
+        if (shape.length != 3) {
+            throw new TensorConversionException(
+                    "Cannot reshape to 3D: tensor has " + shape.length + " dimensions, expected 3D shape");
+        }
+        float[] flat = (float[]) data;
+        int d0 = (int) shape[0];
+        int d1 = (int) shape[1];
+        int d2 = (int) shape[2];
+        float[][][] result = new float[d0][d1][d2];
+        for (int i = 0; i < d0; i++) {
+            for (int j = 0; j < d1; j++) {
+                System.arraycopy(flat, (i * d1 + j) * d2, result[i][j], 0, d2);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Returns this tensor's data as a flat string array.
      *
      * @return a copy of the underlying string data
