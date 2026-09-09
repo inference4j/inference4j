@@ -113,6 +113,21 @@ both — 0.10.1 is the final Boot 3 release and remains on Maven Central, frozen
 Only the starter is affected. `inference4j-core` and every other module have no Spring
 dependency.
 
+### v0.12.0 — Depth Estimation
+
+- [x] **`Tensor.toFloats3D()`** — strict 3D reshape mirroring `toFloats2D()`, composing with
+      `squeeze()` for batched model output
+- [x] **`TensorImages`** — dense model output to `BufferedImage`: grayscale, RGB from CHW
+      planes, and colormapped rendering
+- [x] **`Colormap`** — grayscale, viridis and turbo ramps for visualizing dense output
+- [x] **`MathOps.minMax` / `minMaxNormalize`** — the spatial helpers dense output needs
+- [x] **Depth estimation** — `DepthEstimator`, `DepthMap`, and `DepthAnythingEstimator`
+      (Depth Anything V2 Small)
+
+The first four are the shared foundation for pixel-level tasks that `CLAUDE.md` had flagged
+as a prerequisite. Depth estimation is its first consumer; semantic segmentation and
+super-resolution are unblocked behind it.
+
 ## Next Up
 
 ### Tokenizers & LLMs
@@ -144,9 +159,11 @@ dependency.
 
 ### Pixel-level tasks
 
-- [ ] **`Tensor.toFloats3D()` + tensor-to-image utility** — one prerequisite unlocking depth
-      estimation (Depth Anything V2), semantic segmentation (SegFormer) and super-resolution
-      (Real-ESRGAN)
+The shared foundation shipped in v0.12.0, so both of these are now wrapper-level work.
+
+- [ ] **Semantic segmentation** — SegFormer. Needs a `SegmentationMask` result type and
+      per-pixel argmax; `CraftTextDetector.connectedComponents` is a promotion candidate
+- [ ] **Super-resolution** — Real-ESRGAN. Needs denormalization before `TensorImages.toRgb`
 
 ### Beyond
 

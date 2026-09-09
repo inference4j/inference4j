@@ -50,6 +50,7 @@ public class AllExamplesRunner {
 		examples.put("TextToSqlExample", TextToSqlExample::main);
 		examples.put("NamedEntityRecognitionExample", NamedEntityRecognitionExample::main);
 		examples.put("BgeEmbeddingExample", BgeEmbeddingExample::main);
+		examples.put("DepthEstimationExample", DepthEstimationExample::main);
 
 		List<String> failed = new ArrayList<>();
 

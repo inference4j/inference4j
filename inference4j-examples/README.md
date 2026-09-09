@@ -49,6 +49,9 @@ Sample images and audio files are bundled in `src/main/resources/fixtures/` — 
 
 # Text detection — detect text regions with CRAFT
 ./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.CraftTextDetectionExample
+
+# Depth estimation — predict per-pixel depth with Depth Anything V2
+./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.DepthEstimationExample
 ```
 
 ## Examples
@@ -66,3 +69,4 @@ Sample images and audio files are bundled in `src/main/resources/fixtures/` — 
 | `SpeechToTextExample` | Transcribes a WAV audio file to text using Wav2Vec2-CTC |
 | `VoiceActivityDetectionExample` | Detects speech segments in audio using Silero VAD |
 | `CraftTextDetectionExample` | Detects text regions in an image using CRAFT |
+| `DepthEstimationExample` | Estimates per-pixel depth with Depth Anything V2 and writes grayscale and colormapped depth images |

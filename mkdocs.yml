@@ -61,6 +61,7 @@ nav:
     - Speech-to-Text: use-cases/speech-to-text.md
     - Voice Activity Detection: use-cases/voice-activity-detection.md
     - Text Detection: use-cases/text-detection.md
+    - Depth Estimation: use-cases/depth-estimation.md
     - Visual Search: use-cases/visual-search.md
     - Summarization: use-cases/summarization.md
     - Translation: use-cases/translation.md
