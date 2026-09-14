@@ -32,6 +32,8 @@ public class Inference4jProperties {
 
 	private AudioProperties audio = new AudioProperties();
 
+	private MetricsProperties metrics = new MetricsProperties();
+
 	public NlpProperties getNlp() {
 		return nlp;
 	}
@@ -54,6 +56,14 @@ public class Inference4jProperties {
 
 	public void setAudio(AudioProperties audio) {
 		this.audio = audio;
+	}
+
+	public MetricsProperties getMetrics() {
+		return metrics;
+	}
+
+	public void setMetrics(MetricsProperties metrics) {
+		this.metrics = metrics;
 	}
 
 	public static class NlpProperties {
@@ -155,6 +165,20 @@ public class Inference4jProperties {
 
 		public void setVad(TaskProperties vad) {
 			this.vad = vad;
+		}
+
+	}
+
+	public static class MetricsProperties {
+
+		private boolean enabled = true;
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
 		}
 
 	}
