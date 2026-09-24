@@ -62,10 +62,13 @@ class Inference4jMetricsAutoConfigurationTest {
 	}
 
 	@Test
-	void routerMetricsDisabledViaProperty() {
+	void noOpMetricsWhenDisabledViaProperty() {
 		runner.withUserConfiguration(MeterRegistryConfig.class)
 			.withPropertyValues("inference4j.metrics.enabled=false")
-			.run(ctx -> assertThat(ctx).doesNotHaveBean(RouterMetrics.class));
+			.run(ctx -> {
+				assertThat(ctx).hasSingleBean(RouterMetrics.class);
+				assertThat(ctx.getBean(RouterMetrics.class)).isSameAs(NoOpRouterMetrics.getInstance());
+			});
 	}
 
 	@Test

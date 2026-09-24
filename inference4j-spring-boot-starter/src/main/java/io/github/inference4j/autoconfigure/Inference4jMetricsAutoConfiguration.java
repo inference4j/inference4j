@@ -20,12 +20,13 @@ import io.github.inference4j.metrics.RouterMetrics;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
 /**
  * Auto-configuration for a {@link RouterMetrics} bean, falling back to a {@link NoOpRouterMetrics}.
+ * Unconditional on {@code inference4j.metrics.enabled} -- that property only gates the
+ * Micrometer-backed bean, so disabling it still leaves a {@link RouterMetrics} bean available.
  */
 @AutoConfiguration
 @EnableConfigurationProperties(Inference4jProperties.class)
@@ -33,7 +34,6 @@ public class Inference4jMetricsAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean(RouterMetrics.class)
-	@ConditionalOnProperty(prefix = "inference4j.metrics", name = "enabled", matchIfMissing = true)
 	public RouterMetrics routerMetrics() {
 		return NoOpRouterMetrics.getInstance();
 	}
