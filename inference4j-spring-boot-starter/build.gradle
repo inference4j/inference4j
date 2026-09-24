@@ -6,12 +6,15 @@ ext {
 
 dependencies {
     api project(':inference4j-core')
+    api project(':inference4j-runtime')
 
     compileOnly "org.springframework.boot:spring-boot-autoconfigure:${springBootVersion}"
     compileOnly "org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}"
+    compileOnly 'io.micrometer:micrometer-core:1.14.4'
 
     annotationProcessor "org.springframework.boot:spring-boot-configuration-processor:${springBootVersion}"
 
     testImplementation "org.springframework.boot:spring-boot-starter-test:${springBootVersion}"
     testImplementation "org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}"
+    testImplementation 'io.micrometer:micrometer-core:1.14.4'
 }
