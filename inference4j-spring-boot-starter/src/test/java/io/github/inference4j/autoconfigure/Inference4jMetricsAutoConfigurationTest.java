@@ -24,6 +24,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,12 +33,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class Inference4jMetricsAutoConfigurationTest {
 
-	private final ApplicationContextRunner runner = new ApplicationContextRunner()
-		.withConfiguration(AutoConfigurations.of(Inference4jMetricsAutoConfiguration.class));
+	private final ApplicationContextRunner runner = new ApplicationContextRunner().withConfiguration(
+			AutoConfigurations.of(Inference4jMicrometerMetricsAutoConfiguration.class, Inference4jMetricsAutoConfiguration.class));
 
 	@Test
 	void noOpMetricsWhenNoMeterRegistry() {
 		runner.run(ctx -> {
+			assertThat(ctx).hasSingleBean(RouterMetrics.class);
+			assertThat(ctx.getBean(RouterMetrics.class)).isSameAs(NoOpRouterMetrics.getInstance());
+		});
+	}
+
+	@Test
+	void noOpMetricsWhenMicrometerAbsentFromClasspath() {
+		runner.withClassLoader(new FilteredClassLoader(MeterRegistry.class)).run(ctx -> {
 			assertThat(ctx).hasSingleBean(RouterMetrics.class);
 			assertThat(ctx.getBean(RouterMetrics.class)).isSameAs(NoOpRouterMetrics.getInstance());
 		});

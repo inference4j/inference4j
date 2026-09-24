@@ -15,27 +15,31 @@
  */
 package io.github.inference4j.autoconfigure;
 
-import io.github.inference4j.metrics.NoOpRouterMetrics;
+import io.github.inference4j.metrics.MicrometerRouterMetrics;
 import io.github.inference4j.metrics.RouterMetrics;
 
+import io.micrometer.core.instrument.MeterRegistry;
+
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
 /**
- * Auto-configuration for a {@link RouterMetrics} bean, falling back to a {@link NoOpRouterMetrics}.
+ * Auto-configuration for a Micrometer-backed {@link RouterMetrics} bean.
  */
-@AutoConfiguration
-@EnableConfigurationProperties(Inference4jProperties.class)
-public class Inference4jMetricsAutoConfiguration {
+@AutoConfiguration(before = Inference4jMetricsAutoConfiguration.class)
+@ConditionalOnClass(MeterRegistry.class)
+public class Inference4jMicrometerMetricsAutoConfiguration {
 
 	@Bean
+	@ConditionalOnBean(MeterRegistry.class)
 	@ConditionalOnMissingBean(RouterMetrics.class)
 	@ConditionalOnProperty(prefix = "inference4j.metrics", name = "enabled", matchIfMissing = true)
-	public RouterMetrics routerMetrics() {
-		return NoOpRouterMetrics.getInstance();
+	public RouterMetrics routerMetrics(MeterRegistry registry) {
+		return new MicrometerRouterMetrics(registry);
 	}
 
 }
