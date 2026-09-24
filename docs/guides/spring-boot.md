@@ -61,6 +61,7 @@ inference4j:
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
+| `inference4j.metrics.enabled` | `boolean` | `true` | Use a Micrometer-backed `RouterMetrics` when a `MeterRegistry` is present. When `false`, or when Micrometer is absent, `RouterMetrics` falls back to a no-op instead of being removed |
 | `inference4j.nlp.text-classifier.enabled` | `boolean` | `false` | Enable DistilBERT text classifier |
 | `inference4j.nlp.text-classifier.model-id` | `String` | `inference4j/distilbert-base-uncased-finetuned-sst-2-english` | Model ID |
 | `inference4j.nlp.text-embedder.enabled` | `boolean` | `false` | Enable SentenceTransformer embedder |
