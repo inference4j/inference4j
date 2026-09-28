@@ -1,0 +1,63 @@
+description = 'SPIKE: LLM generation for inference4j backed by the ModelJars runtime (Java 25)'
+
+// ModelJars' runtime (Integrallis Models) requires Java 25 and the incubating Vector API.
+// This module alone moves to 25; inference4j-core stays on 17.
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+def modeljarsJvmArgs = ['--add-modules=jdk.incubator.vector', '--enable-native-access=ALL-UNNAMED']
+
+dependencies {
+    api 'org.modeljars:modeljars:0.1.54'
+    implementation project(':inference4j-core')
+
+    testRuntimeOnly 'org.modeljars.huggingface:qwen.qwen2.5-0.5b-instruct-gguf.q4_k_m:2.5.0-q4_k_m.1'
+}
+
+tasks.withType(Test).configureEach {
+    jvmArgs modeljarsJvmArgs
+}
+
+tasks.withType(JavaExec).configureEach {
+    jvmArgs modeljarsJvmArgs
+}
+
+// Spike-only: side-by-side benchmark against the onnxruntime-genai TextGenerator
+sourceSets {
+    spike {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+configurations {
+    spikeImplementation.extendsFrom implementation
+    spikeRuntimeOnly.extendsFrom runtimeOnly
+}
+
+dependencies {
+    spikeImplementation project(':inference4j-genai')
+    spikeImplementation project(':inference4j-core')
+    spikeRuntimeOnly 'org.modeljars.huggingface:bartowski.deepseek-r1-distill-qwen-1.5b-gguf.q4_k_m:1.0.0-q4_k_m.1'
+    spikeRuntimeOnly 'org.modeljars.huggingface:qwen.qwen2.5-0.5b-instruct-gguf.q4_k_m:2.5.0-q4_k_m.1'
+    spikeRuntimeOnly 'org.slf4j:slf4j-simple:2.0.16'
+}
+
+tasks.register('spikeBenchmark', JavaExec) {
+    description = 'Compares ModelJarsTextGenerator against the genai TextGenerator'
+    group = 'spike'
+    classpath = sourceSets.spike.runtimeClasspath
+    mainClass = 'io.github.inference4j.modeljars.spike.GenerationBenchmark'
+    args = project.findProperty('benchArgs')?.toString()?.split(' ')?.toList() ?: []
+}
+
+tasks.register('spikeDiagnose', JavaExec) {
+    group = 'spike'
+    classpath = sourceSets.spike.runtimeClasspath
+    mainClass = 'io.github.inference4j.modeljars.spike.Diagnose'
+}
