@@ -1,3 +1,5 @@
+io.github.inference4j.autoconfigure.Inference4jMicrometerMetricsAutoConfiguration
+io.github.inference4j.autoconfigure.Inference4jMetricsAutoConfiguration
 io.github.inference4j.autoconfigure.Inference4jNlpAutoConfiguration
 io.github.inference4j.autoconfigure.Inference4jVisionAutoConfiguration
 io.github.inference4j.autoconfigure.Inference4jAudioAutoConfiguration
