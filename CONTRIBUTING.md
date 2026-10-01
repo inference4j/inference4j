@@ -67,7 +67,7 @@ Every new model must include a runnable example in `inference4j-examples`. The e
 
 ## Getting Started
 
-**Requirements:** Java 17+, Gradle 9.2.1 (use the included wrapper).
+**Requirements:** Java 17+, Gradle 9.7.1 (use the included wrapper).
 
 ```bash
 ./gradlew build          # Build all modules and run tests
