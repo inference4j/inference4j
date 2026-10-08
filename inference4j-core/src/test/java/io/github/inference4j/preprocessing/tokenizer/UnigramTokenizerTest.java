@@ -23,6 +23,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -166,5 +168,50 @@ class UnigramTokenizerTest {
 		// Empty string produces no tokens (consistent with SentencePiece BPE behavior)
 		EncodedInput result = tokenizer.encode("", 512);
 		assertThat(result.inputIds().length).isEqualTo(0);
+	}
+
+	// --- Models without byte-fallback tokens (e.g. T5, punctuation restoration) ---
+	// Expected IDs mirror SentencePiece: a run of unmapped characters becomes a single unk.
+
+	private static UnigramTokenizer noByteFallbackTokenizer(int unkId) {
+		Map<String, Integer> vocab = new LinkedHashMap<>();
+		vocab.put("<unk>", 0);
+		vocab.put("\u2581", 1);
+		vocab.put("\u2581na", 2);
+		vocab.put("ve", 3);
+		vocab.put("\u2581text", 4);
+		vocab.put("<extra_unk>", 5);
+		float[] scores = {0f, -3f, -5f, -5f, -5f, 0f};
+		return UnigramTokenizer.builder().vocab(vocab).scores(scores).unkId(unkId).build();
+	}
+
+	@Test
+	void encode_noByteFallback_unknownCharBecomesUnk() {
+		EncodedInput result = noByteFallbackTokenizer(0).encode("na\u00efve", 512);
+		assertThat(result.inputIds()).containsExactly(2L, 0L, 3L);
+	}
+
+	@Test
+	void encode_noByteFallback_runOfUnknownCharsBecomesSingleUnk() {
+		EncodedInput result = noByteFallbackTokenizer(0).encode("\u00ef\u00ef", 512);
+		assertThat(result.inputIds()).containsExactly(1L, 0L);
+	}
+
+	@Test
+	void encode_noByteFallback_unknownRunsSeparatedBySpaceEachGetUnk() {
+		EncodedInput result = noByteFallbackTokenizer(0).encode("\u00ef \u00ef", 512);
+		assertThat(result.inputIds()).containsExactly(1L, 0L, 1L, 0L);
+	}
+
+	@Test
+	void encode_noByteFallback_supplementaryAndCjkCharsBecomeSingleUnk() {
+		EncodedInput result = noByteFallbackTokenizer(0).encode("\u65e5\u672c\ud83d\ude00 text", 512);
+		assertThat(result.inputIds()).containsExactly(1L, 0L, 4L);
+	}
+
+	@Test
+	void encode_noByteFallback_usesConfiguredUnkId() {
+		EncodedInput result = noByteFallbackTokenizer(5).encode("na\u00efve", 512);
+		assertThat(result.inputIds()).containsExactly(2L, 5L, 3L);
 	}
 }
