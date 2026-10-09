@@ -16,6 +16,8 @@
 
 package io.github.inference4j.nlp;
 
+import io.github.inference4j.exception.InputTooLongException;
+import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.generation.GenerationResult;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -122,6 +124,34 @@ class BartSummarizerModelTest {
             GenerationResult result = summarizer.summarize(ARTICLE, token -> {});
 
             assertThat(result.generatedTokens() <= 30).as("Should generate at most 30 tokens, got: " + result.generatedTokens()).isTrue();
+        }
+    }
+
+    // BART has 1024 positions; input used to be cut silently at the tokenizer's 512 default
+    private static final String LONG_ARTICLE =
+            "The city council approved a new budget for public transport and road repairs. ".repeat(60);
+
+    @Test
+    void acceptsInputBeyond512Tokens() throws Exception {
+        try (var summarizer = BartSummarizer.distilBartCnn()
+                .maxNewTokens(30)
+                .truncation(TruncationPolicy.FAIL)
+                .build()) {
+            GenerationResult result = summarizer.summarize(LONG_ARTICLE, token -> {});
+
+            assertThat(result.promptTokens()).isBetween(513, 1024);
+            assertThat(result.text()).isNotBlank();
+        }
+    }
+
+    @Test
+    void failPolicyRejectsInputBeyondModelLimit() throws Exception {
+        try (var summarizer = BartSummarizer.distilBartCnn()
+                .maxNewTokens(30)
+                .truncation(TruncationPolicy.FAIL)
+                .build()) {
+            assertThatThrownBy(() -> summarizer.summarize(LONG_ARTICLE.repeat(3), token -> {}))
+                    .isInstanceOf(InputTooLongException.class);
         }
     }
 }

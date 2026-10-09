@@ -25,6 +25,8 @@ import io.github.inference4j.generation.EncoderDecoderSession;
 import io.github.inference4j.generation.GenerationEngine;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.TruncationGuard;
+import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.tokenizer.TokenDecoder;
 import io.github.inference4j.tokenizer.Tokenizer;
@@ -63,6 +65,8 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
     final Set<Integer> eosTokenIds = new LinkedHashSet<>();
     final List<String> addedTokens = new ArrayList<>();
     final List<String> extraFiles = new ArrayList<>();
+    Integer maxInputLength;
+    TruncationPolicy truncation;
 
     @SuppressWarnings("unchecked")
     private B self() {
@@ -110,6 +114,24 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
 
     public B topP(float topP) {
         this.topP = topP;
+        return self();
+    }
+
+    /**
+     * Maximum input length in tokens. Defaults to the model's limit from {@code config.json}
+     * ({@code max_position_embeddings} or {@code n_positions}; 512 for T5).
+     */
+    public B maxInputLength(int maxInputLength) {
+        this.maxInputLength = maxInputLength;
+        return self();
+    }
+
+    /**
+     * What to do with input longer than {@link #maxInputLength(int)}. Defaults to
+     * {@link TruncationPolicy#TRUNCATE}, which keeps the first tokens and logs a warning.
+     */
+    public B truncation(TruncationPolicy truncation) {
+        this.truncation = truncation;
         return self();
     }
 
@@ -204,6 +226,10 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
                     .tokenizer(tokenizer)
                     .decoder(decoder)
                     .appendEosToInput(true)
+                    .maxInputLength(maxInputLength != null
+                            ? maxInputLength
+                            : ModelInputLimits.maxPositions(configPath).orElse(Integer.MAX_VALUE))
+                    .truncationGuard(new TruncationGuard(taskName(), truncation))
                     .maxNewTokens(this.maxNewTokens)
                     .temperature(this.temperature)
                     .topK(this.topK)
@@ -223,6 +249,11 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
             }
             throw new ModelLoadException("Failed to initialize model: " + e.getMessage(), e);
         }
+    }
+
+    private String taskName() {
+        Class<?> wrapper = getClass().getEnclosingClass();
+        return wrapper != null ? wrapper.getSimpleName() : getClass().getSimpleName();
     }
 
     private record ModelConfig(int decoderStartTokenId, Set<Integer> eosTokenIds) {}

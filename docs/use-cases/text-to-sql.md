@@ -105,6 +105,16 @@ sqlGen.generateSql("What is the average salary?", schema);
 | `.topK(int)` | `int` | `0` (disabled) | Top-K sampling |
 | `.topP(float)` | `float` | `0.0` (disabled) | Nucleus sampling |
 | `.eosTokenId(int)` | `int` | Auto-detected | End-of-sequence token ID |
+| `.maxInputLength(int)` | `int` | Model limit from `config.json` | Maximum input length in tokens (query and schema combined) |
+| `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Longer input: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
+
+## Input length
+
+| Model | Default limit | When exceeded | Long-input strategies |
+|-------|---------------|---------------|-----------------------|
+| T5 presets | 512 tokens (the length T5 was trained on), query and schema combined | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
+
+Large schemas count toward the limit. Use `FAIL` to detect when a schema no longer fits, rather than silently losing its last tables.
 
 ## Result type
 
