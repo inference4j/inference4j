@@ -22,8 +22,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -113,5 +116,25 @@ class InferenceSessionTest {
         assertThatThrownBy(() -> InferenceSession.create(tempFile, options))
                 .isInstanceOf(ModelLoadException.class)
                 .satisfies(ex -> assertThat(ex.getMessage()).contains(tempFile.toString()));
+    }
+
+    @Test
+    void run_booleanInputAndOutput_roundTrip() throws URISyntaxException {
+        // test-bool-not.onnx: y = Not(x), x and y are BOOL [batch, n]
+        Path model = Path.of(Objects.requireNonNull(
+                InferenceSessionTest.class.getResource("/test-bool-not.onnx")).toURI());
+
+        try (InferenceSession session = InferenceSession.create(model)) {
+            assertThat(session.inputType("x")).isEqualTo(TensorType.BOOL);
+
+            Map<String, Tensor> outputs = session.run(Map.of("x",
+                    Tensor.fromBooleans(new boolean[]{true, false, false, true, true, false},
+                            new long[]{2, 3})));
+
+            Tensor y = outputs.get("y");
+            assertThat(y.type()).isEqualTo(TensorType.BOOL);
+            assertThat(y.shape()).isEqualTo(new long[]{2, 3});
+            assertThat(y.toBooleans()).containsExactly(false, true, true, false, false, true);
+        }
     }
 }

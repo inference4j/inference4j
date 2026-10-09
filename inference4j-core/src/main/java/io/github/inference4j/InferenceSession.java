@@ -189,7 +189,8 @@ public class InferenceSession implements AutoCloseable {
                 case FLOAT16, BFLOAT16 -> TensorType.FLOAT16;
                 case INT64 -> TensorType.LONG;
                 case INT32 -> TensorType.INT;
-                case INT8, UINT8, BOOL -> TensorType.BYTE;
+                case INT8, UINT8 -> TensorType.BYTE;
+                case BOOL -> TensorType.BOOL;
                 case DOUBLE -> TensorType.DOUBLE;
                 case STRING -> TensorType.STRING;
                 default -> throw new InferenceException(
@@ -295,6 +296,16 @@ public class InferenceSession implements AutoCloseable {
             }
             case STRING -> OnnxTensor.createTensor(environment,
                     (String[]) tensor.rawData(), tensor.shape());
+            case BOOL -> {
+                boolean[] data = (boolean[]) tensor.rawData();
+                ByteBuffer bb = bufferPool.lease(data.length);
+                leasedBuffers.add(bb);
+                for (boolean value : data) {
+                    bb.put(value ? (byte) 1 : (byte) 0);
+                }
+                bb.flip();
+                yield OnnxTensor.createTensor(environment, bb, tensor.shape(), OnnxJavaType.BOOL);
+            }
             default -> throw new TensorConversionException(
                     "Unsupported tensor type for ONNX conversion: " + tensor.type());
         };
@@ -323,17 +334,23 @@ public class InferenceSession implements AutoCloseable {
                 buffer.get(data);
                 yield Tensor.fromLongs(data, shape);
             }
+            case BOOL -> {
+                ByteBuffer buffer = onnxTensor.getByteBuffer();
+                boolean[] data = new boolean[buffer.remaining()];
+                for (int i = 0; i < data.length; i++) {
+                    data[i] = buffer.get() != 0;
+                }
+                yield Tensor.fromBooleans(data, shape);
+            }
             case STRING -> {
                 try {
                     String[] data = (String[]) onnxTensor.getValue();
                     yield Tensor.fromStrings(data, shape);
                 } catch (OrtException e) {
-                    throw new TensorConversionException(
-                            "Failed to read STRING tensor: " + e.getMessage(), e);
+                    throw new TensorConversionException("Failed to read STRING tensor: " + e.getMessage(), e);
                 }
             }
-            default -> throw new TensorConversionException(
-                    "Unsupported ONNX tensor type: " + info.type);
+            default -> throw new TensorConversionException("Unsupported ONNX tensor type: " + info.type);
         };
     }
 
