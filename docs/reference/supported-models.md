@@ -10,6 +10,7 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Named Entity Recognition | `BertNerRecognizer` | `inference4j/distilbert-NER` | ~260 MB | `NamedEntityRecognizer` |
 | Named Entity Recognition | `BertNerRecognizer` | `inference4j/bert-base-NER` | ~431 MB | `NamedEntityRecognizer` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/all-MiniLM-L6-v2` | ~90 MB | `TextEmbedder` |
+| Punctuation & Casing | `PunctCapSegModel` | `inference4j/punctuation-fullstop-truecase-english` | ~210 MB | `InferenceTask<String, List<String>>` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/all-mpnet-base-v2` | ~430 MB | `TextEmbedder` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/bge-base-en-v1.5` | ~430 MB | `TextEmbedder` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/gte-base` | ~430 MB | `TextEmbedder` |
@@ -84,6 +85,7 @@ A comprehensive view of all supported models, organized by architecture:
 | BGE Base EN v1.5 | WordPiece | `SentenceTransformerEmbedder` | Semantic search, embeddings |
 | GTE Base | WordPiece | `SentenceTransformerEmbedder` | Semantic search, embeddings |
 | MiniLM-L-6 MS MARCO | WordPiece | `MiniLMSearchReranker` | Search reranking |
+| Punct-Cap-Seg English | SentencePiece Unigram | `PunctCapSegModel` | Punctuation, true-casing, sentence segmentation |
 
 ### Decoder-only (autoregressive)
 

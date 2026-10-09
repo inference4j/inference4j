@@ -44,6 +44,21 @@ try (var recognizer = Wav2Vec2Recognizer.builder().build()) {
 }
 ```
 
+## Readable transcripts
+
+Wav2Vec2 returns upper-case text with no punctuation. Wrap the recognizer in `PunctuatedSpeechRecognizer` to restore punctuation, casing and sentence boundaries:
+
+```java
+try (SpeechRecognizer recognizer = new PunctuatedSpeechRecognizer(
+        Wav2Vec2Recognizer.builder().build(),
+        PunctCapSegModel.builder().build())) {
+    System.out.println(recognizer.transcribe(Path.of("speech.wav")).text());
+    // "Marie Curie moved to Paris." instead of "MARIE CURIE MOVED TO PARIS"
+}
+```
+
+See [Punctuation & Casing](punctuation-and-casing.md) for details and input limits.
+
 ## Builder options
 
 | Method | Type | Default | Description |
@@ -88,5 +103,6 @@ The pipeline:
 ## Tips
 
 - The default model (`wav2vec2-base-960h`) is trained on English LibriSpeech data. For other languages, use an appropriate fine-tuned model.
+- Wav2Vec2 output is upper-case and unpunctuated. Use [`PunctuatedSpeechRecognizer`](punctuation-and-casing.md) for readable text, or before running cased models such as [NER](named-entity-recognition.md).
 - Wav2Vec2 works best with clean speech. For noisy audio, consider preprocessing with VAD to extract speech segments first — see [Voice Activity Detection](voice-activity-detection.md).
 - This is a CTC model (single-pass), not an autoregressive model. It's fast but may be less accurate on complex audio. For multilingual support or translation, see [Whisper](../generative-ai/whisper.md).
