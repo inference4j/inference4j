@@ -23,5 +23,6 @@ public enum TensorType {
     INT,
     LONG,
     BYTE,
-    STRING
+    STRING,
+    BOOL
 }

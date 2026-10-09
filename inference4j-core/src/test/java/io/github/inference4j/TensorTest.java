@@ -219,4 +219,62 @@ class TensorTest {
         data[0] = "modified";
         assertThat(tensor.toStrings()).isEqualTo(new String[]{"hello", "world"});
     }
+
+    @Test
+    void fromBooleansCreatesWithCorrectShapeAndType() {
+        Tensor tensor = Tensor.fromBooleans(new boolean[]{true, false, true}, new long[]{1, 3});
+        assertThat(tensor.shape()).isEqualTo(new long[]{1, 3});
+        assertThat(tensor.type()).isEqualTo(TensorType.BOOL);
+    }
+
+    @Test
+    void fromBooleansThrowsOnShapeMismatch() {
+        assertThatThrownBy(() -> Tensor.fromBooleans(new boolean[]{true, false}, new long[]{3}))
+                .isInstanceOf(TensorConversionException.class);
+    }
+
+    @Test
+    void toBooleansReturnsDataCopy() {
+        Tensor tensor = Tensor.fromBooleans(new boolean[]{true, false}, new long[]{2});
+        boolean[] values = tensor.toBooleans();
+        values[0] = false;
+        assertThat(tensor.toBooleans()).containsExactly(true, false);
+    }
+
+    @Test
+    void fromBooleansMakesDefensiveCopyOfInput() {
+        boolean[] data = {true, false};
+        Tensor tensor = Tensor.fromBooleans(data, new long[]{2});
+        data[0] = false;
+        assertThat(tensor.toBooleans()).containsExactly(true, false);
+    }
+
+    @Test
+    void toBooleansThrowsOnTypeMismatch() {
+        Tensor tensor = Tensor.fromLongs(new long[]{1}, new long[]{1});
+        assertThatThrownBy(tensor::toBooleans)
+                .isInstanceOf(TensorConversionException.class)
+                .hasMessageContaining("BOOL");
+    }
+
+    @Test
+    void toLongsThrowsOnBooleanTensor() {
+        Tensor tensor = Tensor.fromBooleans(new boolean[]{true}, new long[]{1});
+        assertThatThrownBy(tensor::toLongs).isInstanceOf(TensorConversionException.class);
+    }
+
+    @Test
+    void booleanTensorSqueezeAndSlice() {
+        // shape [1, 2, 3]: rows {T,F,T} and {F,F,T}
+        Tensor tensor = Tensor.fromBooleans(
+                new boolean[]{true, false, true, false, false, true}, new long[]{1, 2, 3});
+
+        Tensor squeezed = tensor.squeeze(0);
+        assertThat(squeezed.shape()).isEqualTo(new long[]{2, 3});
+
+        Tensor secondRow = squeezed.slice(0, 1);
+        assertThat(secondRow.type()).isEqualTo(TensorType.BOOL);
+        assertThat(secondRow.shape()).isEqualTo(new long[]{3});
+        assertThat(secondRow.toBooleans()).containsExactly(false, false, true);
+    }
 }

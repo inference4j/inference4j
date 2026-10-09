@@ -106,6 +106,19 @@ public class Tensor {
         return new Tensor(data.clone(), shape, TensorType.LONG);
     }
 
+    /**
+     * Creates a boolean tensor with the given data and shape.
+     *
+     * @param data  flat array of boolean values
+     * @param shape the tensor dimensions (e.g., {@code {1, 128}})
+     * @return a new boolean tensor
+     * @throws TensorConversionException if data length does not match the shape
+     */
+    public static Tensor fromBooleans(boolean[] data, long[] shape) {
+        validateShape(data.length, shape);
+        return new Tensor(data.clone(), shape, TensorType.BOOL);
+    }
+
     /** Returns a copy of this tensor's shape. */
     public long[] shape() {
         return shape.clone();
@@ -152,6 +165,20 @@ public class Tensor {
                     "Cannot convert " + type + " tensor to LONG");
         }
         return ((long[]) data).clone();
+    }
+
+    /**
+     * Returns this tensor's data as a flat boolean array.
+     *
+     * @return a copy of the underlying boolean data
+     * @throws TensorConversionException if this is not a {@link TensorType#BOOL} tensor
+     */
+    public boolean[] toBooleans() {
+        if (type != TensorType.BOOL) {
+            throw new TensorConversionException(
+                    "Cannot convert " + type + " tensor to BOOL");
+        }
+        return ((boolean[]) data).clone();
     }
 
     /**
@@ -394,6 +421,17 @@ public class Tensor {
                             innerSize);
                 }
                 yield new Tensor(dst, newShape, TensorType.STRING);
+            }
+            case BOOL -> {
+                boolean[] src = (boolean[]) data;
+                boolean[] dst = new boolean[outerSize * innerSize];
+                for (int outer = 0; outer < outerSize; outer++) {
+                    System.arraycopy(
+                            src, outer * axisSize * innerSize + index * innerSize,
+                            dst, outer * innerSize,
+                            innerSize);
+                }
+                yield new Tensor(dst, newShape, TensorType.BOOL);
             }
             default -> throw new TensorConversionException(
                     "Unsupported tensor type for slice: " + type);

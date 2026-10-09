@@ -128,6 +128,17 @@ The first four are the shared foundation for pixel-level tasks that `CLAUDE.md` 
 as a prerequisite. Depth estimation is its first consumer; semantic segmentation and
 super-resolution are unblocked behind it.
 
+### Unreleased — Readable transcripts
+
+- [x] **Punctuation, casing & sentence segmentation** — `PunctCapSegModel` restores
+      punctuation, true-casing (including acronyms) and sentence boundaries in one pass
+- [x] **`PunctuatedSpeechRecognizer`** — decorates any `SpeechRecognizer`, turning Wav2Vec2's
+      upper-case, unpunctuated output into readable sentences
+- [x] **Boolean tensors** — `Tensor.fromBooleans` / `toBooleans`, with BOOL support in
+      `InferenceSession`
+- [x] **`UnigramTokenizer` fixes** — unmapped characters now map to `unk` (they were silently
+      dropped for T5-family models), and empty input produces no tokens
+
 ## Next Up
 
 ### Tokenizers & LLMs
@@ -195,7 +206,8 @@ The shared foundation shipped in v0.12.0, so both of these are now wrapper-level
 | Text | CoEdIT (grammar correction) | Done |
 | Text | BERT NER (named entity recognition) | v0.10.0 |
 | Text | BGE / GTE / E5 (improved embeddings) | v0.10.0 |
-| Text | Tiktoken LLM | v0.11.0 |
+| Text | Tiktoken LLM | Deferred |
+| Text | Punctuation, casing & segmentation (punct-cap-seg) | Unreleased |
 | Vision | ResNet | Done |
 | Vision | EfficientNet | Done |
 | Vision | YOLOv8 / YOLO11 | Done |
@@ -207,5 +219,6 @@ The shared foundation shipped in v0.12.0, so both of these are now wrapper-level
 | Vision | Stable Diffusion (text-to-image) | Beyond — feasibility study |
 | Audio | Wav2Vec2-CTC (speech-to-text) | Done |
 | Audio | Silero VAD (voice activity detection) | Done |
-| Audio | Piper TTS (text-to-speech) | v0.12.0 |
-| Audio | Whisper (autoregressive speech-to-text) | Beyond — feasibility study |
+| Audio | Kokoro TTS (text-to-speech, replaces Piper) | Next |
+| Audio | Moonshine (speech-to-text) | Next |
+| Audio | Whisper (autoregressive speech-to-text) | Done via inference4j-genai; native — Beyond |

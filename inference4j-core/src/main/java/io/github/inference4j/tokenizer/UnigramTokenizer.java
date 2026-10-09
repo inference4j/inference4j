@@ -45,7 +45,9 @@ import java.util.regex.Pattern;
  *   <li>Prepend {@code ▁} and replace all spaces with {@code ▁}</li>
  *   <li>Split on added tokens (special tokens preserved atomically)</li>
  *   <li>For non-special segments: run Viterbi to find optimal segmentation</li>
- *   <li>Unmapped characters → UTF-8 bytes → {@code <0xNN>} token IDs</li>
+ *   <li>Unmapped characters → UTF-8 bytes → {@code <0xNN>} token IDs; models without
+ *       byte-fallback tokens emit a single {@code unk} ID per run of unmapped characters,
+ *       matching SentencePiece</li>
  * </ol>
  *
  * <h2>Decoding</h2>
@@ -75,6 +77,8 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 	private final int maxTokenLength;
 
 	private final int[] byteFallbackIds;
+	private final boolean hasByteFallback;
+	private final int unkId;
 
 	private final ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream();
 
@@ -82,6 +86,7 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 		this.vocab = builder.vocab;
 		this.scores = builder.scores;
 		this.defaultMaxLength = builder.defaultMaxLength;
+		this.unkId = builder.unkId;
 
 		int maxLen = 0;
 		for (String token : vocab.keySet()) {
@@ -96,13 +101,16 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 
 		this.byteFallbackIds = new int[256];
 		Arrays.fill(byteFallbackIds, -1);
+		boolean anyByteToken = false;
 		for (int b = 0; b < 256; b++) {
 			String token = String.format("<0x%02X>", b);
 			Integer id = vocab.get(token);
 			if (id != null) {
 				byteFallbackIds[b] = id;
+				anyByteToken = true;
 			}
 		}
+		this.hasByteFallback = anyByteToken;
 
 		if (builder.addedTokens.isEmpty()) {
 			this.addedTokenMap = Map.of();
@@ -287,6 +295,9 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 
 	private List<Integer> tokenize(String text) {
 		List<Integer> tokenIds = new ArrayList<>();
+		if (text.isEmpty()) {
+			return tokenIds; // as in SentencePiece; the ▁ prefix must not become a token on its own
+		}
 
 		if (addedTokenPattern != null) {
 			Matcher addedMatcher = addedTokenPattern.matcher(text);
@@ -379,7 +390,11 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 
 		// Backtrack to recover optimal token sequence
 		if (bestScore[len] == Float.NEGATIVE_INFINITY) {
-			encodeByteFallback(text, tokenIds);
+			if (hasByteFallback) {
+				encodeByteFallback(text, tokenIds);
+			} else {
+				tokenIds.add(unkId);
+			}
 			return;
 		}
 
@@ -391,11 +406,19 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 		}
 		Collections.reverse(path);
 
+		boolean previousWasUnknown = false;
 		for (int[] seg : path) {
 			if (seg[2] >= 0) {
 				tokenIds.add(seg[2]);
-			} else {
+				previousWasUnknown = false;
+			} else if (hasByteFallback) {
 				encodeByteFallback(text.substring(seg[0], seg[1]), tokenIds);
+			} else {
+				// No byte tokens: a run of unmapped characters becomes one unk, as in SentencePiece
+				if (!previousWasUnknown) {
+					tokenIds.add(unkId);
+				}
+				previousWasUnknown = true;
 			}
 		}
 	}

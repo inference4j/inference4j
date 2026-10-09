@@ -59,6 +59,7 @@ nav:
     - Image Classification: use-cases/image-classification.md
     - Object Detection: use-cases/object-detection.md
     - Speech-to-Text: use-cases/speech-to-text.md
+    - Punctuation & Casing: use-cases/punctuation-and-casing.md
     - Voice Activity Detection: use-cases/voice-activity-detection.md
     - Text Detection: use-cases/text-detection.md
     - Depth Estimation: use-cases/depth-estimation.md
