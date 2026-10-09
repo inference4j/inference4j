@@ -119,7 +119,7 @@ class InferenceSessionTest {
     }
 
     @Test
-    void run_booleanInputAndOutput_roundTrip() throws URISyntaxException {
+    void runBooleanInputAndOutputRoundTrip() throws URISyntaxException {
         // test-bool-not.onnx: y = Not(x), x and y are BOOL [batch, n]
         Path model = Path.of(Objects.requireNonNull(
                 InferenceSessionTest.class.getResource("/test-bool-not.onnx")).toURI());

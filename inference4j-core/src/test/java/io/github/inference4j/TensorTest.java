@@ -221,20 +221,20 @@ class TensorTest {
     }
 
     @Test
-    void fromBooleans_createsWithCorrectShapeAndType() {
+    void fromBooleansCreatesWithCorrectShapeAndType() {
         Tensor tensor = Tensor.fromBooleans(new boolean[]{true, false, true}, new long[]{1, 3});
         assertThat(tensor.shape()).isEqualTo(new long[]{1, 3});
         assertThat(tensor.type()).isEqualTo(TensorType.BOOL);
     }
 
     @Test
-    void fromBooleans_throwsOnShapeMismatch() {
+    void fromBooleansThrowsOnShapeMismatch() {
         assertThatThrownBy(() -> Tensor.fromBooleans(new boolean[]{true, false}, new long[]{3}))
                 .isInstanceOf(TensorConversionException.class);
     }
 
     @Test
-    void toBooleans_returnsDataCopy() {
+    void toBooleansReturnsDataCopy() {
         Tensor tensor = Tensor.fromBooleans(new boolean[]{true, false}, new long[]{2});
         boolean[] values = tensor.toBooleans();
         values[0] = false;
@@ -242,7 +242,7 @@ class TensorTest {
     }
 
     @Test
-    void fromBooleans_makesDefensiveCopyOfInput() {
+    void fromBooleansMakesDefensiveCopyOfInput() {
         boolean[] data = {true, false};
         Tensor tensor = Tensor.fromBooleans(data, new long[]{2});
         data[0] = false;
@@ -250,7 +250,7 @@ class TensorTest {
     }
 
     @Test
-    void toBooleans_throwsOnTypeMismatch() {
+    void toBooleansThrowsOnTypeMismatch() {
         Tensor tensor = Tensor.fromLongs(new long[]{1}, new long[]{1});
         assertThatThrownBy(tensor::toBooleans)
                 .isInstanceOf(TensorConversionException.class)
@@ -258,13 +258,13 @@ class TensorTest {
     }
 
     @Test
-    void toLongs_throwsOnBooleanTensor() {
+    void toLongsThrowsOnBooleanTensor() {
         Tensor tensor = Tensor.fromBooleans(new boolean[]{true}, new long[]{1});
         assertThatThrownBy(tensor::toLongs).isInstanceOf(TensorConversionException.class);
     }
 
     @Test
-    void booleanTensor_squeezeAndSlice() {
+    void booleanTensorSqueezeAndSlice() {
         // shape [1, 2, 3]: rows {T,F,T} and {F,F,T}
         Tensor tensor = Tensor.fromBooleans(
                 new boolean[]{true, false, true, false, false, true}, new long[]{1, 2, 3});

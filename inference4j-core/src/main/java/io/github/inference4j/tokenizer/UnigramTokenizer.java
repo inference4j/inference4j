@@ -295,6 +295,9 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 
 	private List<Integer> tokenize(String text) {
 		List<Integer> tokenIds = new ArrayList<>();
+		if (text.isEmpty()) {
+			return tokenIds; // as in SentencePiece; the ▁ prefix must not become a token on its own
+		}
 
 		if (addedTokenPattern != null) {
 			Matcher addedMatcher = addedTokenPattern.matcher(text);

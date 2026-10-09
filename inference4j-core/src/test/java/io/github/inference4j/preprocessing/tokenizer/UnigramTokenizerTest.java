@@ -186,31 +186,37 @@ class UnigramTokenizerTest {
 	}
 
 	@Test
-	void encode_noByteFallback_unknownCharBecomesUnk() {
+	void encodeEmptyStringWithBareSpaceMarkerInVocabProducesNoTokens() {
+		EncodedInput result = noByteFallbackTokenizer(0).encode("", 512);
+		assertThat(result.inputIds()).isEmpty();
+	}
+
+	@Test
+	void encodeNoByteFallbackUnknownCharBecomesUnk() {
 		EncodedInput result = noByteFallbackTokenizer(0).encode("na\u00efve", 512);
 		assertThat(result.inputIds()).containsExactly(2L, 0L, 3L);
 	}
 
 	@Test
-	void encode_noByteFallback_runOfUnknownCharsBecomesSingleUnk() {
+	void encodeNoByteFallbackRunOfUnknownCharsBecomesSingleUnk() {
 		EncodedInput result = noByteFallbackTokenizer(0).encode("\u00ef\u00ef", 512);
 		assertThat(result.inputIds()).containsExactly(1L, 0L);
 	}
 
 	@Test
-	void encode_noByteFallback_unknownRunsSeparatedBySpaceEachGetUnk() {
+	void encodeNoByteFallbackUnknownRunsSeparatedBySpaceEachGetUnk() {
 		EncodedInput result = noByteFallbackTokenizer(0).encode("\u00ef \u00ef", 512);
 		assertThat(result.inputIds()).containsExactly(1L, 0L, 1L, 0L);
 	}
 
 	@Test
-	void encode_noByteFallback_supplementaryAndCjkCharsBecomeSingleUnk() {
+	void encodeNoByteFallbackSupplementaryAndCjkCharsBecomeSingleUnk() {
 		EncodedInput result = noByteFallbackTokenizer(0).encode("\u65e5\u672c\ud83d\ude00 text", 512);
 		assertThat(result.inputIds()).containsExactly(1L, 0L, 4L);
 	}
 
 	@Test
-	void encode_noByteFallback_usesConfiguredUnkId() {
+	void encodeNoByteFallbackUsesConfiguredUnkId() {
 		EncodedInput result = noByteFallbackTokenizer(5).encode("na\u00efve", 512);
 		assertThat(result.inputIds()).containsExactly(2L, 5L, 3L);
 	}
