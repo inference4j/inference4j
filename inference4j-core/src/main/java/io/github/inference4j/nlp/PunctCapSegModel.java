@@ -24,8 +24,11 @@ import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.TruncationGuard;
+import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.processing.Preprocessor;
 import io.github.inference4j.session.SessionConfigurer;
+import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.TokenizerJsonParser;
 import io.github.inference4j.tokenizer.UnigramTokenizer;
 
@@ -54,7 +57,8 @@ import java.util.Map;
  * }</pre>
  *
  * <p>Input is lower-cased, stripped of punctuation (apostrophes are kept) and whitespace-collapsed
- * before tokenization. Input longer than {@code maxLength} tokens is truncated.
+ * before tokenization. Input longer than {@code maxLength} tokens is handled according to
+ * {@link Builder#truncation(TruncationPolicy)}.
  *
  * <p>Not thread-safe: the tokenizer's streaming decoder keeps state between calls.
  */
@@ -70,9 +74,10 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
     private static final String[] POST_PUNCTUATION = {"", "", ".", ",", "?"};
     private static final int CAP_CHARS_PER_TOKEN = 16;
 
-    private PunctCapSegModel(InferenceSession session, UnigramTokenizer tokenizer, int maxLength) {
+    private PunctCapSegModel(InferenceSession session, UnigramTokenizer tokenizer, int maxLength,
+                             TruncationGuard truncationGuard) {
         super(session,
-                createPreprocessor(tokenizer, maxLength),
+                createPreprocessor(tokenizer, maxLength, truncationGuard),
                 ctx -> postProcess(ctx, tokenizer));
     }
 
@@ -90,9 +95,12 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
     }
 
     private static Preprocessor<String, PreprocessResult> createPreprocessor(
-            UnigramTokenizer tokenizer, int maxLength) {
+            UnigramTokenizer tokenizer, int maxLength, TruncationGuard truncationGuard) {
         return text -> {
-            long[] pieces = tokenizer.encode(normalize(text), maxLength - 2).inputIds();
+            int maxPieces = maxLength - 2; // room for BOS and EOS
+            EncodedInput encoded = tokenizer.encode(normalize(text), maxPieces);
+            truncationGuard.check(encoded, maxPieces);
+            long[] pieces = encoded.inputIds();
             long[] ids = new long[pieces.length + 2];
             ids[0] = BOS_ID;
             System.arraycopy(pieces, 0, ids, 1, pieces.length);
@@ -153,6 +161,7 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
         private SessionConfigurer sessionConfigurer;
         private UnigramTokenizer tokenizer;
         private int maxLength = DEFAULT_MAX_LENGTH;
+        private TruncationPolicy truncation;
 
         Builder session(InferenceSession session) {
             this.session = session;
@@ -185,6 +194,15 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
             return this;
         }
 
+        /**
+         * What to do with input longer than {@code maxLength} tokens. Defaults to
+         * {@link TruncationPolicy#TRUNCATE}, which keeps the first tokens and logs a warning.
+         */
+        public Builder truncation(TruncationPolicy truncation) {
+            this.truncation = truncation;
+            return this;
+        }
+
         public PunctCapSegModel build() {
             if (session == null) {
                 ModelSource source = modelSource != null
@@ -195,7 +213,8 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
             if (tokenizer == null) {
                 throw new IllegalStateException("Tokenizer is required");
             }
-            return new PunctCapSegModel(session, tokenizer, maxLength);
+            return new PunctCapSegModel(session, tokenizer, maxLength,
+                    new TruncationGuard("PunctCapSegModel", truncation));
         }
 
         private void loadFromDirectory(Path dir) {

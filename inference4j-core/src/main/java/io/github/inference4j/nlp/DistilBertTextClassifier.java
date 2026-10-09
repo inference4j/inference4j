@@ -22,6 +22,8 @@ import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.TruncationGuard;
+import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.processing.OutputOperator;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
@@ -92,9 +94,9 @@ public class DistilBertTextClassifier
 
     private DistilBertTextClassifier(InferenceSession session, Tokenizer tokenizer,
                                      ModelConfig config, OutputOperator outputOperator,
-                                     int maxLength) {
+                                     int maxLength, TruncationGuard truncationGuard) {
         super(session,
-                createPreprocessor(tokenizer, maxLength, session.inputNames()),
+                createPreprocessor(tokenizer, maxLength, session.inputNames(), truncationGuard),
                 ctx -> {
                     Tensor outputTensor = ctx.outputs().values().iterator().next();
                     float[] logits = outputTensor.toFloats();
@@ -137,9 +139,11 @@ public class DistilBertTextClassifier
     }
 
     private static io.github.inference4j.processing.Preprocessor<String, PreprocessResult> createPreprocessor(
-            Tokenizer tokenizer, int maxLength, Set<String> expectedInputs) {
+            Tokenizer tokenizer, int maxLength, Set<String> expectedInputs,
+            TruncationGuard truncationGuard) {
         return text -> {
             EncodedInput encoded = tokenizer.encode(text, maxLength);
+            truncationGuard.check(encoded, maxLength);
             long[] shape = {1, encoded.inputIds().length};
             Map<String, Tensor> inputs = new LinkedHashMap<>();
             inputs.put("input_ids", Tensor.fromLongs(encoded.inputIds(), shape));
@@ -160,6 +164,7 @@ public class DistilBertTextClassifier
         private ModelConfig config;
         private OutputOperator outputOperator;
         private int maxLength = DEFAULT_MAX_LENGTH;
+        private TruncationPolicy truncation;
 
         Builder session(InferenceSession session) {
             this.session = session;
@@ -201,6 +206,15 @@ public class DistilBertTextClassifier
             return this;
         }
 
+        /**
+         * What to do with input longer than {@code maxLength} tokens. Defaults to
+         * {@link TruncationPolicy#TRUNCATE}, which keeps the first tokens and logs a warning.
+         */
+        public Builder truncation(TruncationPolicy truncation) {
+            this.truncation = truncation;
+            return this;
+        }
+
         public DistilBertTextClassifier build() {
             if (session == null) {
                 ModelSource source = modelSource != null
@@ -220,7 +234,8 @@ public class DistilBertTextClassifier
                         ? OutputOperator.sigmoid()
                         : OutputOperator.softmax();
             }
-            return new DistilBertTextClassifier(session, tokenizer, config, outputOperator, maxLength);
+            return new DistilBertTextClassifier(session, tokenizer, config, outputOperator, maxLength,
+                    new TruncationGuard("DistilBertTextClassifier", truncation));
         }
 
         private void loadFromDirectory(Path dir) {

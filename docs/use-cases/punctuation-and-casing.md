@@ -57,6 +57,7 @@ public class PunctuationExample {
 | `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | default | ONNX Runtime session config |
 | `.tokenizer(UnigramTokenizer)` | `UnigramTokenizer` | auto-loaded from `tokenizer.json` | Custom tokenizer |
 | `.maxLength(int)` | `int` | `256` | Maximum tokens per call, including the begin/end markers |
+| `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Input longer than the token limit: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
 
 ## Result type
 
@@ -66,7 +67,7 @@ public class PunctuationExample {
 
 | Limit | Behavior when exceeded | Long-input strategies |
 |-------|------------------------|-----------------------|
-| 256 tokens (about 200 words), including begin/end markers | Truncated: text past the limit is dropped | None yet |
+| 256 tokens (about 200 words), including begin/end markers | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
 
 Keep inputs short. When formatting transcripts of long audio, transcribe in pieces, for example one call per [voice activity](voice-activity-detection.md) segment, rather than formatting a whole recording at once.
 

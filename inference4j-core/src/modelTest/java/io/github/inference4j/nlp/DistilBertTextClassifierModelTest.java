@@ -16,6 +16,8 @@
 
 package io.github.inference4j.nlp;
 
+import io.github.inference4j.exception.InputTooLongException;
+import io.github.inference4j.processing.TruncationPolicy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -65,5 +67,18 @@ class DistilBertTextClassifierModelTest {
         assertThat(results.size()).as("topK=1 should return exactly 1 result").isEqualTo(1);
         assertThat(results.get(0).confidence() > 0f).isTrue();
         assertThat(results.get(0).confidence() <= 1f).isTrue();
+    }
+
+    private static final String LONG_TEXT = "great movie ".repeat(400);
+
+    @Test
+    void failPolicyRejectsInputOverTheTokenLimit() {
+        try (var strict = DistilBertTextClassifier.builder()
+                .truncation(TruncationPolicy.FAIL)
+                .build()) {
+            assertThatThrownBy(() -> strict.classify(LONG_TEXT))
+                    .isInstanceOf(InputTooLongException.class);
+            assertThat(strict.classify("I love this movie!")).isNotEmpty();
+        }
     }
 }

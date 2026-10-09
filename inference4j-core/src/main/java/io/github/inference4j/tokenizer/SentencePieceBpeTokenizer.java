@@ -158,6 +158,7 @@ public class SentencePieceBpeTokenizer implements Tokenizer, TokenDecoder {
     public EncodedInput encode(String text, int maxLength) {
         List<Integer> tokenIds = tokenize(text);
 
+        int originalLength = tokenIds.size();
         if (tokenIds.size() > maxLength) {
             tokenIds = new ArrayList<>(tokenIds.subList(0, maxLength));
         }
@@ -173,7 +174,7 @@ public class SentencePieceBpeTokenizer implements Tokenizer, TokenDecoder {
 
         long[] tokenTypeIds = new long[length];
 
-        return new EncodedInput(inputIds, attentionMask, tokenTypeIds);
+        return new EncodedInput(inputIds, attentionMask, tokenTypeIds, null, originalLength);
     }
 
     @Override

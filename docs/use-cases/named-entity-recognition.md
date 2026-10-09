@@ -52,6 +52,15 @@ public class NerExample {
 | `.tokenizer(Tokenizer)` | `Tokenizer` | auto-loaded `WordPieceTokenizer` (cased) | Custom tokenizer |
 | `.config(ModelConfig)` | `ModelConfig` | auto-loaded from `config.json` | Model config with IOB2 labels |
 | `.maxLength(int)` | `int` | `512` | Maximum token sequence length |
+| `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Input longer than the token limit: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
+
+## Input length
+
+| Limit | When exceeded | Long-input strategies |
+|-------|---------------|-----------------------|
+| `maxLength` tokens (512 by default), including `[CLS]` and `[SEP]` | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
+
+Entities after the limit are not found. For long documents, use `FAIL` in tests to detect truncation, and split the text before calling `recognize`.
 
 ## Result type
 

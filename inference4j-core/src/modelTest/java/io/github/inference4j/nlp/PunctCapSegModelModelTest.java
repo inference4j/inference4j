@@ -16,6 +16,8 @@
 
 package io.github.inference4j.nlp;
 
+import io.github.inference4j.exception.InputTooLongException;
+import io.github.inference4j.processing.TruncationPolicy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.TestInstance;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class PunctCapSegModelModelTest {
@@ -86,5 +89,18 @@ class PunctCapSegModelModelTest {
     @Test
     void blankInputReturnsEmptyList() {
         assertThat(model.infer("   ")).isEmpty();
+    }
+
+    private static final String LONG_TEXT = "marie curie moved to paris ".repeat(100);
+
+    @Test
+    void failPolicyRejectsInputOverTheTokenLimit() {
+        try (var strict = PunctCapSegModel.builder()
+                .truncation(TruncationPolicy.FAIL)
+                .build()) {
+            assertThatThrownBy(() -> strict.infer(LONG_TEXT))
+                    .isInstanceOf(InputTooLongException.class);
+            assertThat(strict.infer("marie curie moved to paris")).isNotEmpty();
+        }
     }
 }

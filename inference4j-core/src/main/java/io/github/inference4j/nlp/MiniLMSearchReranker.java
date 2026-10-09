@@ -21,6 +21,8 @@ import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.TruncationGuard;
+import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.processing.Preprocessor;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
@@ -74,9 +76,10 @@ public class MiniLMSearchReranker
 
     private static final int DEFAULT_MAX_LENGTH = 512;
 
-    private MiniLMSearchReranker(InferenceSession session, Tokenizer tokenizer, int maxLength) {
+    private MiniLMSearchReranker(InferenceSession session, Tokenizer tokenizer, int maxLength,
+                                 TruncationGuard truncationGuard) {
         super(session,
-                createPreprocessor(tokenizer, maxLength, session.inputNames()),
+                createPreprocessor(tokenizer, maxLength, session.inputNames(), truncationGuard),
                 ctx -> {
                     Tensor outputTensor = ctx.outputs().values().iterator().next();
                     float[] logits = outputTensor.toFloats();
@@ -93,9 +96,11 @@ public class MiniLMSearchReranker
     }
 
     private static Preprocessor<QueryDocumentPair, PreprocessResult> createPreprocessor(
-            Tokenizer tokenizer, int maxLength, Set<String> expectedInputs) {
+            Tokenizer tokenizer, int maxLength, Set<String> expectedInputs,
+            TruncationGuard truncationGuard) {
         return pair -> {
             EncodedInput encoded = tokenizer.encode(pair.query(), pair.document(), maxLength);
+            truncationGuard.check(encoded, maxLength);
             long[] shape = {1, encoded.inputIds().length};
 
             Map<String, Tensor> inputs = new LinkedHashMap<>();
@@ -115,6 +120,7 @@ public class MiniLMSearchReranker
         private SessionConfigurer sessionConfigurer;
         private Tokenizer tokenizer;
         private int maxLength = DEFAULT_MAX_LENGTH;
+        private TruncationPolicy truncation;
 
         Builder session(InferenceSession session) {
             this.session = session;
@@ -146,6 +152,15 @@ public class MiniLMSearchReranker
             return this;
         }
 
+        /**
+         * What to do with input longer than {@code maxLength} tokens. Defaults to
+         * {@link TruncationPolicy#TRUNCATE}, which keeps the first tokens and logs a warning.
+         */
+        public Builder truncation(TruncationPolicy truncation) {
+            this.truncation = truncation;
+            return this;
+        }
+
         public MiniLMSearchReranker build() {
             if (session == null) {
                 ModelSource source = modelSource != null
@@ -157,7 +172,8 @@ public class MiniLMSearchReranker
             if (tokenizer == null) {
                 throw new IllegalStateException("Tokenizer is required");
             }
-            return new MiniLMSearchReranker(session, tokenizer, maxLength);
+            return new MiniLMSearchReranker(session, tokenizer, maxLength,
+                    new TruncationGuard("MiniLMSearchReranker", truncation));
         }
 
         private void loadFromDirectory(Path dir) {

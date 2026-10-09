@@ -16,6 +16,8 @@
 
 package io.github.inference4j.nlp;
 
+import io.github.inference4j.exception.InputTooLongException;
+import io.github.inference4j.processing.TruncationPolicy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -66,6 +68,19 @@ class MiniLMSearchRerankerModelTest {
         assertThat(scores.length).as("Should return one score per document").isEqualTo(3);
         for (float score : scores) {
             assertThat(score >= 0f && score <= 1f).as("Each score should be between 0 and 1, got: " + score).isTrue();
+        }
+    }
+
+    private static final String LONG_TEXT = "java is a programming language ".repeat(200);
+
+    @Test
+    void failPolicyRejectsInputOverTheTokenLimit() {
+        try (var strict = MiniLMSearchReranker.builder()
+                .truncation(TruncationPolicy.FAIL)
+                .build()) {
+            assertThatThrownBy(() -> strict.score("what is java", LONG_TEXT))
+                    .isInstanceOf(InputTooLongException.class);
+            assertThat(strict.score("what is java", "Java is a programming language.")).isBetween(0f, 1f);
         }
     }
 }

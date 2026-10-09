@@ -236,4 +236,41 @@ class BpeTokenizerTest {
             // We verify the tokenizer doesn't lowercase by checking the processed text
         }
     }
+
+    // --- original length / truncation reporting (CLIP-style padded encoding) ---
+
+    @Nested
+    class TruncationReporting {
+
+        private final BpeTokenizer tokenizer = BpeTokenizer.builder(vocabPath, mergesPath)
+                .lowercase(true)
+                .endOfWordMarker("</w>")
+                .pattern(Pattern.compile("[\\p{L}]+|[\\p{N}]|[^\\s\\p{L}\\p{N}]+"))
+                .bosToken("<|startoftext|>")
+                .eosToken("<|endoftext|>")
+                .pad(true)
+                .defaultMaxLength(8)
+                .build();
+
+        @Test
+        void paddedButNotTruncatedReportsNotTruncated() {
+            EncodedInput result = tokenizer.encode("hello");
+
+            assertThat(result.inputIds()).hasSize(8);
+            assertThat(result.truncated()).isFalse();
+            assertThat(result.originalLength()).isLessThan(8);
+        }
+
+        @Test
+        void overLimitReportsOriginalLength() {
+            int fullLength = tokenizer.encode("hello world hello world hello", 512).originalLength();
+
+            EncodedInput result = tokenizer.encode("hello world hello world hello");
+
+            assertThat(fullLength).isGreaterThan(8);
+            assertThat(result.inputIds()).hasSize(8);
+            assertThat(result.truncated()).isTrue();
+            assertThat(result.originalLength()).isEqualTo(fullLength);
+        }
+    }
 }
