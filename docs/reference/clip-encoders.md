@@ -55,6 +55,7 @@ try (ClipTextEncoder encoder = ClipTextEncoder.builder().build()) {
 | `modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Where to load the model from |
 | `sessionOptions(SessionConfigurer)` | `SessionConfigurer` | Default (CPU) | ONNX Runtime session options |
 | `tokenizer(Tokenizer)` | `Tokenizer` | Auto-loaded BPE from model directory | Custom tokenizer |
+| `truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Text longer than 77 tokens: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](configuration.md#input-length) |
 
 ### Tokenization
 

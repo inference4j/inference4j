@@ -244,4 +244,44 @@ class WordPieceTokenizerTest {
         assertThat(result.wordIds()[0]).isEqualTo(-1);
         assertThat(result.wordIds()[4]).isEqualTo(-1);
     }
+
+    // --- original length / truncation reporting ---
+
+    @Test
+    void encodeWithinLimitIsNotTruncated() {
+        EncodedInput result = tokenizer.encode("hello world", 512);
+
+        assertThat(result.truncated()).isFalse();
+        assertThat(result.originalLength()).isEqualTo(result.inputIds().length);
+    }
+
+    @Test
+    void encodeOverLimitReportsOriginalLength() {
+        int fullLength = tokenizer.encode("hello world", 512).inputIds().length;
+
+        EncodedInput result = tokenizer.encode("hello world", 3);
+
+        assertThat(result.inputIds()).hasSize(3);
+        assertThat(result.truncated()).isTrue();
+        assertThat(result.originalLength()).isEqualTo(fullLength);
+    }
+
+    @Test
+    void encodePairOverLimitReportsOriginalLength() {
+        int fullLength = tokenizer.encode("hello", "world", 512).inputIds().length;
+
+        EncodedInput result = tokenizer.encode("hello", "world", 4);
+
+        assertThat(result.inputIds()).hasSize(4);
+        assertThat(result.truncated()).isTrue();
+        assertThat(result.originalLength()).isEqualTo(fullLength);
+    }
+
+    @Test
+    void encodePairWithinLimitIsNotTruncated() {
+        EncodedInput result = tokenizer.encode("hello", "world", 512);
+
+        assertThat(result.truncated()).isFalse();
+        assertThat(result.originalLength()).isEqualTo(result.inputIds().length);
+    }
 }

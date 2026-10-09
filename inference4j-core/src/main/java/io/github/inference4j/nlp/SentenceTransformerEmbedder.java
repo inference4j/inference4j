@@ -21,6 +21,8 @@ import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.TruncationGuard;
+import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
@@ -73,9 +75,10 @@ public class SentenceTransformerEmbedder
 
     private SentenceTransformerEmbedder(InferenceSession session, Tokenizer tokenizer,
                                         PoolingStrategy poolingStrategy, boolean normalize,
-                                        String textPrefix, int maxLength) {
+                                        String textPrefix, int maxLength,
+                                        TruncationGuard truncationGuard) {
         super(session,
-                createPreprocessor(tokenizer, maxLength, session.inputNames(), textPrefix),
+                createPreprocessor(tokenizer, maxLength, session.inputNames(), textPrefix, truncationGuard),
                 ctx -> {
                     Tensor outputTensor = ctx.outputs().values().iterator().next();
                     Tensor attentionMaskTensor = ctx.preprocessed().get("attention_mask");
@@ -189,10 +192,12 @@ public class SentenceTransformerEmbedder
     }
 
     private static io.github.inference4j.processing.Preprocessor<String, PreprocessResult> createPreprocessor(
-            Tokenizer tokenizer, int maxLength, Set<String> expectedInputs, String textPrefix) {
+            Tokenizer tokenizer, int maxLength, Set<String> expectedInputs, String textPrefix,
+            TruncationGuard truncationGuard) {
         return text -> {
             String input = textPrefix != null ? textPrefix + text : text;
             EncodedInput encoded = tokenizer.encode(input, maxLength);
+            truncationGuard.check(encoded, maxLength);
             long[] shape = {1, encoded.inputIds().length};
             Map<String, Tensor> inputs = new LinkedHashMap<>();
             inputs.put("input_ids", Tensor.fromLongs(encoded.inputIds(), shape));
@@ -228,6 +233,7 @@ public class SentenceTransformerEmbedder
         private boolean normalize = false;
         private String textPrefix;
         private int maxLength = 512;
+        private TruncationPolicy truncation;
 
         Builder session(InferenceSession session) {
             this.session = session;
@@ -327,6 +333,15 @@ public class SentenceTransformerEmbedder
         }
 
         /**
+         * What to do with input longer than {@code maxLength} tokens. Defaults to
+         * {@link TruncationPolicy#TRUNCATE}, which keeps the first tokens and logs a warning.
+         */
+        public Builder truncation(TruncationPolicy truncation) {
+            this.truncation = truncation;
+            return this;
+        }
+
+        /**
          * Builds and returns a new {@link SentenceTransformerEmbedder} instance.
          *
          * @return a configured embedder ready for use
@@ -348,7 +363,8 @@ public class SentenceTransformerEmbedder
                 throw new IllegalStateException("Tokenizer is required");
             }
             return new SentenceTransformerEmbedder(session, tokenizer, poolingStrategy,
-                    normalize, textPrefix, maxLength);
+                    normalize, textPrefix, maxLength,
+                    new TruncationGuard("SentenceTransformerEmbedder", truncation));
         }
 
         private void loadFromDirectory(Path dir) {

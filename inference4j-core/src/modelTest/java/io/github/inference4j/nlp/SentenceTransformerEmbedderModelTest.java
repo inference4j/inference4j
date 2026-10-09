@@ -16,6 +16,8 @@
 
 package io.github.inference4j.nlp;
 
+import io.github.inference4j.exception.InputTooLongException;
+import io.github.inference4j.processing.TruncationPolicy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -84,5 +86,19 @@ class SentenceTransformerEmbedderModelTest {
             normB += b[i] * b[i];
         }
         return dot / (float) (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+
+    private static final String LONG_TEXT = "semantic search works ".repeat(300);
+
+    @Test
+    void failPolicyRejectsInputOverTheTokenLimit() {
+        try (var strict = SentenceTransformerEmbedder.builder()
+                .modelId("inference4j/all-MiniLM-L6-v2")
+                .truncation(TruncationPolicy.FAIL)
+                .build()) {
+            assertThatThrownBy(() -> strict.encode(LONG_TEXT))
+                    .isInstanceOf(InputTooLongException.class);
+            assertThat(strict.encode("A short sentence.")).isNotEmpty();
+        }
     }
 }

@@ -16,6 +16,8 @@
 
 package io.github.inference4j.multimodal;
 
+import io.github.inference4j.exception.InputTooLongException;
+import io.github.inference4j.processing.TruncationPolicy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -110,5 +112,18 @@ class ClipTextEncoderModelTest {
             sum += a[i] * b[i];
         }
         return sum;
+    }
+
+    private static final String LONG_TEXT = "a photo of a cat ".repeat(40);
+
+    @Test
+    void failPolicyRejectsInputOverTheTokenLimit() {
+        try (var strict = ClipTextEncoder.builder()
+                .truncation(TruncationPolicy.FAIL)
+                .build()) {
+            assertThatThrownBy(() -> strict.encode(LONG_TEXT))
+                    .isInstanceOf(InputTooLongException.class);
+            assertThat(strict.encode("a photo of a cat")).isNotEmpty();
+        }
     }
 }

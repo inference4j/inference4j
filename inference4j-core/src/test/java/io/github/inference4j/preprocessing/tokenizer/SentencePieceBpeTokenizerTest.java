@@ -144,4 +144,26 @@ class SentencePieceBpeTokenizerTest {
         String result = tokenizer.decode(new int[]{235, 209});
         assertThat(result).as("Two byte-fallback tokens should decode to 'é'").isEqualTo("\u00e9");
     }
+
+    // --- original length / truncation reporting ---
+
+    @Test
+    void encodeOverLimitReportsOriginalLength() {
+        int fullLength = tokenizer.encode("hello world", 512).inputIds().length;
+
+        EncodedInput result = tokenizer.encode("hello world", 1);
+
+        assertThat(fullLength).isGreaterThan(1);
+        assertThat(result.inputIds()).hasSize(1);
+        assertThat(result.truncated()).isTrue();
+        assertThat(result.originalLength()).isEqualTo(fullLength);
+    }
+
+    @Test
+    void encodeWithinLimitIsNotTruncated() {
+        EncodedInput result = tokenizer.encode("hello world", 512);
+
+        assertThat(result.truncated()).isFalse();
+        assertThat(result.originalLength()).isEqualTo(result.inputIds().length);
+    }
 }

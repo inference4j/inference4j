@@ -163,6 +163,7 @@ public class WordPieceTokenizer implements Tokenizer {
         tokenIds.add(sepId);
         wordIdList.add(-1);
 
+        int originalLength = tokenIds.size();
         if (tokenIds.size() > maxLength) {
             tokenIds = new ArrayList<>(tokenIds.subList(0, maxLength - 1));
             wordIdList = new ArrayList<>(wordIdList.subList(0, maxLength - 1));
@@ -177,7 +178,7 @@ public class WordPieceTokenizer implements Tokenizer {
         long[] tokenTypeIds = new long[length];
         int[] wordIds = wordIdList.stream().mapToInt(Integer::intValue).toArray();
 
-        return new EncodedInput(inputIds, attentionMask, tokenTypeIds, wordIds);
+        return new EncodedInput(inputIds, attentionMask, tokenTypeIds, wordIds, originalLength);
     }
 
     @Override
@@ -191,6 +192,8 @@ public class WordPieceTokenizer implements Tokenizer {
         if (available < 0) {
             available = 0;
         }
+
+        int originalLength = idsA.size() + idsB.size() + specialTokens;
 
         // Truncate the longer sequence first (textB first, as is convention)
         int lenA = idsA.size();
@@ -223,7 +226,7 @@ public class WordPieceTokenizer implements Tokenizer {
             tokenTypeIds[i] = 1;
         }
 
-        return new EncodedInput(inputIds, attentionMask, tokenTypeIds);
+        return new EncodedInput(inputIds, attentionMask, tokenTypeIds, null, originalLength);
     }
 
     private List<Integer> tokenizeToIds(String text) {

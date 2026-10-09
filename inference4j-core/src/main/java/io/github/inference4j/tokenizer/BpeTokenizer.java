@@ -178,6 +178,7 @@ public class BpeTokenizer implements Tokenizer {
             tokenIds.add(eosId);
         }
 
+        int originalLength = tokenIds.size();
         if (tokenIds.size() > maxLength) {
             tokenIds = new ArrayList<>(tokenIds.subList(0, maxLength - (eosId != null ? 1 : 0)));
             if (eosId != null) {
@@ -198,7 +199,7 @@ public class BpeTokenizer implements Tokenizer {
 
         long[] tokenTypeIds = new long[arrayLength];
 
-        return new EncodedInput(inputIds, attentionMask, tokenTypeIds);
+        return new EncodedInput(inputIds, attentionMask, tokenTypeIds, null, originalLength);
     }
 
     /**

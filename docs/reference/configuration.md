@@ -41,6 +41,25 @@ Or, on the module path:
 
 See the [Spring Boot guide](../guides/spring-boot.md#all-properties) for the full list of `inference4j.*` application properties.
 
+## Input length
+
+Models have a fixed maximum input length in tokens: 512 for the BERT-family NLP models, 77 for the CLIP text encoder, 256 for `PunctCapSegModel`. Each affected use-case page lists its limit. The builders of these tasks accept a `TruncationPolicy` that controls what happens to longer input:
+
+| Policy | Behavior |
+|--------|----------|
+| `TRUNCATE` (default) | Keeps the first tokens and drops the rest. The first truncation per task instance is logged at `WARN` with the token counts; later ones at `DEBUG`. |
+| `FAIL` | Throws `InputTooLongException`, which reports `tokenCount()` and `maxTokens()`. |
+
+```java
+try (var ner = BertNerRecognizer.builder()
+        .truncation(TruncationPolicy.FAIL)
+        .build()) {
+    ner.recognize(longDocument);   // throws InputTooLongException instead of silently ignoring the end
+}
+```
+
+`FAIL` is useful in tests and in pipelines where losing part of the input is unacceptable, such as PII redaction. Tasks that can process long input in full expose that as a separate builder option, listed under *Long-input strategies* on their page.
+
 ## ONNX Runtime session options
 
 Session-level configuration is set via `.sessionOptions()` on each builder:

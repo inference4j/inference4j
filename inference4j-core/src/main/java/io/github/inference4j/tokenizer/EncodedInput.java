@@ -20,13 +20,41 @@ public record EncodedInput(
         long[] inputIds,
         long[] attentionMask,
         long[] tokenTypeIds,
-        int[] wordIds
+        int[] wordIds,
+        int originalLength
 ) {
+
+    /**
+     * Constructor for inputs that were not truncated: the original length is the number of
+     * attended tokens.
+     */
+    public EncodedInput(long[] inputIds, long[] attentionMask, long[] tokenTypeIds, int[] wordIds) {
+        this(inputIds, attentionMask, tokenTypeIds, wordIds, attendedTokens(attentionMask));
+    }
 
     /**
      * Backward-compatible constructor without word IDs.
      */
     public EncodedInput(long[] inputIds, long[] attentionMask, long[] tokenTypeIds) {
         this(inputIds, attentionMask, tokenTypeIds, null);
+    }
+
+    /**
+     * Whether the tokenizer cut the input to fit {@code maxLength}: {@link #originalLength()}
+     * (tokens before truncation, special tokens included) exceeds the tokens actually kept.
+     * Padding is not counted as kept.
+     */
+    public boolean truncated() {
+        return originalLength > attendedTokens(attentionMask);
+    }
+
+    private static int attendedTokens(long[] attentionMask) {
+        int count = 0;
+        for (long mask : attentionMask) {
+            if (mask != 0) {
+                count++;
+            }
+        }
+        return count;
     }
 }

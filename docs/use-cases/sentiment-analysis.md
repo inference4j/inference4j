@@ -54,6 +54,15 @@ public class SentimentAnalysis {
 | `.config(ModelConfig)` | `ModelConfig` | auto-loaded from `config.json` | Model config with labels |
 | `.outputOperator(OutputOperator)` | `OutputOperator` | auto-detected (softmax or sigmoid) | Output activation |
 | `.maxLength(int)` | `int` | `512` | Maximum token sequence length |
+| `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Input longer than the token limit: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
+
+## Input length
+
+| Limit | When exceeded | Long-input strategies |
+|-------|---------------|-----------------------|
+| `maxLength` tokens (512 by default), including `[CLS]` and `[SEP]` | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
+
+Only the beginning of a long text contributes to the classification.
 
 ## Result type
 

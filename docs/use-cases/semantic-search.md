@@ -72,6 +72,7 @@ public class SemanticSearch {
 | `.normalize()` | — | disabled | Enables L2 normalization of output embeddings |
 | `.textPrefix(String)` | `String` | `null` | Text prefix to prepend before encoding |
 | `.maxLength(int)` | `int` | `512` | Maximum token sequence length |
+| `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Input longer than the token limit: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
 
 ## Reranker builder options
 
@@ -82,6 +83,16 @@ public class SemanticSearch {
 | `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | default | ONNX Runtime session config |
 | `.tokenizer(Tokenizer)` | `Tokenizer` | auto-loaded `WordPieceTokenizer` | Custom tokenizer |
 | `.maxLength(int)` | `int` | `512` | Maximum token sequence length |
+| `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Input longer than the token limit: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
+
+## Input length
+
+| Task | Limit | When exceeded | Long-input strategies |
+|------|-------|---------------|-----------------------|
+| Embedder | `maxLength` tokens (512 by default) | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
+| Reranker | `maxLength` tokens (512 by default) for query and document combined; the longer one is shortened first | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
+
+An embedding of a truncated text only represents its beginning. Split long documents into chunks before embedding them, for example with a document splitter, so every part of the text is searchable.
 
 ## Result types
 

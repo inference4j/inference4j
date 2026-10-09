@@ -23,6 +23,8 @@ import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.nlp.TextEmbedder;
 import io.github.inference4j.processing.MathOps;
+import io.github.inference4j.processing.TruncationGuard;
+import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.tokenizer.BpeTokenizer;
 import io.github.inference4j.tokenizer.EncodedInput;
@@ -92,10 +94,12 @@ public class ClipTextEncoder implements TextEmbedder {
 
     private final InferenceSession session;
     private final Tokenizer tokenizer;
+    private final TruncationGuard truncationGuard;
 
-    private ClipTextEncoder(InferenceSession session, Tokenizer tokenizer) {
+    private ClipTextEncoder(InferenceSession session, Tokenizer tokenizer, TruncationGuard truncationGuard) {
         this.session = session;
         this.tokenizer = tokenizer;
+        this.truncationGuard = truncationGuard;
     }
 
     public static Builder builder() {
@@ -105,6 +109,7 @@ public class ClipTextEncoder implements TextEmbedder {
     @Override
     public float[] encode(String text) {
         EncodedInput encoded = tokenizer.encode(text);
+        truncationGuard.check(encoded, encoded.inputIds().length);
         long[] shape = {1, encoded.inputIds().length};
 
         Map<String, Tensor> inputs = new LinkedHashMap<>();
@@ -137,6 +142,7 @@ public class ClipTextEncoder implements TextEmbedder {
         private String modelId;
         private SessionConfigurer sessionConfigurer;
         private Tokenizer tokenizer;
+        private TruncationPolicy truncation;
 
         Builder session(InferenceSession session) {
             this.session = session;
@@ -163,6 +169,15 @@ public class ClipTextEncoder implements TextEmbedder {
             return this;
         }
 
+        /**
+         * What to do with input longer than CLIP's 77-token context. Defaults to
+         * {@link TruncationPolicy#TRUNCATE}, which keeps the first tokens and logs a warning.
+         */
+        public Builder truncation(TruncationPolicy truncation) {
+            this.truncation = truncation;
+            return this;
+        }
+
         public ClipTextEncoder build() {
             if (session == null) {
                 ModelSource source = modelSource != null
@@ -174,7 +189,8 @@ public class ClipTextEncoder implements TextEmbedder {
             if (tokenizer == null) {
                 throw new IllegalStateException("Tokenizer is required");
             }
-            return new ClipTextEncoder(session, tokenizer);
+            return new ClipTextEncoder(session, tokenizer,
+                    new TruncationGuard("ClipTextEncoder", truncation));
         }
 
         private void loadFromDirectory(Path dir) {

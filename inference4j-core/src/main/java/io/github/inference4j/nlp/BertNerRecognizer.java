@@ -24,6 +24,8 @@ import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.TruncationGuard;
+import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.preprocessing.text.ModelConfig;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.session.SessionConfigurer;
@@ -83,9 +85,9 @@ public class BertNerRecognizer
     static final String WORD_IDS_KEY = "wordIds";
 
     private BertNerRecognizer(InferenceSession session, Tokenizer tokenizer,
-                              ModelConfig config, int maxLength) {
+                              ModelConfig config, int maxLength, TruncationGuard truncationGuard) {
         super(session,
-                createPreprocessor(tokenizer, maxLength, session.inputNames()),
+                createPreprocessor(tokenizer, maxLength, session.inputNames(), truncationGuard),
                 ctx -> postProcess(ctx, config));
         this.tokenizer = tokenizer;
         this.config = config;
@@ -232,9 +234,11 @@ public class BertNerRecognizer
     }
 
     private static io.github.inference4j.processing.Preprocessor<String, PreprocessResult> createPreprocessor(
-            Tokenizer tokenizer, int maxLength, Set<String> expectedInputs) {
+            Tokenizer tokenizer, int maxLength, Set<String> expectedInputs,
+            TruncationGuard truncationGuard) {
         return text -> {
             EncodedInput encoded = tokenizer.encode(text, maxLength);
+            truncationGuard.check(encoded, maxLength);
             long[] shape = {1, encoded.inputIds().length};
             Map<String, Tensor> inputs = new LinkedHashMap<>();
             inputs.put("input_ids", Tensor.fromLongs(encoded.inputIds(), shape));
@@ -260,6 +264,7 @@ public class BertNerRecognizer
         private Tokenizer tokenizer;
         private ModelConfig config;
         private int maxLength = DEFAULT_MAX_LENGTH;
+        private TruncationPolicy truncation;
 
         Builder session(InferenceSession session) {
             this.session = session;
@@ -296,6 +301,15 @@ public class BertNerRecognizer
             return this;
         }
 
+        /**
+         * What to do with input longer than {@code maxLength} tokens. Defaults to
+         * {@link TruncationPolicy#TRUNCATE}, which keeps the first tokens and logs a warning.
+         */
+        public Builder truncation(TruncationPolicy truncation) {
+            this.truncation = truncation;
+            return this;
+        }
+
         public BertNerRecognizer build() {
             if (session == null) {
                 ModelSource source = modelSource != null
@@ -310,7 +324,8 @@ public class BertNerRecognizer
             if (config == null) {
                 throw new IllegalStateException("ModelConfig is required");
             }
-            return new BertNerRecognizer(session, tokenizer, config, maxLength);
+            return new BertNerRecognizer(session, tokenizer, config, maxLength,
+                    new TruncationGuard("BertNerRecognizer", truncation));
         }
 
         private void loadFromDirectory(Path dir) {

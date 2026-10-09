@@ -16,6 +16,8 @@
 
 package io.github.inference4j.nlp;
 
+import io.github.inference4j.exception.InputTooLongException;
+import io.github.inference4j.processing.TruncationPolicy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.TestInstance;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BertNerRecognizerModelTest {
 
@@ -122,6 +125,19 @@ class BertNerRecognizerModelTest {
                         .as("Label should be one of PER, ORG, LOC, MISC")
                         .isIn("PER", "ORG", "LOC", "MISC");
             }
+        }
+    }
+
+    private static final String LONG_TEXT = "Marie Curie worked in Paris. ".repeat(150);
+
+    @Test
+    void failPolicyRejectsInputOverTheTokenLimit() {
+        try (var strict = BertNerRecognizer.builder()
+                .truncation(TruncationPolicy.FAIL)
+                .build()) {
+            assertThatThrownBy(() -> strict.recognize(LONG_TEXT))
+                    .isInstanceOf(InputTooLongException.class);
+            assertThat(strict.recognize("Marie Curie worked in Paris.")).isNotEmpty();
         }
     }
 }
