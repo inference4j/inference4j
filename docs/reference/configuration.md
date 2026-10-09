@@ -43,7 +43,7 @@ See the [Spring Boot guide](../guides/spring-boot.md#all-properties) for the ful
 
 ## Input length
 
-Models have a fixed maximum input length in tokens: 512 for the BERT-family NLP models, 77 for the CLIP text encoder, 256 for `PunctCapSegModel`. Each affected use-case page lists its limit. The builders of these tasks accept a `TruncationPolicy` that controls what happens to longer input:
+Models have a fixed maximum input length in tokens: 512 for the BERT-family NLP models, 77 for the CLIP text encoder, 256 for `PunctCapSegModel`. Text generators read their limit from the model's `config.json` (1024 for BART, 512 for MarianMT and T5; for decoder-only models, the model's positions minus `maxNewTokens`) and accept `.maxInputLength(int)` to change it. Each affected use-case page lists its limit. The builders of these tasks accept a `TruncationPolicy` that controls what happens to longer input:
 
 | Policy | Behavior |
 |--------|----------|

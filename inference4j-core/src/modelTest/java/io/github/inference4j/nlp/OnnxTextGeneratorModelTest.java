@@ -16,6 +16,8 @@
 
 package io.github.inference4j.nlp;
 
+import io.github.inference4j.exception.InputTooLongException;
+import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.generation.GenerationResult;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -258,6 +260,35 @@ class OnnxTextGeneratorModelTest {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    // Prompts used to be cut at the BPE tokenizer's 512-token default, regardless of the model
+    private static final String LONG_PROMPT =
+            "Here is some background about the history of the printing press in Europe. ".repeat(50)
+                    + "Summarize the background in one sentence.";
+
+    @Test
+    void qwenAcceptsPromptBeyond512Tokens() throws Exception {
+        try (var gen = OnnxTextGenerator.qwen2()
+                .maxNewTokens(5)
+                .truncation(TruncationPolicy.FAIL)
+                .build()) {
+            GenerationResult result = gen.generate(LONG_PROMPT);
+
+            assertThat(result.promptTokens()).isGreaterThan(512);
+        }
+    }
+
+    @Test
+    void gpt2FailPolicyRejectsPromptBeyondPositionBudget() throws Exception {
+        // GPT-2 has 1024 positions, shared by the prompt and maxNewTokens
+        try (var gen = OnnxTextGenerator.gpt2()
+                .maxNewTokens(20)
+                .truncation(TruncationPolicy.FAIL)
+                .build()) {
+            assertThatThrownBy(() -> gen.generate(LONG_PROMPT.repeat(2)))
+                    .isInstanceOf(InputTooLongException.class);
         }
     }
 }

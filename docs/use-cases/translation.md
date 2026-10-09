@@ -130,6 +130,17 @@ Each constant provides `displayName()` (e.g., `"Brazilian Portuguese"`) and `iso
 | `.topP(float)` | `float` | `0.0` (disabled) | Nucleus sampling |
 | `.eosTokenId(int)` | `int` | Auto-detected | End-of-sequence token ID |
 | `.addedToken(String)` | `String` | — | Register a special token for atomic encoding |
+| `.maxInputLength(int)` | `int` | Model limit from `config.json` | Maximum input length in tokens |
+| `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Longer input: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
+
+## Input length
+
+| Model | Default limit | When exceeded | Long-input strategies |
+|-------|---------------|---------------|-----------------------|
+| MarianMT | 512 tokens | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
+| Flan-T5 | 512 tokens (the length T5 was trained on) | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
+
+The limit comes from the model's `config.json` and can be changed with `.maxInputLength(int)`.
 
 ## Result type
 

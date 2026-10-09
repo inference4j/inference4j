@@ -16,6 +16,9 @@
 
 package io.github.inference4j.generation;
 
+import io.github.inference4j.exception.InputTooLongException;
+import io.github.inference4j.processing.TruncationGuard;
+import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.TokenDecoder;
 import io.github.inference4j.tokenizer.Tokenizer;
@@ -28,7 +31,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class GenerationEngineTest {
@@ -80,7 +85,7 @@ class GenerationEngineTest {
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
 
-        when(tokenizer.encode("Hello")).thenReturn(
+        when(tokenizer.encode(eq("Hello"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{15496}, new long[]{1}, new long[]{0}));
 
         // prefill returns logits that will greedily select token 318
@@ -130,7 +135,7 @@ class GenerationEngineTest {
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
 
-        when(tokenizer.encode("Hi")).thenReturn(
+        when(tokenizer.encode(eq("Hi"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{10}, new long[]{1}, new long[]{0}));
 
         when(session.prefill(any())).thenReturn(new ForwardResult(logitsForToken(1, 10)));
@@ -163,7 +168,7 @@ class GenerationEngineTest {
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
 
-        when(tokenizer.encode("x")).thenReturn(
+        when(tokenizer.encode(eq("x"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
 
         // Always return token 5 (never EOS)
@@ -195,7 +200,7 @@ class GenerationEngineTest {
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
 
-        when(tokenizer.encode("prompt")).thenReturn(
+        when(tokenizer.encode(eq("prompt"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
 
         when(session.prefill(any())).thenReturn(new ForwardResult(logitsForToken(10, 20)));
@@ -234,7 +239,7 @@ class GenerationEngineTest {
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
 
-        when(tokenizer.encode("prompt")).thenReturn(
+        when(tokenizer.encode(eq("prompt"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
 
         // Generate: "The" + " quick" + " brown" + " fox" + "<|end|>"
@@ -276,7 +281,7 @@ class GenerationEngineTest {
         TokenDecoder decoder = mock(TokenDecoder.class);
         ChatTemplate template = msg -> "<|user|>" + msg + "<|end|>";
 
-        when(tokenizer.encode("<|user|>Hi<|end|>")).thenReturn(
+        when(tokenizer.encode(eq("<|user|>Hi<|end|>"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{1, 2, 3}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
 
         when(session.prefill(new long[]{1, 2, 3})).thenReturn(
@@ -298,7 +303,7 @@ class GenerationEngineTest {
             fail(e);
         }
 
-        verify(tokenizer).encode("<|user|>Hi<|end|>");
+        verify(tokenizer).encode(eq("<|user|>Hi<|end|>"), anyInt());
     }
 
     @Test
@@ -308,7 +313,7 @@ class GenerationEngineTest {
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
 
-        when(tokenizer.encode("raw prompt")).thenReturn(
+        when(tokenizer.encode(eq("raw prompt"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
 
         when(session.prefill(any())).thenReturn(
@@ -326,7 +331,7 @@ class GenerationEngineTest {
             fail(e);
         }
 
-        verify(tokenizer).encode("raw prompt");
+        verify(tokenizer).encode(eq("raw prompt"), anyInt());
     }
 
     @Test
@@ -353,7 +358,7 @@ class GenerationEngineTest {
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
 
-        when(tokenizer.encode("x")).thenReturn(
+        when(tokenizer.encode(eq("x"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
 
         // prefill returns token 5, then decode returns second EOS token (200)
@@ -383,6 +388,97 @@ class GenerationEngineTest {
     /**
      * Creates a logits array where the given tokenId has the highest value.
      */
+    // --- input length ---
+
+    private static GenerationEngine.Builder immediateEosEngine(GenerativeSession session, Tokenizer tokenizer) {
+        TokenDecoder decoder = mock(TokenDecoder.class);
+        when(session.prefill(any())).thenReturn(new ForwardResult(logitsForToken(7, 10)));
+        return GenerationEngine.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .decoder(decoder)
+                .eosTokenId(7);
+    }
+
+    @Test
+    void encodesWithoutLimitByDefault() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode(eq("x"), anyInt())).thenReturn(
+                new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
+
+        try (var engine = immediateEosEngine(session, tokenizer).build()) {
+            engine.generate("x");
+        }
+
+        verify(tokenizer).encode("x", Integer.MAX_VALUE);
+    }
+
+    @Test
+    void encodesWithMaxInputLength() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode(eq("x"), anyInt())).thenReturn(
+                new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
+
+        try (var engine = immediateEosEngine(session, tokenizer).maxInputLength(10).build()) {
+            engine.generate("x");
+        }
+
+        verify(tokenizer).encode("x", 10);
+    }
+
+    @Test
+    void reservesOneTokenForAppendedEos() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode(eq("x"), anyInt())).thenReturn(
+                new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
+
+        try (var engine = immediateEosEngine(session, tokenizer)
+                .maxInputLength(10)
+                .appendEosToInput(true)
+                .build()) {
+            engine.generate("x");
+        }
+
+        verify(tokenizer).encode("x", 9);
+        verify(session).prefill(new long[]{1, 7});
+    }
+
+    @Test
+    void failGuardRejectsTruncatedPrompt() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        // Tokenizer kept 2 of 50 tokens
+        when(tokenizer.encode(eq("long prompt"), anyInt())).thenReturn(
+                new EncodedInput(new long[]{1, 2}, new long[]{1, 1}, new long[2], null, 50));
+
+        try (var engine = immediateEosEngine(session, tokenizer)
+                .maxInputLength(2)
+                .truncationGuard(new TruncationGuard("TestGenerator", TruncationPolicy.FAIL))
+                .build()) {
+            assertThatThrownBy(() -> engine.generate("long prompt"))
+                    .isInstanceOf(InputTooLongException.class)
+                    .hasMessageContaining("TestGenerator");
+        }
+        verify(session, never()).prefill(any());
+    }
+
+    @Test
+    void defaultGuardRunsTruncatedPrompt() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode(eq("long prompt"), anyInt())).thenReturn(
+                new EncodedInput(new long[]{1, 2}, new long[]{1, 1}, new long[2], null, 50));
+
+        try (var engine = immediateEosEngine(session, tokenizer).maxInputLength(2).build()) {
+            engine.generate("long prompt");
+        }
+
+        verify(session).prefill(new long[]{1, 2});
+    }
+
     private static float[] logitsForToken(int tokenId, int vocabSize) {
         float[] logits = new float[vocabSize];
         for (int i = 0; i < vocabSize; i++) {

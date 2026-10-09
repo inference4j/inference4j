@@ -16,6 +16,8 @@
 
 package io.github.inference4j.nlp;
 
+import io.github.inference4j.exception.InputTooLongException;
+import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.generation.GenerationResult;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -84,6 +86,33 @@ class MarianTranslatorModelTest {
             } finally {
                 limited.close();
             }
+        }
+    }
+
+    // Marian has 512 positions; longer input used to reach ONNX Runtime and crash
+    private static final String LONG_TEXT = "The weather is nice today and we are going to the park. ".repeat(60);
+
+    @Test
+    void truncatesInputBeyondModelLimitInsteadOfCrashing() throws Exception {
+        try (var translator = MarianTranslator.builder()
+                .modelId("inference4j/opus-mt-en-es")
+                .maxNewTokens(20)
+                .build()) {
+            GenerationResult result = translator.translate(LONG_TEXT, token -> {});
+
+            assertThat(result.promptTokens()).isLessThanOrEqualTo(512);
+            assertThat(result.text()).isNotBlank();
+        }
+    }
+
+    @Test
+    void failPolicyRejectsInputBeyondModelLimit() throws Exception {
+        try (var translator = MarianTranslator.builder()
+                .modelId("inference4j/opus-mt-en-es")
+                .truncation(TruncationPolicy.FAIL)
+                .build()) {
+            assertThatThrownBy(() -> translator.translate(LONG_TEXT, token -> {}))
+                    .isInstanceOf(InputTooLongException.class);
         }
     }
 }

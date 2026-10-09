@@ -16,11 +16,14 @@
 
 package io.github.inference4j.generation;
 
+import io.github.inference4j.processing.TruncationGuard;
+import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.sampling.CategoricalSampler;
 import io.github.inference4j.sampling.GreedySampler;
 import io.github.inference4j.sampling.LogitsProcessor;
 import io.github.inference4j.sampling.LogitsProcessors;
 import io.github.inference4j.sampling.LogitsSampler;
+import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.TokenDecoder;
 import io.github.inference4j.tokenizer.Tokenizer;
 
@@ -65,6 +68,8 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
     private final int maxNewTokens;
     private final Set<String> stopSequences;
     private final boolean appendEosToInput;
+    private final int maxInputLength;
+    private final TruncationGuard truncationGuard;
 
     private GenerationEngine(Builder builder) {
         this.session = builder.session;
@@ -75,6 +80,10 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         this.maxNewTokens = builder.maxNewTokens;
         this.stopSequences = Set.copyOf(builder.stopSequences);
         this.appendEosToInput = builder.appendEosToInput;
+        this.maxInputLength = builder.maxInputLength;
+        this.truncationGuard = builder.truncationGuard != null
+                ? builder.truncationGuard
+                : new TruncationGuard("GenerationEngine", TruncationPolicy.TRUNCATE);
         this.logitsProcessor = builder.buildLogitsProcessor();
         this.sampler = builder.buildSampler();
     }
@@ -93,7 +102,12 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         long startTime = System.nanoTime();
 
         String prompt = chatTemplate != null ? chatTemplate.format(input) : input;
-        long[] inputIds = tokenizer.encode(prompt).inputIds();
+        // Leave room for the EOS token appended below
+        int tokenLimit = appendEosToInput && maxInputLength != Integer.MAX_VALUE
+                ? maxInputLength - 1 : maxInputLength;
+        EncodedInput encoded = tokenizer.encode(prompt, tokenLimit);
+        truncationGuard.check(encoded, tokenLimit);
+        long[] inputIds = encoded.inputIds();
         if (appendEosToInput) {
             int eosId = eosTokenIds.iterator().next();
             inputIds = Arrays.copyOf(inputIds, inputIds.length + 1);
@@ -150,6 +164,8 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         private final Set<String> stopSequences = new LinkedHashSet<>();
 
         private boolean appendEosToInput = false;
+        private int maxInputLength = Integer.MAX_VALUE;
+        private TruncationGuard truncationGuard;
         private float temperature = 0f;
         private int topK = 0;
         private float topP = 0f;
@@ -191,6 +207,22 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
 
         public Builder appendEosToInput(boolean appendEos) {
             this.appendEosToInput = appendEos;
+            return this;
+        }
+
+        /**
+         * Maximum prompt length in tokens, including any appended EOS token. Longer prompts are
+         * handled by the {@link #truncationGuard(TruncationGuard) truncation guard}. Defaults to
+         * no limit.
+         */
+        public Builder maxInputLength(int maxInputLength) {
+            this.maxInputLength = maxInputLength;
+            return this;
+        }
+
+        /** Policy for prompts longer than {@link #maxInputLength(int)}. Defaults to truncating with a warning. */
+        public Builder truncationGuard(TruncationGuard truncationGuard) {
+            this.truncationGuard = truncationGuard;
             return this;
         }
 

@@ -27,6 +27,8 @@ import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.generation.OnnxGenerativeSession;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.TruncationGuard;
+import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.tokenizer.DecodingBpeTokenizer;
 import io.github.inference4j.tokenizer.SentencePieceBpeTokenizer;
@@ -40,6 +42,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -272,6 +275,8 @@ public class OnnxTextGenerator implements TextGenerator {
         private final Set<String> stopSequences = new LinkedHashSet<>();
         private final List<String> addedTokens = new ArrayList<>();
         private final List<String> extraFiles = new ArrayList<>();
+        private Integer maxInputLength;
+        private TruncationPolicy truncation;
 
         public Builder modelSource(ModelSource modelSource) {
             this.modelSource = modelSource;
@@ -325,6 +330,25 @@ public class OnnxTextGenerator implements TextGenerator {
 
         public Builder topP(float topP) {
             this.topP = topP;
+            return this;
+        }
+
+        /**
+         * Maximum prompt length in tokens. Defaults to the model's position limit from
+         * {@code config.json} minus {@link #maxNewTokens(int)}, since generated tokens share the
+         * same positions; no limit if {@code config.json} declares none.
+         */
+        public Builder maxInputLength(int maxInputLength) {
+            this.maxInputLength = maxInputLength;
+            return this;
+        }
+
+        /**
+         * What to do with prompts longer than {@link #maxInputLength(int)}. Defaults to
+         * {@link TruncationPolicy#TRUNCATE}, which keeps the first tokens and logs a warning.
+         */
+        public Builder truncation(TruncationPolicy truncation) {
+            this.truncation = truncation;
             return this;
         }
 
@@ -408,6 +432,8 @@ public class OnnxTextGenerator implements TextGenerator {
                         .tokenizer(this.tokenizer)
                         .decoder(this.decoder)
                         .maxNewTokens(this.maxNewTokens)
+                        .maxInputLength(resolveMaxInputLength(configPath))
+                        .truncationGuard(new TruncationGuard("OnnxTextGenerator", truncation))
                         .temperature(this.temperature)
                         .topK(this.topK)
                         .topP(this.topP);
@@ -431,6 +457,17 @@ public class OnnxTextGenerator implements TextGenerator {
                 throw new ModelLoadException(
                         "Failed to initialize model: " + e.getMessage(), e);
             }
+        }
+
+        private int resolveMaxInputLength(Path configPath) {
+            if (maxInputLength != null) {
+                return maxInputLength;
+            }
+            OptionalInt positions = ModelInputLimits.maxPositions(configPath);
+            if (positions.isPresent() && positions.getAsInt() > maxNewTokens) {
+                return positions.getAsInt() - maxNewTokens;
+            }
+            return Integer.MAX_VALUE;
         }
 
         private static Set<Integer> readEosTokenIds(Path configPath) {

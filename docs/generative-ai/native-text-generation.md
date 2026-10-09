@@ -117,6 +117,23 @@ the full text and timing information.
 | `.topP(float)` | `float` | `0.0` (disabled) | Nucleus sampling (keep tokens summing to P probability) |
 | `.eosTokenId(int)` | `int` | Auto-detected | End-of-sequence token ID (loaded from `config.json`) |
 | `.stopSequence(String)` | `String` | — | Stop sequence (can be called multiple times) |
+| `.maxInputLength(int)` | `int` | Model positions minus `maxNewTokens` | Maximum prompt length in tokens |
+| `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Longer prompts: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
+
+## Prompt length
+
+The prompt and the generated tokens share the model's positions (`max_position_embeddings` or `n_positions` in `config.json`). The default prompt limit is therefore that number minus `maxNewTokens`, for example 1024 − 256 = 768 tokens for GPT-2 with the default `maxNewTokens`. If `config.json` declares no limit, prompts are not truncated.
+
+| Case | Behavior |
+|------|----------|
+| Prompt within the limit | Sent in full |
+| Prompt over the limit | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` |
+
+!!! warning "Truncation keeps the start of the prompt"
+    Truncation drops the **end** of the prompt, which includes the chat template's closing tokens. A truncated chat prompt usually produces poor output. Use `FAIL` to detect over-long prompts and shorten them yourself.
+
+!!! note "Memory grows with prompt length"
+    Prefill currently materializes logits for every prompt position (`prompt length × vocabulary × 4 bytes`), for example about 490 MB for an 800-token Qwen2.5 prompt. Size the JVM heap accordingly for long prompts. This is tracked in [#69](https://github.com/inference4j/inference4j/issues/69).
 
 ## Result type
 

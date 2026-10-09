@@ -34,6 +34,8 @@ tasks.register('modelTest', Test) {
 
     // Models load multi-GB ONNX sessions — never run in parallel
     maxParallelForks = 1
+    // Prefill materializes [prompt length x vocabulary] logits; long-prompt LLM tests need the room
+    maxHeapSize = '4g'
     systemProperty 'junit.jupiter.execution.parallel.enabled', 'false'
 
     testLogging {
