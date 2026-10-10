@@ -1,15 +1,26 @@
 # Whisper Speech-to-Text
 
-!!! warning "Work in Progress"
-
-    `WhisperSpeechModel` is implemented but the pre-exported model artifact
-    (`inference4j/whisper-small-genai`) is not yet available on HuggingFace.
-    The onnxruntime Whisper converter has compatibility issues with current
-    Python package versions. This page documents the target API.
-
 Transcribe and translate speech using OpenAI's Whisper models, with automatic chunking for long audio.
 
 See the [overview](introduction.md) for background on how autoregressive generation differs from single-pass inference.
+
+## Models
+
+| Model ID | Parameters | Size | 11 s clip on CPU* |
+|----------|------------|------|-------------------|
+| `inference4j/whisper-tiny-genai` | 39M | ~225 MB | ~0.1 s |
+| `inference4j/whisper-small-genai` | 244M | ~1.1 GB | ~0.5 s |
+
+\* Measured on an Apple M4 Pro. Both are FP32 exports made with onnxruntime-genai's model builder,
+and download on first use.
+
+`small` transcribes noticeably better, including punctuation such as commas; `tiny` is the
+choice when size and speed matter most.
+
+!!! note "Verified for English transcription"
+
+    Our tests cover English transcription. Whisper also supports 98 other languages and
+    translation to English (shown below), but we have not verified those yet.
 
 ## Quick example
 
@@ -90,7 +101,7 @@ try (var whisper = WhisperSpeechModel.builder()
 | Field | Type | Description |
 |-------|------|-------------|
 | `text()` | `String` | The transcribed or translated text |
-| `segments()` | `List<Segment>` | Timed segments (when available) |
+| `segments()` | `List<Segment>` | Timed segments — always empty for Whisper, which runs without timestamps |
 
 Each `Segment` contains:
 
@@ -111,6 +122,12 @@ Whisper processes audio in 30-second windows. For audio longer than 30 seconds,
 
 This happens transparently — just call `transcribe()` with any length audio.
 
+!!! warning "Chunks are cut at fixed 30-second boundaries"
+
+    A cut can land in the middle of a word or sentence, and Whisper may then repeat or garble
+    a few words around the boundary. Cutting at pauses instead is tracked in
+    [#86](https://github.com/inference4j/inference4j/issues/86).
+
 ## How it works
 
 Unlike [Wav2Vec2](../use-cases/speech-to-text.md) (single-pass CTC), Whisper is an
@@ -124,7 +141,7 @@ flowchart LR
 ```
 
 All heavy lifting — mel spectrogram computation, encoder forward pass, autoregressive
-decoding, KV cache, beam search — is handled natively by onnxruntime-genai's C++ layer.
+decoding and the KV cache — is handled natively by onnxruntime-genai's C++ layer.
 
 ## Whisper vs Wav2Vec2
 
