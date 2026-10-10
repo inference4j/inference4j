@@ -85,13 +85,14 @@ public class SemanticSearch {
 | `.tokenizer(Tokenizer)` | `Tokenizer` | auto-loaded `WordPieceTokenizer` | Custom tokenizer |
 | `.maxLength(int)` | `int` | `512` | Maximum token sequence length |
 | `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Input longer than the token limit: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
+| `.stride(int)` | `int` | off | Score documents longer than `maxLength` with MaxP: passages sharing this many tokens, each scored with the full query; the highest score wins |
 
 ## Input length
 
 | Task | Limit | When exceeded | Long-input strategies |
 |------|-------|---------------|-----------------------|
 | Embedder | `maxLength` tokens (512 by default) | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | `.stride(int)`: windows averaged into one vector |
-| Reranker | `maxLength` tokens (512 by default) for query and document combined; the longer one is shortened first | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
+| Reranker | `maxLength` tokens (512 by default) for query and document combined; the longer one is shortened first | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | `.stride(int)`: MaxP over passages |
 
 An embedding of a truncated text only represents its beginning. There are two ways to cover long documents:
 
@@ -109,6 +110,32 @@ try (var embedder = SentenceTransformerEmbedder.builder()
 ```
 
 An averaged vector represents each part of the document in proportion to its length. A topic covered by one sentence in a long document carries little weight, which is why chunking is usually better for search. In a test with about 550 tokens about baking followed by about 250 about whales, a query about whales scored 0.04 cosine similarity against the truncated embedding and 0.21 against the averaged one.
+
+### Reranking long documents (MaxP)
+
+With `.stride(int)`, a document too long for one pass is split into passages, each passage is scored together with the full query, and the highest passage score is the document's score. This is the established "MaxP" technique.
+
+```java
+try (var reranker = MiniLMSearchReranker.builder()
+        .maxLength(128)
+        .stride(32)
+        .build()) {
+    float score = reranker.score("How many people live in Berlin?", longDocument);
+}
+```
+
+!!! warning "Keep passages short"
+    `ms-marco-MiniLM-L-6-v2` was trained on short MS MARCO passages, and a relevant sentence carries less weight the more unrelated text surrounds it. To measure this, we appended the sentence *"Berlin has a population of about 3.7 million people…"* to the end of 10 real news articles (each over 520 tokens), and scored them for the query *"How many people live in Berlin?"*:
+
+    | Setting | Mean score |
+    |---|---|
+    | No windowing (truncates at 512) | 0.000 |
+    | `stride(128)` with the default `maxLength(512)` | 0.076 |
+    | `maxLength(256).stride(64)` | 0.001 |
+    | **`maxLength(128).stride(32)`** | **0.962** (lowest 0.872) |
+    | The same articles without the sentence, MaxP | 0.000 |
+
+    Use `maxLength(128).stride(32)` for MaxP. The effect also applies without MaxP: when reranking retrieved chunks, shorter chunks (around 100–150 tokens) let a relevant passage stand out. With varied text, the drop is gradual: the same sentence preceded by about 150 to 240 tokens of other text still scored 0.80–0.92 on its own.
 
 ## Result types
 

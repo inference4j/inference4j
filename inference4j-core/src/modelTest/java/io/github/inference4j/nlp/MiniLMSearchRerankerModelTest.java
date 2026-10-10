@@ -83,4 +83,41 @@ class MiniLMSearchRerankerModelTest {
             assertThat(strict.score("what is java", "Java is a programming language.")).isBetween(0f, 1f);
         }
     }
+
+    private static final String QUERY = "How many people live in Berlin?";
+    // ~600 tokens of unrelated text, then the answer at the very end
+    private static final String LONG_DOCUMENT_ANSWER_AT_END =
+            "The orchestra rehearsed the symphony for weeks before the season opened in the autumn. ".repeat(40)
+                    + "Berlin has a population of about 3.7 million people, making it the largest city in Germany.";
+    private static final String LONG_DOCUMENT_IRRELEVANT =
+            "The orchestra rehearsed the symphony for weeks before the season opened in the autumn. ".repeat(41);
+
+    @Test
+    void strideScoresARelevantPassageBeyondTheTokenLimit() {
+        // ms-marco-MiniLM was trained on short passages; see the reranker docs for passage size
+        try (var maxP = MiniLMSearchReranker.builder().maxLength(128).stride(32).build()) {
+            float truncatedScore = reranker.score(QUERY, LONG_DOCUMENT_ANSWER_AT_END);
+            float maxPScore = maxP.score(QUERY, LONG_DOCUMENT_ANSWER_AT_END);
+
+            assertThat(truncatedScore).as("truncated: the answer is cut off").isLessThan(0.1f);
+            assertThat(maxPScore).as("MaxP: the answer passage is scored").isGreaterThan(0.5f);
+        }
+    }
+
+    @Test
+    void strideRanksTheDocumentWithTheAnswerFirst() {
+        try (var maxP = MiniLMSearchReranker.builder().maxLength(128).stride(32).build()) {
+            float[] scores = maxP.scoreBatch(QUERY, List.of(LONG_DOCUMENT_IRRELEVANT, LONG_DOCUMENT_ANSWER_AT_END));
+
+            assertThat(scores[1]).isGreaterThan(scores[0]);
+        }
+    }
+
+    @Test
+    void strideGivesSameScoreForShortDocuments() {
+        String document = "Berlin has a population of about 3.7 million people.";
+        try (var maxP = MiniLMSearchReranker.builder().stride(64).build()) {
+            assertThat(maxP.score(QUERY, document)).isEqualTo(reranker.score(QUERY, document));
+        }
+    }
 }
