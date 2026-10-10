@@ -39,10 +39,11 @@ import java.util.List;
 /**
  * Whisper speech model backed by onnxruntime-genai.
  *
- * <p>Wraps OpenAI Whisper models (tiny, base, small) for automatic speech
- * recognition and translation. Audio preprocessing (mel spectrogram),
- * autoregressive decoding, KV cache, and beam search are all handled
- * natively by onnxruntime-genai's C++ layer.
+ * <p>Wraps OpenAI Whisper models for automatic speech recognition and
+ * translation. Published exports: {@code inference4j/whisper-tiny-genai} and
+ * {@code inference4j/whisper-small-genai}. Audio preprocessing (mel spectrogram),
+ * autoregressive decoding and the KV cache are all handled natively by
+ * onnxruntime-genai's C++ layer.
  *
  * <h2>Transcription</h2>
  * <pre>{@code
@@ -71,6 +72,20 @@ import java.util.List;
 public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcription> {
 
 	private static final int CHUNK_DURATION_SECONDS = 30;
+
+	/**
+	 * Files of a Whisper model in onnxruntime-genai format, as written by genai's model builder.
+	 * Downloads fetch exactly these; local model sources ignore the list.
+	 */
+	private static final List<String> MODEL_FILES = List.of(
+			"genai_config.json",
+			"audio_processor_config.json",
+			"encoder.onnx",
+			"encoder.onnx.data",
+			"decoder.onnx",
+			"decoder.onnx.data",
+			"tokenizer.json",
+			"tokenizer_config.json");
 
 	private final MultiModalProcessor processor;
 	private final String language;
@@ -303,7 +318,7 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 				}
 				ModelSource source = modelSource != null
 						? modelSource : HuggingFaceModelSource.defaultInstance();
-				Path modelDir = source.resolve(modelId);
+				Path modelDir = source.resolve(modelId, MODEL_FILES);
 				Model m = null;
 				try {
 					m = new Model(modelDir.toString());

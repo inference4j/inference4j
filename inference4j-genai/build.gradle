@@ -23,6 +23,10 @@ configurations {
 
 tasks.named('processModelTestResources') {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    // Share core's speech fixture rather than keeping a second copy of the WAV
+    from('../inference4j-core/src/modelTest/resources') {
+        include 'fixtures/speech.wav'
+    }
 }
 
 tasks.register('modelTest', Test) {
