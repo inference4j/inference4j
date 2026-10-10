@@ -115,7 +115,7 @@ env.unregisterExecutionProviderLibrary("my_ep");
 !!! note "Requires ONNX Runtime 1.24.3 or later"
 
     `registerExecutionProviderLibrary()`, `getEpDevices()` and `addExecutionProvider()` are not
-    present in 1.23. inference4j depends on ONNX Runtime 1.26.0 as of 0.10.1, so they are
+    present in 1.23. inference4j depends on ONNX Runtime 1.28.0 as of 0.13.0, so they are
     available with no extra setup.
 
 ## The `sessionOptions` API
