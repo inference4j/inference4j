@@ -21,6 +21,7 @@ import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.session.SessionConfigurer;
@@ -72,11 +73,14 @@ public class SentenceTransformerEmbedder
     private final boolean normalize;
     private final String textPrefix;
     private final int maxLength;
+    private final Integer stride;
+    private final long[] prefixIds;
 
     private SentenceTransformerEmbedder(InferenceSession session, Tokenizer tokenizer,
                                         PoolingStrategy poolingStrategy, boolean normalize,
                                         String textPrefix, int maxLength,
-                                        TruncationGuard truncationGuard) {
+                                        TruncationGuard truncationGuard, Integer stride,
+                                        long[] prefixIds) {
         super(session,
                 createPreprocessor(tokenizer, maxLength, session.inputNames(), textPrefix, truncationGuard),
                 ctx -> {
@@ -95,6 +99,8 @@ public class SentenceTransformerEmbedder
         this.normalize = normalize;
         this.textPrefix = textPrefix;
         this.maxLength = maxLength;
+        this.stride = stride;
+        this.prefixIds = prefixIds;
     }
 
     /**
@@ -114,7 +120,69 @@ public class SentenceTransformerEmbedder
      */
     @Override
     public float[] encode(String text) {
-        return run(text);
+        if (stride == null) {
+            return run(text);
+        }
+        String input = textPrefix != null ? textPrefix + text : text;
+        long[] ids = tokenizer.encode(input, Integer.MAX_VALUE).inputIds();
+        if (ids.length <= maxLength) {
+            return run(text);
+        }
+        return encodeInWindows(ids);
+    }
+
+    /**
+     * Embeds each window of a long input and averages the window embeddings, weighting each by the
+     * tokens it owns, so every token counts once. The text prefix is repeated in every window.
+     */
+    private float[] encodeInWindows(long[] ids) {
+        int contentStart = 1 + prefixIds.length;                    // after [CLS] and the prefix
+        int contentCount = ids.length - contentStart - 1;            // before [SEP]
+        int windowSize = maxLength - 2 - prefixIds.length;
+
+        List<float[]> embeddings = new ArrayList<>();
+        List<Integer> weights = new ArrayList<>();
+        for (TokenWindows.Window window : TokenWindows.plan(contentCount, windowSize, stride)) {
+            int windowTokens = window.end() - window.start();
+            long[] windowIds = new long[windowTokens + prefixIds.length + 2];
+            windowIds[0] = ids[0];
+            System.arraycopy(prefixIds, 0, windowIds, 1, prefixIds.length);
+            System.arraycopy(ids, contentStart + window.start(), windowIds, 1 + prefixIds.length, windowTokens);
+            windowIds[windowIds.length - 1] = ids[ids.length - 1];
+
+            long[] attentionMask = new long[windowIds.length];
+            Arrays.fill(attentionMask, 1L);
+            long[] shape = {1, windowIds.length};
+            Map<String, Tensor> inputs = new LinkedHashMap<>();
+            inputs.put("input_ids", Tensor.fromLongs(windowIds, shape));
+            inputs.put("attention_mask", Tensor.fromLongs(attentionMask, shape));
+            if (session.inputNames().contains("token_type_ids")) {
+                inputs.put("token_type_ids", Tensor.fromLongs(new long[windowIds.length], shape));
+            }
+            Tensor output = session.run(inputs).values().iterator().next();
+            embeddings.add(applyPooling(output.toFloats(), output.shape(), attentionMask, poolingStrategy));
+            weights.add(window.ownedEnd() - window.ownedStart());
+        }
+
+        float[] average = weightedAverage(embeddings, weights);
+        return normalize ? MathOps.l2Normalize(average) : average;
+    }
+
+    static float[] weightedAverage(List<float[]> vectors, List<Integer> weights) {
+        float[] result = new float[vectors.get(0).length];
+        long total = 0;
+        for (int i = 0; i < vectors.size(); i++) {
+            float[] vector = vectors.get(i);
+            int weight = weights.get(i);
+            for (int d = 0; d < result.length; d++) {
+                result[d] += vector[d] * weight;
+            }
+            total += weight;
+        }
+        for (int d = 0; d < result.length; d++) {
+            result[d] /= total;
+        }
+        return result;
     }
 
     /**
@@ -234,6 +302,7 @@ public class SentenceTransformerEmbedder
         private String textPrefix;
         private int maxLength = 512;
         private TruncationPolicy truncation;
+        private Integer stride;
 
         Builder session(InferenceSession session) {
             this.session = session;
@@ -348,6 +417,21 @@ public class SentenceTransformerEmbedder
          * @throws IllegalStateException if {@code modelId} is not set
          * @throws ModelSourceException if model files cannot be found or loaded
          */
+        /**
+         * Embeds input longer than {@code maxLength} in full: the text is split into windows that
+         * share {@code stride} tokens, each window is embedded, and the result is the average of the
+         * window embeddings weighted by the tokens each window covers. {@code 0} gives consecutive,
+         * non-overlapping chunks. Off by default. When set, input is never truncated, so
+         * {@link #truncation(TruncationPolicy)} does not apply.
+         *
+         * <p>Splitting documents into chunks before embedding usually retrieves better than one
+         * averaged vector; use this when a single vector per document is required.
+         */
+        public Builder stride(int stride) {
+            this.stride = stride;
+            return this;
+        }
+
         public SentenceTransformerEmbedder build() {
             if (session == null) {
                 if (modelId == null) {
@@ -362,9 +446,21 @@ public class SentenceTransformerEmbedder
             if (tokenizer == null) {
                 throw new IllegalStateException("Tokenizer is required");
             }
+            long[] prefixIds = new long[0];
+            if (stride != null) {
+                if (textPrefix != null) {
+                    long[] encoded = tokenizer.encode(textPrefix, Integer.MAX_VALUE).inputIds();
+                    prefixIds = Arrays.copyOfRange(encoded, 1, encoded.length - 1);   // without [CLS]/[SEP]
+                }
+                int windowSize = maxLength - 2 - prefixIds.length;
+                if (stride < 0 || stride >= windowSize) {
+                    throw new IllegalArgumentException("stride must be in [0, " + windowSize + ") for maxLength "
+                            + maxLength + (prefixIds.length > 0 ? " and the text prefix" : "") + ", got " + stride);
+                }
+            }
             return new SentenceTransformerEmbedder(session, tokenizer, poolingStrategy,
                     normalize, textPrefix, maxLength,
-                    new TruncationGuard("SentenceTransformerEmbedder", truncation));
+                    new TruncationGuard("SentenceTransformerEmbedder", truncation), stride, prefixIds);
         }
 
         private void loadFromDirectory(Path dir) {
