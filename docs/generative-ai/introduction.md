@@ -29,19 +29,26 @@ inference4j implements the full autoregressive loop in Java on top of standard O
 **Pros:**
 
 - The entire loop (including tokenization and KV cache) runs in native C++, maximizing throughput
-- Supports multimodal models (Phi-3.5 Vision) where image preprocessing is handled natively
+- Broad, fast-growing architecture coverage maintained by Microsoft — Llama, Mistral, Qwen, Phi,
+  Gemma, DeepSeek, gpt-oss, Granite, and more
+- Handles multimodal preprocessing natively — image processing for vision-language models
+  (Phi-3.5 Vision) and audio feature extraction for speech models (Whisper)
 
 **Cons:**
 
-- Models must be exported in onnxruntime-genai's specific format — few are available today
-- The library is still in preview and community support is limited
-- Requires a separate native dependency (`onnxruntime-genai`) that we build and publish ourselves since Microsoft does not currently publish Java bindings to Maven Central
+- Models must be exported in onnxruntime-genai's format (a model folder with `genai_config.json`),
+  either prebuilt or produced with its model builder
+- The Java API is still in preview and may change between releases
+- Requires a second native library (`onnxruntime-genai`), which we redistribute on Maven Central
+  from Microsoft's official Java release
+- No encoder-decoder text models — T5, BART and MarianMT run on the native engine only
 - GPU support is not available in the Java bindings
 
-!!! warning "onnxruntime-genai is experimental"
+!!! warning "Preview API"
 
-    The `inference4j-genai` module wraps a library in preview. The API may change
-    between releases.
+    onnxruntime-genai's Java API is still in preview upstream, so `inference4j-genai` may
+    change between releases. Each genai upgrade is verified against real models before
+    it ships.
 
 ### Versions
 
@@ -62,11 +69,22 @@ official onnxruntime-genai Java release JAR on Maven Central:
     dependency that `inference4j-core` brings in. If you override the ONNX Runtime
     version yourself, keep it at or above the version in the table above.
 
-### Where we're heading
+### Which one to use
 
-The native generation approach is the future. It unlocks any ONNX model on HuggingFace that exports with KV cache support — hundreds of models — without depending on a third-party native library. It supports both **decoder-only** models (GPT-2, SmolLM2, Qwen2.5, Gemma 2, TinyLlama) and **encoder-decoder** models (Flan-T5, BART, MarianMT, CoEdIT).
+The two engines are complementary, and each has a clear job:
 
-The onnxruntime-genai path remains valuable for models that need native multimodal preprocessing (like Phi-3.5 Vision) and for users who prefer the optimized C++ loop.
+| Use case | Engine | Why |
+|----------|--------|-----|
+| Chat and instruction LLMs (Llama, Qwen, Phi, Gemma, DeepSeek, …) | **onnxruntime-genai** | Upstream keeps pace with new architectures; we wrap them instead of re-implementing each one |
+| Vision-language (Phi-3.5 Vision) | **onnxruntime-genai** | Image preprocessing runs natively |
+| Speech-to-text with Whisper | **onnxruntime-genai** | Audio feature extraction runs natively |
+| Summarization, translation, grammar correction (Flan-T5, BART, MarianMT, CoEdIT) | **Native** | Encoder-decoder text models are not supported by onnxruntime-genai |
+| Small decoder models from a standard HuggingFace ONNX export (GPT-2, SmolLM2, TinyLlama) | **Native** | No genai export needed, and no extra native library |
+
+New LLM, vision-language and speech architectures will come through `inference4j-genai`.
+The native engine stays fully supported for encoder-decoder models and for anything
+onnxruntime-genai does not cover, and it remains the option when you want ONNX Runtime
+as your only native dependency.
 
 ## The autoregressive loop
 
