@@ -27,11 +27,6 @@ public class SpeechToText {
 }
 ```
 
-<figure markdown="span">
-  ![Screenshot from showcase app](../assets/images/speech-to-text.png)
-  <figcaption>Screenshot from showcase app</figcaption>
-</figure>
-
 ## From raw audio data
 
 If you already have audio samples as a float array:
@@ -46,16 +41,24 @@ try (var recognizer = Wav2Vec2Recognizer.builder().build()) {
 
 ## Readable transcripts
 
-Wav2Vec2 returns upper-case text with no punctuation. Wrap the recognizer in `PunctuatedSpeechRecognizer` to restore punctuation, casing and sentence boundaries:
+Wav2Vec2 returns upper-case text with no punctuation, which is hard to read and a poor input for cased models such as [named entity recognition](named-entity-recognition.md). Wrap the recognizer in `PunctuatedSpeechRecognizer` to restore punctuation, casing and sentence boundaries:
 
 ```java
 try (SpeechRecognizer recognizer = new PunctuatedSpeechRecognizer(
         Wav2Vec2Recognizer.builder().build(),
-        PunctCapSegModel.builder().build())) {
+        PunctCapSegModel.builder().stride(64).build())) {
     System.out.println(recognizer.transcribe(Path.of("speech.wav")).text());
-    // "Marie Curie moved to Paris." instead of "MARIE CURIE MOVED TO PARIS"
 }
 ```
+
+The wrapper is itself a `SpeechRecognizer`, so it can be used anywhere a recognizer is expected. It formats only the transcript text, and closing it closes both the recognizer and the punctuation model. `stride(64)` lets the punctuation model format transcripts of any length; without it, text beyond about 200 words is truncated.
+
+The showcase app shows the difference on the same recording: the formatted transcript, with the raw Wav2Vec2 output below it for comparison.
+
+<figure markdown="span">
+  ![Showcase app: punctuated transcript above the raw Wav2Vec2 output](../assets/images/speech-to-text-punctuation.png)
+  <figcaption>Wav2Vec2 wrapped in PunctuatedSpeechRecognizer, compared with the raw output</figcaption>
+</figure>
 
 See [Punctuation & Casing](punctuation-and-casing.md) for details and input limits.
 
