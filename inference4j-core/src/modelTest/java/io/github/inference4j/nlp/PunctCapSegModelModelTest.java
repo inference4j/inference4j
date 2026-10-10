@@ -103,4 +103,31 @@ class PunctCapSegModelModelTest {
             assertThat(strict.infer("marie curie moved to paris")).isNotEmpty();
         }
     }
+
+    // Well over the 254-piece window
+    private static final String LONG_TRANSCRIPT = "marie curie moved to paris she won two nobel prizes ".repeat(60);
+
+    private static List<String> words(List<String> sentences) {
+        return java.util.Arrays.stream(String.join(" ", sentences).toLowerCase()
+                        .replaceAll("[^a-z' ]", " ").trim().split("\\s+"))
+                .toList();
+    }
+
+    @Test
+    void strideFormatsInputBeyondTheWindowInFull() {
+        try (var windowed = PunctCapSegModel.builder().stride(64).build()) {
+            List<String> sentences = windowed.infer(LONG_TRANSCRIPT);
+
+            assertThat(words(sentences)).isEqualTo(List.of(LONG_TRANSCRIPT.trim().split("\\s+")));
+            assertThat(sentences).allSatisfy(s -> assertThat(s).isNotBlank());
+            assertThat(String.join(" ", sentences)).contains("Marie Curie", "Paris", "Nobel");
+        }
+    }
+
+    @Test
+    void withoutStrideInputBeyondTheWindowIsCut() {
+        List<String> sentences = model.infer(LONG_TRANSCRIPT);
+
+        assertThat(words(sentences).size()).isLessThan(LONG_TRANSCRIPT.trim().split("\\s+").length);
+    }
 }

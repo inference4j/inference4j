@@ -24,6 +24,7 @@ import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.preprocessing.text.ModelConfig;
@@ -36,6 +37,7 @@ import io.github.inference4j.tokenizer.WordPieceTokenizer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,17 +83,20 @@ public class BertNerRecognizer
     private final Tokenizer tokenizer;
     private final ModelConfig config;
     private final int maxLength;
+    private final Integer stride;
 
     static final String WORD_IDS_KEY = "wordIds";
 
     private BertNerRecognizer(InferenceSession session, Tokenizer tokenizer,
-                              ModelConfig config, int maxLength, TruncationGuard truncationGuard) {
+                              ModelConfig config, int maxLength, TruncationGuard truncationGuard,
+                              Integer stride) {
         super(session,
                 createPreprocessor(tokenizer, maxLength, session.inputNames(), truncationGuard),
                 ctx -> postProcess(ctx, config));
         this.tokenizer = tokenizer;
         this.config = config;
         this.maxLength = maxLength;
+        this.stride = stride;
     }
 
     public static Builder builder() {
@@ -100,7 +105,44 @@ public class BertNerRecognizer
 
     @Override
     public List<NamedEntity> recognize(String text) {
-        return run(text);
+        if (stride == null) {
+            return run(text);
+        }
+        EncodedInput full = tokenizer.encode(text, Integer.MAX_VALUE);
+        if (full.inputIds().length <= maxLength) {
+            return run(text);
+        }
+        return recognizeInWindows(text, full);
+    }
+
+    /**
+     * Runs the model over overlapping windows of the full token sequence, keeping each token's label
+     * from the window where it is most central, then aggregates entities over the whole text.
+     */
+    private List<NamedEntity> recognizeInWindows(String text, EncodedInput full) {
+        long[] ids = full.inputIds();               // [CLS] content… [SEP]
+        int length = ids.length;
+        String[] labels = new String[length];
+        float[] scores = new float[length];
+
+        for (TokenWindows.Window window : TokenWindows.plan(length - 2, maxLength - 2, stride)) {
+            int windowTokens = window.end() - window.start();
+            long[] windowIds = new long[windowTokens + 2];
+            windowIds[0] = ids[0];
+            System.arraycopy(ids, 1 + window.start(), windowIds, 1, windowTokens);
+            windowIds[windowTokens + 1] = ids[length - 1];
+
+            long[] attentionMask = new long[windowIds.length];
+            Arrays.fill(attentionMask, 1L);       // single segment, no padding
+            Tensor output = session.run(buildInputs(windowIds, attentionMask,
+                            new long[windowIds.length], session.inputNames()))
+                    .values().iterator().next();
+            float[][] logits = output.squeeze(0).toFloats2D();
+            for (int t = window.ownedStart(); t < window.ownedEnd(); t++) {
+                labelToken(logits[1 + t - window.start()], config, labels, scores, 1 + t);
+            }
+        }
+        return aggregateEntities(text, labels, scores, full.wordIds(), length);
     }
 
     static List<NamedEntity> postProcess(InferenceContext<String> ctx, ModelConfig config) {
@@ -117,13 +159,18 @@ public class BertNerRecognizer
         String[] tokenLabels = new String[seqLen];
         float[] tokenScores = new float[seqLen];
         for (int t = 0; t < seqLen; t++) {
-            float[] probs = MathOps.softmax(tokenLogits[t]);
-            int bestIdx = argmax(probs);
-            tokenLabels[t] = config.label(bestIdx);
-            tokenScores[t] = probs[bestIdx];
+            labelToken(tokenLogits[t], config, tokenLabels, tokenScores, t);
         }
 
         return aggregateEntities(originalText, tokenLabels, tokenScores, wordIds, seqLen);
+    }
+
+    private static void labelToken(float[] logits, ModelConfig config,
+                                   String[] labels, float[] scores, int position) {
+        float[] probs = MathOps.softmax(logits);
+        int bestIdx = argmax(probs);
+        labels[position] = config.label(bestIdx);
+        scores[position] = probs[bestIdx];
     }
 
     static List<NamedEntity> aggregateEntities(String originalText,
@@ -239,15 +286,22 @@ public class BertNerRecognizer
         return text -> {
             EncodedInput encoded = tokenizer.encode(text, maxLength);
             truncationGuard.check(encoded, maxLength);
-            long[] shape = {1, encoded.inputIds().length};
-            Map<String, Tensor> inputs = new LinkedHashMap<>();
-            inputs.put("input_ids", Tensor.fromLongs(encoded.inputIds(), shape));
-            inputs.put("attention_mask", Tensor.fromLongs(encoded.attentionMask(), shape));
-            if (expectedInputs.contains("token_type_ids")) {
-                inputs.put("token_type_ids", Tensor.fromLongs(encoded.tokenTypeIds(), shape));
-            }
-            return PreprocessResult.of(inputs, Map.of(WORD_IDS_KEY, encoded.wordIds()));
+            return PreprocessResult.of(
+                    buildInputs(encoded.inputIds(), encoded.attentionMask(), encoded.tokenTypeIds(), expectedInputs),
+                    Map.of(WORD_IDS_KEY, encoded.wordIds()));
         };
+    }
+
+    private static Map<String, Tensor> buildInputs(long[] inputIds, long[] attentionMask,
+                                                   long[] tokenTypeIds, Set<String> expectedInputs) {
+        long[] shape = {1, inputIds.length};
+        Map<String, Tensor> inputs = new LinkedHashMap<>();
+        inputs.put("input_ids", Tensor.fromLongs(inputIds, shape));
+        inputs.put("attention_mask", Tensor.fromLongs(attentionMask, shape));
+        if (expectedInputs.contains("token_type_ids")) {
+            inputs.put("token_type_ids", Tensor.fromLongs(tokenTypeIds, shape));
+        }
+        return inputs;
     }
 
     record WordLabel(int wordIndex, String label, float score) {
@@ -265,6 +319,7 @@ public class BertNerRecognizer
         private ModelConfig config;
         private int maxLength = DEFAULT_MAX_LENGTH;
         private TruncationPolicy truncation;
+        private Integer stride;
 
         Builder session(InferenceSession session) {
             this.session = session;
@@ -310,7 +365,24 @@ public class BertNerRecognizer
             return this;
         }
 
+        /**
+         * Processes input longer than {@code maxLength} in full, as overlapping windows that share
+         * {@code stride} tokens; each token keeps its label from the window where it is most central.
+         * A typical value is 128. Off by default. When set, input is never truncated, so
+         * {@link #truncation(TruncationPolicy)} does not apply.
+         *
+         * @param stride tokens shared by consecutive windows, in {@code [1, maxLength - 2)}
+         */
+        public Builder stride(int stride) {
+            this.stride = stride;
+            return this;
+        }
+
         public BertNerRecognizer build() {
+            if (stride != null && (stride < 1 || stride >= maxLength - 2)) {
+                throw new IllegalArgumentException(
+                        "stride must be in [1, maxLength - 2), got " + stride + " for maxLength " + maxLength);
+            }
             if (session == null) {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
@@ -325,7 +397,7 @@ public class BertNerRecognizer
                 throw new IllegalStateException("ModelConfig is required");
             }
             return new BertNerRecognizer(session, tokenizer, config, maxLength,
-                    new TruncationGuard("BertNerRecognizer", truncation));
+                    new TruncationGuard("BertNerRecognizer", truncation), stride);
         }
 
         private void loadFromDirectory(Path dir) {

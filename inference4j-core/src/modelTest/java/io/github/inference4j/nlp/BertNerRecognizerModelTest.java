@@ -17,13 +17,17 @@
 package io.github.inference4j.nlp;
 
 import io.github.inference4j.exception.InputTooLongException;
+import io.github.inference4j.model.HuggingFaceModelSource;
+import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationPolicy;
+import io.github.inference4j.tokenizer.WordPieceTokenizer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -139,5 +143,95 @@ class BertNerRecognizerModelTest {
                     .isInstanceOf(InputTooLongException.class);
             assertThat(strict.recognize("Marie Curie worked in Paris.")).isNotEmpty();
         }
+    }
+
+    // Over 512 tokens; entities in the middle and only at the very end
+    private static final String FILLER =
+            "Researchers in the laboratory measured samples, recorded the results, and compared them "
+                    + "with earlier experiments carefully. ";
+    private static final String LONG_DOCUMENT = FILLER.repeat(15)
+            + "Albert Einstein visited Leonardo da Vinci's workshop in Florence. "
+            + FILLER.repeat(15)
+            + "Later that evening Marie Curie arrived in Warsaw.";
+
+    @Test
+    void strideFindsEntitiesAcrossTheWholeDocument() {
+        // distilbert-NER is most accurate on windows of about 256 tokens; see the NER docs
+        try (var ner = BertNerRecognizer.builder().maxLength(256).stride(64).build()) {
+            List<NamedEntity> entities = ner.recognize(LONG_DOCUMENT);
+
+            assertThat(entities).extracting(NamedEntity::text, NamedEntity::label).contains(
+                    org.assertj.core.groups.Tuple.tuple("Albert Einstein", "PER"),
+                    org.assertj.core.groups.Tuple.tuple("Leonardo da Vinci", "PER"),
+                    org.assertj.core.groups.Tuple.tuple("Florence", "LOC"),
+                    org.assertj.core.groups.Tuple.tuple("Marie Curie", "PER"),
+                    org.assertj.core.groups.Tuple.tuple("Warsaw", "LOC"));
+            for (NamedEntity e : entities) {
+                assertThat(LONG_DOCUMENT.substring(e.start(), e.end())).isEqualTo(e.text());
+            }
+        }
+    }
+
+    @Test
+    void withoutStrideEntitiesBeyondTheTokenLimitAreMissed() {
+        try (var ner = BertNerRecognizer.builder().build()) {
+            List<NamedEntity> entities = ner.recognize(LONG_DOCUMENT);
+
+            assertThat(entities).noneSatisfy(e -> assertThat(e.text()).isEqualTo("Marie Curie"));
+        }
+    }
+
+    @Test
+    void strideGivesSameResultForShortText() {
+        String text = "Marie Curie worked at the University of Paris in France.";
+        try (var plain = BertNerRecognizer.builder().build();
+             var windowed = BertNerRecognizer.builder().stride(128).build()) {
+            assertThat(windowed.recognize(text)).isEqualTo(plain.recognize(text));
+        }
+    }
+
+    @Test
+    void strideKeepsAnEntityThatStraddlesAWindowBoundaryWhole() throws Exception {
+        // Windows of 128 tokens (126 content tokens) overlapping by 32: ownership passes from the
+        // first window to the second at content token 110. Place "Marie Curie" across that boundary.
+        int maxLength = 128;
+        int stride = 32;
+        Path vocab = HuggingFaceModelSource.defaultInstance()
+                .resolve("inference4j/distilbert-NER", List.of("model.onnx", "vocab.txt", "config.json"))
+                .resolve("vocab.txt");
+        WordPieceTokenizer tokenizer = WordPieceTokenizer.fromVocabFile(vocab, false);
+        String tail = " Marie Curie arrived in Warsaw. " + "Researchers recorded the results carefully. ".repeat(20);
+
+        try (var ner = BertNerRecognizer.builder().maxLength(maxLength).stride(stride).build()) {
+            for (int shift = -2; shift <= 1; shift++) {
+                String text = prefixOfTokens(tokenizer, 110 + shift) + tail;
+                int contentTokens = tokenizer.encode(text, Integer.MAX_VALUE).inputIds().length - 2;
+                int boundary = TokenWindows.plan(contentTokens, maxLength - 2, stride).get(0).ownedEnd();
+                assertThat(boundary).as("first ownership boundary").isEqualTo(110);
+
+                List<NamedEntity> people = ner.recognize(text).stream()
+                        .filter(e -> e.label().equals("PER"))
+                        .toList();
+
+                assertThat(people).as("entity starting at content token %d", 110 + shift).hasSize(1);
+                NamedEntity person = people.get(0);
+                assertThat(person.text()).isEqualTo("Marie Curie");
+                assertThat(text.substring(person.start(), person.end())).isEqualTo("Marie Curie");
+            }
+        }
+    }
+
+    /** A filler text that tokenizes to exactly {@code tokens} content tokens. */
+    private static String prefixOfTokens(WordPieceTokenizer tokenizer, int tokens) {
+        String[] words = {"researchers", "measured", "the", "samples", "and", "compared", "results"};
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; tokenizer.encode(text.toString(), Integer.MAX_VALUE).inputIds().length - 2 < tokens; i++) {
+            text.append(text.length() == 0 ? "" : " ").append(words[i % words.length]);
+        }
+        int count = tokenizer.encode(text.toString(), Integer.MAX_VALUE).inputIds().length - 2;
+        if (count != tokens) {
+            throw new IllegalStateException("filler produced " + count + " tokens, wanted " + tokens);
+        }
+        return text.toString();
     }
 }

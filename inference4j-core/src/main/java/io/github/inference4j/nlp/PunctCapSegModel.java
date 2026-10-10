@@ -24,6 +24,7 @@ import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.processing.Preprocessor;
@@ -57,8 +58,8 @@ import java.util.Map;
  * }</pre>
  *
  * <p>Input is lower-cased, stripped of punctuation (apostrophes are kept) and whitespace-collapsed
- * before tokenization. Input longer than {@code maxLength} tokens is handled according to
- * {@link Builder#truncation(TruncationPolicy)}.
+ * before tokenization. Input longer than {@code maxLength} tokens is truncated according to
+ * {@link Builder#truncation(TruncationPolicy)}, or processed in full with {@link Builder#stride(int)}.
  *
  * <p>Not thread-safe: the tokenizer's streaming decoder keeps state between calls.
  */
@@ -74,11 +75,18 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
     private static final String[] POST_PUNCTUATION = {"", "", ".", ",", "?"};
     private static final int CAP_CHARS_PER_TOKEN = 16;
 
+    private final UnigramTokenizer tokenizer;
+    private final int maxLength;
+    private final Integer stride;
+
     private PunctCapSegModel(InferenceSession session, UnigramTokenizer tokenizer, int maxLength,
-                             TruncationGuard truncationGuard) {
+                             TruncationGuard truncationGuard, Integer stride) {
         super(session,
                 createPreprocessor(tokenizer, maxLength, truncationGuard),
                 ctx -> postProcess(ctx, tokenizer));
+        this.tokenizer = tokenizer;
+        this.maxLength = maxLength;
+        this.stride = stride;
     }
 
     public static Builder builder() {
@@ -91,7 +99,59 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
      * @return the sentences in order; empty if the input has no words
      */
     public List<String> infer(String text) {
-        return run(text);
+        if (stride == null) {
+            return run(text);
+        }
+        long[] pieces = tokenizer.encode(normalize(text), Integer.MAX_VALUE).inputIds();
+        if (pieces.length <= maxLength - 2) {
+            return run(text);
+        }
+        return inferInWindows(text, pieces);
+    }
+
+    /**
+     * Runs the model over overlapping windows of the full piece sequence, keeps each token's
+     * predictions from the window where it is most central, and post-processes the whole sequence.
+     */
+    private List<String> inferInWindows(String text, long[] pieces) {
+        int length = pieces.length + 2;             // BOS + pieces + EOS
+        long[] ids = withBosEos(pieces, 0, pieces.length);
+        long[] punctuation = new long[length];
+        boolean[] capitals = new boolean[length * CAP_CHARS_PER_TOKEN];
+        boolean[] sentenceEnds = new boolean[length];
+
+        for (TokenWindows.Window window : TokenWindows.plan(pieces.length, maxLength - 2, stride)) {
+            long[] windowIds = withBosEos(pieces, window.start(), window.end());
+            Map<String, Tensor> outputs = session.run(Map.of("input_ids",
+                    Tensor.fromLongs(windowIds, new long[]{1, windowIds.length})));
+            long[] windowPunctuation = outputs.get("post_preds").toLongs();
+            boolean[] windowCapitals = outputs.get("cap_preds").toBooleans();
+            boolean[] windowSentenceEnds = outputs.get("seg_preds").toBooleans();
+
+            for (int t = window.ownedStart(); t < window.ownedEnd(); t++) {
+                int from = 1 + t - window.start();  // skip BOS in both sequences
+                int to = 1 + t;
+                punctuation[to] = windowPunctuation[from];
+                sentenceEnds[to] = windowSentenceEnds[from];
+                System.arraycopy(windowCapitals, from * CAP_CHARS_PER_TOKEN,
+                        capitals, to * CAP_CHARS_PER_TOKEN, CAP_CHARS_PER_TOKEN);
+            }
+        }
+
+        Map<String, Tensor> outputs = Map.of(
+                "post_preds", Tensor.fromLongs(punctuation, new long[]{1, length}),
+                "cap_preds", Tensor.fromBooleans(capitals, new long[]{1, length, CAP_CHARS_PER_TOKEN}),
+                "seg_preds", Tensor.fromBooleans(sentenceEnds, new long[]{1, length}));
+        Map<String, Tensor> inputs = Map.of("input_ids", Tensor.fromLongs(ids, new long[]{1, length}));
+        return postProcess(new InferenceContext<>(text, inputs, outputs), tokenizer);
+    }
+
+    private static long[] withBosEos(long[] pieces, int from, int to) {
+        long[] ids = new long[to - from + 2];
+        ids[0] = BOS_ID;
+        System.arraycopy(pieces, from, ids, 1, to - from);
+        ids[ids.length - 1] = EOS_ID;
+        return ids;
     }
 
     private static Preprocessor<String, PreprocessResult> createPreprocessor(
@@ -101,10 +161,7 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
             EncodedInput encoded = tokenizer.encode(normalize(text), maxPieces);
             truncationGuard.check(encoded, maxPieces);
             long[] pieces = encoded.inputIds();
-            long[] ids = new long[pieces.length + 2];
-            ids[0] = BOS_ID;
-            System.arraycopy(pieces, 0, ids, 1, pieces.length);
-            ids[ids.length - 1] = EOS_ID;
+            long[] ids = withBosEos(pieces, 0, pieces.length);
             return PreprocessResult.of(Map.of("input_ids", Tensor.fromLongs(ids, new long[]{1, ids.length})));
         };
     }
@@ -162,6 +219,7 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
         private UnigramTokenizer tokenizer;
         private int maxLength = DEFAULT_MAX_LENGTH;
         private TruncationPolicy truncation;
+        private Integer stride;
 
         Builder session(InferenceSession session) {
             this.session = session;
@@ -203,7 +261,24 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
             return this;
         }
 
+        /**
+         * Processes input longer than {@code maxLength} in full, as overlapping windows that share
+         * {@code stride} tokens; each token keeps its predictions from the window where it is most
+         * central. A typical value is 64. Off by default. When set, input is never truncated, so
+         * {@link #truncation(TruncationPolicy)} does not apply.
+         *
+         * @param stride tokens shared by consecutive windows, in {@code [1, maxLength - 2)}
+         */
+        public Builder stride(int stride) {
+            this.stride = stride;
+            return this;
+        }
+
         public PunctCapSegModel build() {
+            if (stride != null && (stride < 1 || stride >= maxLength - 2)) {
+                throw new IllegalArgumentException(
+                        "stride must be in [1, maxLength - 2), got " + stride + " for maxLength " + maxLength);
+            }
             if (session == null) {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
@@ -214,7 +289,7 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
                 throw new IllegalStateException("Tokenizer is required");
             }
             return new PunctCapSegModel(session, tokenizer, maxLength,
-                    new TruncationGuard("PunctCapSegModel", truncation));
+                    new TruncationGuard("PunctCapSegModel", truncation), stride);
         }
 
         private void loadFromDirectory(Path dir) {
