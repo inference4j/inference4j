@@ -176,4 +176,62 @@ class SileroVadDetectorTest {
         verify(session).close();
     }
 
+
+    // --- speech padding ---
+
+    @Test
+    void zeroPaddingLeavesSegmentsUnchanged() {
+        List<VoiceSegment> segments = List.of(new VoiceSegment(1.0f, 2.0f, 0.9f));
+
+        assertThat(SileroVadDetector.pad(segments, 0f, 10f)).isEqualTo(segments);
+    }
+
+    @Test
+    void paddingExtendsBothSidesAndKeepsConfidence() {
+        List<VoiceSegment> padded = SileroVadDetector.pad(
+                List.of(new VoiceSegment(1.0f, 2.0f, 0.9f)), 0.2f, 10f);
+
+        assertThat(padded).hasSize(1);
+        assertThat(padded.get(0).start()).isCloseTo(0.8f, within(1e-6f));
+        assertThat(padded.get(0).end()).isCloseTo(2.2f, within(1e-6f));
+        assertThat(padded.get(0).confidence()).isEqualTo(0.9f);
+    }
+
+    @Test
+    void paddingIsClampedToTheAudio() {
+        List<VoiceSegment> padded = SileroVadDetector.pad(
+                List.of(new VoiceSegment(0.1f, 2.9f, 0.9f)), 0.5f, 3.0f);
+
+        assertThat(padded.get(0).start()).isZero();
+        assertThat(padded.get(0).end()).isEqualTo(3.0f);
+    }
+
+    @Test
+    void closeNeighboursMeetAtTheMidpointWithoutOverlapping() {
+        // gap of 0.16s between segments, padding 0.2s on each side would overlap
+        List<VoiceSegment> padded = SileroVadDetector.pad(List.of(
+                new VoiceSegment(3.30f, 3.81f, 0.9f),
+                new VoiceSegment(3.97f, 4.38f, 0.9f)), 0.2f, 10f);
+
+        float midpoint = (3.81f + 3.97f) / 2;
+        assertThat(padded.get(0).end()).isCloseTo(midpoint, within(1e-6f));
+        assertThat(padded.get(1).start()).isCloseTo(midpoint, within(1e-6f));
+        assertThat(padded.get(0).end()).isLessThanOrEqualTo(padded.get(1).start());
+    }
+
+    @Test
+    void distantNeighboursGetFullPadding() {
+        List<VoiceSegment> padded = SileroVadDetector.pad(List.of(
+                new VoiceSegment(1.0f, 2.0f, 0.9f),
+                new VoiceSegment(5.0f, 6.0f, 0.9f)), 0.2f, 10f);
+
+        assertThat(padded.get(0).end()).isCloseTo(2.2f, within(1e-6f));
+        assertThat(padded.get(1).start()).isCloseTo(4.8f, within(1e-6f));
+    }
+
+    @Test
+    void negativePaddingIsRejected() {
+        assertThatThrownBy(() -> SileroVadDetector.builder().speechPadding(-0.1f))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }

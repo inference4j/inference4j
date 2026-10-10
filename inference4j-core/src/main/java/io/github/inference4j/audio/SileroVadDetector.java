@@ -83,6 +83,7 @@ public class SileroVadDetector implements VoiceActivityDetector {
     private static final float DEFAULT_THRESHOLD = 0.5f;
     private static final float DEFAULT_MIN_SPEECH_DURATION = 0.25f; // seconds
     private static final float DEFAULT_MIN_SILENCE_DURATION = 0.1f; // seconds
+    private static final float DEFAULT_SPEECH_PADDING = 0f; // seconds
 
     // Hidden state dimensions (Silero VAD v5 uses combined state tensor)
     private static final int HIDDEN_SIZE = 128;
@@ -98,11 +99,13 @@ public class SileroVadDetector implements VoiceActivityDetector {
     private final float threshold;
     private final float minSpeechDuration;
     private final float minSilenceDuration;
+    private final float speechPadding;
     private final io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline;
 
     private SileroVadDetector(InferenceSession session, int targetSampleRate, int windowSizeSamples,
                               int contextSize, float threshold, float minSpeechDuration,
-                              float minSilenceDuration, io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline) {
+                              float minSilenceDuration, float speechPadding,
+                              io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline) {
         this.session = session;
         this.targetSampleRate = targetSampleRate;
         this.windowSizeSamples = windowSizeSamples;
@@ -110,6 +113,7 @@ public class SileroVadDetector implements VoiceActivityDetector {
         this.threshold = threshold;
         this.minSpeechDuration = minSpeechDuration;
         this.minSilenceDuration = minSilenceDuration;
+        this.speechPadding = speechPadding;
         this.pipeline = pipeline;
     }
 
@@ -277,7 +281,33 @@ public class SileroVadDetector implements VoiceActivityDetector {
             segments.add(new VoiceSegment(startTime, endTime, avgConfidence));
         }
 
-        return segments;
+        return pad(segments, speechPadding, (float) totalSamples / targetSampleRate);
+    }
+
+    /**
+     * Extends each segment by {@code padding} seconds on both sides, so slicing audio by segment
+     * does not clip the edges of words. A segment never extends past the start or end of the audio,
+     * nor past the midpoint of the gap to a neighbouring segment, so padded segments never overlap.
+     */
+    static List<VoiceSegment> pad(List<VoiceSegment> segments, float padding, float audioDuration) {
+        if (padding <= 0 || segments.isEmpty()) {
+            return segments;
+        }
+        List<VoiceSegment> padded = new ArrayList<>(segments.size());
+        for (int i = 0; i < segments.size(); i++) {
+            VoiceSegment segment = segments.get(i);
+            float earliest = i == 0
+                    ? 0f
+                    : (segments.get(i - 1).end() + segment.start()) / 2;
+            float latest = i == segments.size() - 1
+                    ? audioDuration
+                    : (segment.end() + segments.get(i + 1).start()) / 2;
+            padded.add(new VoiceSegment(
+                    Math.max(earliest, segment.start() - padding),
+                    Math.min(latest, segment.end() + padding),
+                    segment.confidence()));
+        }
+        return padded;
     }
 
     private float frameToTime(int frame) {
@@ -297,6 +327,7 @@ public class SileroVadDetector implements VoiceActivityDetector {
         private float threshold = DEFAULT_THRESHOLD;
         private float minSpeechDuration = DEFAULT_MIN_SPEECH_DURATION;
         private float minSilenceDuration = DEFAULT_MIN_SILENCE_DURATION;
+        private float speechPadding = DEFAULT_SPEECH_PADDING;
 
         Builder session(InferenceSession session) {
             this.session = session;
@@ -343,6 +374,20 @@ public class SileroVadDetector implements VoiceActivityDetector {
             return this;
         }
 
+        /**
+         * Extends every detected segment by this many seconds on both sides (default {@code 0}).
+         * Silero's segment boundaries are tight, so audio sliced by segment can lose the edges of
+         * words; around {@code 0.2} seconds avoids that when the segments are transcribed. Padding
+         * is clamped to the audio and never makes neighbouring segments overlap.
+         */
+        public Builder speechPadding(float seconds) {
+            if (seconds < 0) {
+                throw new IllegalArgumentException("speechPadding must not be negative, got " + seconds);
+            }
+            this.speechPadding = seconds;
+            return this;
+        }
+
         public SileroVadDetector build() {
             if (session == null) {
                 ModelSource source = modelSource != null
@@ -356,7 +401,7 @@ public class SileroVadDetector implements VoiceActivityDetector {
                     .resample(sampleRate)
                     .build();
             return new SileroVadDetector(session, sampleRate, windowSizeSamples,
-                    contextSize, threshold, minSpeechDuration, minSilenceDuration, pipeline);
+                    contextSize, threshold, minSpeechDuration, minSilenceDuration, speechPadding, pipeline);
         }
 
         private void loadFromDirectory(Path dir) {

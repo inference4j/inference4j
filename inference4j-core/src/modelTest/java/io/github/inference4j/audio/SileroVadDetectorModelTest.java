@@ -69,4 +69,22 @@ class SileroVadDetectorModelTest {
             assertThat(segment.confidence() > 0f && segment.confidence() <= 1f).as("Segment confidence should be (0, 1], got: " + segment.confidence()).isTrue();
         }
     }
+
+    @Test
+    void speechPaddingWidensSegmentsWithoutOverlap() {
+        List<VoiceSegment> plain = vad.detect(speechFixture);
+        try (var padded = SileroVadDetector.builder().speechPadding(0.2f).build()) {
+            List<VoiceSegment> segments = padded.detect(speechFixture);
+
+            assertThat(segments).hasSameSizeAs(plain);
+            for (int i = 0; i < segments.size(); i++) {
+                assertThat(segments.get(i).start()).isLessThanOrEqualTo(plain.get(i).start());
+                assertThat(segments.get(i).end()).isGreaterThanOrEqualTo(plain.get(i).end());
+                assertThat(segments.get(i).start()).isGreaterThanOrEqualTo(0f);
+                if (i > 0) {
+                    assertThat(segments.get(i).start()).isGreaterThanOrEqualTo(segments.get(i - 1).end());
+                }
+            }
+        }
+    }
 }
