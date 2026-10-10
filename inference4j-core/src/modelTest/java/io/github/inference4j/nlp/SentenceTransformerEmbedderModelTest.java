@@ -101,4 +101,37 @@ class SentenceTransformerEmbedderModelTest {
             assertThat(strict.encode("A short sentence.")).isNotEmpty();
         }
     }
+
+    // ~550 tokens about bread first (beyond the 512 limit), then ~250 tokens about the ocean
+    private static final String BREAD_THEN_OCEAN =
+            "Bakers knead the dough, let it rise overnight, and bake the bread in a hot oven until the crust is brown. ".repeat(24)
+                    + "Whales migrate across the ocean, diving deep below the waves to feed on krill near the sea floor. ".repeat(12);
+
+    @Test
+    void strideEmbedsTheWholeDocument() {
+        String query = "whales swimming in the deep ocean";
+        try (var truncating = SentenceTransformerEmbedder.builder()
+                     .modelId("inference4j/all-MiniLM-L6-v2").normalize().build();
+             var windowed = SentenceTransformerEmbedder.builder()
+                     .modelId("inference4j/all-MiniLM-L6-v2").normalize().stride(0)
+                     .truncation(TruncationPolicy.FAIL).build()) {
+            float[] queryVector = truncating.encode(query);
+
+            float truncatedScore = cosineSimilarity(queryVector, truncating.encode(BREAD_THEN_OCEAN));
+            float windowedScore = cosineSimilarity(queryVector, windowed.encode(BREAD_THEN_OCEAN));
+
+            // Truncated, the ocean section is never seen; windowed, it contributes in proportion to its length
+            assertThat(windowedScore).isGreaterThan(truncatedScore + 0.1f);
+        }
+    }
+
+    @Test
+    void strideGivesSameEmbeddingForShortText() {
+        String text = "A short sentence that fits in one window.";
+        try (var plain = SentenceTransformerEmbedder.builder().modelId("inference4j/all-MiniLM-L6-v2").build();
+             var windowed = SentenceTransformerEmbedder.builder()
+                     .modelId("inference4j/all-MiniLM-L6-v2").stride(128).build()) {
+            assertThat(windowed.encode(text)).containsExactly(plain.encode(text));
+        }
+    }
 }

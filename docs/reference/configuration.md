@@ -58,7 +58,7 @@ try (var ner = BertNerRecognizer.builder()
 }
 ```
 
-`FAIL` is useful in tests and in pipelines where losing part of the input is unacceptable, such as PII redaction. Tasks that can process long input in full expose that as a separate builder option, listed under *Long-input strategies* on their page. Currently, [named entity recognition](../use-cases/named-entity-recognition.md#long-documents) and [punctuation & casing](../use-cases/punctuation-and-casing.md#input-length) support `.stride(int)`, which processes the whole input in overlapping windows.
+`FAIL` is useful in tests and in pipelines where losing part of the input is unacceptable, such as PII redaction. Tasks that can process long input in full expose that as a separate builder option, listed under *Long-input strategies* on their page. Currently, [named entity recognition](../use-cases/named-entity-recognition.md#long-documents), [punctuation & casing](../use-cases/punctuation-and-casing.md#input-length) and the [embedder](../use-cases/semantic-search.md#input-length) support `.stride(int)`, which processes the whole input in windows.
 
 ## ONNX Runtime session options
 

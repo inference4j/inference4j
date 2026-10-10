@@ -408,4 +408,14 @@ class SentenceTransformerEmbedderTest {
 
         verify(session).close();
     }
+
+    @Test
+    void weightedAverageWeighsEachVectorByItsTokens() {
+        float[] average = SentenceTransformerEmbedder.weightedAverage(
+                List.of(new float[]{1f, 0f}, new float[]{0f, 1f}),
+                List.of(3, 1));
+
+        assertThat(average[0]).isCloseTo(0.75f, within(1e-6f));
+        assertThat(average[1]).isCloseTo(0.25f, within(1e-6f));
+    }
 }

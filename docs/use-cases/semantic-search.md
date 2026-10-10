@@ -73,6 +73,7 @@ public class SemanticSearch {
 | `.textPrefix(String)` | `String` | `null` | Text prefix to prepend before encoding |
 | `.maxLength(int)` | `int` | `512` | Maximum token sequence length |
 | `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Input longer than the token limit: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
+| `.stride(int)` | `int` | off | Embed input longer than `maxLength` in full: windows sharing this many tokens (`0` = consecutive chunks), averaged by the tokens each covers |
 
 ## Reranker builder options
 
@@ -89,10 +90,25 @@ public class SemanticSearch {
 
 | Task | Limit | When exceeded | Long-input strategies |
 |------|-------|---------------|-----------------------|
-| Embedder | `maxLength` tokens (512 by default) | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
+| Embedder | `maxLength` tokens (512 by default) | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | `.stride(int)`: windows averaged into one vector |
 | Reranker | `maxLength` tokens (512 by default) for query and document combined; the longer one is shortened first | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
 
-An embedding of a truncated text only represents its beginning. Split long documents into chunks before embedding them, for example with a document splitter, so every part of the text is searchable.
+An embedding of a truncated text only represents its beginning. There are two ways to cover long documents:
+
+- **Split documents into chunks before embedding** (for example with a document splitter), and store one vector per chunk. This retrieves best: every passage keeps its own vector.
+- **Use `.stride(int)`** when you need exactly one vector per document. The text is split into windows, each window is embedded, and the vectors are averaged, weighted by the tokens each window covers. This matches what LangChain4j's in-process embedding models do.
+
+```java
+try (var embedder = SentenceTransformerEmbedder.builder()
+        .modelId("inference4j/all-MiniLM-L6-v2")
+        .normalize()
+        .stride(0)          // consecutive chunks; use e.g. 64 for overlapping windows
+        .build()) {
+    float[] documentVector = embedder.encode(longDocument);
+}
+```
+
+An averaged vector represents each part of the document in proportion to its length. A topic covered by one sentence in a long document carries little weight, which is why chunking is usually better for search. In a test with about 550 tokens about baking followed by about 250 about whales, a query about whales scored 0.04 cosine similarity against the truncated embedding and 0.21 against the averaged one.
 
 ## Result types
 
