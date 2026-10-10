@@ -72,8 +72,15 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
                 StringBuilder sb = new StringBuilder();
 
                 try (TokenizerStream stream = createStream()) {
+                    long sequenceLength = generator.tokenCount();
                     while (!generator.isDone()) {
                         generator.generateNextToken();
+                        long newLength = generator.tokenCount();
+                        if (newLength == sequenceLength) {
+                            // End-of-text is not appended to the sequence, so there is no new token to decode
+                            continue;
+                        }
+                        sequenceLength = newLength;
                         int token = generator.getLastTokenInSequence(0);
                         String text = stream.decode(token);
                         sb.append(text);
