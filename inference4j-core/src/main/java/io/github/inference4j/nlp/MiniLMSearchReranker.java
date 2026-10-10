@@ -21,6 +21,7 @@ import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.processing.Preprocessor;
@@ -33,6 +34,7 @@ import io.github.inference4j.tokenizer.WordPieceTokenizer;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -76,8 +78,12 @@ public class MiniLMSearchReranker
 
     private static final int DEFAULT_MAX_LENGTH = 512;
 
+    private final Tokenizer tokenizer;
+    private final int maxLength;
+    private final Integer stride;
+
     private MiniLMSearchReranker(InferenceSession session, Tokenizer tokenizer, int maxLength,
-                                 TruncationGuard truncationGuard) {
+                                 TruncationGuard truncationGuard, Integer stride) {
         super(session,
                 createPreprocessor(tokenizer, maxLength, session.inputNames(), truncationGuard),
                 ctx -> {
@@ -85,6 +91,63 @@ public class MiniLMSearchReranker
                     float[] logits = outputTensor.toFloats();
                     return toScore(logits[0]);
                 });
+        this.tokenizer = tokenizer;
+        this.maxLength = maxLength;
+        this.stride = stride;
+    }
+
+    /**
+     * Scores a document's relevance to a query. With {@link Builder#stride(int)} set, a document
+     * too long for one pass is scored passage by passage and the highest passage score is returned
+     * ("MaxP"); the query is included in full with every passage.
+     */
+    @Override
+    public float score(String query, String document) {
+        if (stride == null) {
+            return run(new QueryDocumentPair(query, document));
+        }
+        long[] queryIds = tokenizer.encode(query, Integer.MAX_VALUE).inputIds();     // [CLS] query [SEP]
+        long[] documentIds = tokenizer.encode(document, Integer.MAX_VALUE).inputIds(); // [CLS] document [SEP]
+        int queryTokens = queryIds.length - 2;
+        int documentTokens = documentIds.length - 2;
+        int passageSize = maxLength - 3 - queryTokens;                       // [CLS] q [SEP] passage [SEP]
+        if (queryTokens + documentTokens + 3 <= maxLength || passageSize <= stride) {
+            // Fits in one pass, or the query leaves no room for passages: the policy applies
+            return run(new QueryDocumentPair(query, document));
+        }
+        float best = 0f;
+        for (TokenWindows.Window passage : TokenWindows.plan(documentTokens, passageSize, stride)) {
+            best = Math.max(best, scorePassage(queryIds, documentIds, passage));
+        }
+        return best;
+    }
+
+    private float scorePassage(long[] queryIds, long[] documentIds, TokenWindows.Window passage) {
+        int queryTokens = queryIds.length - 2;
+        int passageTokens = passage.end() - passage.start();
+        long cls = queryIds[0];
+        long sep = queryIds[queryIds.length - 1];
+
+        long[] ids = new long[queryTokens + passageTokens + 3];
+        long[] tokenTypes = new long[ids.length];
+        ids[0] = cls;
+        System.arraycopy(queryIds, 1, ids, 1, queryTokens);
+        ids[1 + queryTokens] = sep;
+        System.arraycopy(documentIds, 1 + passage.start(), ids, 2 + queryTokens, passageTokens);
+        ids[ids.length - 1] = sep;
+        Arrays.fill(tokenTypes, 2 + queryTokens, ids.length, 1L);           // second segment
+
+        long[] attentionMask = new long[ids.length];
+        Arrays.fill(attentionMask, 1L);
+        long[] shape = {1, ids.length};
+        Map<String, Tensor> inputs = new LinkedHashMap<>();
+        inputs.put("input_ids", Tensor.fromLongs(ids, shape));
+        inputs.put("attention_mask", Tensor.fromLongs(attentionMask, shape));
+        if (session.inputNames().contains("token_type_ids")) {
+            inputs.put("token_type_ids", Tensor.fromLongs(tokenTypes, shape));
+        }
+        float[] logits = session.run(inputs).values().iterator().next().toFloats();
+        return toScore(logits[0]);
     }
 
     public static Builder builder() {
@@ -121,6 +184,7 @@ public class MiniLMSearchReranker
         private Tokenizer tokenizer;
         private int maxLength = DEFAULT_MAX_LENGTH;
         private TruncationPolicy truncation;
+        private Integer stride;
 
         Builder session(InferenceSession session) {
             this.session = session;
@@ -161,6 +225,22 @@ public class MiniLMSearchReranker
             return this;
         }
 
+        /**
+         * Scores documents longer than {@code maxLength} in full with MaxP: the document is split
+         * into passages that share {@code stride} tokens, each passage is scored together with the
+         * whole query, and the highest score is returned. {@code 0} gives consecutive passages.
+         * Off by default. When set, documents are not truncated, so
+         * {@link #truncation(TruncationPolicy)} applies only to a query too long to leave room
+         * for passages.
+         */
+        public Builder stride(int stride) {
+            if (stride < 0) {
+                throw new IllegalArgumentException("stride must not be negative, got " + stride);
+            }
+            this.stride = stride;
+            return this;
+        }
+
         public MiniLMSearchReranker build() {
             if (session == null) {
                 ModelSource source = modelSource != null
@@ -173,7 +253,7 @@ public class MiniLMSearchReranker
                 throw new IllegalStateException("Tokenizer is required");
             }
             return new MiniLMSearchReranker(session, tokenizer, maxLength,
-                    new TruncationGuard("MiniLMSearchReranker", truncation));
+                    new TruncationGuard("MiniLMSearchReranker", truncation), stride);
         }
 
         private void loadFromDirectory(Path dir) {
