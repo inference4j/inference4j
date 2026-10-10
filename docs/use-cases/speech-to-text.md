@@ -1,6 +1,30 @@
 # Speech-to-Text
 
-Transcribe audio files using Wav2Vec2, a non-autoregressive CTC model that converts speech to text in a single forward pass.
+Transcribe audio files to text. inference4j supports two speech models:
+
+- **Wav2Vec2** (`inference4j-core`), a non-autoregressive CTC model that converts speech to text in a
+  single forward pass. Its output is upper-case and unpunctuated, so pair it with a punctuation model
+  for readable text.
+- **Whisper** (`inference4j-genai`), OpenAI's encoder-decoder model, which generates punctuated,
+  cased text directly and can also translate to English.
+
+## Choosing a model
+
+The same 11-second recording through each option:
+
+| Option | Transcript | Time* |
+|--------|------------|-------|
+| Wav2Vec2 | AND SO MY FELLOW AMERICANS ASK NOT WHAT YOUR COUNTRY CAN DO FOR YOU ASK WHAT YOU CAN DO FOR YOUR COUNTRY | ~0.25 s |
+| Wav2Vec2 + [punctuation](#readable-transcripts) | And so my fellow Americans ask not what your country can do for you, ask what you can do for your country. | ~0.22 s |
+| [Whisper](#whisper) small | And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country. | ~0.5 s |
+
+\* Measured on an Apple M4 Pro CPU, with the models already loaded.
+
+- **Wav2Vec2**: the fastest and smallest option, and part of `inference4j-core` with no extra
+  dependency. Add the punctuation model when people will read the text.
+- **Whisper**: the most accurate and readable output, plus 99 languages and translation to English
+  (we currently verify English transcription only). It needs the `inference4j-genai` module and is
+  slower, because it generates text token by token.
 
 ## Quick example
 
@@ -62,7 +86,29 @@ The showcase app shows the difference on the same recording: the formatted trans
 
 See [Punctuation & Casing](punctuation-and-casing.md) for details and input limits.
 
+## Whisper
+
+`WhisperSpeechModel` lives in the `inference4j-genai` module and runs Whisper through
+onnxruntime-genai. It returns the same `Transcription` result:
+
+```java
+try (var whisper = WhisperSpeechModel.builder()
+        .modelId("inference4j/whisper-small-genai")
+        .build()) {
+    System.out.println(whisper.transcribe(Path.of("speech.wav")).text());
+}
+```
+
+Two models are published: `inference4j/whisper-tiny-genai` (~225 MB, fastest) and
+`inference4j/whisper-small-genai` (~1.1 GB, more accurate). `WhisperSpeechModel` is not a
+`SpeechRecognizer`, so it cannot be passed where a recognizer is expected, such as to
+`PunctuatedSpeechRecognizer`; it does not need that wrapper anyway. Long audio is split into
+30-second chunks. See [Whisper](../generative-ai/whisper.md) for builder options, translation and
+chunking details.
+
 ## Builder options
+
+For `Wav2Vec2Recognizer` (see [Whisper](../generative-ai/whisper.md#builder-options) for `WhisperSpeechModel`):
 
 | Method | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -82,7 +128,7 @@ See [Punctuation & Casing](punctuation-and-casing.md) for details and input limi
 | Field | Type | Description |
 |-------|------|-------------|
 | `text()` | `String` | The transcribed text |
-| `segments()` | `List<Segment>` | Timed segments (empty for Wav2Vec2) |
+| `segments()` | `List<Segment>` | Timed segments (empty for Wav2Vec2 and Whisper) |
 
 ## Audio requirements
 
@@ -108,4 +154,4 @@ The pipeline:
 - The default model (`wav2vec2-base-960h`) is trained on English LibriSpeech data. For other languages, use an appropriate fine-tuned model.
 - Wav2Vec2 output is upper-case and unpunctuated. Use [`PunctuatedSpeechRecognizer`](punctuation-and-casing.md) for readable text, or before running cased models such as [NER](named-entity-recognition.md).
 - Wav2Vec2 works best with clean speech. For noisy audio, consider preprocessing with VAD to extract speech segments first — see [Voice Activity Detection](voice-activity-detection.md).
-- This is a CTC model (single-pass), not an autoregressive model. It's fast but may be less accurate on complex audio. For multilingual support or translation, see [Whisper](../generative-ai/whisper.md).
+- Wav2Vec2 is a CTC model (single-pass), not an autoregressive model. It's fast but may be less accurate on complex audio. For better accuracy, multilingual support or translation, use [Whisper](#whisper).
