@@ -40,28 +40,27 @@ inference4j implements the full autoregressive loop in Java on top of standard O
 
 !!! warning "onnxruntime-genai is experimental"
 
-    The `inference4j-genai` module wraps a library in preview. We maintain the
-    [onnxruntime-genai Java build](https://github.com/inference4j/onnxruntime-genai)
-    ourselves. The API may change between releases.
+    The `inference4j-genai` module wraps a library in preview. The API may change
+    between releases.
 
 ### Versions
 
-`inference4j-genai` tracks upstream onnxruntime-genai releases through our shadow
-build, published as `io.github.inference4j:onnxruntime-genai`:
+`inference4j-genai` depends on `io.github.inference4j:onnxruntime-genai`, a
+[redistribution](https://github.com/inference4j/onnxruntime-genai-maven) of Microsoft's
+official onnxruntime-genai Java release JAR on Maven Central:
 
 | inference4j | onnxruntime-genai | ONNX Runtime |
 |-------------|-------------------|--------------|
+| 0.13.0      | 0.17.0            | 1.28.0       |
 | 0.10.1      | 0.15.2            | 1.26.0       |
 | 0.10.0      | 0.12.0            | 1.23.0       |
 
-!!! note "Keep ONNX Runtime versions aligned"
+!!! note "One ONNX Runtime on the classpath"
 
-    The shadow build ships a fat JAR that bundles ONNX Runtime's native libraries
-    under the same resource path (`ai/onnxruntime/native/`) that the official
-    `com.microsoft.onnxruntime:onnxruntime` JAR uses. `inference4j-core` therefore
-    pins the ONNX Runtime version the genai natives were built against. If you
-    override the ONNX Runtime version yourself, keep it matched to the table above
-    — otherwise which native library gets loaded depends on classpath order.
+    Since 0.13.0 the onnxruntime-genai JAR contains only the genai natives; it loads the
+    ONNX Runtime native library from the regular `com.microsoft.onnxruntime:onnxruntime`
+    dependency that `inference4j-core` brings in. If you override the ONNX Runtime
+    version yourself, keep it at or above the version in the table above.
 
 ### Where we're heading
 

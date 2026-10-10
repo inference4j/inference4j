@@ -3,7 +3,7 @@
 ## Requirements
 
 - **Java 17** or higher
-- ONNX Runtime 1.26.0 (included transitively via `inference4j-core`)
+- ONNX Runtime 1.28.0 (included transitively via `inference4j-core`)
 
 ## Add the dependency
 
