@@ -147,6 +147,22 @@ super-resolution are unblocked behind it.
       the realistic near-term targets use byte-level BPE or SentencePiece Unigram, both of
       which are already implemented. Revisit when a concrete model needs it.
 
+### Generative AI via onnxruntime-genai
+
+New LLM, vision-language and speech architectures come through `inference4j-genai` rather
+than being re-implemented on the native engine. onnxruntime-genai now covers Llama, Mistral,
+Qwen (language + vision), Phi (language + vision), Gemma, DeepSeek, gpt-oss, Granite, LFM2
+(language + vision + speech input) and Whisper, among others. The native engine stays for
+encoder-decoder models (T5, BART, MarianMT) and plain HuggingFace exports.
+
+- [ ] **Whisper model test** — run `WhisperSpeechModel` against a real model in the model
+      test suite (today it is covered by unit tests only)
+- [ ] **Newer architectures** — model tests and docs for current genai exports (e.g. Qwen3,
+      gpt-oss), so the supported list reflects what is verified
+- [ ] **Qwen vision-language** — a second `VisionLanguageModel` backed by a Qwen VL export
+- [ ] **LFM2 speech input** — evaluate audio-in chat through `inference4j-genai`
+- [ ] **Spring Boot auto-configuration** for the genai wrappers
+
 ### Speech
 
 - [ ] **Moonshine speech-to-text** — raw-waveform ASR (MIT, 27M/62M) that performs feature
@@ -180,13 +196,14 @@ The shared foundation shipped in v0.12.0, so both of these are now wrapper-level
 
 - [ ] **OCR Pipeline** — CRAFT detection + TrOCR recognition composed end-to-end; study viability of full TrOCR models
 - [ ] **CRAFT improvements** — test and improve support for vertical text and mixed orientation
-- [ ] **Whisper** — study cost of mel spectrogram / FFT preprocessing; native autoregressive speech-to-text
 - [ ] **Stable Diffusion** — study feasibility of text-to-image models on ONNX Runtime, including lightweight variants with GPU acceleration
 - [ ] **More ViT models** — additional Vision Transformer variants (low effort, reuse existing image classification infrastructure)
 
 ## Dropped
 
 - ~~Generic Pipeline API~~ — `Pipeline.builder().stage().stage().build()` adds abstraction without value. Models are too different for a generic composition framework. Named pipelines (e.g., `OcrPipeline`) as concrete classes instead.
+- ~~Native Whisper~~ — would require mel spectrogram / FFT preprocessing in Java to duplicate
+  what onnxruntime-genai already does natively. Whisper ships through `inference4j-genai`.
 - ~~Codegen plugin~~ — generates type-safe wrappers from `.onnx` metadata but doesn't solve preprocessing/postprocessing, which is where the real complexity lives. Handcrafted wrappers deliver more value.
 
 ## Target models
@@ -221,4 +238,4 @@ The shared foundation shipped in v0.12.0, so both of these are now wrapper-level
 | Audio | Silero VAD (voice activity detection) | Done |
 | Audio | Kokoro TTS (text-to-speech, replaces Piper) | Next |
 | Audio | Moonshine (speech-to-text) | Next |
-| Audio | Whisper (autoregressive speech-to-text) | Done via inference4j-genai; native — Beyond |
+| Audio | Whisper (autoregressive speech-to-text) | Done via inference4j-genai |
