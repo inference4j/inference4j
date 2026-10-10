@@ -39,9 +39,9 @@ import java.nio.file.Path;
  * <p>Only {@link Transcription#text()} is formatted; segments are passed through unchanged.
  * Closing this recognizer closes both the wrapped recognizer and the model.
  *
- * <p>The model processes at most 256 tokens (roughly 200 words) per transcript; longer
- * transcripts are truncated. Transcribe long audio in shorter pieces, for example per voice
- * activity segment.
+ * <p>The model processes at most 256 tokens (roughly 200 words) per call. Longer transcripts are
+ * truncated, unless the model is built with {@link PunctCapSegModel.Builder#stride(int)}, which
+ * formats them in full.
  */
 public class PunctuatedSpeechRecognizer implements SpeechRecognizer {
 

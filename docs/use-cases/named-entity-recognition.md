@@ -53,14 +53,47 @@ public class NerExample {
 | `.config(ModelConfig)` | `ModelConfig` | auto-loaded from `config.json` | Model config with IOB2 labels |
 | `.maxLength(int)` | `int` | `512` | Maximum token sequence length |
 | `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Input longer than the token limit: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
+| `.stride(int)` | `int` | off | Process input longer than `maxLength` in full, as overlapping windows sharing this many tokens. When set, input is never truncated |
 
 ## Input length
 
 | Limit | When exceeded | Long-input strategies |
 |-------|---------------|-----------------------|
-| `maxLength` tokens (512 by default), including `[CLS]` and `[SEP]` | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
+| `maxLength` tokens (512 by default), including `[CLS]` and `[SEP]` | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | `.stride(int)`: overlapping windows, whole input processed |
 
-Entities after the limit are not found. For long documents, use `FAIL` in tests to detect truncation, and split the text before calling `recognize`.
+Without `stride`, entities after the limit are not found.
+
+### Long documents
+
+Set `stride` to process the whole document. The text is split into overlapping windows of `maxLength` tokens, and each token keeps the label from the window where it sits most centrally. Character offsets always refer to the original text:
+
+```java
+try (var ner = BertNerRecognizer.builder()
+        .maxLength(256)
+        .stride(64)
+        .build()) {
+    List<NamedEntity> entities = ner.recognize(longDocument);   // entities from the whole document
+}
+```
+
+#### Choosing the window size
+
+The default `distilbert-NER` model was trained on single sentences and loses accuracy on long inputs, so smaller windows find more entities. These are results on the 31 long articles (over 512 tokens) of the [CoNLL-2003](https://www.clips.uantwerpen.be/conll2003/ner/) test set, the benchmark this model was trained and evaluated on. Scores are entity-level: an entity counts only if its exact span and type match the human annotation.
+
+| Configuration | F1 | Recall | Precision |
+|---|---|---|---|
+| No windowing (truncates at 512 tokens) | 0.566 | 0.522 | 0.619 |
+| `stride(128)` with the default `maxLength(512)` | 0.682 | 0.699 | 0.665 |
+| **`maxLength(256).stride(64)`** | **0.766** | 0.774 | 0.758 |
+| `maxLength(128).stride(32)` | 0.773 | 0.782 | 0.763 |
+| One sentence at a time, split automatically with the JDK's `BreakIterator` | 0.753 | 0.757 | 0.749 |
+| One sentence at a time, using the dataset's human-marked sentences (reference) | 0.830 | 0.875 | 0.790 |
+
+- **Use `maxLength(256).stride(64)`.** It recovers most of the accuracy lost to long inputs. Smaller windows add model calls for little further gain.
+- **Without windowing, about half of the entities in a long article are missed** (recall 0.522), because everything past 512 tokens is ignored.
+- **Splitting into sentences automatically does not beat windows.** With the JDK's rule-based `BreakIterator`, sentence-by-sentence recognition scores slightly below 256-token windows. Only perfect, human-marked sentence boundaries do better (the reference row), because news text has headlines, datelines and tables that rule-based splitters merge into run-on sentences.
+
+The evaluation is reproducible locally; see `BertNerLongDocumentEvaluation` in the model tests.
 
 ## Result type
 

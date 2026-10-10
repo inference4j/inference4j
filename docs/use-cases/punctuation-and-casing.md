@@ -58,6 +58,7 @@ public class PunctuationExample {
 | `.tokenizer(UnigramTokenizer)` | `UnigramTokenizer` | auto-loaded from `tokenizer.json` | Custom tokenizer |
 | `.maxLength(int)` | `int` | `256` | Maximum tokens per call, including the begin/end markers |
 | `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Input longer than the token limit: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
+| `.stride(int)` | `int` | off | Process input longer than `maxLength` in full, as overlapping windows sharing this many tokens. When set, input is never truncated |
 
 ## Result type
 
@@ -67,9 +68,17 @@ public class PunctuationExample {
 
 | Limit | Behavior when exceeded | Long-input strategies |
 |-------|------------------------|-----------------------|
-| 256 tokens (about 200 words), including begin/end markers | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
+| 256 tokens (about 200 words), including begin/end markers | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | `.stride(int)`: overlapping windows, whole input processed |
 
-Keep inputs short. When formatting transcripts of long audio, transcribe in pieces, for example one call per [voice activity](voice-activity-detection.md) segment, rather than formatting a whole recording at once.
+To format long text in full, set `stride`. The input is split into overlapping windows, and each token keeps the predictions from the window where it sits most centrally:
+
+```java
+try (var model = PunctCapSegModel.builder().stride(64).build()) {
+    List<String> sentences = model.infer(longTranscript);   // the whole transcript, formatted
+}
+```
+
+The same applies to `PunctuatedSpeechRecognizer`: pass it a model built with `stride` to format long transcripts in full.
 
 ## Available models
 
