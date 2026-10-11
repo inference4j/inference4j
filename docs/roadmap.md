@@ -163,65 +163,70 @@ super-resolution are unblocked behind it.
 - [x] **Fixes** — genai wrappers no longer repeat the last token; `UnigramTokenizer` maps
       unknown characters to `unk`; boolean tensors supported
 
-## Next Up
+## Planned — 0.13.1
 
-### Tokenizers & LLMs
+Fixes and small additions, tracked in the [0.13.1 milestone](https://github.com/inference4j/inference4j/milestone/1).
 
-- [ ] **Tiktoken tokenizer** — deferred. No small, ONNX-viable model currently requires it;
-      the realistic near-term targets use byte-level BPE or SentencePiece Unigram, both of
-      which are already implemented. Revisit when a concrete model needs it.
+- [ ] **Chat prompts keep their end** — over-long prompts keep the chat template's closing tokens and the
+      most recent context; the prompt and `maxNewTokens` share one budget ([#76](https://github.com/inference4j/inference4j/issues/76))
+- [ ] **KV cache stays native** — no Java ↔ native copy of the cache on every decode step ([#99](https://github.com/inference4j/inference4j/issues/99))
+- [ ] **Spring Boot auto-configuration for the genai wrappers** — `TextGenerator`, `VisionLanguageModel`,
+      `WhisperSpeechModel` ([#90](https://github.com/inference4j/inference4j/issues/90))
+- [ ] **Newer genai LLMs** — Qwen3, SmolLM3 and Phi-4-mini, verified with model tests ([#87](https://github.com/inference4j/inference4j/issues/87))
 
-### Generative AI via onnxruntime-genai
+## Planned — 0.14.0
 
-New LLM, vision-language and speech architectures come through `inference4j-genai` rather
-than being re-implemented on the native engine. onnxruntime-genai now covers Llama, Mistral,
-Qwen (language + vision), Phi (language + vision), Gemma, DeepSeek, gpt-oss, Granite, LFM2
-(language + vision + speech input) and Whisper, among others. The native engine stays for
-encoder-decoder models (T5, BART, MarianMT) and plain HuggingFace exports.
+Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/milestone/2).
 
-- [x] **Whisper model test** — run `WhisperSpeechModel` against a real model in the model
-      test suite (today it is covered by unit tests only)
-- [ ] **Newer architectures** — model tests and docs for current genai exports (e.g. Qwen3,
-      gpt-oss), so the supported list reflects what is verified
-- [ ] **Qwen vision-language** — a second `VisionLanguageModel` backed by a Qwen VL export
-- [ ] **LFM2 speech input** — evaluate audio-in chat through `inference4j-genai`
-- [ ] **Spring Boot auto-configuration** for the genai wrappers
+### Zero-shot NLP, guardrails and RAG
+
+- [ ] **Zero-shot NER** — GLiNER: extract entity types given at call time, plus a PII-tuned model ([#101](https://github.com/inference4j/inference4j/issues/101))
+- [ ] **Prompt-injection detector** — a DeBERTa-v3 guardrail classifier (Apache-2.0 default; Llama Prompt
+      Guard 2 through a user-supplied source, since it is gated) ([#102](https://github.com/inference4j/inference4j/issues/102))
+- [ ] **Zero-shot text classification** — NLI-based, labels chosen at call time ([#103](https://github.com/inference4j/inference4j/issues/103))
+- [ ] **Modern embeddings** — nomic-embed-text-v1.5 (8K context), Qwen3-Embedding-0.6B, and Matryoshka
+      `.dimensions(int)` ([#104](https://github.com/inference4j/inference4j/issues/104))
+- [ ] **Modern reranker** — bge-reranker-v2-m3, multilingual and long-context ([#105](https://github.com/inference4j/inference4j/issues/105))
+- [ ] **LangChain4j adapter** — `EmbeddingModel`, `ScoringModel`, audio document parser, PII redaction and an
+      input guardrail ([#111](https://github.com/inference4j/inference4j/issues/111))
+- [ ] **Long input for generators** — sentence chunking for translation, map-reduce for summarization ([#74](https://github.com/inference4j/inference4j/issues/74))
 
 ### Speech
 
-- [ ] **Moonshine speech-to-text** — raw-waveform ASR (MIT, 27M/62M) that performs feature
-      extraction inside the ONNX graph, so it needs no mel-spectrogram/FFT work in Java.
-      Reuses the existing raw-waveform audio pipeline.
+- [ ] **Moonshine speech-to-text** — variable-length input, suited to live transcription; works with
+      `SegmentedSpeechRecognizer` ([#109](https://github.com/inference4j/inference4j/issues/109))
+- [ ] **Kokoro TTS** — `SpeechSynthesizer` plus a permissively licensed Java phonemizer (espeak-ng is
+      GPL-3.0); replaces Piper ([#50](https://github.com/inference4j/inference4j/issues/50))
 
-### Embeddings & reranking
+### Vision & documents
 
-- [ ] **Qwen3-Embedding / Qwen3-Reranker (0.6B)** — Apache 2.0 with existing ONNX exports.
-      Uses byte-level BPE we already support; the reranker scores via decoder tokens rather
-      than a cross-encoder head, so it needs a new `OutputOperator`.
+- [ ] **OCR recognizer and `OcrPipeline`** — PaddleOCR mobile recognizer (CTC) with `CraftTextDetector` for
+      end-to-end OCR; replaces the earlier TrOCR plan ([#106](https://github.com/inference4j/inference4j/issues/106))
+- [ ] **Apache-licensed detector** — RT-DETR / D-FINE, NMS-free, an alternative to the AGPL-3.0 Ultralytics
+      models ([#107](https://github.com/inference4j/inference4j/issues/107))
+- [ ] **Promptable segmentation** — SAM 2.1 tiny, with a `SegmentationMask` result type shared with
+      semantic segmentation ([#108](https://github.com/inference4j/inference4j/issues/108))
 
-### Text-to-Speech
+### Generative AI via onnxruntime-genai
 
-- [ ] **Kokoro TTS** — replaces Piper as the TTS target. Apache 2.0 end to end, versus
-      Piper's development having moved to a GPL-3.0 fork.
-- [ ] **Java phonemizer** — Kokoro needs grapheme-to-phoneme conversion, and the usual
-      fallback (espeak-ng) is GPL-3.0. Needs a dictionary-based phonemizer over a
-      permissively licensed lexicon. This is the real cost of the TTS milestone.
-- [ ] `SpeechSynthesizer` interface, audio output generation
+New LLM, vision-language and speech architectures come through `inference4j-genai` rather than being
+re-implemented on the native engine. The native engine stays for encoder-decoder models (T5, BART, MarianMT)
+and plain HuggingFace exports.
 
-### Pixel-level tasks
+- [ ] **Qwen vision-language** — a second `VisionLanguageModel` backed by a Qwen VL export ([#88](https://github.com/inference4j/inference4j/issues/88))
+- [ ] **Audio-in chat** — LFM2 / Phi-4-multimodal through `inference4j-genai` ([#89](https://github.com/inference4j/inference4j/issues/89))
+- [ ] **License-restricted LLMs** — Llama-3.2 and Gemma-3 through a user-supplied source ([#110](https://github.com/inference4j/inference4j/issues/110))
 
-The shared foundation shipped in v0.12.0, so both of these are now wrapper-level work.
+## Unscheduled
 
-- [ ] **Semantic segmentation** — SegFormer. Needs a `SegmentationMask` result type and
-      per-pixel argmax; `CraftTextDetector.connectedComponents` is a promotion candidate
+- [ ] **Semantic segmentation** — SegFormer; reuses the `SegmentationMask` type from [#108](https://github.com/inference4j/inference4j/issues/108)
 - [ ] **Super-resolution** — Real-ESRGAN. Needs denormalization before `TensorImages.toRgb`
-
-### Beyond
-
-- [ ] **OCR Pipeline** — CRAFT detection + TrOCR recognition composed end-to-end; study viability of full TrOCR models
-- [ ] **CRAFT improvements** — test and improve support for vertical text and mixed orientation
-- [ ] **Stable Diffusion** — study feasibility of text-to-image models on ONNX Runtime, including lightweight variants with GPU acceleration
-- [ ] **More ViT models** — additional Vision Transformer variants (low effort, reuse existing image classification infrastructure)
+- [ ] **Qwen3-Reranker** — decoder-token scoring needs a new `OutputOperator`; see [#105](https://github.com/inference4j/inference4j/issues/105) for the
+      cross-encoder reranker
+- [ ] **Tiktoken tokenizer** — deferred. No small, ONNX-viable model currently requires it
+- [ ] **CRAFT improvements** — vertical text and mixed orientation
+- [ ] **Stable Diffusion** — feasibility study of text-to-image on ONNX Runtime
+- [ ] **More ViT models** — additional Vision Transformer variants
 
 ## Dropped
 
@@ -248,6 +253,12 @@ The shared foundation shipped in v0.12.0, so both of these are now wrapper-level
 | Text | BERT NER (named entity recognition) | v0.10.0 |
 | Text | BGE / GTE / E5 (improved embeddings) | v0.10.0 |
 | Text | Tiktoken LLM | Deferred |
+| Text | GLiNER (zero-shot NER, PII) | 0.14.0 |
+| Text | Prompt-injection detector (DeBERTa-v3) | 0.14.0 |
+| Text | Zero-shot classification (NLI) | 0.14.0 |
+| Text | nomic-embed-text-v1.5 / Qwen3-Embedding | 0.14.0 |
+| Text | bge-reranker-v2-m3 | 0.14.0 |
+| Text | Qwen3, SmolLM3, Phi-4-mini (via inference4j-genai) | 0.13.1 |
 | Text | Punctuation, casing & segmentation (punct-cap-seg) | v0.13.0 |
 | Vision | ResNet | Done |
 | Vision | EfficientNet | Done |
@@ -256,10 +267,13 @@ The shared foundation shipped in v0.12.0, so both of these are now wrapper-level
 | Vision | CLIP (visual search, zero-shot classification) | Done |
 | Vision | Phi-3.5 Vision (captioning, VQA) | Done |
 | Vision | Additional ViT models | Beyond |
-| Vision | TrOCR + OCR Pipeline | Beyond |
+| Vision | PaddleOCR recognizer + OCR Pipeline | 0.14.0 |
+| Vision | RT-DETR / D-FINE (Apache-licensed detection) | 0.14.0 |
+| Vision | SAM 2.1 tiny (promptable segmentation) | 0.14.0 |
+| Vision | Qwen VL (vision-language) | 0.14.0 |
 | Vision | Stable Diffusion (text-to-image) | Beyond — feasibility study |
 | Audio | Wav2Vec2-CTC (speech-to-text) | Done |
 | Audio | Silero VAD (voice activity detection) | Done |
-| Audio | Kokoro TTS (text-to-speech, replaces Piper) | Next |
-| Audio | Moonshine (speech-to-text) | Next |
+| Audio | Kokoro TTS (text-to-speech, replaces Piper) | 0.14.0 |
+| Audio | Moonshine (speech-to-text) | 0.14.0 |
 | Audio | Whisper (autoregressive speech-to-text) | Done via inference4j-genai |
