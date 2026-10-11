@@ -15,6 +15,8 @@
  */
 package io.github.inference4j.genai.audio;
 
+import io.github.inference4j.audio.SegmentedSpeechRecognizer;
+import io.github.inference4j.audio.SileroVadDetector;
 import io.github.inference4j.audio.SpeechRecognizer;
 import io.github.inference4j.audio.Transcription;
 import io.github.inference4j.preprocessing.audio.AudioData;
@@ -92,16 +94,8 @@ class WhisperSpeechModelModelTest {
 
     @Test
     void transcribesAudioLongerThan30Seconds() throws IOException {
-        AudioData audio = AudioLoader.load(speechFixture);
-        int gap = audio.sampleRate() / 2;
-        float[] samples = new float[audio.samples().length * 4 + gap * 3];
-        for (int i = 0; i < 4; i++) {
-            System.arraycopy(audio.samples(), 0, samples, i * (audio.samples().length + gap), audio.samples().length);
-        }
-        Path longAudio = Files.createTempFile("speech-long-", ".wav");
+        Path longAudio = repeatFixture(4);
         try {
-            AudioWriter.write(new AudioData(samples, audio.sampleRate()), longAudio);
-
             Transcription result = whisper.transcribe(longAudio);
 
             // Four repetitions across two 30-second chunks: every one must be transcribed. A cut
@@ -112,6 +106,36 @@ class WhisperSpeechModelModelTest {
         } finally {
             Files.deleteIfExists(longAudio);
         }
+    }
+
+    @Test
+    void segmentedRecognizerCutsLongAudioAtPauses() throws IOException {
+        Path longAudio = repeatFixture(4);
+        // A separate instance: closing the wrapper closes the model it wraps
+        try (SpeechRecognizer recognizer = new SegmentedSpeechRecognizer(
+                WhisperSpeechModel.builder().modelId("inference4j/whisper-tiny-genai").build(),
+                SileroVadDetector.builder().build())) {
+
+            Transcription result = recognizer.transcribe(longAudio);
+
+            // Cut in the half-second gaps, every repetition comes out whole and exactly once
+            assertThat(countOccurrences(result.text(), "what you can do for your country")).isEqualTo(4);
+        } finally {
+            Files.deleteIfExists(longAudio);
+        }
+    }
+
+    /** The speech fixture repeated with half-second gaps, written to a temporary WAV. */
+    private Path repeatFixture(int times) throws IOException {
+        AudioData audio = AudioLoader.load(speechFixture);
+        int gap = audio.sampleRate() / 2;
+        float[] samples = new float[audio.samples().length * times + gap * (times - 1)];
+        for (int i = 0; i < times; i++) {
+            System.arraycopy(audio.samples(), 0, samples, i * (audio.samples().length + gap), audio.samples().length);
+        }
+        Path path = Files.createTempFile("speech-long-", ".wav");
+        AudioWriter.write(new AudioData(samples, audio.sampleRate()), path);
+        return path;
     }
 
     private static int countOccurrences(String text, String phrase) {
