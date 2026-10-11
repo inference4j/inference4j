@@ -205,6 +205,24 @@ class BertNerRecognizerTest {
     }
 
     @Test
+    void splitIntoWordsSplitsAsciiSymbolsLikeTheTokenizer() {
+        // "$" and "=" are words of their own for the tokenizer, so they must be here too,
+        // or every later word index points at the wrong characters
+        List<BertNerRecognizer.WordSpan> spans = BertNerRecognizer.splitIntoWords("Paid $5 to Marie=Curie");
+
+        assertThat(spans).extracting(BertNerRecognizer.WordSpan::start)
+                .containsExactly(0, 5, 6, 8, 11, 16, 17);
+    }
+
+    @Test
+    void splitIntoWordsSkipsCharactersTheTokenizerDrops() {
+        // A lone control character is no word for the tokenizer, so it must not be one here
+        List<BertNerRecognizer.WordSpan> spans = BertNerRecognizer.splitIntoWords("Marie \u0085 Curie");
+
+        assertThat(spans).extracting(BertNerRecognizer.WordSpan::start).containsExactly(0, 8);
+    }
+
+    @Test
     void splitIntoWords_multipleSpaces() {
         List<BertNerRecognizer.WordSpan> spans = BertNerRecognizer.splitIntoWords("Hello  world");
         assertThat(spans).hasSize(2);

@@ -20,6 +20,8 @@ import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.WordPieceTokenizer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.file.Path;
 import java.util.Objects;
@@ -73,6 +75,34 @@ class WordPieceTokenizerTest {
         EncodedInput result = tokenizer.encode("hello!");
         // [CLS]=2, hello=5, !=18, [SEP]=3
         assertThat(result.inputIds()).isEqualTo(new long[]{2, 5, 18, 3});
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"$", "+", "<", "=", ">", "^", "`", "|", "~"})
+    void asciiSymbolsSplitWordsLikeBert(String symbol) {
+        // Unicode classes these as symbols, not punctuation, but BERT splits on every ASCII
+        // non-alphanumeric character. The symbol is not in the test vocab, so it becomes [UNK]=1.
+        EncodedInput result = tokenizer.encode("hello" + symbol + "world");
+
+        assertThat(result.inputIds()).isEqualTo(new long[]{2, 5, 1, 6, 3});
+    }
+
+    @Test
+    void uncasedTokenizerStripsAccentsLikeBert() {
+        // "héllo wörld" lowercases and drops the combining marks: hello=5, world=6
+        assertThat(tokenizer.encode("Héllo Wörld").inputIds()).isEqualTo(new long[]{2, 5, 6, 3});
+    }
+
+    @Test
+    void controlCharactersAreDroppedLikeBert() {
+        // U+0085 and U+0096 are C1 controls (mis-decoded Windows-1252); BERT deletes them
+        assertThat(tokenizer.encode("hello\u0085 world\u0096").inputIds()).isEqualTo(new long[]{2, 5, 6, 3});
+    }
+
+    @Test
+    void casedTokenizerKeepsAccents() {
+        // Cased BERT models keep accents, so the accented words are not in the vocab: [UNK]=1
+        assertThat(casedTokenizer.encode("héllo").inputIds()).isEqualTo(new long[]{2, 1, 3});
     }
 
     @Test

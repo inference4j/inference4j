@@ -21,6 +21,7 @@ import io.github.inference4j.exception.ModelSourceException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -239,11 +240,14 @@ public class WordPieceTokenizer implements Tokenizer {
     }
 
     private List<String> basicTokenize(String text) {
-        text = (lowercase ? text.toLowerCase() : text).strip();
+        text = (lowercase ? stripAccents(text.toLowerCase()) : text).strip();
         List<String> tokens = new ArrayList<>();
         StringBuilder current = new StringBuilder();
 
         for (char c : text.toCharArray()) {
+            if (isIgnored(c)) {
+                continue;
+            }
             if (Character.isWhitespace(c)) {
                 if (!current.isEmpty()) {
                     tokens.add(current.toString());
@@ -296,7 +300,47 @@ public class WordPieceTokenizer implements Tokenizer {
         return ids;
     }
 
-    private boolean isPunctuation(char c) {
+    /**
+     * Whether BERT's pre-tokenizer deletes {@code c}: the null character, the replacement character
+     * U+FFFD, and control or format characters other than tab, newline and carriage return (for
+     * example the C1 controls U+0085 and U+0096 left over from mis-decoded Windows-1252 text).
+     * Surrogates are kept, since Java strings encode emoji as surrogate pairs.
+     */
+    public static boolean isIgnored(char c) {
+        if (c == 0 || c == 0xFFFD) {
+            return true;
+        }
+        if (c == '\t' || c == '\n' || c == '\r') {
+            return false;
+        }
+        int type = Character.getType(c);
+        return type == Character.CONTROL || type == Character.FORMAT
+                || type == Character.PRIVATE_USE || type == Character.UNASSIGNED;
+    }
+
+    /** Removes accents as uncased BERT does: canonical decomposition, then dropping combining marks. */
+    private static String stripAccents(String text) {
+        String decomposed = Normalizer.normalize(text, Normalizer.Form.NFD);
+        StringBuilder out = new StringBuilder(decomposed.length());
+        for (int i = 0; i < decomposed.length(); i++) {
+            char c = decomposed.charAt(i);
+            if (Character.getType(c) != Character.NON_SPACING_MARK) {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
+    /**
+     * Whether BERT's pre-tokenizer treats {@code c} as punctuation, which splits it into a word of its
+     * own: every non-alphanumeric ASCII character, including symbols such as {@code $ + < = > ^ ` | ~}
+     * that Unicode does not class as punctuation, plus any Unicode punctuation character. Code that
+     * maps tokens back to words of the original text must split words by the same rule.
+     */
+    public static boolean isPunctuation(char c) {
+        if ((c >= 33 && c <= 47) || (c >= 58 && c <= 64) || (c >= 91 && c <= 96) || (c >= 123 && c <= 126)) {
+            return true;
+        }
         int type = Character.getType(c);
         return type == Character.CONNECTOR_PUNCTUATION
                 || type == Character.DASH_PUNCTUATION

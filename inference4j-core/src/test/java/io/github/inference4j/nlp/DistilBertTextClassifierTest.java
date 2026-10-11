@@ -19,6 +19,7 @@ package io.github.inference4j.nlp;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.processing.OutputOperator;
+import io.github.inference4j.processing.WindowAggregation;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.tokenizer.EncodedInput;
@@ -29,6 +30,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.nio.file.Path;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -347,5 +349,136 @@ class DistilBertTextClassifierTest {
         model.close();
 
         verify(session).close();
+    }
+
+    // --- long input in windows (stride) ---
+    // maxLength 6 leaves 4 content tokens per window; 10 content tokens with stride 2 give
+    // windows starting at 0, 2, 4 and 6. Identity output keeps the "probabilities" readable.
+
+    private static final long[] LONG_IDS = {101, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 102};
+
+    private InferenceSession windowSession() {
+        InferenceSession session = mock(InferenceSession.class);
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(session.run(any())).thenReturn(
+                logits(0.2f, 0.8f), logits(0.6f, 0.4f), logits(0.1f, 0.9f), logits(0.3f, 0.7f));
+        return session;
+    }
+
+    private Tokenizer longTokenizer() {
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode("long text", Integer.MAX_VALUE)).thenReturn(encoded(LONG_IDS));
+        return tokenizer;
+    }
+
+    private DistilBertTextClassifier.Builder windowed(InferenceSession session, Tokenizer tokenizer) {
+        return DistilBertTextClassifier.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .config(SENTIMENT_CONFIG)
+                .outputOperator(OutputOperator.identity())
+                .maxLength(6)
+                .stride(2);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void strideClassifiesEveryWindowOfALongText() {
+        InferenceSession session = windowSession();
+
+        windowed(session, longTokenizer()).build().classify("long text");
+
+        ArgumentCaptor<Map<String, Tensor>> inputs = ArgumentCaptor.forClass(Map.class);
+        verify(session, times(4)).run(inputs.capture());
+        List<long[]> windows = new ArrayList<>();
+        inputs.getAllValues().forEach(in -> windows.add(in.get("input_ids").toLongs()));
+        assertThat(windows).containsExactly(
+                new long[]{101, 1, 2, 3, 4, 102},
+                new long[]{101, 3, 4, 5, 6, 102},
+                new long[]{101, 5, 6, 7, 8, 102},
+                new long[]{101, 7, 8, 9, 10, 102});
+    }
+
+    @Test
+    void strideAveragesWindowScoresByDefault() {
+        List<TextClassification> results = windowed(windowSession(), longTokenizer()).build().classify("long text");
+
+        assertThat(results).extracting(TextClassification::label).containsExactly("POSITIVE", "NEGATIVE");
+        assertThat(results.get(0).confidence()).isCloseTo(0.7f, within(1e-6f));
+        assertThat(results.get(1).confidence()).isCloseTo(0.3f, within(1e-6f));
+    }
+
+    @Test
+    void maxAggregationKeepsTheStrongestWindowPerLabel() {
+        List<TextClassification> results = windowed(windowSession(), longTokenizer())
+                .windowAggregation(WindowAggregation.max())
+                .build()
+                .classify("long text");
+
+        assertThat(results.get(0).confidence()).isCloseTo(0.9f, within(1e-6f));   // POSITIVE, window 3
+        assertThat(results.get(1).confidence()).isCloseTo(0.6f, within(1e-6f));   // NEGATIVE, window 2
+    }
+
+    @Test
+    void customAggregationReceivesEveryWindowInOrder() {
+        List<float[]> received = new ArrayList<>();
+        WindowAggregation firstWindow = windowScores -> {
+            received.addAll(windowScores);
+            return windowScores.get(0);
+        };
+
+        List<TextClassification> results = windowed(windowSession(), longTokenizer())
+                .windowAggregation(firstWindow)
+                .build()
+                .classify("long text", 1);
+
+        assertThat(received).containsExactly(
+                new float[]{0.2f, 0.8f}, new float[]{0.6f, 0.4f}, new float[]{0.1f, 0.9f}, new float[]{0.3f, 0.7f});
+        assertThat(results).singleElement().satisfies(r -> {
+            assertThat(r.label()).isEqualTo("POSITIVE");
+            assertThat(r.confidence()).isCloseTo(0.8f, within(1e-6f));
+        });
+    }
+
+    @Test
+    void strideLeavesInputThatFitsToASinglePass() {
+        InferenceSession session = windowSession();
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode("short", Integer.MAX_VALUE)).thenReturn(encoded(new long[]{101, 1, 2, 102}));
+        when(tokenizer.encode("short", 6)).thenReturn(encoded(new long[]{101, 1, 2, 102}));
+
+        List<TextClassification> results = windowed(session, tokenizer).build().classify("short");
+
+        verify(session, times(1)).run(any());
+        assertThat(results.get(0).confidence()).isCloseTo(0.8f, within(1e-6f));
+    }
+
+    @Test
+    void windowAggregationWithoutStrideIsRejected() {
+        assertThatThrownBy(() -> DistilBertTextClassifier.builder()
+                .session(mock(InferenceSession.class))
+                .tokenizer(mock(Tokenizer.class))
+                .config(SENTIMENT_CONFIG)
+                .windowAggregation(WindowAggregation.max())
+                .build())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("stride");
+    }
+
+    @Test
+    void strideMustLeaveRoomInTheWindow() {
+        assertThatThrownBy(() -> windowed(mock(InferenceSession.class), mock(Tokenizer.class)).stride(4).build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("[0, 4)");
+    }
+
+    private static Map<String, Tensor> logits(float... values) {
+        return Map.of("logits", Tensor.fromFloats(values, new long[]{1, values.length}));
+    }
+
+    private static EncodedInput encoded(long[] ids) {
+        long[] ones = new long[ids.length];
+        java.util.Arrays.fill(ones, 1L);
+        return new EncodedInput(ids, ones, new long[ids.length]);
     }
 }
