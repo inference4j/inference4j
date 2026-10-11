@@ -21,8 +21,10 @@ import io.github.inference4j.Tensor;
 import io.github.inference4j.TensorType;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class OnnxGenerativeSession implements GenerativeSession {
 
@@ -33,6 +35,7 @@ public class OnnxGenerativeSession implements GenerativeSession {
     private final int headDim;
     private final TensorType kvCacheType;
     private final boolean hasPositionIds;
+    private final Set<String> cacheOutputNames;
     private int sequenceLength;
 
     public OnnxGenerativeSession(InferenceSession session) {
@@ -46,11 +49,39 @@ public class OnnxGenerativeSession implements GenerativeSession {
             .count();
         this.kvCacheType = session.inputType("past_key_values.0.key");
         this.hasPositionIds = session.inputNames().contains("position_ids");
+        Set<String> presentNames = new HashSet<>();
+        for (int i = 0; i < this.numLayers; i++) {
+            presentNames.add("present." + i + ".key");
+            presentNames.add("present." + i + ".value");
+        }
+        this.cacheOutputNames = Set.copyOf(presentNames);
     }
 
+    /**
+     * Processes the prompt and returns the logits for its last position.
+     *
+     * <p>The model returns logits for every prompt position, {@code [promptLength × vocabSize]}
+     * floats, but generation needs only the last row. So all tokens but the last are run for their
+     * key/value cache alone, without requesting the logits, and the last token is then processed
+     * as a regular one-step {@link #decode(long)}. Memory therefore no longer grows with prompt
+     * length times vocabulary size.
+     */
     @Override
     public ForwardResult prefill(long[] tokenIds) {
+        if (tokenIds.length > 1) {
+            long[] prefix = Arrays.copyOf(tokenIds, tokenIds.length - 1);
+            updateCache(session.run(prefillInputs(prefix), cacheOutputNames));
+            this.sequenceLength = prefix.length;
+            return decode(tokenIds[tokenIds.length - 1]);
+        }
         this.sequenceLength = tokenIds.length;
+        Map<String, Tensor> outputs = session.run(prefillInputs(tokenIds));
+        var logitsOutput = outputs.get("logits").slice(0, 0).slice(0, -1).toFloats();
+        updateCache(outputs);
+        return new ForwardResult(logitsOutput);
+    }
+
+    private Map<String, Tensor> prefillInputs(long[] tokenIds) {
         Map<String, Tensor> inputs = new LinkedHashMap<>();
         inputs.put("input_ids", Tensor.fromLongs(tokenIds, new long[]{1, tokenIds.length}));
         inputs.put("attention_mask", Tensor.fromLongs(ones(tokenIds.length), new long[]{1, tokenIds.length}));
@@ -62,10 +93,7 @@ public class OnnxGenerativeSession implements GenerativeSession {
             inputs.put("position_ids", Tensor.fromLongs(positionIds, new long[]{1, tokenIds.length}));
         }
         preFillCache(inputs);
-        Map<String, Tensor> outputs = session.run(inputs);
-        var logitsOutput = outputs.get("logits").slice(0, 0).slice(0, -1).toFloats();
-        updateCache(outputs);
-        return new ForwardResult(logitsOutput);
+        return inputs;
     }
 
     @Override

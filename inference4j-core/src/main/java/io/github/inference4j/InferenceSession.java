@@ -237,6 +237,22 @@ public class InferenceSession implements AutoCloseable {
      * @throws io.github.inference4j.exception.TensorConversionException if a tensor type is unsupported
      */
     public Map<String, Tensor> run(Map<String, Tensor> inputs) {
+        return run(inputs, null);
+    }
+
+    /**
+     * Runs inference and returns only the named outputs.
+     *
+     * <p>ONNX Runtime computes only what those outputs depend on, and only they are copied into
+     * Java memory. Use this to skip large outputs a caller does not need, such as the logits for
+     * every prompt position when only the model's key/value cache is wanted.
+     *
+     * @param inputs      map of input name to tensor (must match the model's expected inputs)
+     * @param outputNames the outputs to compute; each must be a model output
+     * @return map of output name to tensor, for the requested outputs
+     * @throws InferenceException if inference fails or an output name is unknown
+     */
+    public Map<String, Tensor> run(Map<String, Tensor> inputs, Set<String> outputNames) {
         Map<String, OnnxTensor> onnxInputs = new HashMap<>();
         List<ByteBuffer> leasedBuffers = new ArrayList<>();
         try {
@@ -244,7 +260,9 @@ public class InferenceSession implements AutoCloseable {
                 onnxInputs.put(entry.getKey(), toOnnxTensor(entry.getValue(), leasedBuffers));
             }
 
-            try (OrtSession.Result result = session.run(onnxInputs)) {
+            try (OrtSession.Result result = outputNames == null
+                    ? session.run(onnxInputs)
+                    : session.run(onnxInputs, outputNames)) {
                 Map<String, Tensor> outputs = new LinkedHashMap<>();
                 for (Map.Entry<String, OnnxValue> entry : result) {
                     if (entry.getValue() instanceof OnnxTensor onnxTensor) {
