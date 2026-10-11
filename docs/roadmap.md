@@ -128,16 +128,40 @@ The first four are the shared foundation for pixel-level tasks that `CLAUDE.md` 
 as a prerequisite. Depth estimation is its first consumer; semantic segmentation and
 super-resolution are unblocked behind it.
 
-### Unreleased — Readable transcripts
+### v0.13.0 — Long input, Whisper & readable transcripts
 
-- [x] **Punctuation, casing & sentence segmentation** — `PunctCapSegModel` restores
-      punctuation, true-casing (including acronyms) and sentence boundaries in one pass
-- [x] **`PunctuatedSpeechRecognizer`** — decorates any `SpeechRecognizer`, turning Wav2Vec2's
-      upper-case, unpunctuated output into readable sentences
-- [x] **Boolean tensors** — `Tensor.fromBooleans` / `toBooleans`, with BOOL support in
-      `InferenceSession`
-- [x] **`UnigramTokenizer` fixes** — unmapped characters now map to `unk` (they were silently
-      dropped for T5-family models), and empty input produces no tokens
+**Long input, processed in full or rejected — never silently cut**
+
+- [x] **`TruncationPolicy`** — every token-limited wrapper either truncates with a warning
+      (default) or fails with `InputTooLongException`; generators use the model's real
+      position limit instead of a fixed 512
+- [x] **`TokenWindows`** and **`.stride(int)`** — overlapping windows for NER and punctuation
+      (lossless), the embedder (weighted average) and the reranker (MaxP)
+- [x] **`WindowAggregation`** — the text classifier combines window scores with `mean()`,
+      `max()` or a custom lambda
+- [x] **`WordPieceTokenizer` parity with HuggingFace** — ASCII symbols split, accents
+      stripped for uncased models, control characters dropped
+- [x] **Prefill memory** — generation no longer copies `[prompt × vocabulary]` logits into
+      the heap
+
+**Speech**
+
+- [x] **Whisper end to end** — `inference4j/whisper-tiny-genai` and `whisper-small-genai`
+      exported with onnxruntime-genai's model builder; `WhisperSpeechModel` is a
+      `SpeechRecognizer`
+- [x] **`SegmentedSpeechRecognizer`** — cuts long audio at voice-activity pauses; whisper-small
+      word error rate on TED-LIUM long-form drops from 11.7% to 3.7%
+- [x] **Punctuation, casing & sentence segmentation** — `PunctCapSegModel`, plus
+      **`PunctuatedSpeechRecognizer`** to make Wav2Vec2 transcripts readable
+- [x] **`SileroVadDetector.speechPadding`** — keeps word edges from being clipped
+
+**Platform**
+
+- [x] **ONNX Runtime 1.28.0** and **onnxruntime-genai 0.17.0** — the official genai Java
+      release, redistributed on Maven Central; one native ONNX Runtime on the classpath
+- [x] **onnxruntime-genai is the default engine** for LLMs, vision-language and speech
+- [x] **Fixes** — genai wrappers no longer repeat the last token; `UnigramTokenizer` maps
+      unknown characters to `unk`; boolean tensors supported
 
 ## Next Up
 
@@ -155,7 +179,7 @@ Qwen (language + vision), Phi (language + vision), Gemma, DeepSeek, gpt-oss, Gra
 (language + vision + speech input) and Whisper, among others. The native engine stays for
 encoder-decoder models (T5, BART, MarianMT) and plain HuggingFace exports.
 
-- [ ] **Whisper model test** — run `WhisperSpeechModel` against a real model in the model
+- [x] **Whisper model test** — run `WhisperSpeechModel` against a real model in the model
       test suite (today it is covered by unit tests only)
 - [ ] **Newer architectures** — model tests and docs for current genai exports (e.g. Qwen3,
       gpt-oss), so the supported list reflects what is verified
@@ -224,7 +248,7 @@ The shared foundation shipped in v0.12.0, so both of these are now wrapper-level
 | Text | BERT NER (named entity recognition) | v0.10.0 |
 | Text | BGE / GTE / E5 (improved embeddings) | v0.10.0 |
 | Text | Tiktoken LLM | Deferred |
-| Text | Punctuation, casing & segmentation (punct-cap-seg) | Unreleased |
+| Text | Punctuation, casing & segmentation (punct-cap-seg) | v0.13.0 |
 | Vision | ResNet | Done |
 | Vision | EfficientNet | Done |
 | Vision | YOLOv8 / YOLO11 | Done |
