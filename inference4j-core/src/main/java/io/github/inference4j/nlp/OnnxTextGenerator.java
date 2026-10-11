@@ -164,6 +164,8 @@ public class OnnxTextGenerator implements TextGenerator {
         return builder()
                 .modelId("inference4j/qwen2.5-1.5b-instruct")
                 .requiredFile("model.onnx_data")
+                // The chat-template tokens (<|im_start|>, <|im_end|>) are defined here, not in vocab.json
+                .requiredFile("tokenizer_config.json")
                 .addedToken("<|im_start|>")
                 .addedToken("<|im_end|>")
                 .addedToken("<|endoftext|>")
@@ -345,7 +347,10 @@ public class OnnxTextGenerator implements TextGenerator {
 
         /**
          * What to do with prompts longer than {@link #maxInputLength(int)}. Defaults to
-         * {@link TruncationPolicy#TRUNCATE}, which keeps the first tokens and logs a warning.
+         * {@link TruncationPolicy#TRUNCATE}, which logs a warning and keeps the chat template (system
+         * prompt and the cue for the assistant to answer) plus the <em>end</em> of the message: the
+         * model answers only after the template's closing tokens and continues from the end of its
+         * input. {@link TruncationPolicy#FAIL} rejects the prompt instead.
          */
         public Builder truncation(TruncationPolicy truncation) {
             this.truncation = truncation;
@@ -434,6 +439,7 @@ public class OnnxTextGenerator implements TextGenerator {
                         .maxNewTokens(this.maxNewTokens)
                         .maxInputLength(resolveMaxInputLength(configPath))
                         .truncationGuard(new TruncationGuard("OnnxTextGenerator", truncation))
+                        .keepPromptEnd(true)
                         .temperature(this.temperature)
                         .topK(this.topK)
                         .topP(this.topP);

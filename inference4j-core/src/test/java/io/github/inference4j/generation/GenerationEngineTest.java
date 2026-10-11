@@ -479,6 +479,147 @@ class GenerationEngineTest {
         verify(session).prefill(new long[]{1, 2});
     }
 
+    // --- keeping the end of over-long decoder-only prompts ---
+
+    @Test
+    void keepPromptEndKeepsTemplateAndEndOfMessage() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+
+        try (var engine = immediateEosEngine(session, new CharTokenizer(false))
+                .chatTemplate(msg -> "<" + msg + ">")
+                .maxInputLength(6)
+                .keepPromptEnd(true)
+                .build()) {
+            engine.generate("abcdefghij");
+        }
+
+        verify(session).prefill(CharTokenizer.ids("<ghij>"));
+    }
+
+    @Test
+    void keepPromptEndKeepsTokensTheTokenizerAdds() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+
+        try (var engine = immediateEosEngine(session, new CharTokenizer(true))
+                .chatTemplate(msg -> "<" + msg + ">")
+                .maxInputLength(6)
+                .keepPromptEnd(true)
+                .build()) {
+            engine.generate("abcdefghij");
+        }
+
+        // BOS, the template's "<" and ">", and the last 3 characters of the message
+        verify(session).prefill(CharTokenizer.withBos("<hij>"));
+    }
+
+    @Test
+    void keepPromptEndWithoutTemplateKeepsTheEndOfThePrompt() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+
+        try (var engine = immediateEosEngine(session, new CharTokenizer(true))
+                .maxInputLength(4)
+                .keepPromptEnd(true)
+                .build()) {
+            engine.generate("abcdefghij");
+        }
+
+        verify(session).prefill(CharTokenizer.withBos("hij"));
+    }
+
+    @Test
+    void keepPromptEndFallsBackToTheEndWhenTheTemplateTransformsTheMessage() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+
+        try (var engine = immediateEosEngine(session, new CharTokenizer(false))
+                .chatTemplate(msg -> "<" + msg.toUpperCase() + ">")
+                .maxInputLength(4)
+                .keepPromptEnd(true)
+                .build()) {
+            engine.generate("abcdefghij");
+        }
+
+        verify(session).prefill(CharTokenizer.ids("HIJ>"));
+    }
+
+    @Test
+    void keepPromptEndLeavesPromptsThatFitUnchanged() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+
+        try (var engine = immediateEosEngine(session, new CharTokenizer(true))
+                .chatTemplate(msg -> "<" + msg + ">")
+                .maxInputLength(20)
+                .keepPromptEnd(true)
+                .build()) {
+            engine.generate("abc");
+        }
+
+        verify(session).prefill(CharTokenizer.withBos("<abc>"));
+    }
+
+    @Test
+    void withoutKeepPromptEndTheBeginningIsKept() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+
+        try (var engine = immediateEosEngine(session, new CharTokenizer(false))
+                .chatTemplate(msg -> "<" + msg + ">")
+                .maxInputLength(6)
+                .build()) {
+            engine.generate("abcdefghij");
+        }
+
+        verify(session).prefill(CharTokenizer.ids("<abcde"));
+    }
+
+    @Test
+    void keepPromptEndStillFailsUnderFailPolicy() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+
+        try (var engine = immediateEosEngine(session, new CharTokenizer(false))
+                .chatTemplate(msg -> "<" + msg + ">")
+                .maxInputLength(6)
+                .keepPromptEnd(true)
+                .truncationGuard(new TruncationGuard("TestGenerator", TruncationPolicy.FAIL))
+                .build()) {
+            assertThatThrownBy(() -> engine.generate("abcdefghij")).isInstanceOf(InputTooLongException.class);
+        }
+        verify(session, never()).prefill(any());
+    }
+
+    /** One token per character (its code point), optionally preceded by BOS = 1; keeps the first tokens when cut. */
+    private static final class CharTokenizer implements Tokenizer {
+        private final boolean bos;
+
+        CharTokenizer(boolean bos) {
+            this.bos = bos;
+        }
+
+        static long[] ids(String text) {
+            return text.chars().asLongStream().toArray();
+        }
+
+        static long[] withBos(String text) {
+            long[] chars = ids(text);
+            long[] out = new long[chars.length + 1];
+            out[0] = 1;
+            System.arraycopy(chars, 0, out, 1, chars.length);
+            return out;
+        }
+
+        @Override
+        public EncodedInput encode(String text) {
+            return encode(text, Integer.MAX_VALUE);
+        }
+
+        @Override
+        public EncodedInput encode(String text, int maxLength) {
+            long[] all = bos ? withBos(text) : ids(text);
+            long[] kept = java.util.Arrays.copyOf(all, Math.min(all.length, maxLength));
+            long[] mask = new long[kept.length];
+            java.util.Arrays.fill(mask, 1L);
+            return new EncodedInput(kept, mask, new long[kept.length], null, all.length);
+        }
+    }
+
     private static float[] logitsForToken(int tokenId, int vocabSize) {
         float[] logits = new float[vocabSize];
         for (int i = 0; i < vocabSize; i++) {

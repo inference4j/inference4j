@@ -51,13 +51,23 @@ public final class TruncationGuard {
      * @throws InputTooLongException if the input was truncated and the policy is {@code FAIL}
      */
     public void check(EncodedInput encoded, int maxTokens) {
+        check(encoded, maxTokens, "the remaining text was ignored");
+    }
+
+    /**
+     * Like {@link #check(EncodedInput, int)}, with a description of which part of the input was kept,
+     * for tasks that do not simply keep the first tokens.
+     *
+     * @param kept what the warning says about the truncated input, e.g. "kept the end of the message"
+     */
+    public void check(EncodedInput encoded, int maxTokens, String kept) {
         if (!encoded.truncated()) {
             return;
         }
         if (policy == TruncationPolicy.FAIL) {
             throw new InputTooLongException(task, encoded.originalLength(), maxTokens);
         }
-        String message = "{}: input of {} tokens truncated to {}; the remaining text was ignored. "
+        String message = "{}: input of {} tokens truncated to {}; " + kept + ". "
                 + "Use truncation(TruncationPolicy.FAIL) to reject long input instead.";
         if (warned.compareAndSet(false, true)) {
             logger.warn(message, task, encoded.originalLength(), maxTokens);

@@ -21,11 +21,15 @@ import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.generation.GenerationResult;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -289,6 +293,38 @@ class OnnxTextGeneratorModelTest {
                 .build()) {
             assertThatThrownBy(() -> gen.generate(LONG_PROMPT.repeat(2)))
                     .isInstanceOf(InputTooLongException.class);
+        }
+    }
+
+    // A long document followed by a question: truncation must keep the question and the chat template's
+    // closing tokens, or the model never sees the question and just continues the document
+    private static final String DOCUMENT_THEN_QUESTION =
+            "Here is some background about the history of the printing press in Europe. ".repeat(40)
+                    + "\n\nQuestion: What is the capital of France? Answer with one word.";
+
+    static Stream<OnnxTextGenerator.Builder> chatPresets() {
+        return Stream.of(OnnxTextGenerator.smolLM2(), OnnxTextGenerator.qwen2(), OnnxTextGenerator.tinyLlama());
+    }
+
+    @ParameterizedTest
+    @MethodSource("chatPresets")
+    void overLongChatPromptKeepsTheQuestionAndTheTemplate(OnnxTextGenerator.Builder preset) throws Exception {
+        try (var gen = preset.maxInputLength(80).maxNewTokens(10).build()) {
+            GenerationResult result = gen.generate(DOCUMENT_THEN_QUESTION);
+
+            assertThat(result.promptTokens()).isEqualTo(80);
+            assertThat(result.text()).containsIgnoringCase("Paris");
+        }
+    }
+
+    @Test
+    void qwenChatTemplateTokensAreRecognized() throws Exception {
+        // <|im_start|>/<|im_end|> live in tokenizer_config.json, not vocab.json. Read as plain text they left
+        // the model without turn markers, so it never stopped: "Paris|im_end|Human: What..."
+        try (var gen = OnnxTextGenerator.qwen2().maxNewTokens(10).build()) {
+            GenerationResult result = gen.generate("What is the capital of France? Answer with one word.");
+
+            assertThat(result.text().strip()).isEqualTo("Paris");
         }
     }
 }

@@ -21,7 +21,10 @@ import io.github.inference4j.tokenizer.EncodedInput;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -271,6 +274,37 @@ class BpeTokenizerTest {
             assertThat(result.inputIds()).hasSize(8);
             assertThat(result.truncated()).isTrue();
             assertThat(result.originalLength()).isEqualTo(fullLength);
+        }
+    }
+
+    @Nested
+    class AddedTokensFromTokenizerConfig {
+
+        @Test
+        void specialTokensMissingFromVocabAreKeptWholeWithTheirIds(@TempDir Path dir) throws IOException {
+            Path config = dir.resolve("tokenizer_config.json");
+            Files.writeString(config, """
+                    {"added_tokens_decoder": {
+                      "9001": {"content": "<|im_start|>", "special": true},
+                      "9002": {"content": "<tool>", "special": false}
+                    }}""");
+
+            BpeTokenizer tokenizer = BpeTokenizer.builder(vocabPath, mergesPath).addedTokensFrom(config).build();
+
+            long[] ids = tokenizer.encode("<|im_start|>", Integer.MAX_VALUE).inputIds();
+            assertThat(ids).containsExactly(9001);
+            // Non-special added tokens are not registered: decoding would drop them from the output
+            assertThat(tokenizer.encode("<tool>", Integer.MAX_VALUE).inputIds()).doesNotContain(9002L);
+        }
+
+        @Test
+        void aMissingTokenizerConfigChangesNothing(@TempDir Path dir) {
+            BpeTokenizer withConfig = BpeTokenizer.builder(vocabPath, mergesPath)
+                    .addedTokensFrom(dir.resolve("tokenizer_config.json")).build();
+            BpeTokenizer without = BpeTokenizer.builder(vocabPath, mergesPath).build();
+
+            assertThat(withConfig.encode("hello world", 32).inputIds())
+                    .isEqualTo(without.encode("hello world", 32).inputIds());
         }
     }
 }

@@ -118,7 +118,7 @@ the full text and timing information.
 | `.eosTokenId(int)` | `int` | Auto-detected | End-of-sequence token ID (loaded from `config.json`) |
 | `.stopSequence(String)` | `String` | — | Stop sequence (can be called multiple times) |
 | `.maxInputLength(int)` | `int` | Model positions minus `maxNewTokens` | Maximum prompt length in tokens |
-| `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Longer prompts: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
+| `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Longer prompts: `TRUNCATE` keeps the chat template and the end of the message and logs a warning, `FAIL` throws `InputTooLongException`. See [Prompt length](#prompt-length) |
 
 ## Prompt length
 
@@ -129,11 +129,31 @@ The prompt and the generated tokens share the model's positions (`max_position_e
 | Prompt within the limit | Sent in full |
 | Prompt over the limit | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` |
 
-!!! warning "Truncation keeps the start of the prompt"
-    Truncation drops the **end** of the prompt, which includes the chat template's closing tokens. A truncated chat prompt usually produces poor output. Use `FAIL` to detect over-long prompts and shorten them yourself.
+### What truncation keeps
 
-!!! note "Memory grows with prompt length"
-    Prefill currently materializes logits for every prompt position (`prompt length × vocabulary × 4 bytes`), for example about 490 MB for an 800-token Qwen2.5 prompt. Size the JVM heap accordingly for long prompts. This is tracked in [#69](https://github.com/inference4j/inference4j/issues/69).
+A decoder-only model answers only after the chat template's closing tokens (for ChatML,
+`<|im_end|>\n<|im_start|>assistant\n`), and it continues from the end of its input. So when a prompt is
+too long, `TRUNCATE` keeps:
+
+1. the template's **prefix**, including any system prompt;
+2. the **end** of your message, as much as fits;
+3. the template's **suffix**, the cue for the model to answer.
+
+The beginning of the message is dropped. A prompt without a chat template keeps its end. This matches how
+chat runtimes such as Ollama and llama.cpp drop the oldest context first.
+
+For example, a long document followed by a question, cut to 80 tokens, still gets an answer:
+
+```java
+try (var gen = OnnxTextGenerator.qwen2().maxInputLength(80).build()) {
+    gen.generate(longDocument + "\n\nQuestion: What is the capital of France? Answer with one word.");
+    // " Paris": the question and the template's closing tokens were kept
+}
+```
+
+Before this behavior, the template's closing tokens were cut, and the model continued the document instead
+of answering. If the important part of your input is at the start, put the question last, or use `FAIL`
+and shorten the input yourself.
 
 ## Result type
 

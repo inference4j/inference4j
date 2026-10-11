@@ -17,6 +17,7 @@
 package io.github.inference4j.tokenizer;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.inference4j.exception.ModelSourceException;
 
@@ -445,6 +446,41 @@ public class BpeTokenizer implements Tokenizer {
 
         public Builder addedToken(String token) {
             this.addedTokens.add(token);
+            return this;
+        }
+
+        /**
+         * Registers a special token whose ID is not in {@code vocab.json}, as with Qwen2's
+         * {@code <|im_start|>}, which HuggingFace defines in {@code tokenizer_config.json}. The token is
+         * kept whole when encoding and is known to the decoder.
+         */
+        public Builder addedToken(String token, int id) {
+            this.vocab.put(token, id);
+            this.addedTokens.add(token);
+            return this;
+        }
+
+        /**
+         * Registers every token in the {@code added_tokens_decoder} of a HuggingFace
+         * {@code tokenizer_config.json}, if the file exists. Their IDs are often missing from
+         * {@code vocab.json}; without them, chat-template markers would be split into plain text.
+         */
+        public Builder addedTokensFrom(Path tokenizerConfig) {
+            if (!Files.isRegularFile(tokenizerConfig)) {
+                return this;
+            }
+            try {
+                JsonNode decoder = new ObjectMapper().readTree(tokenizerConfig.toFile()).path("added_tokens_decoder");
+                decoder.fields().forEachRemaining(entry -> {
+                    // Only special tokens: decoding drops them, as HuggingFace's skip_special_tokens does
+                    if (entry.getValue().path("special").asBoolean(false)) {
+                        addedToken(entry.getValue().path("content").asText(), Integer.parseInt(entry.getKey()));
+                    }
+                });
+            } catch (IOException | NumberFormatException e) {
+                throw new ModelSourceException("Failed to read added tokens from " + tokenizerConfig + ": "
+                        + e.getMessage(), e);
+            }
             return this;
         }
 
