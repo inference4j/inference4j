@@ -61,6 +61,7 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 ├── ImageEmbedder                       // encode(BufferedImage/Path) → float[]
 ├── SearchReranker                      // score(String, String) → float
 ├── SpeechRecognizer                    // transcribe(Path) → Transcription
+│                                       //   Wav2Vec2Recognizer, WhisperSpeechModel (inference4j-genai)
 │                                       //   PunctuatedSpeechRecognizer decorates any recognizer
 ├── PunctCapSegModel                    // infer(String) → List<String>  (class)
 ├── TextGenerator                       // generate(String) → GenerationResult
@@ -88,7 +89,7 @@ Exceptions: `SileroVadDetector` (stateful hidden state), `MiniLMSearchReranker`,
 GenerativeTask<I, O>                    // generate(I) → O, extends AutoCloseable
 └── AbstractGenerativeTask<I, O>        // owns the autoregressive loop
     ├── TextGenerator                   // generate(String) → GenerationResult
-    ├── WhisperSpeechModel              // transcribe(Path) → Transcription
+    ├── WhisperSpeechModel              // SpeechRecognizer: transcribe(Path) → Transcription
     └── VisionLanguageModel             // generate(VisionInput) → GenerationResult
 ```
 

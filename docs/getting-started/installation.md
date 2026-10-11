@@ -46,13 +46,13 @@ For text generation (Phi-3, DeepSeek-R1, etc.), add `inference4j-genai` instead:
 
 This is a separate module backed by onnxruntime-genai. See the [Generative AI guide](../generative-ai/introduction.md) for details.
 
-!!! warning "Don't override the ONNX Runtime version alongside `inference4j-genai`"
+`inference4j-genai` includes `inference4j-core`, so the task wrappers are available too.
 
-    `inference4j-genai` pulls in a fat JAR that bundles ONNX Runtime's native
-    libraries under the same resource path the official ONNX Runtime JAR uses.
-    `inference4j-core` pins the version those natives were built against, so
-    forcing a different ONNX Runtime version can silently load the wrong native
-    library. See [Generative AI &rarr; Versions](../generative-ai/introduction.md#versions).
+!!! note "ONNX Runtime version"
+
+    onnxruntime-genai loads ONNX Runtime from the regular ONNX Runtime dependency that
+    `inference4j-core` brings in. If you override the ONNX Runtime version, keep it at or
+    above the one listed in [Generative AI &rarr; Versions](../generative-ai/introduction.md#versions).
 
 ## JVM flags
 
