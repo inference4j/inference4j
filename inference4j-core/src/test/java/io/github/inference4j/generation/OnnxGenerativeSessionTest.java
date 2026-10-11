@@ -21,12 +21,16 @@ import io.github.inference4j.Tensor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class OnnxGenerativeSessionTest {
@@ -76,6 +80,47 @@ class OnnxGenerativeSessionTest {
     }
 
     @Test
+    void prefillRunsAllButTheLastTokenForTheCacheOnly() {
+        stubRunForPrefill();
+
+        session.prefill(new long[]{1, 2, 3});
+
+        Set<String> cacheOutputs = Set.of("present.0.key", "present.0.value", "present.1.key", "present.1.value");
+        verify(inferenceSession).run(argThat(in -> in != null
+                && java.util.Arrays.equals(in.get("input_ids").toLongs(), new long[]{1, 2})), eq(cacheOutputs));
+    }
+
+    @Test
+    void prefillDecodesTheLastTokenAtTheEndOfThePrompt() {
+        stubRunForPrefill();
+        List<Map<String, Tensor>> fullRuns = new ArrayList<>();
+        when(inferenceSession.run(anyMap())).thenAnswer(call -> {
+            fullRuns.add(call.getArgument(0));
+            return prefillOutputs();
+        });
+
+        ForwardResult result = session.prefill(new long[]{1, 2, 3});
+
+        assertThat(fullRuns).singleElement().satisfies(in -> {
+            assertThat(in.get("input_ids").toLongs()).containsExactly(3);
+            assertThat(in.get("position_ids").toLongs()).containsExactly(2);
+            assertThat(in.get("attention_mask").toLongs()).containsExactly(1, 1, 1);
+        });
+        assertThat(result.logits()).containsExactly(1.0f, 2.0f, 3.0f);
+    }
+
+    @Test
+    void singleTokenPromptIsProcessedInOnePass() {
+        stubRunForPrefill();
+
+        session.prefill(new long[]{7});
+
+        verify(inferenceSession, never()).run(anyMap(), anySet());
+        verify(inferenceSession).run(anyMap());
+        assertThat(session.cacheSequenceLength()).isEqualTo(1);
+    }
+
+    @Test
     void close_delegatesToInferenceSession() throws Exception {
         session.close();
 
@@ -83,6 +128,11 @@ class OnnxGenerativeSessionTest {
     }
 
     private void stubRunForPrefill() {
+        when(inferenceSession.run(anyMap())).thenReturn(prefillOutputs());
+        when(inferenceSession.run(anyMap(), anySet())).thenReturn(prefillOutputs());
+    }
+
+    private static Map<String, Tensor> prefillOutputs() {
         Map<String, Tensor> outputs = new LinkedHashMap<>();
         // logits tensor: [1, seqLen, vocabSize] — slice(0,0) → [seqLen, vocabSize], slice(0,-1) → [vocabSize]
         outputs.put("logits", Tensor.fromFloats(new float[]{1.0f, 2.0f, 3.0f}, new long[]{1, 1, 3}));
@@ -90,6 +140,6 @@ class OnnxGenerativeSessionTest {
         outputs.put("present.0.value", Tensor.fromFloats(new float[0], new long[]{1, 4, 0, 8}));
         outputs.put("present.1.key", Tensor.fromFloats(new float[0], new long[]{1, 4, 0, 8}));
         outputs.put("present.1.value", Tensor.fromFloats(new float[0], new long[]{1, 4, 0, 8}));
-        when(inferenceSession.run(anyMap())).thenReturn(outputs);
+        return outputs;
     }
 }
