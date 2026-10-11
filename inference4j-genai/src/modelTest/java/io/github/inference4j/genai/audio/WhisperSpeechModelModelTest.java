@@ -15,6 +15,7 @@
  */
 package io.github.inference4j.genai.audio;
 
+import io.github.inference4j.audio.SpeechRecognizer;
 import io.github.inference4j.audio.Transcription;
 import io.github.inference4j.preprocessing.audio.AudioData;
 import io.github.inference4j.preprocessing.audio.AudioLoader;
@@ -71,6 +72,13 @@ class WhisperSpeechModelModelTest {
         Transcription result = whisper.transcribe(speechFixture);
 
         assertThat(result.text()).isEqualTo(EXPECTED);
+    }
+
+    @Test
+    void worksAsSpeechRecognizer() {
+        SpeechRecognizer recognizer = whisper;
+
+        assertThat(recognizer.run(speechFixture).text()).isEqualTo(EXPECTED);
     }
 
     @Test

@@ -100,9 +100,9 @@ try (var whisper = WhisperSpeechModel.builder()
 ```
 
 Two models are published: `inference4j/whisper-tiny-genai` (~225 MB, fastest) and
-`inference4j/whisper-small-genai` (~1.1 GB, more accurate). `WhisperSpeechModel` is not a
-`SpeechRecognizer`, so it cannot be passed where a recognizer is expected, such as to
-`PunctuatedSpeechRecognizer`; it does not need that wrapper anyway. Long audio is split into
+`inference4j/whisper-small-genai` (~1.1 GB, more accurate). `WhisperSpeechModel` is a
+`SpeechRecognizer`, so it can replace `Wav2Vec2Recognizer` anywhere a recognizer is expected. It
+needs no punctuation wrapper, since its output is already punctuated. Long audio is split into
 30-second chunks. See [Whisper](../generative-ai/whisper.md) for builder options, translation and
 chunking details.
 

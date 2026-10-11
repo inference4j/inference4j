@@ -23,6 +23,7 @@ import ai.onnxruntime.genai.Model;
 import ai.onnxruntime.genai.MultiModalProcessor;
 import ai.onnxruntime.genai.NamedTensors;
 import ai.onnxruntime.genai.TokenizerStream;
+import io.github.inference4j.audio.SpeechRecognizer;
 import io.github.inference4j.audio.Transcription;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
@@ -69,7 +70,8 @@ import java.util.List;
  *
  * @see WhisperTask
  */
-public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcription> {
+public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcription>
+		implements SpeechRecognizer {
 
 	private static final int CHUNK_DURATION_SECONDS = 30;
 
@@ -123,6 +125,7 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 	 * @param audioPath path to a WAV audio file
 	 * @return the transcription result
 	 */
+	@Override
 	public Transcription transcribe(Path audioPath) {
 		AudioData audio = io.github.inference4j.preprocessing.audio.AudioLoader.load(audioPath);
 		int chunkSamples = audio.sampleRate() * CHUNK_DURATION_SECONDS;
@@ -167,6 +170,7 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 	 * @param sampleRate sample rate in Hz (e.g., 16000)
 	 * @return the transcription result
 	 */
+	@Override
 	public Transcription transcribe(float[] audioData, int sampleRate) {
 		try {
 			Path tempFile = Files.createTempFile("inference4j-whisper-", ".wav");
