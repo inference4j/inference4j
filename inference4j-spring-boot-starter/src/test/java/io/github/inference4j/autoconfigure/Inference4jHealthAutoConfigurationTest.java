@@ -16,6 +16,7 @@
 package io.github.inference4j.autoconfigure;
 
 import io.github.inference4j.InferenceTask;
+import io.github.inference4j.generation.GenerativeTask;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -65,6 +66,16 @@ class Inference4jHealthAutoConfigurationTest {
 	}
 
 	@Test
+	void generativeTasksAreCountedAndDualTasksOnlyOnce() {
+		runner.withUserConfiguration(TaskConfig.class, GenerativeTaskConfig.class).run(ctx -> {
+			Health health = ctx.getBean(HealthIndicator.class).health();
+			// dummyTask + generator + dual (both an InferenceTask and a GenerativeTask) = 3
+			assertThat(health.getStatus()).isEqualTo(Status.UP);
+			assertThat(health.getDetails()).containsEntry("tasks", 3);
+		});
+	}
+
+	@Test
 	void userCanOverrideHealthIndicator() {
 		runner.withUserConfiguration(CustomHealthConfig.class).run(ctx -> {
 			assertThat(ctx).hasSingleBean(HealthIndicator.class);
@@ -88,6 +99,49 @@ class Inference4jHealthAutoConfigurationTest {
 				public void close() {
 				}
 			};
+		}
+
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	static class GenerativeTaskConfig {
+
+		@Bean
+		GenerativeTask<String, String> generator() {
+			return new StubGenerator();
+		}
+
+		@Bean
+		DualTask dual() {
+			return new DualTask();
+		}
+
+	}
+
+	static class StubGenerator implements GenerativeTask<String, String> {
+
+		@Override
+		public String generate(String input) {
+			return input;
+		}
+
+		@Override
+		public String generate(String input, java.util.function.Consumer<String> tokenListener) {
+			return input;
+		}
+
+		@Override
+		public void close() {
+		}
+
+	}
+
+	/** Like WhisperSpeechModel: both kinds of task. */
+	static class DualTask extends StubGenerator implements InferenceTask<String, String> {
+
+		@Override
+		public String run(String input) {
+			return input;
 		}
 
 	}

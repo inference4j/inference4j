@@ -7,6 +7,8 @@ ext {
 dependencies {
     api project(':inference4j-core')
     api project(':inference4j-runtime')
+    // Optional: the genai auto-configuration activates only when inference4j-genai is on the classpath
+    compileOnly project(':inference4j-genai')
 
     compileOnly "org.springframework.boot:spring-boot-autoconfigure:${springBootVersion}"
     compileOnly "org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}"
@@ -14,6 +16,7 @@ dependencies {
 
     annotationProcessor "org.springframework.boot:spring-boot-configuration-processor:${springBootVersion}"
 
+    testImplementation project(':inference4j-genai')
     testImplementation "org.springframework.boot:spring-boot-starter-test:${springBootVersion}"
     testImplementation "org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}"
     testImplementation 'io.micrometer:micrometer-core:1.14.4'

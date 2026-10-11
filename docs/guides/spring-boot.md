@@ -80,6 +80,17 @@ inference4j:
 | `inference4j.audio.speech-recognizer.model-id` | `String` | `inference4j/wav2vec2-base-960h` | Model ID |
 | `inference4j.audio.vad.enabled` | `boolean` | `false` | Enable Silero VAD |
 | `inference4j.audio.vad.model-id` | `String` | `inference4j/silero-vad` | Model ID |
+| `inference4j.genai.text-generator.enabled` | `boolean` | `false` | Enable the onnxruntime-genai `TextGenerator` (requires `inference4j-genai`) |
+| `inference4j.genai.text-generator.model` | `String` | `phi-3-mini` | Preset: `phi-3-mini` or `deepseek-r1-1.5b` |
+| `inference4j.genai.text-generator.max-length` / `temperature` / `top-k` / `top-p` | number | builder defaults | Generation settings; unset keeps the builder's default |
+| `inference4j.genai.vision-language.enabled` | `boolean` | `false` | Enable `VisionLanguageModel` (requires `inference4j-genai`) |
+| `inference4j.genai.vision-language.model` | `String` | `phi-3.5-vision` | Preset: `phi-3.5-vision` |
+| `inference4j.genai.vision-language.max-length` / `temperature` / `top-k` / `top-p` | number | builder defaults | Generation settings |
+| `inference4j.genai.whisper.enabled` | `boolean` | `false` | Enable `WhisperSpeechModel`; it also becomes the `SpeechRecognizer` bean (requires `inference4j-genai`) |
+| `inference4j.genai.whisper.model-id` | `String` | `inference4j/whisper-small-genai` | Model ID (`inference4j/whisper-tiny-genai` for the small, fast one) |
+| `inference4j.genai.whisper.language` | `String` | `en` | Source language code |
+| `inference4j.genai.whisper.task` | `String` | `transcribe` | `transcribe` or `translate` (to English) |
+| `inference4j.genai.whisper.max-length` | `int` | `448` | Maximum tokens per 30-second chunk |
 
 ## Usage
 
@@ -100,6 +111,38 @@ public class SentimentController {
     }
 }
 ```
+
+### Generative models
+
+Add `inference4j-genai` next to the starter, and the text generator, vision-language model and
+Whisper become available with the same opt-in properties:
+
+```yaml
+inference4j:
+  genai:
+    text-generator:
+      enabled: true
+      model: phi-3-mini
+      max-length: 512
+    whisper:
+      enabled: true
+      model-id: inference4j/whisper-tiny-genai
+```
+
+```java
+public AssistantController(TextGenerator generator, SpeechRecognizer recognizer) { … }
+```
+
+Without `inference4j-genai` on the classpath, the `inference4j.genai.*` properties are ignored.
+
+`WhisperSpeechModel` is a `SpeechRecognizer`, so with `inference4j.genai.whisper.enabled=true` it
+**replaces** Wav2Vec2 as the application's `SpeechRecognizer` bean, even if
+`inference4j.audio.speech-recognizer.enabled` is also set. Inject `WhisperSpeechModel` directly for
+Whisper-only options. For recordings longer than 30 seconds, wrap it yourself in a
+[`SegmentedSpeechRecognizer`](../use-cases/speech-to-text.md#long-recordings) bean.
+
+Presets cover the models with known chat templates. For any other genai model, define your own
+`TextGenerator` bean with `modelSource` and `chatTemplate`; it replaces the auto-configured one.
 
 ## Overriding beans
 
@@ -123,7 +166,7 @@ When you define your own bean, the auto-configured one is skipped.
 
 ## Health indicator
 
-An actuator health indicator is included automatically when Spring Boot Actuator is on the classpath. It reports the number of registered `InferenceTask` beans.
+An actuator health indicator is included automatically when Spring Boot Actuator is on the classpath. It reports the number of registered `InferenceTask` and `GenerativeTask` beans (a bean that is both, like `WhisperSpeechModel`, counts once).
 
 ```
 GET /actuator/health

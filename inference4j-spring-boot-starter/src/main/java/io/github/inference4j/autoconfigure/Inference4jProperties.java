@@ -34,6 +34,8 @@ public class Inference4jProperties {
 
 	private MetricsProperties metrics = new MetricsProperties();
 
+	private GenaiProperties genai = new GenaiProperties();
+
 	public NlpProperties getNlp() {
 		return nlp;
 	}
@@ -64,6 +66,14 @@ public class Inference4jProperties {
 
 	public void setMetrics(MetricsProperties metrics) {
 		this.metrics = metrics;
+	}
+
+	public GenaiProperties getGenai() {
+		return genai;
+	}
+
+	public void setGenai(GenaiProperties genai) {
+		this.genai = genai;
 	}
 
 	public static class NlpProperties {
@@ -179,6 +189,172 @@ public class Inference4jProperties {
 
 		public void setEnabled(boolean enabled) {
 			this.enabled = enabled;
+		}
+
+	}
+
+	/**
+	 * Generative models from {@code inference4j-genai}; used only when that module is on the classpath.
+	 */
+	public static class GenaiProperties {
+
+		private GenerationProperties textGenerator = new GenerationProperties("phi-3-mini");
+
+		private GenerationProperties visionLanguage = new GenerationProperties("phi-3.5-vision");
+
+		private WhisperProperties whisper = new WhisperProperties();
+
+		public GenerationProperties getTextGenerator() {
+			return textGenerator;
+		}
+
+		public void setTextGenerator(GenerationProperties textGenerator) {
+			this.textGenerator = textGenerator;
+		}
+
+		public GenerationProperties getVisionLanguage() {
+			return visionLanguage;
+		}
+
+		public void setVisionLanguage(GenerationProperties visionLanguage) {
+			this.visionLanguage = visionLanguage;
+		}
+
+		public WhisperProperties getWhisper() {
+			return whisper;
+		}
+
+		public void setWhisper(WhisperProperties whisper) {
+			this.whisper = whisper;
+		}
+
+	}
+
+	/**
+	 * A generative model chosen by preset name, with optional generation settings. Unset settings keep
+	 * the builder's defaults.
+	 */
+	public static class GenerationProperties {
+
+		private boolean enabled = false;
+
+		private String model;
+
+		private Integer maxLength;
+
+		private Double temperature;
+
+		private Integer topK;
+
+		private Double topP;
+
+		public GenerationProperties() {
+		}
+
+		public GenerationProperties(String defaultModel) {
+			this.model = defaultModel;
+		}
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
+		public String getModel() {
+			return model;
+		}
+
+		public void setModel(String model) {
+			this.model = model;
+		}
+
+		public Integer getMaxLength() {
+			return maxLength;
+		}
+
+		public void setMaxLength(Integer maxLength) {
+			this.maxLength = maxLength;
+		}
+
+		public Double getTemperature() {
+			return temperature;
+		}
+
+		public void setTemperature(Double temperature) {
+			this.temperature = temperature;
+		}
+
+		public Integer getTopK() {
+			return topK;
+		}
+
+		public void setTopK(Integer topK) {
+			this.topK = topK;
+		}
+
+		public Double getTopP() {
+			return topP;
+		}
+
+		public void setTopP(Double topP) {
+			this.topP = topP;
+		}
+
+	}
+
+	public static class WhisperProperties {
+
+		private boolean enabled = false;
+
+		private String modelId = "inference4j/whisper-small-genai";
+
+		private String language = "en";
+
+		private String task = "transcribe";
+
+		private Integer maxLength;
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
+		public String getModelId() {
+			return modelId;
+		}
+
+		public void setModelId(String modelId) {
+			this.modelId = modelId;
+		}
+
+		public String getLanguage() {
+			return language;
+		}
+
+		public void setLanguage(String language) {
+			this.language = language;
+		}
+
+		public String getTask() {
+			return task;
+		}
+
+		public void setTask(String task) {
+			this.task = task;
+		}
+
+		public Integer getMaxLength() {
+			return maxLength;
+		}
+
+		public void setMaxLength(Integer maxLength) {
+			this.maxLength = maxLength;
 		}
 
 	}
