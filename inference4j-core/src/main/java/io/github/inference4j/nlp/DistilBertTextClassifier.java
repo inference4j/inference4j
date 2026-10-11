@@ -22,9 +22,11 @@ import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.processing.OutputOperator;
+import io.github.inference4j.processing.WindowAggregation;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
@@ -36,6 +38,7 @@ import io.github.inference4j.tokenizer.WordPieceTokenizer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +80,19 @@ import java.util.Set;
  * }
  * }</pre>
  *
+ * <h2>Long texts</h2>
+ * <p>Text longer than {@code maxLength} tokens is truncated by default. With
+ * {@link Builder#stride(int)} set, the whole text is classified in overlapping windows whose
+ * scores are combined by a {@link WindowAggregation}, the mean by default:
+ * <pre>{@code
+ * try (DistilBertTextClassifier classifier = DistilBertTextClassifier.builder()
+ *         .stride(128)
+ *         .windowAggregation(WindowAggregation.max())
+ *         .build()) {
+ *     List<TextClassification> results = classifier.classify(longReview);
+ * }
+ * }</pre>
+ *
  * @see TextClassifier
  * @see TextClassification
  */
@@ -91,10 +107,13 @@ public class DistilBertTextClassifier
     private final ModelConfig config;
     private final OutputOperator outputOperator;
     private final int maxLength;
+    private final Integer stride;
+    private final WindowAggregation windowAggregation;
 
     private DistilBertTextClassifier(InferenceSession session, Tokenizer tokenizer,
                                      ModelConfig config, OutputOperator outputOperator,
-                                     int maxLength, TruncationGuard truncationGuard) {
+                                     int maxLength, TruncationGuard truncationGuard,
+                                     Integer stride, WindowAggregation windowAggregation) {
         super(session,
                 createPreprocessor(tokenizer, maxLength, session.inputNames(), truncationGuard),
                 ctx -> {
@@ -106,6 +125,8 @@ public class DistilBertTextClassifier
         this.config = config;
         this.outputOperator = outputOperator;
         this.maxLength = maxLength;
+        this.stride = stride;
+        this.windowAggregation = windowAggregation;
     }
 
     public static Builder builder() {
@@ -114,11 +135,17 @@ public class DistilBertTextClassifier
 
     @Override
     public List<TextClassification> classify(String text) {
-        return run(text);
+        return classify(text, config.numLabels());
     }
 
     @Override
     public List<TextClassification> classify(String text, int topK) {
+        if (stride != null) {
+            long[] ids = tokenizer.encode(text, Integer.MAX_VALUE).inputIds();
+            if (ids.length > maxLength) {
+                return topLabels(windowAggregation.aggregate(scoreWindows(ids)), config, topK);
+            }
+        }
         PreprocessResult result = preprocessor.process(text);
         Map<String, Tensor> outputs = session.run(result.tensors());
         Tensor outputTensor = outputs.values().iterator().next();
@@ -126,9 +153,38 @@ public class DistilBertTextClassifier
         return postProcess(logits, config, topK, outputOperator);
     }
 
+    /** Scores every window of a long input: one array of label probabilities per window. */
+    private List<float[]> scoreWindows(long[] ids) {
+        int contentCount = ids.length - 2;                          // without [CLS] and [SEP]
+        List<float[]> windowScores = new ArrayList<>();
+        for (TokenWindows.Window window : TokenWindows.plan(contentCount, maxLength - 2, stride)) {
+            int windowTokens = window.end() - window.start();
+            long[] windowIds = new long[windowTokens + 2];
+            windowIds[0] = ids[0];
+            System.arraycopy(ids, 1 + window.start(), windowIds, 1, windowTokens);
+            windowIds[windowIds.length - 1] = ids[ids.length - 1];
+
+            long[] attentionMask = new long[windowIds.length];
+            Arrays.fill(attentionMask, 1L);
+            long[] shape = {1, windowIds.length};
+            Map<String, Tensor> inputs = new LinkedHashMap<>();
+            inputs.put("input_ids", Tensor.fromLongs(windowIds, shape));
+            inputs.put("attention_mask", Tensor.fromLongs(attentionMask, shape));
+            if (session.inputNames().contains("token_type_ids")) {
+                inputs.put("token_type_ids", Tensor.fromLongs(new long[windowIds.length], shape));
+            }
+            float[] logits = session.run(inputs).values().iterator().next().toFloats();
+            windowScores.add(outputOperator.apply(logits));
+        }
+        return windowScores;
+    }
+
     static List<TextClassification> postProcess(float[] logits, ModelConfig config,
                                                  int topK, OutputOperator outputOperator) {
-        float[] probabilities = outputOperator.apply(logits);
+        return topLabels(outputOperator.apply(logits), config, topK);
+    }
+
+    private static List<TextClassification> topLabels(float[] probabilities, ModelConfig config, int topK) {
         int[] topIndices = MathOps.topK(probabilities, topK);
 
         List<TextClassification> results = new ArrayList<>(topIndices.length);
@@ -165,6 +221,8 @@ public class DistilBertTextClassifier
         private OutputOperator outputOperator;
         private int maxLength = DEFAULT_MAX_LENGTH;
         private TruncationPolicy truncation;
+        private Integer stride;
+        private WindowAggregation windowAggregation;
 
         Builder session(InferenceSession session) {
             this.session = session;
@@ -215,7 +273,35 @@ public class DistilBertTextClassifier
             return this;
         }
 
+        /**
+         * Classifies input longer than {@code maxLength} in full: the text is split into windows that
+         * share {@code stride} tokens, each window is classified, and the window scores are combined
+         * by the {@link #windowAggregation(WindowAggregation) window aggregation}. {@code 0} gives
+         * consecutive, non-overlapping windows. Off by default. When set, input is never truncated,
+         * so {@link #truncation(TruncationPolicy)} does not apply.
+         */
+        public Builder stride(int stride) {
+            this.stride = stride;
+            return this;
+        }
+
+        /**
+         * How the scores of a long input's windows are combined into one score per label. Defaults to
+         * {@link WindowAggregation#mean()}. Requires {@link #stride(int)}.
+         */
+        public Builder windowAggregation(WindowAggregation windowAggregation) {
+            this.windowAggregation = windowAggregation;
+            return this;
+        }
+
         public DistilBertTextClassifier build() {
+            if (stride != null && (stride < 0 || stride >= maxLength - 2)) {
+                throw new IllegalArgumentException(
+                        "stride must be in [0, " + (maxLength - 2) + ") for maxLength " + maxLength + ", got " + stride);
+            }
+            if (windowAggregation != null && stride == null) {
+                throw new IllegalStateException("windowAggregation requires stride(int)");
+            }
             if (session == null) {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
@@ -235,7 +321,8 @@ public class DistilBertTextClassifier
                         : OutputOperator.softmax();
             }
             return new DistilBertTextClassifier(session, tokenizer, config, outputOperator, maxLength,
-                    new TruncationGuard("DistilBertTextClassifier", truncation));
+                    new TruncationGuard("DistilBertTextClassifier", truncation), stride,
+                    windowAggregation != null ? windowAggregation : WindowAggregation.mean());
         }
 
         private void loadFromDirectory(Path dir) {

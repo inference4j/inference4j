@@ -239,7 +239,8 @@ public class BertNerRecognizer
         List<WordSpan> spans = new ArrayList<>();
         int i = 0;
         while (i < text.length()) {
-            if (Character.isWhitespace(text.charAt(i))) {
+            // Characters the tokenizer deletes never start a word, matching its word count
+            if (Character.isWhitespace(text.charAt(i)) || WordPieceTokenizer.isIgnored(text.charAt(i))) {
                 i++;
                 continue;
             }
@@ -258,14 +259,8 @@ public class BertNerRecognizer
     }
 
     private static boolean isPunctuation(char c) {
-        int type = Character.getType(c);
-        return type == Character.CONNECTOR_PUNCTUATION
-                || type == Character.DASH_PUNCTUATION
-                || type == Character.END_PUNCTUATION
-                || type == Character.FINAL_QUOTE_PUNCTUATION
-                || type == Character.INITIAL_QUOTE_PUNCTUATION
-                || type == Character.OTHER_PUNCTUATION
-                || type == Character.START_PUNCTUATION;
+        // Must match the tokenizer's word split, or word indices map to the wrong character offsets
+        return WordPieceTokenizer.isPunctuation(c);
     }
 
     private static int argmax(float[] values) {
