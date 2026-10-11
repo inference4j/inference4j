@@ -117,6 +117,7 @@ public class DecodingBpeTokenizer extends BpeTokenizer implements TokenDecoder {
                 for (String t : addedTokens) {
                     b.addedToken(t);
                 }
+                b.addedTokensFrom(dir.resolve("tokenizer_config.json"));
                 b.pattern(pattern);
                 DecodingBpeTokenizer tok = DecodingBpeTokenizer.from(b);
                 return new TokenizerAndDecoder(tok, tok);

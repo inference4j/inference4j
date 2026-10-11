@@ -47,7 +47,7 @@ Models have a fixed maximum input length in tokens: 512 for the BERT-family NLP 
 
 | Policy | Behavior |
 |--------|----------|
-| `TRUNCATE` (default) | Keeps the first tokens and drops the rest. The first truncation per task instance is logged at `WARN` with the token counts; later ones at `DEBUG`. |
+| `TRUNCATE` (default) | Keeps the first tokens and drops the rest; decoder-only text generators instead keep the chat template and the end of the message (see [Prompt length](../generative-ai/native-text-generation.md#prompt-length)). The first truncation per task instance is logged at `WARN` with the token counts; later ones at `DEBUG`. |
 | `FAIL` | Throws `InputTooLongException`, which reports `tokenCount()` and `maxTokens()`. |
 
 ```java

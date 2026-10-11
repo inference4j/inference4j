@@ -70,6 +70,10 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
     private final boolean appendEosToInput;
     private final int maxInputLength;
     private final TruncationGuard truncationGuard;
+    private final boolean keepPromptEnd;
+
+    /** Stands in for the user message when splitting a chat template into prefix and suffix. */
+    private static final String MESSAGE_MARKER = "\uE000";
 
     private GenerationEngine(Builder builder) {
         this.session = builder.session;
@@ -81,6 +85,7 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         this.stopSequences = Set.copyOf(builder.stopSequences);
         this.appendEosToInput = builder.appendEosToInput;
         this.maxInputLength = builder.maxInputLength;
+        this.keepPromptEnd = builder.keepPromptEnd;
         this.truncationGuard = builder.truncationGuard != null
                 ? builder.truncationGuard
                 : new TruncationGuard("GenerationEngine", TruncationPolicy.TRUNCATE);
@@ -106,8 +111,14 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         int tokenLimit = appendEosToInput && maxInputLength != Integer.MAX_VALUE
                 ? maxInputLength - 1 : maxInputLength;
         EncodedInput encoded = tokenizer.encode(prompt, tokenLimit);
-        truncationGuard.check(encoded, tokenLimit);
-        long[] inputIds = encoded.inputIds();
+        long[] inputIds;
+        if (keepPromptEnd && encoded.truncated()) {
+            truncationGuard.check(encoded, tokenLimit, "kept the chat template and the end of the message");
+            inputIds = keepTemplateAndEnd(input, prompt, tokenLimit);
+        } else {
+            truncationGuard.check(encoded, tokenLimit);
+            inputIds = encoded.inputIds();
+        }
         if (appendEosToInput) {
             int eosId = eosTokenIds.iterator().next();
             inputIds = Arrays.copyOf(inputIds, inputIds.length + 1);
@@ -148,6 +159,69 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         return new GenerationResult(streamer.getText(), promptTokens, generatedTokens, duration);
     }
 
+    /**
+     * Fits an over-long prompt into {@code limit} tokens for a decoder-only model, which answers only
+     * after the chat template's closing tokens and continues from the end of its input. Keeps the
+     * template's prefix (including any system prompt), its suffix (the cue that the assistant should
+     * answer), and as much of the <em>end</em> of the message as fits; tokens the tokenizer adds on its
+     * own, such as BOS, are kept too. Without a template, or when the template's tokens do not line up
+     * with the full prompt's, it keeps those added tokens and the end of the prompt.
+     */
+    private long[] keepTemplateAndEnd(String input, String prompt, int limit) {
+        long[] full = tokenizer.encode(prompt, Integer.MAX_VALUE).inputIds();
+        long[] added = tokenizer.encode("", Integer.MAX_VALUE).inputIds();
+        int leading = 0;                                   // added at the start, e.g. BOS
+        while (leading < added.length && leading < full.length && added[leading] == full[leading]) {
+            leading++;
+        }
+        int trailing = added.length - leading;             // added at the end, e.g. EOS
+
+        int prefixLength = leading;
+        int suffixLength = trailing;
+        String[] parts = templateParts(input, prompt);
+        if (parts != null) {
+            long[] prefix = tokenizer.encode(parts[0], Integer.MAX_VALUE).inputIds();
+            long[] suffix = tokenizer.encode(parts[1], Integer.MAX_VALUE).inputIds();
+            int p = prefix.length - trailing;
+            int s = suffix.length - leading;
+            boolean aligned = p >= 0 && s >= 0 && p + s < full.length
+                    && Arrays.equals(full, 0, p, prefix, 0, p)
+                    && Arrays.equals(full, full.length - s, full.length, suffix, leading, suffix.length);
+            if (aligned && p + s < limit) {
+                prefixLength = p;
+                suffixLength = s;
+            }
+        }
+        if (prefixLength + suffixLength >= limit) {
+            return Arrays.copyOfRange(full, full.length - limit, full.length);
+        }
+
+        int messageTokens = limit - prefixLength - suffixLength;
+        long[] kept = new long[limit];
+        System.arraycopy(full, 0, kept, 0, prefixLength);
+        System.arraycopy(full, full.length - suffixLength - messageTokens, kept, prefixLength, messageTokens);
+        System.arraycopy(full, full.length - suffixLength, kept, prefixLength + messageTokens, suffixLength);
+        return kept;
+    }
+
+    /**
+     * The chat template's text before and after the message, or {@code null} when there is no template or
+     * it does not simply wrap the message.
+     */
+    private String[] templateParts(String input, String prompt) {
+        if (chatTemplate == null) {
+            return null;
+        }
+        String marked = chatTemplate.format(MESSAGE_MARKER);
+        int at = marked.indexOf(MESSAGE_MARKER);
+        if (at < 0 || marked.indexOf(MESSAGE_MARKER, at + 1) >= 0) {
+            return null;
+        }
+        String prefix = marked.substring(0, at);
+        String suffix = marked.substring(at + MESSAGE_MARKER.length());
+        return prompt.equals(prefix + input + suffix) ? new String[]{prefix, suffix} : null;
+    }
+
     @Override
     public void close() throws Exception {
         session.close();
@@ -165,6 +239,7 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
 
         private boolean appendEosToInput = false;
         private int maxInputLength = Integer.MAX_VALUE;
+        private boolean keepPromptEnd;
         private TruncationGuard truncationGuard;
         private float temperature = 0f;
         private int topK = 0;
@@ -217,6 +292,17 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
          */
         public Builder maxInputLength(int maxInputLength) {
             this.maxInputLength = maxInputLength;
+            return this;
+        }
+
+        /**
+         * How an over-long prompt is truncated. {@code false} (the default) keeps its beginning, which is
+         * right for an encoder's input. {@code true} keeps the chat template and the end of the message,
+         * which is what a decoder-only model needs: it answers after the template's closing tokens and
+         * continues from the end of its input.
+         */
+        public Builder keepPromptEnd(boolean keepPromptEnd) {
+            this.keepPromptEnd = keepPromptEnd;
             return this;
         }
 
