@@ -17,8 +17,11 @@
 package io.github.inference4j.generation;
 
 import io.github.inference4j.InferenceSession;
+import io.github.inference4j.NativeTensors;
 import io.github.inference4j.Tensor;
+import io.github.inference4j.TensorType;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -29,8 +32,11 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.*;
 
 class OnnxGenerativeSessionTest {
@@ -51,6 +57,9 @@ class OnnxGenerativeSessionTest {
                         "past_key_values.0.key", "past_key_values.0.value",
                         "past_key_values.1.key", "past_key_values.1.value"
                 ));
+        // present.* comes back as FLOAT16 while past_key_values.* takes FLOAT: the copy-and-cast path
+        when(inferenceSession.inputType("past_key_values.0.key")).thenReturn(TensorType.FLOAT);
+        when(inferenceSession.outputType(anyString())).thenReturn(TensorType.FLOAT16);
 
         session = new OnnxGenerativeSession(inferenceSession);
     }
@@ -125,6 +134,92 @@ class OnnxGenerativeSessionTest {
         session.close();
 
         verify(inferenceSession).close();
+    }
+
+    @Nested
+    class NativeCache {
+
+        private InferenceSession native4j;
+        private OnnxGenerativeSession nativeSession;
+        private final List<NativeTensors> steps = new ArrayList<>();
+        private final List<NativeTensors> keptCaches = new ArrayList<>();
+
+        @BeforeEach
+        void setUp() {
+            native4j = mock(InferenceSession.class);
+            when(native4j.inputShape("past_key_values.0.key")).thenReturn(new long[]{1, 4, 0, 8});
+            when(native4j.inputNames()).thenReturn(Set.of(
+                    "input_ids", "attention_mask", "position_ids",
+                    "past_key_values.0.key", "past_key_values.0.value",
+                    "past_key_values.1.key", "past_key_values.1.value"));
+            // Matching types: the cache can stay in ONNX Runtime memory
+            when(native4j.inputType("past_key_values.0.key")).thenReturn(TensorType.FLOAT16);
+            when(native4j.outputType(anyString())).thenReturn(TensorType.FLOAT16);
+            when(native4j.runNative(anyMap(), any(), any())).thenAnswer(call -> newStep());
+            nativeSession = new OnnxGenerativeSession(native4j);
+        }
+
+        private NativeTensors newStep() {
+            NativeTensors step = mock(NativeTensors.class);
+            NativeTensors selected = mock(NativeTensors.class);
+            NativeTensors kept = mock(NativeTensors.class);
+            when(step.copy("logits")).thenReturn(Tensor.fromFloats(new float[]{1f, 2f, 3f}, new long[]{1, 1, 3}));
+            when(step.select(anySet())).thenReturn(selected);
+            when(selected.rename(any())).thenReturn(kept);
+            steps.add(step);
+            keptCaches.add(kept);
+            return step;
+        }
+
+        @Test
+        void prefillComputesOnlyTheCacheForThePrefix() {
+            nativeSession.prefill(new long[]{1, 2, 3});
+
+            Set<String> cacheOutputs = Set.of("present.0.key", "present.0.value", "present.1.key", "present.1.value");
+            verify(native4j).runNative(argThat(in -> in != null
+                    && java.util.Arrays.equals(in.get("input_ids").toLongs(), new long[]{1, 2})),
+                    same(NativeTensors.empty()), eq(cacheOutputs));
+            verify(native4j, never()).run(anyMap());
+        }
+
+        @Test
+        void eachStepUsesThePreviousCacheAndThenFreesIt() {
+            nativeSession.prefill(new long[]{1, 2, 3});   // prefix run + decode of the last token
+            nativeSession.decode(4);
+
+            // the decode of token 4 received the cache kept from the step before it...
+            verify(native4j).runNative(argThat(in -> in != null && in.get("input_ids").toLongs()[0] == 4),
+                    same(keptCaches.get(1)), isNull());
+            // ...which was freed afterwards, while the newest cache stays open
+            verify(keptCaches.get(0)).close();
+            verify(keptCaches.get(1)).close();
+            verify(keptCaches.get(2), never()).close();
+            assertThat(nativeSession.cacheSequenceLength()).isEqualTo(4);
+        }
+
+        @Test
+        void onlyTheLogitsAreCopiedIntoJava() {
+            ForwardResult result = nativeSession.prefill(new long[]{1, 2, 3});
+
+            assertThat(result.logits()).containsExactly(1f, 2f, 3f);
+            verify(steps.get(1)).copy("logits");
+            verify(steps.get(1), never()).copy(org.mockito.ArgumentMatchers.startsWith("present"));
+        }
+
+        @Test
+        void resetAndCloseFreeTheCache() throws Exception {
+            nativeSession.prefill(new long[]{1, 2, 3});
+            NativeTensors current = keptCaches.get(keptCaches.size() - 1);
+
+            nativeSession.resetCache();
+            verify(current).close();
+
+            nativeSession.prefill(new long[]{5, 6});
+            NativeTensors afterReset = keptCaches.get(keptCaches.size() - 1);
+            nativeSession.close();
+            verify(afterReset).close();
+            verify(native4j).close();
+        }
     }
 
     private void stubRunForPrefill() {
