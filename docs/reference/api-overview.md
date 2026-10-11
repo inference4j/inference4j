@@ -6,7 +6,7 @@
 
 | Package | Contents |
 |---------|----------|
-| `io.github.inference4j` | Core contracts: `InferenceTask`, `Classifier`, `Detector`, `ZeroShotClassifier`, `ZeroShotInput`, `AbstractInferenceTask`, `Tensor`, `TensorType`, `InferenceSession`, `InferenceContext` |
+| `io.github.inference4j` | Core contracts: `InferenceTask`, `Classifier`, `Detector`, `ZeroShotClassifier`, `ZeroShotInput`, `AbstractInferenceTask`, `Tensor`, `TensorType`, `InferenceSession`, `NativeTensors`, `InferenceContext` |
 | `io.github.inference4j.session` | Session config: `SessionConfigurer`, `SessionOptions` |
 | `io.github.inference4j.model` | Model resolution: `ModelSource`, `HuggingFaceModelSource`, `LocalModelSource` |
 | `io.github.inference4j.processing` | Pre/post-processing: `Preprocessor`, `Postprocessor`, `OutputOperator`, `MathOps`, `TruncationPolicy`, `TruncationGuard`, `TokenWindows`, `WindowAggregation` |

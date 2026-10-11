@@ -183,22 +183,43 @@ public class InferenceSession implements AutoCloseable {
             if (info == null) {
                 throw new InferenceException("Unknown input: " + name);
             }
-            OnnxJavaType javaType = ((TensorInfo) info.getInfo()).type;
-            return switch (javaType) {
-                case FLOAT -> TensorType.FLOAT;
-                case FLOAT16, BFLOAT16 -> TensorType.FLOAT16;
-                case INT64 -> TensorType.LONG;
-                case INT32 -> TensorType.INT;
-                case INT8, UINT8 -> TensorType.BYTE;
-                case BOOL -> TensorType.BOOL;
-                case DOUBLE -> TensorType.DOUBLE;
-                case STRING -> TensorType.STRING;
-                default -> throw new InferenceException(
-                        "Unsupported input type for '" + name + "': " + javaType);
-            };
+            return tensorType(name, ((TensorInfo) info.getInfo()).type);
         } catch (OrtException e) {
             throw new InferenceException("Failed to get input type: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Returns the element type of the named output tensor as defined in the model.
+     *
+     * @param name the output tensor name
+     * @return the tensor type
+     * @throws InferenceException if the output name is not found
+     */
+    public TensorType outputType(String name) {
+        try {
+            NodeInfo info = session.getOutputInfo().get(name);
+            if (info == null) {
+                throw new InferenceException("Unknown output: " + name);
+            }
+            return tensorType(name, ((TensorInfo) info.getInfo()).type);
+        } catch (OrtException e) {
+            throw new InferenceException("Failed to get output type: " + e.getMessage(), e);
+        }
+    }
+
+    private static TensorType tensorType(String name, OnnxJavaType javaType) {
+        return switch (javaType) {
+            case FLOAT -> TensorType.FLOAT;
+            case FLOAT16, BFLOAT16 -> TensorType.FLOAT16;
+            case INT64 -> TensorType.LONG;
+            case INT32 -> TensorType.INT;
+            case INT8, UINT8 -> TensorType.BYTE;
+            case BOOL -> TensorType.BOOL;
+            case DOUBLE -> TensorType.DOUBLE;
+            case STRING -> TensorType.STRING;
+            default -> throw new InferenceException("Unsupported tensor type for '" + name + "': " + javaType);
+        };
     }
 
     /**
@@ -281,6 +302,51 @@ public class InferenceSession implements AutoCloseable {
         }
     }
 
+    /**
+     * Runs inference keeping the outputs in ONNX Runtime memory instead of copying them into Java.
+     *
+     * <p>Use this when outputs feed the next run, as a language model's key/value cache does from one
+     * generated token to the next: pass them back as {@code nativeInputs} and they never cross into Java.
+     * Copy out only what Java needs with {@link NativeTensors#copy(String)}. The caller owns the result
+     * and must {@link NativeTensors#close() close} it to free the memory.
+     *
+     * @param inputs       inputs held in Java, copied into ONNX Runtime for this run
+     * @param nativeInputs inputs already in ONNX Runtime memory, e.g. outputs of an earlier run
+     * @param outputNames  the outputs to compute, or {@code null} for all; outputs not requested are
+     *                     not computed at all
+     * @return the outputs, still in ONNX Runtime memory
+     * @throws InferenceException if inference fails or {@code nativeInputs} was closed
+     */
+    public NativeTensors runNative(Map<String, Tensor> inputs, NativeTensors nativeInputs, Set<String> outputNames) {
+        Map<String, OnnxTensor> converted = new HashMap<>();
+        List<ByteBuffer> leasedBuffers = new ArrayList<>();
+        try {
+            for (var entry : inputs.entrySet()) {
+                converted.put(entry.getKey(), toOnnxTensor(entry.getValue(), leasedBuffers));
+            }
+            Map<String, OnnxTensor> allInputs = new HashMap<>(converted);
+            allInputs.putAll(nativeInputs.tensors());
+
+            OrtSession.Result result = outputNames == null
+                    ? session.run(allInputs)
+                    : session.run(allInputs, outputNames);
+            Map<String, OnnxTensor> outputs = new LinkedHashMap<>();
+            for (Map.Entry<String, OnnxValue> entry : result) {
+                if (entry.getValue() instanceof OnnxTensor onnxTensor) {
+                    outputs.put(entry.getKey(), onnxTensor);
+                }
+            }
+            return new NativeTensors(new NativeTensors.Owner(result), outputs);
+        } catch (OrtException e) {
+            throw new InferenceException("Inference failed: " + e.getMessage(), e);
+        } finally {
+            converted.values().forEach(OnnxTensor::close);
+            for (ByteBuffer bb : leasedBuffers) {
+                bufferPool.returnBuffer(bb);
+            }
+        }
+    }
+
     private OnnxTensor toOnnxTensor(Tensor tensor, List<ByteBuffer> leasedBuffers)
             throws OrtException {
         return switch (tensor.type()) {
@@ -329,7 +395,7 @@ public class InferenceSession implements AutoCloseable {
         };
     }
 
-    private Tensor fromOnnxTensor(OnnxTensor onnxTensor) {
+    static Tensor fromOnnxTensor(OnnxTensor onnxTensor) {
         TensorInfo info = onnxTensor.getInfo();
         long[] shape = info.getShape();
 

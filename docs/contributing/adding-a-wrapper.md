@@ -261,6 +261,8 @@ Postprocessor<InferenceContext<BufferedImage>, List<Classification>> postprocess
 | `AudioProcessor` | `io.github.inference4j.preprocessing.audio` | Resample, normalize audio |
 | `Vocabulary` | `io.github.inference4j.preprocessing.audio` | Load vocab.json for CTC models |
 | `ModelConfig` | `io.github.inference4j.preprocessing.text` | Parse HuggingFace config.json (`id2label`, `problem_type`) |
+| `InferenceSession.run(inputs, outputNames)` | `io.github.inference4j` | Compute and copy only the named outputs |
+| `InferenceSession.runNative` / `NativeTensors` | `io.github.inference4j` | Keep outputs in ONNX Runtime memory and pass them to the next run, for models that run step by step (e.g. a key/value cache); copy out only what Java needs with `copy(name)` |
 
 ## Checklist for a new wrapper
 

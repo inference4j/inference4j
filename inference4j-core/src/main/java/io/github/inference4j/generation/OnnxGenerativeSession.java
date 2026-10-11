@@ -17,6 +17,7 @@
 package io.github.inference4j.generation;
 
 import io.github.inference4j.InferenceSession;
+import io.github.inference4j.NativeTensors;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.TensorType;
 
@@ -36,6 +37,10 @@ public class OnnxGenerativeSession implements GenerativeSession {
     private final TensorType kvCacheType;
     private final boolean hasPositionIds;
     private final Set<String> cacheOutputNames;
+    // The key/value cache stays in ONNX Runtime memory between steps when the model's present.* outputs
+    // have the same type as its past_key_values.* inputs; otherwise it is copied to Java and cast.
+    private final boolean nativeCache;
+    private NativeTensors nativeKv = NativeTensors.empty();
     private int sequenceLength;
 
     public OnnxGenerativeSession(InferenceSession session) {
@@ -55,6 +60,15 @@ public class OnnxGenerativeSession implements GenerativeSession {
             presentNames.add("present." + i + ".value");
         }
         this.cacheOutputNames = Set.copyOf(presentNames);
+        this.nativeCache = cacheOutputNames.stream().allMatch(name -> outputHasType(name, kvCacheType));
+    }
+
+    private boolean outputHasType(String name, TensorType type) {
+        try {
+            return session.outputType(name) == type;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /**
@@ -70,11 +84,21 @@ public class OnnxGenerativeSession implements GenerativeSession {
     public ForwardResult prefill(long[] tokenIds) {
         if (tokenIds.length > 1) {
             long[] prefix = Arrays.copyOf(tokenIds, tokenIds.length - 1);
-            updateCache(session.run(prefillInputs(prefix), cacheOutputNames));
+            if (nativeCache) {
+                keepNativeCache(session.runNative(prefillInputs(prefix), NativeTensors.empty(), cacheOutputNames));
+            } else {
+                updateCache(session.run(prefillInputs(prefix), cacheOutputNames));
+            }
             this.sequenceLength = prefix.length;
             return decode(tokenIds[tokenIds.length - 1]);
         }
         this.sequenceLength = tokenIds.length;
+        if (nativeCache) {
+            NativeTensors step = session.runNative(prefillInputs(tokenIds), NativeTensors.empty(), null);
+            float[] logits = lastLogits(step);
+            keepNativeCache(step);
+            return new ForwardResult(logits);
+        }
         Map<String, Tensor> outputs = session.run(prefillInputs(tokenIds));
         var logitsOutput = outputs.get("logits").slice(0, 0).slice(0, -1).toFloats();
         updateCache(outputs);
@@ -104,6 +128,13 @@ public class OnnxGenerativeSession implements GenerativeSession {
         if (hasPositionIds) {
             inputs.put("position_ids", Tensor.fromLongs(new long[]{sequenceLength}, new long[]{1, 1}));
         }
+        if (nativeCache) {
+            NativeTensors step = session.runNative(inputs, nativeKv, null);
+            float[] logits = lastLogits(step);
+            keepNativeCache(step);
+            this.sequenceLength++;
+            return new ForwardResult(logits);
+        }
         inputs.putAll(this.cache);
         Map<String, Tensor> outputs = session.run(inputs);
         var logitsOutput = outputs.get("logits").slice(0, 0).slice(0, -1).toFloats();
@@ -119,13 +150,32 @@ public class OnnxGenerativeSession implements GenerativeSession {
 
     @Override
     public void resetCache() {
+        this.nativeKv.close();
+        this.nativeKv = NativeTensors.empty();
         this.cache.clear();
         this.sequenceLength = 0;
     }
 
     @Override
     public void close() {
+        this.nativeKv.close();
         this.session.close();
+    }
+
+    /** The logits of the step's last position: the only output copied into Java. */
+    private static float[] lastLogits(NativeTensors step) {
+        return step.copy("logits").slice(0, 0).slice(0, -1).toFloats();
+    }
+
+    /**
+     * Keeps a step's present.* outputs, in ONNX Runtime memory, as the next step's past_key_values.*
+     * inputs, and frees the previous step's cache. Read everything else from the step (the logits)
+     * before calling this: the kept view shares the step's memory.
+     */
+    private void keepNativeCache(NativeTensors step) {
+        NativeTensors previous = this.nativeKv;
+        this.nativeKv = step.select(cacheOutputNames).rename(name -> name.replace("present.", "past_key_values."));
+        previous.close();
     }
 
     private long[] ones(int length) {
