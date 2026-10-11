@@ -15,9 +15,12 @@
  */
 package io.github.inference4j.autoconfigure;
 
-import java.util.List;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 
 import io.github.inference4j.InferenceTask;
+import io.github.inference4j.generation.GenerativeTask;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -38,9 +41,13 @@ public class Inference4jHealthAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean(name = "inference4jHealthIndicator")
-	public HealthIndicator inference4jHealthIndicator(ObjectProvider<InferenceTask<?, ?>> tasks) {
+	public HealthIndicator inference4jHealthIndicator(ObjectProvider<InferenceTask<?, ?>> tasks,
+			ObjectProvider<GenerativeTask<?, ?>> generativeTasks) {
 		return () -> {
-			List<InferenceTask<?, ?>> activeTasks = tasks.orderedStream().toList();
+			// A bean can be both (WhisperSpeechModel is a SpeechRecognizer and a GenerativeTask): count it once
+			Set<Object> activeTasks = Collections.newSetFromMap(new IdentityHashMap<>());
+			tasks.orderedStream().forEach(activeTasks::add);
+			generativeTasks.orderedStream().forEach(activeTasks::add);
 			if (activeTasks.isEmpty()) {
 				return Health.unknown().withDetail("reason", "No inference4j tasks configured").build();
 			}
