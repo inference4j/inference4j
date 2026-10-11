@@ -16,7 +16,7 @@
 | `io.github.inference4j.preprocessing.image` | Image transforms pipeline: `ImageTransformPipeline`, `ResizeTransform`, `CenterCropTransform`, `ImageLayout`, `Labels` |
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
 | `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `DepthAnythingEstimator`, `ImageEmbedder`, `ImageAnnotator`, `TensorImages`, `Colormap` |
-| `io.github.inference4j.audio` | `Wav2Vec2Recognizer`, `PunctuatedSpeechRecognizer`, `SileroVadDetector` |
+| `io.github.inference4j.audio` | `Wav2Vec2Recognizer`, `PunctuatedSpeechRecognizer`, `SegmentedSpeechRecognizer`, `SileroVadDetector` |
 | `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
 | `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `EncoderDecoderSession`, `ChatTemplate`, `GenerativeModel` |
@@ -63,6 +63,7 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 ├── SpeechRecognizer                    // transcribe(Path) → Transcription
 │                                       //   Wav2Vec2Recognizer, WhisperSpeechModel (inference4j-genai)
 │                                       //   PunctuatedSpeechRecognizer decorates any recognizer
+│                                       //   SegmentedSpeechRecognizer cuts long audio at pauses
 ├── PunctCapSegModel                    // infer(String) → List<String>  (class)
 ├── TextGenerator                       // generate(String) → GenerationResult
 ├── Summarizer                          // summarize(String) → String

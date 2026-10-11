@@ -117,10 +117,12 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 	/**
 	 * Transcribes or translates speech from an audio file.
 	 *
-	 * <p>Audio longer than 30 seconds is automatically split into chunks,
-	 * processed individually, and concatenated. The task mode (transcription
-	 * or translation) is determined by the {@link WhisperTask} configured
-	 * via the builder.
+	 * <p>Whisper processes 30 seconds of audio per pass. Longer audio is cut
+	 * every 30 seconds, processed piece by piece, and concatenated; cuts that
+	 * land mid-sentence lose accuracy. For long recordings, wrap this model in
+	 * {@link io.github.inference4j.audio.SegmentedSpeechRecognizer}, which cuts
+	 * at pauses instead. The task mode (transcription or translation) is
+	 * determined by the {@link WhisperTask} configured via the builder.
 	 *
 	 * @param audioPath path to a WAV audio file
 	 * @return the transcription result

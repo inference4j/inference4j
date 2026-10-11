@@ -111,22 +111,40 @@ Each `Segment` contains:
 | `startTime()` | `float` | Start time in seconds |
 | `endTime()` | `float` | End time in seconds |
 
-## Auto-chunking
+## Long audio
 
-Whisper processes audio in 30-second windows. For audio longer than 30 seconds,
-`WhisperSpeechModel` automatically:
+Whisper sees **30 seconds of audio per pass**; this is a property of the model, not of
+inference4j. On its own, `WhisperSpeechModel` handles longer audio by cutting it every 30
+seconds. Those cuts land in the middle of words and sentences, and Whisper then drops or repeats
+text around them, sometimes losing a whole 30-second chunk.
 
-1. Splits the audio into 30-second chunks
-2. Transcribes each chunk independently
-3. Concatenates the results
+For recordings longer than 30 seconds, wrap the model in `SegmentedSpeechRecognizer`, which cuts
+at pauses found by [voice activity detection](../use-cases/voice-activity-detection.md):
 
-This happens transparently — just call `transcribe()` with any length audio.
+```java
+try (SpeechRecognizer recognizer = new SegmentedSpeechRecognizer(
+        WhisperSpeechModel.builder().modelId("inference4j/whisper-small-genai").build(),
+        SileroVadDetector.builder().build())) {
+    System.out.println(recognizer.transcribe(Path.of("meeting.wav")).text());
+}
+```
 
-!!! warning "Chunks are cut at fixed 30-second boundaries"
+| Word error rate (lower is better) | Cut every 30 s | `SegmentedSpeechRecognizer` | HF `transformers` chunked | HF `transformers` sequential |
+|---|---|---|---|---|
+| whisper-tiny  | 13.2% | **6.1%** | 6.1% | 6.5% |
+| whisper-small | 11.7% | **3.7%** | 3.7% | 3.9% |
 
-    A cut can land in the middle of a word or sentence, and Whisper may then repeat or garble
-    a few words around the boundary. Cutting at pauses instead is tracked in
-    [#86](https://github.com/inference4j/inference4j/issues/86).
+Measured on the 11 talks of the [TED-LIUM long-form](https://huggingface.co/datasets/distil-whisper/tedlium-long-form)
+test set (148 minutes), with Whisper's standard English text normalizer. The two right-hand
+columns run the same models through the HuggingFace `transformers` reference implementation's
+long-form strategies (30-second chunks with 5-second overlap, and OpenAI's timestamp-driven
+sequential decoding). The voice activity detection adds processing time: 12% with
+whisper-small (302 s instead of 270 s for all 11 talks on an Apple M4 Pro CPU) and 40% with the
+much faster whisper-tiny (74 s instead of 53 s).
+
+Cutting at pauses roughly halves tiny's error rate and cuts small's by two thirds, matching
+the reference implementation. See [Long recordings](../use-cases/speech-to-text.md#long-recordings) for how the cuts are
+chosen.
 
 ## How it works
 

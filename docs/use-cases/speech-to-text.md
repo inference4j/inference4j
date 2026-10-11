@@ -102,9 +102,51 @@ try (var whisper = WhisperSpeechModel.builder()
 Two models are published: `inference4j/whisper-tiny-genai` (~225 MB, fastest) and
 `inference4j/whisper-small-genai` (~1.1 GB, more accurate). `WhisperSpeechModel` is a
 `SpeechRecognizer`, so it can replace `Wav2Vec2Recognizer` anywhere a recognizer is expected. It
-needs no punctuation wrapper, since its output is already punctuated. Long audio is split into
-30-second chunks. See [Whisper](../generative-ai/whisper.md) for builder options, translation and
-chunking details.
+needs no punctuation wrapper, since its output is already punctuated. Whisper sees 30 seconds of
+audio per pass, so wrap it in [`SegmentedSpeechRecognizer`](#long-recordings) for longer
+recordings. See [Whisper](../generative-ai/whisper.md) for builder options and translation.
+
+## Long recordings
+
+`SegmentedSpeechRecognizer` splits long audio at pauses before passing it to any recognizer. It is
+essential for Whisper, which processes at most 30 seconds per pass, and also keeps memory per pass
+bounded for Wav2Vec2:
+
+```java
+try (SpeechRecognizer recognizer = new SegmentedSpeechRecognizer(
+        WhisperSpeechModel.builder().modelId("inference4j/whisper-small-genai").build(),
+        SileroVadDetector.builder().build())) {
+    System.out.println(recognizer.transcribe(Path.of("meeting.wav")).text());
+}
+```
+
+How it cuts:
+
+1. A [voice activity detector](voice-activity-detection.md) finds the speech in the recording.
+2. Each piece ends at the midpoint of the latest pause that fits within the maximum length
+   (30 seconds by default; pass a `Duration` as the third constructor argument to change it).
+3. A stretch of speech with no pause at all is cut at the maximum length.
+4. The pieces' transcripts are joined with spaces, and their segments are shifted to the
+   recording's timeline.
+
+Audio that already fits is passed through unchanged. Closing the wrapper closes both the
+recognizer and the detector. It is itself a `SpeechRecognizer`, so it combines with
+`PunctuatedSpeechRecognizer` for Wav2Vec2.
+
+### Measured accuracy
+
+| Word error rate (lower is better) | Cut every 30 s | `SegmentedSpeechRecognizer` | HF `transformers` chunked | HF `transformers` sequential |
+|---|---|---|---|---|
+| whisper-tiny  | 13.2% | **6.1%** | 6.1% | 6.5% |
+| whisper-small | 11.7% | **3.7%** | 3.7% | 3.9% |
+
+Measured on the 11 talks of the [TED-LIUM long-form](https://huggingface.co/datasets/distil-whisper/tedlium-long-form)
+test set (148 minutes), with Whisper's standard English text normalizer. The two right-hand
+columns run the same models through the HuggingFace `transformers` reference implementation's
+long-form strategies (30-second chunks with 5-second overlap, and OpenAI's timestamp-driven
+sequential decoding). The voice activity detection adds processing time: 12% with
+whisper-small (302 s instead of 270 s for all 11 talks on an Apple M4 Pro CPU) and 40% with the
+much faster whisper-tiny (74 s instead of 53 s).
 
 ## Builder options
 
