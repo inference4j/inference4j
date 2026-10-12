@@ -66,6 +66,9 @@ Generative models use a separate module (`inference4j-genai`) and a different bu
 |------------|---------|----------|------|---------|
 | Text Generation | `TextGenerator` | `inference4j/phi-3-mini-4k-instruct` | ~2.7 GB | MIT |
 | Text Generation | `TextGenerator` | `inference4j/deepseek-r1-distill-qwen-1.5b` | ~1 GB | MIT |
+| Text Generation | `TextGenerator` | `inference4j/qwen3-0.6b` | ~0.4 GB | Apache-2.0 |
+| Text Generation | `TextGenerator` | `inference4j/smollm3-3b` | ~2 GB | Apache-2.0 |
+| Text Generation | `TextGenerator` | `inference4j/phi-4-mini-instruct` | ~4.9 GB | MIT |
 | Speech-to-Text / Translation | `WhisperSpeechModel` | `inference4j/whisper-tiny-genai` | ~225 MB | MIT |
 | Speech-to-Text / Translation | `WhisperSpeechModel` | `inference4j/whisper-small-genai` | ~1.1 GB | MIT |
 | Vision-Language | `VisionLanguageModel` | `inference4j/phi-3.5-vision-instruct` | ~3.3 GB | MIT |

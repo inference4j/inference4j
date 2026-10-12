@@ -81,7 +81,7 @@ inference4j:
 | `inference4j.audio.vad.enabled` | `boolean` | `false` | Enable Silero VAD |
 | `inference4j.audio.vad.model-id` | `String` | `inference4j/silero-vad` | Model ID |
 | `inference4j.genai.text-generator.enabled` | `boolean` | `false` | Enable the onnxruntime-genai `TextGenerator` (requires `inference4j-genai`) |
-| `inference4j.genai.text-generator.model` | `String` | `phi-3-mini` | Preset: `phi-3-mini` or `deepseek-r1-1.5b` |
+| `inference4j.genai.text-generator.model` | `String` | `phi-3-mini` | Preset: `phi-3-mini`, `phi-4-mini`, `deepseek-r1-1.5b`, `qwen3-0.6b` or `smollm3-3b` |
 | `inference4j.genai.text-generator.max-length` / `temperature` / `top-k` / `top-p` | number | builder defaults | Generation settings; unset keeps the builder's default |
 | `inference4j.genai.vision-language.enabled` | `boolean` | `false` | Enable `VisionLanguageModel` (requires `inference4j-genai`) |
 | `inference4j.genai.vision-language.model` | `String` | `phi-3.5-vision` | Preset: `phi-3.5-vision` |

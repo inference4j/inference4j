@@ -50,7 +50,10 @@ public class Inference4jGenaiAutoConfiguration {
 
 	private static final Map<String, Supplier<GenerativeModel>> TEXT_MODELS = Map.of(
 			"phi-3-mini", ModelSources::phi3Mini,
-			"deepseek-r1-1.5b", ModelSources::deepSeekR1_1_5B);
+			"phi-4-mini", ModelSources::phi4Mini,
+			"deepseek-r1-1.5b", ModelSources::deepSeekR1_1_5B,
+			"qwen3-0.6b", ModelSources::qwen3_0_6B,
+			"smollm3-3b", ModelSources::smolLM3_3B);
 
 	private static final Map<String, Supplier<GenerativeModel>> VISION_MODELS = Map.of(
 			"phi-3.5-vision", ModelSources::phi3Vision);
