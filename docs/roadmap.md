@@ -163,16 +163,19 @@ super-resolution are unblocked behind it.
 - [x] **Fixes** — genai wrappers no longer repeat the last token; `UnigramTokenizer` maps
       unknown characters to `unk`; boolean tensors supported
 
-## Planned — 0.13.1
+### v0.13.1 — Generation fixes & newer LLMs
 
-Fixes and small additions, tracked in the [0.13.1 milestone](https://github.com/inference4j/inference4j/milestone/1).
-
-- [ ] **Chat prompts keep their end** — over-long prompts keep the chat template's closing tokens and the
-      most recent context; the prompt and `maxNewTokens` share one budget ([#76](https://github.com/inference4j/inference4j/issues/76))
-- [ ] **KV cache stays native** — no Java ↔ native copy of the cache on every decode step ([#99](https://github.com/inference4j/inference4j/issues/99))
-- [ ] **Spring Boot auto-configuration for the genai wrappers** — `TextGenerator`, `VisionLanguageModel`,
+- [x] **Chat prompts keep their end** — over-long prompts keep the chat template and the end of the
+      message, so the model still answers instead of continuing the text
+      ([#76](https://github.com/inference4j/inference4j/issues/76))
+- [x] **Qwen2.5 chat-template tokens** — special tokens are read from `tokenizer_config.json`, so the
+      template is no longer tokenized as plain text
+- [x] **KV cache stays native** — `NativeTensors` and `InferenceSession.runNative`; heap per generated token
+      no longer grows with context ([#99](https://github.com/inference4j/inference4j/issues/99))
+- [x] **Spring Boot auto-configuration for the genai wrappers** — `TextGenerator`, `VisionLanguageModel`,
       `WhisperSpeechModel` ([#90](https://github.com/inference4j/inference4j/issues/90))
-- [ ] **Newer genai LLMs** — Qwen3, SmolLM3 and Phi-4-mini, verified with model tests ([#87](https://github.com/inference4j/inference4j/issues/87))
+- [x] **Newer genai LLMs** — Qwen3-0.6B, SmolLM3-3B and Phi-4-mini presets
+      ([#87](https://github.com/inference4j/inference4j/issues/87))
 
 ## Planned — 0.14.0
 
@@ -258,7 +261,7 @@ and plain HuggingFace exports.
 | Text | Zero-shot classification (NLI) | 0.14.0 |
 | Text | nomic-embed-text-v1.5 / Qwen3-Embedding | 0.14.0 |
 | Text | bge-reranker-v2-m3 | 0.14.0 |
-| Text | Qwen3, SmolLM3, Phi-4-mini (via inference4j-genai) | 0.13.1 |
+| Text | Qwen3, SmolLM3, Phi-4-mini (via inference4j-genai) | v0.13.1 |
 | Text | Punctuation, casing & segmentation (punct-cap-seg) | v0.13.0 |
 | Vision | ResNet | Done |
 | Vision | EfficientNet | Done |
