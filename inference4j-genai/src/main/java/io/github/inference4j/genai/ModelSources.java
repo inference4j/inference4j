@@ -21,7 +21,10 @@ import io.github.inference4j.generation.GenerativeModel;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Factory for preconfigured {@link GenerativeModel} instances for generative AI models.
@@ -120,6 +123,84 @@ public final class ModelSources {
                         "special_tokens_map.json"
                 )),
                 message -> "<|user|>\n<|image_1|>\n" + message + "\n<|end|>\n<|assistant|>\n"
+        );
+    }
+
+    /**
+     * Qwen3-0.6B (INT4, ~0.4 GB).
+     *
+     * <p>Small multilingual model from Alibaba (Apache-2.0), quantized to INT4 for CPU inference.
+     * Hosted at {@code inference4j/qwen3-0.6b}. Uses Qwen3's non-thinking mode: the template
+     * closes an empty {@code <think>} block, so the model answers directly instead of writing out
+     * its reasoning first, as Qwen's {@code enable_thinking=False} does.
+     *
+     * @return a preconfigured generative model for Qwen3-0.6B
+     */
+    public static GenerativeModel qwen3_0_6B() {
+        return new GenerativeModel(
+                preconfigured("inference4j/qwen3-0.6b", List.of(
+                        "genai_config.json",
+                        "model.onnx",
+                        "model.onnx.data",
+                        "tokenizer.json",
+                        "tokenizer_config.json"
+                )),
+                message -> "<|im_start|>user\n" + message + "<|im_end|>\n"
+                        + "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        );
+    }
+
+    /**
+     * SmolLM3-3B (INT4, ~2 GB).
+     *
+     * <p>3B-parameter model from Hugging Face (Apache-2.0), quantized to INT4 for CPU inference.
+     * Hosted at {@code inference4j/smollm3-3b}. Uses SmolLM3's non-thinking mode
+     * ({@code /no_think}): the model answers directly instead of writing out its reasoning first.
+     *
+     * @return a preconfigured generative model for SmolLM3-3B
+     */
+    public static GenerativeModel smolLM3_3B() {
+        return new GenerativeModel(
+                preconfigured("inference4j/smollm3-3b", List.of(
+                        "genai_config.json",
+                        "model.onnx",
+                        "model.onnx.data",
+                        "tokenizer.json",
+                        "tokenizer_config.json"
+                )),
+                // SmolLM3's own template; like the original, the system block has no <|im_end|>
+                message -> "<|im_start|>system\n## Metadata\n\n"
+                        + "Knowledge Cutoff Date: June 2025\n"
+                        + "Today Date: " + LocalDate.now().format(
+                                DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH)) + "\n"
+                        + "Reasoning Mode: /no_think\n\n"
+                        + "## Custom Instructions\n\n"
+                        + "You are a helpful AI assistant named SmolLM, trained by Hugging Face.\n\n"
+                        + "<|im_start|>user\n" + message + "<|im_end|>\n"
+                        + "<|im_start|>assistant\n<think>\n\n</think>\n"
+        );
+    }
+
+    /**
+     * Phi-4-mini-instruct (INT4, ~4.9 GB).
+     *
+     * <p>3.8B-parameter model from Microsoft (MIT), quantized to INT4 for CPU inference, with a
+     * 128K-token context. Hosted at {@code inference4j/phi-4-mini-instruct}.
+     *
+     * @return a preconfigured generative model for Phi-4-mini
+     */
+    public static GenerativeModel phi4Mini() {
+        return new GenerativeModel(
+                preconfigured("inference4j/phi-4-mini-instruct", List.of(
+                        "genai_config.json",
+                        "model.onnx",
+                        "model.onnx.data",
+                        "tokenizer.json",
+                        "tokenizer_config.json",
+                        "added_tokens.json",
+                        "special_tokens_map.json"
+                )),
+                message -> "<|user|>" + message + "<|end|><|assistant|>"
         );
     }
 
