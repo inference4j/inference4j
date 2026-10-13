@@ -104,6 +104,55 @@ if you are still on Boot 3.
 
 See the [Spring Boot guide](../guides/spring-boot.md) for configuration details.
 
+## Pre-release snapshots (JitPack)
+
+To try features merged to `main` before they reach Maven Central, build them through
+[JitPack](https://jitpack.io/#inference4j/inference4j). JitPack serves every module under the
+`com.github.inference4j.inference4j` group, at version `main-SNAPSHOT` (the latest commit on
+`main`) or at a commit hash (a fixed build, recommended for anything you want to reproduce):
+
+=== "Gradle"
+
+    ```groovy
+    repositories {
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+
+    dependencies {
+        implementation 'com.github.inference4j.inference4j:inference4j-core:main-SNAPSHOT'
+    }
+    ```
+
+=== "Maven"
+
+    ```xml
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
+    <dependency>
+        <groupId>com.github.inference4j.inference4j</groupId>
+        <artifactId>inference4j-core</artifactId>
+        <version>main-SNAPSHOT</version>
+    </dependency>
+    ```
+
+The other modules work the same way (`inference4j-genai`, `inference4j-runtime`,
+`inference4j-spring-boot-starter`); their dependencies on each other resolve from JitPack too.
+
+!!! note "Snapshots"
+
+    - Don't mix JitPack and Maven Central coordinates for inference4j modules in one build: the
+      two groups would put the same classes on the classpath twice.
+    - The first request for a new commit starts a build on JitPack, which can take a few minutes.
+    - Gradle caches `-SNAPSHOT` versions for 24 hours; run with `--refresh-dependencies` to pick
+      up a newer commit sooner.
+    - Snapshots are not releases: APIs can change before the next version ships.
+
 ## GPU support
 
 The default dependency includes CPU and CoreML (macOS) support. For CUDA (Linux/Windows), swap the ONNX Runtime dependency:
