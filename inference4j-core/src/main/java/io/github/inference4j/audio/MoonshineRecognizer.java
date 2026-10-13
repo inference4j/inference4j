@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Speech-to-text with Moonshine v2, an English ASR model built for live and on-device use.
@@ -87,6 +88,9 @@ public class MoonshineRecognizer implements SpeechRecognizer {
     private final TokenDecoder decoder;
     private final AudioTransformPipeline pipeline;
 
+    /** Serializes all use of the model's sessions, by this recognizer and its streams. */
+    private final Object lock = new Object();
+
     private MoonshineRecognizer(MoonshineModel model, TokenDecoder decoder) {
         this.model = model;
         this.decoder = decoder;
@@ -119,19 +123,102 @@ public class MoonshineRecognizer implements SpeechRecognizer {
                     + " s; wrap the recognizer in a SegmentedSpeechRecognizer to cut long audio at pauses");
         }
         float[] samples = pipeline.transform(new AudioData(audioData, sampleRate)).samples();
-        try (MoonshineModel.Line line = model.newLine()) {
-            line.addAudio(samples);
-            line.encode(true);
-            double seconds = (double) samples.length / MoonshineModel.SAMPLE_RATE;
-            int maxTokens = Math.min((int) Math.ceil(seconds * MAX_TOKENS_PER_SECOND), MAX_TOKENS);
-            int[] tokens = line.decode(maxTokens, new int[0]);
-            return new Transcription(decoder.decode(tokens).strip());
+        synchronized (lock) {
+            try (MoonshineModel.Line line = model.newLine()) {
+                line.addAudio(samples);
+                line.encode(true);
+                int[] tokens = line.decode(maxTokens(samples.length), new int[0]);
+                return new Transcription(decoder.decode(tokens).strip());
+            }
         }
+    }
+
+    /**
+     * Starts building a live transcription stream, which splits continuous audio into lines at the pauses
+     * {@code vad} finds and transcribes each line while it is being spoken.
+     *
+     * <pre>{@code
+     * try (TranscriptionStream stream = recognizer.stream(vad)
+     *         .listener(new TranscriptListener() {
+     *             public void onLineCompleted(TranscriptLine line) {
+     *                 System.out.println(line.text());
+     *             }
+     *         })
+     *         .build()) {
+     *     stream.addAudio(samples, 48000);
+     * }
+     * }</pre>
+     *
+     * <p>The stream uses this recognizer and {@code vad} but does not own them: closing the stream leaves
+     * both open, and one recognizer can serve several streams. Work for streams of the same recognizer is
+     * serialized.
+     *
+     * @param vad finds the pauses that end lines; each stream keeps its own detection state
+     */
+    public StreamBuilder stream(SileroVadDetector vad) {
+        return new StreamBuilder(Objects.requireNonNull(vad, "vad"));
+    }
+
+    /** The token budget for audio of this many samples at 16 kHz. */
+    static int maxTokens(int samples) {
+        double seconds = (double) samples / MoonshineModel.SAMPLE_RATE;
+        return Math.min((int) Math.ceil(seconds * MAX_TOKENS_PER_SECOND), MAX_TOKENS);
     }
 
     @Override
     public void close() {
         model.close();
+    }
+
+    /** Configures a {@link TranscriptionStream}. */
+    public class StreamBuilder {
+
+        private final SileroVadDetector vad;
+        private Duration updateInterval = Duration.ofMillis(500);
+        private Duration maxLineDuration = Duration.ofSeconds(15);
+        private TranscriptListener listener = new TranscriptListener() {
+        };
+
+        private StreamBuilder(SileroVadDetector vad) {
+            this.vad = vad;
+        }
+
+        /**
+         * How much audio passes between updates of the open line's text; defaults to 500 ms. Shorter
+         * intervals give livelier text at the cost of more decoding.
+         */
+        public StreamBuilder updateInterval(Duration updateInterval) {
+            if (updateInterval.isNegative() || updateInterval.isZero()) {
+                throw new IllegalArgumentException("updateInterval must be positive, got " + updateInterval);
+            }
+            this.updateInterval = updateInterval;
+            return this;
+        }
+
+        /**
+         * The longest a line can get when the speaker does not pause; defaults to 15 seconds, at most
+         * {@value MoonshineRecognizer#MAX_SECONDS}. Past two thirds of it, lines end at the next dip in speech.
+         */
+        public StreamBuilder maxLineDuration(Duration maxLineDuration) {
+            if (maxLineDuration.compareTo(Duration.ofSeconds(1)) < 0
+                    || maxLineDuration.compareTo(Duration.ofSeconds(MAX_SECONDS)) > 0) {
+                throw new IllegalArgumentException("maxLineDuration must be between 1 and " + MAX_SECONDS
+                        + " seconds, got " + maxLineDuration);
+            }
+            this.maxLineDuration = maxLineDuration;
+            return this;
+        }
+
+        /** Receives the stream's events. */
+        public StreamBuilder listener(TranscriptListener listener) {
+            this.listener = Objects.requireNonNull(listener, "listener");
+            return this;
+        }
+
+        public TranscriptionStream build() {
+            return new MoonshineTranscriptionStream(model, decoder, lock, vad, updateInterval, maxLineDuration,
+                    listener);
+        }
     }
 
     public static class Builder {

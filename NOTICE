@@ -7,8 +7,10 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
 This product includes software ported from Moonshine
 (https://github.com/moonshine-ai/moonshine): the streaming speech-to-text
-pipeline in inference4j-core's io.github.inference4j.audio.MoonshineModel,
-ported from core/moonshine-streaming-model.cpp and core/transcriber.cpp.
+pipeline in inference4j-core's io.github.inference4j.audio.MoonshineModel and
+io.github.inference4j.audio.MoonshineTranscriptionStream, ported from
+core/moonshine-streaming-model.cpp, core/transcriber.cpp and
+core/voice-activity-detector.cpp.
 It is distributed under the following license:
 
 MIT License
