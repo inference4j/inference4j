@@ -7,6 +7,13 @@ plugins {
 allprojects {
     group = 'io.github.inference4j'
 
+    // JitPack builds pre-release snapshots: it serves modules as com.github.inference4j.inference4j:<module>:<VERSION>,
+    // so the POMs must use those coordinates for modules to find each other
+    if (System.getenv('JITPACK') == 'true') {
+        group = 'com.github.inference4j.inference4j'
+        version = System.getenv('VERSION')
+    }
+
     repositories {
         mavenCentral()
     }
