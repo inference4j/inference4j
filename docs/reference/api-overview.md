@@ -16,7 +16,7 @@
 | `io.github.inference4j.preprocessing.image` | Image transforms pipeline: `ImageTransformPipeline`, `ResizeTransform`, `CenterCropTransform`, `ImageLayout`, `Labels` |
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
 | `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `DepthAnythingEstimator`, `ImageEmbedder`, `ImageAnnotator`, `TensorImages`, `Colormap` |
-| `io.github.inference4j.audio` | `MoonshineRecognizer`, `Wav2Vec2Recognizer`, `PunctuatedSpeechRecognizer`, `SegmentedSpeechRecognizer`, `SileroVadDetector` |
+| `io.github.inference4j.audio` | `MoonshineRecognizer`, `TranscriptionStream`, `TranscriptListener`, `TranscriptLine`, `Wav2Vec2Recognizer`, `PunctuatedSpeechRecognizer`, `SegmentedSpeechRecognizer`, `SileroVadDetector` |
 | `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
 | `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `EncoderDecoderSession`, `ChatTemplate`, `GenerativeModel` |
@@ -63,6 +63,7 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 ├── SpeechRecognizer                    // transcribe(Path) → Transcription
 │                                       //   MoonshineRecognizer, Wav2Vec2Recognizer,
 │                                       //   WhisperSpeechModel (inference4j-genai)
+│                                       //   MoonshineRecognizer.stream(vad) → TranscriptionStream (live)
 │                                       //   PunctuatedSpeechRecognizer decorates any recognizer
 │                                       //   SegmentedSpeechRecognizer cuts long audio at pauses
 ├── PunctCapSegModel                    // infer(String) → List<String>  (class)
@@ -115,6 +116,7 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | `BoundingBox` | `x1()`, `y1()`, `x2()`, `y2()` | Embedded in `Detection`, `TextRegion` |
 | `DepthMap` | `values()`, `width()`, `height()`, `at()`, `min()`, `max()`, `toImage()` | `DepthAnythingEstimator` |
 | `Transcription` | `text()`, `segments()` | `MoonshineRecognizer`, `Wav2Vec2Recognizer`, `WhisperSpeechModel` |
+| `TranscriptLine` | `id()`, `text()`, `start()`, `end()`, `completed()` | `TranscriptionStream` (via `TranscriptListener`) |
 | `VoiceSegment` | `start()`, `end()`, `duration()`, `confidence()` | `SileroVadDetector` |
 | `GenerationResult` | `text()`, `promptTokens()`, `generatedTokens()`, `duration()` | `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `TextGenerator`, `VisionLanguageModel` |
 | `QueryDocumentPair` | `query()`, `document()` | `MiniLMSearchReranker`, `SearchReranker` |

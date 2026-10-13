@@ -179,12 +179,7 @@ public class SileroVadDetector implements VoiceActivityDetector {
     private float[] runInference(float[] samples) {
         int numFrames = (int) Math.ceil((double) samples.length / windowSizeSamples);
         float[] probabilities = new float[numFrames];
-
-        // Initialize combined hidden state tensor [2, batch=1, hidden_size]
-        float[] state = new float[STATE_LAYERS * 1 * HIDDEN_SIZE];
-
-        // Initialize context buffer with zeros (Silero VAD v5 requires context prepended)
-        float[] context = new float[contextSize];
+        Scorer scorer = newScorer();
 
         for (int frame = 0; frame < numFrames; frame++) {
             int start = frame * windowSizeSamples;
@@ -192,41 +187,72 @@ public class SileroVadDetector implements VoiceActivityDetector {
 
             // Extract window with zero-padding if needed
             float[] window = new float[windowSizeSamples];
-            int copyLen = end - start;
-            System.arraycopy(samples, start, window, 0, copyLen);
+            System.arraycopy(samples, start, window, 0, end - start);
+            probabilities[frame] = scorer.score(window);
+        }
 
-            // Create input with context prepended (Silero VAD v5 requirement)
+        return probabilities;
+    }
+
+    /** A scorer for audio that arrives a window at a time, as in live transcription. */
+    Scorer newScorer() {
+        return new Scorer();
+    }
+
+    /** The speech probability threshold. */
+    float threshold() {
+        return threshold;
+    }
+
+    /** Samples per scored window, at {@link #sampleRate()}. */
+    int windowSizeSamples() {
+        return windowSizeSamples;
+    }
+
+    /** The sample rate the model expects. */
+    int sampleRate() {
+        return targetSampleRate;
+    }
+
+    /**
+     * Scores consecutive windows of one audio stream, carrying the model's hidden state and audio context
+     * from each window to the next. Not thread-safe.
+     */
+    final class Scorer {
+
+        // Combined hidden state tensor [2, batch=1, hidden_size]
+        private float[] state = new float[STATE_LAYERS * HIDDEN_SIZE];
+
+        // Silero VAD v5 prepends the end of the previous window
+        private final float[] context = new float[contextSize];
+
+        private Scorer() {
+        }
+
+        /**
+         * Returns the speech probability of the next window.
+         *
+         * @param window exactly {@link #windowSizeSamples()} samples at {@link #sampleRate()}
+         */
+        float score(float[] window) {
             float[] inputWithContext = new float[contextSize + windowSizeSamples];
             System.arraycopy(context, 0, inputWithContext, 0, contextSize);
             System.arraycopy(window, 0, inputWithContext, contextSize, windowSizeSamples);
 
-            Tensor inputTensor = Tensor.fromFloats(inputWithContext, new long[]{1, contextSize + windowSizeSamples});
-            Tensor stateTensor = Tensor.fromFloats(state, new long[]{STATE_LAYERS, 1, HIDDEN_SIZE});
-            Tensor srTensor = Tensor.fromLongs(new long[]{targetSampleRate}, new long[]{});
-
             Map<String, Tensor> inputs = new LinkedHashMap<>();
-            inputs.put("input", inputTensor);
-            inputs.put("state", stateTensor);
-            inputs.put("sr", srTensor);
+            inputs.put("input", Tensor.fromFloats(inputWithContext, new long[]{1, contextSize + windowSizeSamples}));
+            inputs.put("state", Tensor.fromFloats(state, new long[]{STATE_LAYERS, 1, HIDDEN_SIZE}));
+            inputs.put("sr", Tensor.fromLongs(new long[]{targetSampleRate}, new long[]{}));
 
             Map<String, Tensor> outputs = session.run(inputs);
 
-            // Get output probability
-            Tensor outputTensor = outputs.get("output");
-            float[] output = outputTensor.toFloats();
-            probabilities[frame] = output[0];
-
-            // Update hidden state for next frame
-            Tensor stateNTensor = outputs.get("stateN");
-            if (stateNTensor != null) {
-                state = stateNTensor.toFloats();
+            Tensor stateN = outputs.get("stateN");
+            if (stateN != null) {
+                state = stateN.toFloats();
             }
-
-            // Update context with the last contextSize samples from the current window
             System.arraycopy(window, windowSizeSamples - contextSize, context, 0, contextSize);
+            return outputs.get("output").toFloats()[0];
         }
-
-        return probabilities;
     }
 
     /**

@@ -24,7 +24,8 @@ The same 11-second recording through each option:
 
 \* Measured on an Apple M4 Pro CPU, with the models already loaded.
 
-- **Moonshine**: accurate, readable English with no extra dependency. On long-form talks the default
+- **Moonshine**: accurate, readable English with no extra dependency, and the only option that
+  [transcribes live audio](#live-transcription) while it is spoken. On long-form talks the default
   small model lands between whisper-tiny and whisper-small in accuracy, at an eighth of whisper-small's
   download (see [Measured accuracy](#measured-accuracy)). English only.
 - **Wav2Vec2**: the fastest and smallest option, and part of `inference4j-core` with no extra
@@ -149,6 +150,73 @@ try (SpeechRecognizer recognizer = new SegmentedSpeechRecognizer(
     System.out.println(recognizer.transcribe(Path.of("meeting.wav")).text());
 }
 ```
+
+### Live transcription
+
+`MoonshineRecognizer.stream(vad)` transcribes continuous audio, such as a microphone, while it is
+being spoken. Feed audio as it arrives, in pieces of any size and at any sample rate; a voice
+activity detector splits it into lines at pauses, and a listener receives each line's text as it
+changes and once more when it is final:
+
+```java
+try (var moonshine = MoonshineRecognizer.builder().build();
+     var vad = SileroVadDetector.builder().build();
+     TranscriptionStream stream = moonshine.stream(vad)
+             .listener(new TranscriptListener() {
+                 @Override
+                 public void onLineTextChanged(TranscriptLine line) {
+                     showPartial(line.text());      // may still change
+                 }
+
+                 @Override
+                 public void onLineCompleted(TranscriptLine line) {
+                     append(line.text());           // final
+                 }
+             })
+             .build()) {
+    while (capturing) {
+        stream.addAudio(nextMicBuffer(), 48000);
+    }
+}   // closing completes the open line
+```
+
+How it works:
+
+1. Silero VAD scores every 32 ms of audio. A line starts when the average speech probability over
+   the last half second rises above the detector's threshold; it includes half a second of audio
+   from before, so the first word is not clipped.
+2. While the line is open, its audio is encoded as it arrives, and every `updateInterval` of audio
+   (500 ms by default) the line is decoded again, reusing the previous text as a draft, so only
+   the words that changed cost new work. `onLineTextChanged` fires when the text differs.
+3. When the speaker pauses, the line is decoded one last time and `onLineCompleted` fires. A
+   completed line never changes. If the speaker never pauses, lines end at the next dip in speech
+   after two thirds of `maxLineDuration` (15 seconds by default), and at the maximum at the latest.
+
+`flush()` completes the open line immediately, for example when a push-to-talk button is
+released. Lines carry their `start` and `end` on the stream's timeline.
+
+All work happens inside `addAudio`, on the calling thread, and listener events fire on that
+thread. Updates take tens of milliseconds, so read the microphone on one thread and pass its audio
+to the stream on another through a queue. One recognizer can serve several streams; their work is
+serialized. Closing a stream leaves the recognizer and the detector open.
+
+Measured by feeding the two TED-LIUM talks below in 100 ms pieces, on an Apple M4 Pro CPU limited
+to 4 threads:
+
+| Model | Typical `addAudio` call | Call with a text update (p50 / p95) | Word error rate |
+|---|---|---|---|
+| Moonshine tiny | 0.5 ms | 24 / 78 ms | 6.6% |
+| Moonshine small | 1 ms | 51 / 147 ms | 3.6% |
+
+The word error rate is slightly higher than when transcribing the whole recording with
+`SegmentedSpeechRecognizer` (5.4% and 3.3%): live lines are shorter, so the model has less
+context, and audio the detector scores as silence between lines is never transcribed.
+
+| Stream option | Default | Description |
+|---|---|---|
+| `.listener(TranscriptListener)` | does nothing | Receives `onLineStarted`, `onLineTextChanged` and `onLineCompleted` |
+| `.updateInterval(Duration)` | 500 ms | Audio between updates of the open line's text |
+| `.maxLineDuration(Duration)` | 15 s | Longest line when the speaker does not pause; 1 to 30 s |
 
 The models are Moonshine AI's 8-bit quantized ONNX Runtime graphs, released under the MIT license.
 We checked our implementation against Moonshine's own runtime, token for token, on test recordings.

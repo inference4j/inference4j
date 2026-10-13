@@ -198,7 +198,7 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
 
 - [x] **Moonshine v2 speech-to-text** — `MoonshineRecognizer` (tiny, small, medium; English) with no fixed
       30-second window; works with `SegmentedSpeechRecognizer` ([#109](https://github.com/inference4j/inference4j/issues/109))
-- [ ] **Live transcription** — streaming Moonshine: feed audio as it arrives, get line-by-line text while the
+- [x] **Live transcription** — streaming Moonshine: feed audio as it arrives, get line-by-line text while the
       speaker talks ([#118](https://github.com/inference4j/inference4j/issues/118))
 - [ ] **Kokoro TTS** — `SpeechSynthesizer` plus a permissively licensed Java phonemizer (espeak-ng is
       GPL-3.0); replaces Piper ([#50](https://github.com/inference4j/inference4j/issues/50))
@@ -280,5 +280,5 @@ and plain HuggingFace exports.
 | Audio | Wav2Vec2-CTC (speech-to-text) | Done |
 | Audio | Silero VAD (voice activity detection) | Done |
 | Audio | Kokoro TTS (text-to-speech, replaces Piper) | 0.14.0 |
-| Audio | Moonshine v2 (speech-to-text) | Done; live streaming in 0.14.0 |
+| Audio | Moonshine v2 (speech-to-text, live transcription) | Done |
 | Audio | Whisper (autoregressive speech-to-text) | Done via inference4j-genai |
