@@ -5,6 +5,16 @@ dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.3'
 }
 
+// Ships the third-party notices (Moonshine port, MIT) with the jar
+tasks.named('jar') {
+    from(rootProject.file('NOTICE')) {
+        into 'META-INF'
+    }
+    from(rootProject.file('LICENSE')) {
+        into 'META-INF'
+    }
+}
+
 // Model integration tests — downloads real models and runs actual inference
 sourceSets {
     modelTest {

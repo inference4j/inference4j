@@ -55,6 +55,7 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 
 | Capability | Wrapper | Default Model ID | Size | API |
 |------------|---------|-------------------|------|-----|
+| Speech-to-Text | `MoonshineRecognizer` | `inference4j/moonshine-streaming-small-en` | ~140 MB | `SpeechRecognizer` |
 | Speech-to-Text | `Wav2Vec2Recognizer` | `inference4j/wav2vec2-base-960h` | ~370 MB | `SpeechRecognizer` |
 | Voice Activity Detection | `SileroVadDetector` | `inference4j/silero-vad` | ~2 MB | `VoiceActivityDetector` |
 
@@ -134,6 +135,7 @@ A comprehensive view of all supported models, organized by architecture:
 
 | Model | Tokenizer | Wrapper | Use Cases |
 |-------|-----------|---------|-----------|
+| Moonshine v2 (tiny, small, medium; English) | SentencePiece BPE | `MoonshineRecognizer` | Speech-to-text |
 | Wav2Vec2 | CTC | `Wav2Vec2Recognizer` | Speech-to-text |
 | Silero VAD | N/A | `SileroVadDetector` | Voice activity detection |
 

@@ -318,6 +318,26 @@ public class InferenceSession implements AutoCloseable {
      * @throws InferenceException if inference fails or {@code nativeInputs} was closed
      */
     public NativeTensors runNative(Map<String, Tensor> inputs, NativeTensors nativeInputs, Set<String> outputNames) {
+        return runNative(inputs, outputNames, nativeInputs);
+    }
+
+    /**
+     * Runs inference keeping the outputs in ONNX Runtime memory, taking native inputs from several runs.
+     *
+     * <p>Use this when one run needs native data produced by different earlier runs, as an encoder-decoder
+     * step does with its self-attention cache (from the previous step) and its cross-attention cache
+     * (computed once from the encoder output). Each of {@code nativeInputs} keeps its own ownership; this
+     * run does not close any of them.
+     *
+     * @param inputs       inputs held in Java, copied into ONNX Runtime for this run
+     * @param outputNames  the outputs to compute, or {@code null} for all; outputs not requested are
+     *                     not computed at all
+     * @param nativeInputs inputs already in ONNX Runtime memory, e.g. outputs of earlier runs
+     * @return the outputs, still in ONNX Runtime memory
+     * @throws InferenceException if inference fails, any of {@code nativeInputs} was closed, or two inputs
+     *                            share a name
+     */
+    public NativeTensors runNative(Map<String, Tensor> inputs, Set<String> outputNames, NativeTensors... nativeInputs) {
         Map<String, OnnxTensor> converted = new HashMap<>();
         List<ByteBuffer> leasedBuffers = new ArrayList<>();
         try {
@@ -325,7 +345,13 @@ public class InferenceSession implements AutoCloseable {
                 converted.put(entry.getKey(), toOnnxTensor(entry.getValue(), leasedBuffers));
             }
             Map<String, OnnxTensor> allInputs = new HashMap<>(converted);
-            allInputs.putAll(nativeInputs.tensors());
+            for (NativeTensors nativeInput : nativeInputs) {
+                for (var entry : nativeInput.tensors().entrySet()) {
+                    if (allInputs.putIfAbsent(entry.getKey(), entry.getValue()) != null) {
+                        throw new InferenceException("Input '" + entry.getKey() + "' was given more than once");
+                    }
+                }
+            }
 
             OrtSession.Result result = outputNames == null
                     ? session.run(allInputs)
