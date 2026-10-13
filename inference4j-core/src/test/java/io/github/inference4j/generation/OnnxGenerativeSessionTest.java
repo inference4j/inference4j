@@ -155,7 +155,7 @@ class OnnxGenerativeSessionTest {
             // Matching types: the cache can stay in ONNX Runtime memory
             when(native4j.inputType("past_key_values.0.key")).thenReturn(TensorType.FLOAT16);
             when(native4j.outputType(anyString())).thenReturn(TensorType.FLOAT16);
-            when(native4j.runNative(anyMap(), any(), any())).thenAnswer(call -> newStep());
+            when(native4j.runNative(anyMap(), any(NativeTensors.class), any())).thenAnswer(call -> newStep());
             nativeSession = new OnnxGenerativeSession(native4j);
         }
 

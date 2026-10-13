@@ -1,7 +1,9 @@
 # Speech-to-Text
 
-Transcribe audio files to text. inference4j supports two speech models:
+Transcribe audio files to text. inference4j supports three speech models:
 
+- **Moonshine** (`inference4j-core`), Moonshine AI's English model built for live and on-device use.
+  It generates punctuated, cased text, and spends compute only on the audio it is given.
 - **Wav2Vec2** (`inference4j-core`), a non-autoregressive CTC model that converts speech to text in a
   single forward pass. Its output is upper-case and unpunctuated, so pair it with a punctuation model
   for readable text.
@@ -16,10 +18,15 @@ The same 11-second recording through each option:
 |--------|------------|-------|
 | Wav2Vec2 | AND SO MY FELLOW AMERICANS ASK NOT WHAT YOUR COUNTRY CAN DO FOR YOU ASK WHAT YOU CAN DO FOR YOUR COUNTRY | ~0.25 s |
 | Wav2Vec2 + [punctuation](#readable-transcripts) | And so my fellow Americans ask not what your country can do for you, ask what you can do for your country. | ~0.22 s |
+| [Moonshine](#moonshine) small | And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country. | ~0.26 s |
+| [Moonshine](#moonshine) tiny | And so, my fellow America, ask not what your country can do for you, as what you can do for your country. | ~0.14 s |
 | [Whisper](#whisper) small | And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country. | ~0.5 s |
 
 \* Measured on an Apple M4 Pro CPU, with the models already loaded.
 
+- **Moonshine**: accurate, readable English with no extra dependency. On long-form talks the default
+  small model lands between whisper-tiny and whisper-small in accuracy, at an eighth of whisper-small's
+  download (see [Measured accuracy](#measured-accuracy)). English only.
 - **Wav2Vec2**: the fastest and smallest option, and part of `inference4j-core` with no extra
   dependency. Add the punctuation model when people will read the text.
 - **Whisper**: the most accurate and readable output, plus 99 languages and translation to English
@@ -106,6 +113,46 @@ needs no punctuation wrapper, since its output is already punctuated. Whisper se
 audio per pass, so wrap it in [`SegmentedSpeechRecognizer`](#long-recordings) for longer
 recordings. See [Whisper](../generative-ai/whisper.md) for builder options and translation.
 
+## Moonshine
+
+`MoonshineRecognizer` runs Moonshine AI's Moonshine v2 models in `inference4j-core`. Its output is
+punctuated and cased, so it needs no punctuation wrapper:
+
+```java
+try (var recognizer = MoonshineRecognizer.builder().build()) {
+    System.out.println(recognizer.transcribe(Path.of("speech.wav")).text());
+}
+```
+
+| Model ID | Parameters | Download | WER (Open ASR avg.)* |
+|---|---|---|---|
+| `inference4j/moonshine-streaming-tiny-en` | 34M | 46 MB | 12.00% |
+| `inference4j/moonshine-streaming-small-en` (default) | 123M | 140 MB | 7.84% |
+| `inference4j/moonshine-streaming-medium-en` | 245M | 260 MB | 6.65% |
+
+\* Moonshine AI's figures on the [Open ASR Leaderboard](https://huggingface.co/spaces/hf-audio/open_asr_leaderboard)
+average, for comparison with Whisper Large v3 at 7.44%. Our own long-form measurements are under
+[Measured accuracy](#measured-accuracy).
+
+Unlike Whisper, Moonshine has no fixed 30-second window, so a short clip costs only its own length
+in compute. It is still limited per call: one call transcribes at most 30 seconds
+(`MoonshineRecognizer.MAX_SECONDS`), because beyond that the model starts repeating itself.
+Longer audio throws `IllegalArgumentException`; wrap the recognizer in
+[`SegmentedSpeechRecognizer`](#long-recordings) to cut it at pauses. Moonshine's own runtime ends
+lines after at most 15 seconds, which works well here too:
+
+```java
+try (SpeechRecognizer recognizer = new SegmentedSpeechRecognizer(
+        MoonshineRecognizer.builder().build(),
+        SileroVadDetector.builder().build(),
+        Duration.ofSeconds(15))) {
+    System.out.println(recognizer.transcribe(Path.of("meeting.wav")).text());
+}
+```
+
+The models are Moonshine AI's 8-bit quantized ONNX Runtime graphs, released under the MIT license.
+We checked our implementation against Moonshine's own runtime, token for token, on test recordings.
+
 ## Long recordings
 
 `SegmentedSpeechRecognizer` splits long audio at pauses before passing it to any recognizer. It is
@@ -148,7 +195,29 @@ sequential decoding). The voice activity detection adds processing time: 12% wit
 whisper-small (302 s instead of 270 s for all 11 talks on an Apple M4 Pro CPU) and 40% with the
 much faster whisper-tiny (74 s instead of 53 s).
 
+On a shorter subset of the same test set (two talks, 11.4 minutes), with `SegmentedSpeechRecognizer`
+and a 15-second maximum for every model:
+
+| Model | Download | Word error rate | Time* |
+|---|---|---|---|
+| whisper-small | ~1.1 GB | **2.4%** | 34 s |
+| Moonshine small | 140 MB | 3.3% | 22 s |
+| Moonshine tiny | 46 MB | 5.4% | 11 s |
+| whisper-tiny | ~225 MB | 6.0% | 8 s |
+| Wav2Vec2 | ~360 MB | 11.7% | 18 s |
+
+\* All 11.4 minutes, on an Apple M4 Pro CPU limited to 4 threads per model. Over a whole recording,
+Moonshine tiny is slower per minute of audio than whisper-tiny, but more accurate.
+
 ## Builder options
+
+For `MoonshineRecognizer`:
+
+| Method | Type | Default | Description |
+|--------|------|---------|-------------|
+| `.modelId(String)` | `String` | `inference4j/moonshine-streaming-small-en` | HuggingFace model ID |
+| `.modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Model resolution strategy |
+| `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | default | ONNX Runtime session config, applied to each of the model's graphs |
 
 For `Wav2Vec2Recognizer` (see [Whisper](../generative-ai/whisper.md#builder-options) for `WhisperSpeechModel`):
 
@@ -170,16 +239,24 @@ For `Wav2Vec2Recognizer` (see [Whisper](../generative-ai/whisper.md#builder-opti
 | Field | Type | Description |
 |-------|------|-------------|
 | `text()` | `String` | The transcribed text |
-| `segments()` | `List<Segment>` | Timed segments (empty for Wav2Vec2 and Whisper) |
+| `segments()` | `List<Segment>` | Timed segments (empty for Moonshine, Wav2Vec2 and Whisper) |
 
 ## Audio requirements
 
 - **Format**: WAV files (loaded automatically from `Path`)
 - **Sample rate**: Audio is automatically resampled to the model's target rate (16kHz by default)
 - **Channels**: Mono (stereo is downmixed automatically)
-- **Duration**: No hard limit, but very long files will use more memory
+- **Duration**: At most 30 seconds per call for Moonshine and per pass for Whisper; use
+  [`SegmentedSpeechRecognizer`](#long-recordings) for longer audio. No hard limit for Wav2Vec2, but very
+  long files use more memory.
 
 ## How it works
+
+Moonshine runs as six ONNX Runtime graphs. A frontend turns 80 ms chunks of audio into features, an
+encoder with sliding-window attention encodes them, an adapter turns them into the decoder's memory,
+and a decoder generates tokens one at a time with greedy search. The attention caches stay in ONNX
+Runtime memory between tokens. Decoding stops at 6.5 tokens per second of audio, which ends
+decodes that start repeating.
 
 Wav2Vec2 is a **non-autoregressive** model — it processes the entire audio waveform in a single forward pass and produces character-level predictions using CTC (Connectionist Temporal Classification) decoding.
 

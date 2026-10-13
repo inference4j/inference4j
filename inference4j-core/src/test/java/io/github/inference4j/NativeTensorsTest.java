@@ -112,4 +112,45 @@ class NativeTensorsTest {
         assertThat(session.outputType("y")).isEqualTo(TensorType.BOOL);
         assertThatThrownBy(() -> session.outputType("z")).isInstanceOf(InferenceException.class);
     }
+
+    @Test
+    void nativeInputsFromSeveralRunsFeedOneRun() throws Exception {
+        try (InferenceSession and = InferenceSession.create(Path.of(Objects.requireNonNull(
+                NativeTensorsTest.class.getResource("/test-bool-and.onnx")).toURI()));
+             NativeTensors first = session.runNative(input(), NativeTensors.empty(), null);
+             NativeTensors second = session.runNative(
+                     Map.of("x", Tensor.fromBooleans(new boolean[]{false, false, true, true, false, true}, new long[]{2, 3})),
+                     NativeTensors.empty(), null);
+             NativeTensors result = and.runNative(Map.of(), null, first.rename(name -> "a"), second.rename(name -> "b"))) {
+            // Not(VALUES) And Not({F,F,T,T,F,T})
+            assertThat(result.copy("z").toBooleans()).containsExactly(false, true, false, false, false, false);
+            assertThat(first.isClosed()).isFalse();
+            assertThat(second.isClosed()).isFalse();
+        }
+    }
+
+    @Test
+    void javaAndNativeInputsCombine() throws Exception {
+        try (InferenceSession and = InferenceSession.create(Path.of(Objects.requireNonNull(
+                NativeTensorsTest.class.getResource("/test-bool-and.onnx")).toURI()));
+             NativeTensors first = session.runNative(input(), NativeTensors.empty(), null);
+             NativeTensors result = and.runNative(
+                     Map.of("b", Tensor.fromBooleans(new boolean[]{true, true, true, false, false, false}, new long[]{2, 3})),
+                     null, first.rename(name -> "a"))) {
+            assertThat(result.copy("z").toBooleans()).containsExactly(false, true, true, false, false, false);
+        }
+    }
+
+    @Test
+    void anInputGivenTwiceFails() throws Exception {
+        try (InferenceSession and = InferenceSession.create(Path.of(Objects.requireNonNull(
+                NativeTensorsTest.class.getResource("/test-bool-and.onnx")).toURI()));
+             NativeTensors first = session.runNative(input(), NativeTensors.empty(), null)) {
+            NativeTensors asA = first.rename(name -> "a");
+
+            assertThatThrownBy(() -> and.runNative(Map.of("a", input().get("x")), null, asA))
+                    .isInstanceOf(InferenceException.class)
+                    .hasMessageContaining("'a'");
+        }
+    }
 }
