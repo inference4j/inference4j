@@ -1,0 +1,5 @@
+# Pre-release snapshots: https://jitpack.io/#inference4j/inference4j
+jdk:
+  - openjdk17
+install:
+  - ./gradlew publishToMavenLocal -x test
