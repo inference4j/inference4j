@@ -71,7 +71,7 @@ import java.util.Set;
  * <pre>{@code
  * try (DistilBertTextClassifier classifier = DistilBertTextClassifier.builder()
  *         .modelId("my-org/my-distilbert")
- *         .modelSource(ModelSource.fromPath(localDir))
+ *         .modelSource(new LocalModelSource(modelsDir))   // resolves modelsDir/<modelId>
  *         .sessionOptions(opts -> opts.addCUDA(0))
  *         .tokenizer(WordPieceTokenizer.fromVocabFile(vocabPath))
  *         .config(ModelConfig.fromFile(configPath))

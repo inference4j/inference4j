@@ -54,6 +54,7 @@ nav:
     - How It Works: getting-started/how-it-works.md
   - Use Cases:
     - Sentiment Analysis: use-cases/sentiment-analysis.md
+    - Prompt-Injection Detection: use-cases/guardrails.md
     - Named Entity Recognition: use-cases/named-entity-recognition.md
     - Semantic Search: use-cases/semantic-search.md
     - Image Classification: use-cases/image-classification.md

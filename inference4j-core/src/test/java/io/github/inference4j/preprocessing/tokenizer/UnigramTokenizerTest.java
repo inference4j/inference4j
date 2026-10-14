@@ -16,11 +16,15 @@
 
 package io.github.inference4j.preprocessing.tokenizer;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.TokenizerJsonParser;
 import io.github.inference4j.tokenizer.UnigramTokenizer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -241,5 +245,93 @@ class UnigramTokenizerTest {
 
 		assertThat(result.truncated()).isFalse();
 		assertThat(result.originalLength()).isEqualTo(result.inputIds().length);
+	}
+	// --- Normalization, byte fallback flag and Metaspace prefix, as in HuggingFace tokenizers ---
+
+	@TempDir
+	Path tempDir;
+
+	private Path fixtureWith(java.util.function.Consumer<ObjectNode> edit) throws Exception {
+		ObjectMapper mapper = new ObjectMapper();
+		ObjectNode root = (ObjectNode) mapper.readTree(Objects.requireNonNull(
+				UnigramTokenizerTest.class.getResource("/test-unigram-tokenizer.json")));
+		edit.accept(root);
+		Path file = tempDir.resolve("tokenizer.json");
+		mapper.writeValue(file.toFile(), root);
+		return file;
+	}
+
+	@Test
+	void textStartingWithASpaceGetsNoSecondPrefix() {
+		assertThat(tokenizer.encode(" hello", 512).inputIds()).containsExactly(12L);
+	}
+
+	@Test
+	void normalizerRunsBeforeSegmentation() {
+		UnigramTokenizer lowercasing = tokenizerBuilder().normalizer(String::toLowerCase).build();
+
+		assertThat(lowercasing.encode("HELLO World", 512).inputIds()).containsExactly(12L, 16L);
+	}
+
+	@Test
+	void normalizerRunsOnEachSegmentBetweenAddedTokens() {
+		UnigramTokenizer stripping = tokenizerBuilder().normalizer(String::strip).build();
+
+		assertThat(stripping.encode("<start_of_turn>  hello  <end_of_turn>", 512).inputIds())
+				.containsExactly(297L, 12L, 298L);
+	}
+
+	@Test
+	void textNormalizedToNothingProducesNoTokens() {
+		UnigramTokenizer stripping = tokenizerBuilder().normalizer(String::strip).build();
+
+		assertThat(stripping.encode("   ", 512).inputIds()).isEmpty();
+	}
+
+	@Test
+	void byteFallbackOffEmitsUnkEvenWhenTheVocabularyHasByteTokens() {
+		UnigramTokenizer noFallback = tokenizerBuilder().byteFallback(false).build();
+
+		assertThat(noFallback.encode("!", 512).inputIds()).containsExactly(3L, 2L);
+	}
+
+	@Test
+	void parserReadsTheByteFallbackFlag() throws Exception {
+		Path json = fixtureWith(root -> ((ObjectNode) root.get("model")).put("byte_fallback", false));
+
+		UnigramTokenizer parsed = TokenizerJsonParser.parseUnigram(json).build();
+
+		assertThat(parsed.encode("!", 512).inputIds()).containsExactly(3L, 2L);
+	}
+
+	@Test
+	void parserBuildsTheNormalizerSequence() throws Exception {
+		Path json = fixtureWith(root -> {
+			ObjectNode normalizer = root.putObject("normalizer");
+			normalizer.put("type", "Sequence");
+			ArrayNode steps = normalizer.putArray("normalizers");
+			steps.addObject().put("type", "Strip").put("strip_left", true).put("strip_right", true);
+			ObjectNode replace = steps.addObject().put("type", "Replace").put("content", " ");
+			replace.putObject("pattern").put("Regex", " {2,}");
+		});
+
+		UnigramTokenizer parsed = TokenizerJsonParser.parseUnigram(json).build();
+
+		assertThat(parsed.encode("  hello    world ", 512).inputIds()).containsExactly(12L, 16L);
+	}
+
+	@Test
+	void parserSkipsUnsupportedNormalizers() throws Exception {
+		Path json = fixtureWith(root -> root.putObject("normalizer").put("type", "SomethingNew"));
+
+		UnigramTokenizer parsed = TokenizerJsonParser.parseUnigram(json).build();
+
+		assertThat(parsed.encode("hello", 512).inputIds()).containsExactly(12L);
+	}
+
+	private static UnigramTokenizer.Builder tokenizerBuilder() {
+		Path tokenizerJson = Path.of(Objects.requireNonNull(
+				UnigramTokenizerTest.class.getResource("/test-unigram-tokenizer.json")).getPath());
+		return TokenizerJsonParser.parseUnigram(tokenizerJson);
 	}
 }

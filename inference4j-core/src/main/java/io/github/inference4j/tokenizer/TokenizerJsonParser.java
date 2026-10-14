@@ -19,6 +19,8 @@ package io.github.inference4j.tokenizer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.inference4j.exception.ModelSourceException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -27,6 +29,9 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.UnaryOperator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Parses HuggingFace {@code tokenizer.json} files into tokenizer builders.
@@ -46,6 +51,8 @@ import java.util.Map;
  * {@link UnigramTokenizer} for Viterbi decoding.
  */
 public final class TokenizerJsonParser {
+
+    private static final Logger logger = LoggerFactory.getLogger(TokenizerJsonParser.class);
 
     private TokenizerJsonParser() {
     }
@@ -157,6 +164,57 @@ public final class TokenizerJsonParser {
      * @return a builder pre-configured with vocab, scores, and added tokens
      * @throws ModelSourceException if the file cannot be read or parsed
      */
+    /**
+     * Builds the {@code normalizer} section of a {@code tokenizer.json}. Supports {@code Sequence},
+     * {@code Strip}, {@code Precompiled} and {@code Replace}; other types are skipped with a warning.
+     */
+    private static UnaryOperator<String> parseNormalizer(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return UnaryOperator.identity();
+        }
+        String type = node.path("type").asText();
+        switch (type) {
+            case "Sequence": {
+                List<UnaryOperator<String>> steps = new ArrayList<>();
+                for (JsonNode child : node.path("normalizers")) {
+                    steps.add(parseNormalizer(child));
+                }
+                return text -> {
+                    String result = text;
+                    for (UnaryOperator<String> step : steps) {
+                        result = step.apply(result);
+                    }
+                    return result;
+                };
+            }
+            case "Strip": {
+                boolean left = node.path("strip_left").asBoolean(true);
+                boolean right = node.path("strip_right").asBoolean(true);
+                return text -> left && right ? text.strip()
+                        : left ? text.stripLeading()
+                        : right ? text.stripTrailing()
+                        : text;
+            }
+            case "Precompiled": {
+                String charsmap = node.path("precompiled_charsmap").asText("");
+                return charsmap.isEmpty() ? UnaryOperator.identity() : PrecompiledNormalizer.fromBase64(charsmap);
+            }
+            case "Replace": {
+                JsonNode pattern = node.path("pattern");
+                String content = node.path("content").asText();
+                Pattern regex = pattern.has("Regex")
+                        ? Pattern.compile(pattern.get("Regex").asText())
+                        : Pattern.compile(Pattern.quote(pattern.path("String").asText()));
+                String replacement = Matcher.quoteReplacement(content);
+                return text -> regex.matcher(text).replaceAll(replacement);
+            }
+            default:
+                logger.warn("Unsupported tokenizer.json normalizer '{}' is skipped; tokenization may differ "
+                        + "from the reference tokenizer", type);
+                return UnaryOperator.identity();
+        }
+    }
+
     public static UnigramTokenizer.Builder parseUnigram(Path tokenizerJson) {
         try {
             ObjectMapper mapper = new ObjectMapper();
@@ -193,7 +251,13 @@ public final class TokenizerJsonParser {
             UnigramTokenizer.Builder builder = UnigramTokenizer.builder()
                     .vocab(vocab)
                     .scores(scores)
-                    .unkId(unkId);
+                    .unkId(unkId)
+                    .normalizer(parseNormalizer(root.get("normalizer")));
+
+            JsonNode byteFallbackNode = modelNode.get("byte_fallback");
+            if (byteFallbackNode != null && byteFallbackNode.isBoolean()) {
+                builder.byteFallback(byteFallbackNode.booleanValue());
+            }
 
             JsonNode addedTokensNode = root.get("added_tokens");
             if (addedTokensNode != null && addedTokensNode.isArray()) {

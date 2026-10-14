@@ -11,13 +11,13 @@
 | `io.github.inference4j.model` | Model resolution: `ModelSource`, `HuggingFaceModelSource`, `LocalModelSource` |
 | `io.github.inference4j.processing` | Pre/post-processing: `Preprocessor`, `Postprocessor`, `OutputOperator`, `MathOps`, `TruncationPolicy`, `TruncationGuard`, `TokenWindows`, `WindowAggregation` |
 | `io.github.inference4j.exception` | Custom exceptions: `ModelLoadException`, `InferenceException`, `InputTooLongException` |
-| `io.github.inference4j.tokenizer` | `Tokenizer`, `EncodedInput`, `WordPieceTokenizer`, `BpeTokenizer`, `DecodingBpeTokenizer`, `SentencePieceBpeTokenizer`, `UnigramTokenizer`, `TokenDecoder` |
+| `io.github.inference4j.tokenizer` | `Tokenizer`, `EncodedInput`, `WordPieceTokenizer`, `BpeTokenizer`, `DecodingBpeTokenizer`, `SentencePieceBpeTokenizer`, `UnigramTokenizer`, `PrecompiledNormalizer`, `TokenDecoder` |
 | `io.github.inference4j.preprocessing.text` | `ModelConfig` (HuggingFace config.json parser) |
 | `io.github.inference4j.preprocessing.image` | Image transforms pipeline: `ImageTransformPipeline`, `ResizeTransform`, `CenterCropTransform`, `ImageLayout`, `Labels` |
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
 | `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `DepthAnythingEstimator`, `ImageEmbedder`, `ImageAnnotator`, `TensorImages`, `Colormap` |
 | `io.github.inference4j.audio` | `MoonshineRecognizer`, `TranscriptionStream`, `TranscriptListener`, `TranscriptLine`, `Wav2Vec2Recognizer`, `PunctuatedSpeechRecognizer`, `SegmentedSpeechRecognizer`, `SileroVadDetector` |
-| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
+| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `DebertaPromptInjectionDetector`, `PromptInjectionDetector`, `InjectionCheck`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
 | `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `EncoderDecoderSession`, `ChatTemplate`, `GenerativeModel` |
 | `io.github.inference4j.sampling` | `LogitsProcessor`, `LogitsSampler`, `CategoricalSampler`, `GreedySampler` |
@@ -50,6 +50,7 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 ├── Classifier<I, C>                    // classify(I) → List<C>
 │   ├── ImageClassifier                 // classify(BufferedImage/Path) → List<Classification>
 │   └── TextClassifier                  // classify(String) → List<TextClassification>
+│                                       //   DistilBertTextClassifier, DebertaPromptInjectionDetector
 ├── ZeroShotClassifier<I, C>            // classify(I, List<String>) → List<C>, run(ZeroShotInput<I>) → List<C>
 ├── Detector<I, D>                      // detect(I) → List<D>
 │   ├── ObjectDetector                  // detect(BufferedImage/Path) → List<Detection>
@@ -72,6 +73,8 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 ├── Translator                          // translate(String) → String
 ├── GrammarCorrector                    // correct(String) → String
 └── SqlGenerator                        // generateSql(String, String) → String
+
+PromptInjectionDetector                 // check(String) → InjectionCheck, extends AutoCloseable
 ```
 
 ## AbstractInferenceTask
@@ -109,7 +112,8 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | Type | Fields | Used by |
 |------|--------|---------|
 | `Classification` | `label()`, `index()`, `confidence()` | `ResNetClassifier`, `EfficientNetClassifier`, `ClipClassifier` |
-| `TextClassification` | `label()`, `classIndex()`, `confidence()` | `DistilBertTextClassifier` |
+| `TextClassification` | `label()`, `classIndex()`, `confidence()` | `DistilBertTextClassifier`, `DebertaPromptInjectionDetector` |
+| `InjectionCheck` | `probability()`, `threshold()`, `isInjection()` | `DebertaPromptInjectionDetector` |
 | `NamedEntity` | `text()`, `label()`, `start()`, `end()`, `score()` | `BertNerRecognizer` |
 | `Detection` | `label()`, `classIndex()`, `confidence()`, `box()` | `YoloV8Detector`, `Yolo26Detector` |
 | `TextRegion` | `box()`, `confidence()` | `CraftTextDetector` |

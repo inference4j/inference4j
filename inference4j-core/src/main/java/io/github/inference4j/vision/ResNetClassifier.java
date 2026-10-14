@@ -64,7 +64,7 @@ import java.util.List;
  * <pre>{@code
  * try (ResNetClassifier classifier = ResNetClassifier.builder()
  *         .modelId("my-org/my-resnet")
- *         .modelSource(ModelSource.fromPath(localDir))
+ *         .modelSource(new LocalModelSource(modelsDir))   // resolves modelsDir/<modelId>
  *         .sessionOptions(opts -> opts.addCUDA(0))
  *         .labels(Labels.fromFile(Path.of("my-labels.txt")))
  *         .outputOperator(OutputOperator.identity()) // if model has built-in softmax
