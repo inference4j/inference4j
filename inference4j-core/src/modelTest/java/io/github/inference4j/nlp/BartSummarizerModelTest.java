@@ -144,6 +144,42 @@ class BartSummarizerModelTest {
         }
     }
 
+    // 758 tokens. Expected starts are Hugging Face transformers' greedy output for the same input.
+    private static final String NEWS_ARTICLE = String.join(" ", java.util.Collections.nCopies(12,
+            "The city council approved a new budget for public transport and road repairs on Tuesday. "
+            + "Officials said bus routes would expand to the northern suburbs, while potholes on main roads "
+            + "would be fixed before winter. Residents welcomed the plan but asked about cycling lanes. "
+            + "The mayor promised a separate study of bike infrastructure early next year."));
+
+    @Test
+    void bartLargeCnnSummarizesLongInputLikeTheReference() throws Exception {
+        try (var summarizer = BartSummarizer.bartLargeCnn().maxNewTokens(30).build()) {
+            GenerationResult result = summarizer.summarize(NEWS_ARTICLE, token -> {});
+
+            assertThat(result.promptTokens()).isEqualTo(758);
+            assertThat(result.text()).startsWith("The city council approved a new budget for public transport");
+            assertThat(result.text()).doesNotContain("<s>");
+        }
+    }
+
+    @Test
+    void bartLargeCnnSummarizesShortInputLikeTheReference() throws Exception {
+        try (var summarizer = BartSummarizer.bartLargeCnn().maxNewTokens(30).build()) {
+            GenerationResult result = summarizer.summarize(ARTICLE, token -> {});
+
+            assertThat(result.text()).startsWith("The tower is 324 metres (1,063 ft) tall");
+        }
+    }
+
+    @Test
+    void distilBartCnnKeepsTheFirstWordOfTheSummary() throws Exception {
+        try (var summarizer = BartSummarizer.distilBartCnn().maxNewTokens(30).build()) {
+            GenerationResult result = summarizer.summarize(NEWS_ARTICLE, token -> {});
+
+            assertThat(result.text()).startsWith(" The city council approved a new budget");
+        }
+    }
+
     @Test
     void failPolicyRejectsInputBeyondModelLimit() throws Exception {
         try (var summarizer = BartSummarizer.distilBartCnn()

@@ -68,6 +68,8 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
     private final int maxNewTokens;
     private final Set<String> stopSequences;
     private final boolean appendEosToInput;
+    private final Integer inputPrefixTokenId;
+    private final Integer forcedBosTokenId;
     private final int maxInputLength;
     private final TruncationGuard truncationGuard;
     private final boolean keepPromptEnd;
@@ -84,6 +86,8 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         this.maxNewTokens = builder.maxNewTokens;
         this.stopSequences = Set.copyOf(builder.stopSequences);
         this.appendEosToInput = builder.appendEosToInput;
+        this.inputPrefixTokenId = builder.inputPrefixTokenId;
+        this.forcedBosTokenId = builder.forcedBosTokenId;
         this.maxInputLength = builder.maxInputLength;
         this.keepPromptEnd = builder.keepPromptEnd;
         this.truncationGuard = builder.truncationGuard != null
@@ -107,9 +111,10 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         long startTime = System.nanoTime();
 
         String prompt = chatTemplate != null ? chatTemplate.format(input) : input;
-        // Leave room for the EOS token appended below
-        int tokenLimit = appendEosToInput && maxInputLength != Integer.MAX_VALUE
-                ? maxInputLength - 1 : maxInputLength;
+        // Leave room for the tokens added around the prompt below
+        int addedTokens = (appendEosToInput ? 1 : 0) + (inputPrefixTokenId != null ? 1 : 0);
+        int tokenLimit = maxInputLength != Integer.MAX_VALUE
+                ? maxInputLength - addedTokens : maxInputLength;
         EncodedInput encoded = tokenizer.encode(prompt, tokenLimit);
         long[] inputIds;
         if (keepPromptEnd && encoded.truncated()) {
@@ -124,10 +129,20 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
             inputIds = Arrays.copyOf(inputIds, inputIds.length + 1);
             inputIds[inputIds.length - 1] = eosId;
         }
+        if (inputPrefixTokenId != null) {
+            long[] prefixed = new long[inputIds.length + 1];
+            prefixed[0] = inputPrefixTokenId;
+            System.arraycopy(inputIds, 0, prefixed, 1, inputIds.length);
+            inputIds = prefixed;
+        }
         int promptTokens = inputIds.length;
 
         session.resetCache();
         ForwardResult result = session.prefill(inputIds);
+        if (forcedBosTokenId != null && maxNewTokens > 0) {
+            // The first generated token is fixed; it is fed to the model but is not part of the text
+            result = session.decode(forcedBosTokenId);
+        }
 
         TokenStreamer streamer = new TokenStreamer(stopSequences, tokenListener);
         int generatedTokens = 0;
@@ -238,6 +253,8 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         private final Set<String> stopSequences = new LinkedHashSet<>();
 
         private boolean appendEosToInput = false;
+        private Integer inputPrefixTokenId;
+        private Integer forcedBosTokenId;
         private int maxInputLength = Integer.MAX_VALUE;
         private boolean keepPromptEnd;
         private TruncationGuard truncationGuard;
@@ -286,7 +303,27 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         }
 
         /**
-         * Maximum prompt length in tokens, including any appended EOS token. Longer prompts are
+         * A token placed before the prompt, such as BART's {@code <s>}, for tokenizers that do not add it
+         * themselves. Counts toward {@link #maxInputLength(int)}.
+         */
+        public Builder prependToInput(int tokenId) {
+            this.inputPrefixTokenId = tokenId;
+            return this;
+        }
+
+        /**
+         * A token forced as the first generated token, after the decoder start token, as Hugging Face's
+         * {@code forced_bos_token_id} does (BART's CNN summarizers force {@code <s>}). It is fed to the model
+         * but is neither streamed nor part of the result text, and does not count toward
+         * {@link #maxNewTokens(int)}.
+         */
+        public Builder forcedBosTokenId(int tokenId) {
+            this.forcedBosTokenId = tokenId;
+            return this;
+        }
+
+        /**
+         * Maximum prompt length in tokens, including any token added before or after it. Longer prompts are
          * handled by the {@link #truncationGuard(TruncationGuard) truncation guard}. Defaults to
          * no limit.
          */

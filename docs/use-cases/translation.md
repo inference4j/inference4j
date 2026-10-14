@@ -129,6 +129,7 @@ Each constant provides `displayName()` (e.g., `"Brazilian Portuguese"`) and `iso
 | `.topK(int)` | `int` | `0` (disabled) | Top-K sampling |
 | `.topP(float)` | `float` | `0.0` (disabled) | Nucleus sampling |
 | `.eosTokenId(int)` | `int` | Auto-detected | End-of-sequence token ID |
+| `.forcedBosTokenId(int)` | `int` | `forced_bos_token_id` from `config.json`, if set | Token forced as the first generated token; not part of the output text |
 | `.addedToken(String)` | `String` | — | Register a special token for atomic encoding |
 | `.maxInputLength(int)` | `int` | Model limit from `config.json` | Maximum input length in tokens |
 | `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Longer input: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |

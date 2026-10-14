@@ -67,6 +67,7 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
     final List<String> extraFiles = new ArrayList<>();
     Integer maxInputLength;
     TruncationPolicy truncation;
+    Integer forcedBosTokenId;
 
     @SuppressWarnings("unchecked")
     private B self() {
@@ -76,6 +77,14 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
     protected abstract TokenizerProvider defaultTokenizerProvider();
 
     protected abstract T createWrapper(GenerationEngine engine);
+
+    /**
+     * Whether the model expects its input to start with the {@code bos_token_id} from {@code config.json}
+     * (BART's {@code <s>}), which the tokenizer does not add. Defaults to {@code false}.
+     */
+    protected boolean prependBosToInput() {
+        return false;
+    }
 
     public B modelSource(ModelSource modelSource) {
         this.modelSource = modelSource;
@@ -132,6 +141,15 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
      */
     public B truncation(TruncationPolicy truncation) {
         this.truncation = truncation;
+        return self();
+    }
+
+    /**
+     * Token forced as the first generated token, as Hugging Face's {@code forced_bos_token_id} does.
+     * Defaults to {@code forced_bos_token_id} from {@code config.json}, if present.
+     */
+    public B forcedBosTokenId(int forcedBosTokenId) {
+        this.forcedBosTokenId = forcedBosTokenId;
         return self();
     }
 
@@ -238,6 +256,16 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
             for (int eosId : eos) {
                 engineBuilder.eosTokenId(eosId);
             }
+            if (prependBosToInput()) {
+                if (config.bosTokenId() == null) {
+                    throw new ModelLoadException("config.json missing bos_token_id, needed to start the input");
+                }
+                engineBuilder.prependToInput(config.bosTokenId());
+            }
+            Integer forcedBos = forcedBosTokenId != null ? forcedBosTokenId : config.forcedBosTokenId();
+            if (forcedBos != null) {
+                engineBuilder.forcedBosTokenId(forcedBos);
+            }
 
             return createWrapper(engineBuilder.build());
         } catch (Exception e) {
@@ -256,7 +284,8 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
         return wrapper != null ? wrapper.getSimpleName() : getClass().getSimpleName();
     }
 
-    private record ModelConfig(int decoderStartTokenId, Set<Integer> eosTokenIds) {}
+    private record ModelConfig(int decoderStartTokenId, Set<Integer> eosTokenIds,
+                               Integer bosTokenId, Integer forcedBosTokenId) {}
 
     private static ModelConfig readModelConfig(Path configPath) {
         try (InputStream is = Files.newInputStream(configPath)) {
@@ -266,10 +295,16 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
             int decoderStartTokenId = extractDecoderStartTokenId(root);
             Set<Integer> eosTokenIds = extractEosTokenIds(root);
 
-            return new ModelConfig(decoderStartTokenId, eosTokenIds);
+            return new ModelConfig(decoderStartTokenId, eosTokenIds,
+                    optionalInt(root, "bos_token_id"), optionalInt(root, "forced_bos_token_id"));
         } catch (IOException e) {
             throw new ModelLoadException("Failed to read config.json: " + e.getMessage(), e);
         }
+    }
+
+    private static Integer optionalInt(JsonNode root, String field) {
+        JsonNode node = root.get(field);
+        return node != null && node.isInt() ? node.intValue() : null;
     }
 
     private static int extractDecoderStartTokenId(JsonNode root) {
