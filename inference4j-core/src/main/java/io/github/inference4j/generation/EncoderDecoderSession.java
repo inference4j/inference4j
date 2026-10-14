@@ -17,11 +17,14 @@
 package io.github.inference4j.generation;
 
 import io.github.inference4j.InferenceSession;
+import io.github.inference4j.NativeTensors;
 import io.github.inference4j.Tensor;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A {@link GenerativeSession} for encoder-decoder (seq2seq) models exported
@@ -40,6 +43,9 @@ import java.util.Map;
  *   <li><b>Cross-attention cache</b> ({@code past_key_values.N.encoder.key/value}) —
  *       frozen after the first decode step, since encoder hidden states don't change.</li>
  * </ul>
+ *
+ * <p>Both caches, and the encoder hidden states, stay in ONNX Runtime memory between runs;
+ * only the logits of each step are copied into Java.
  */
 public class EncoderDecoderSession implements GenerativeSession {
 
@@ -47,10 +53,15 @@ public class EncoderDecoderSession implements GenerativeSession {
     private final InferenceSession decoderSession;
     private final InferenceSession decoderWithPastSession;
     private final int decoderStartTokenId;
-    private final int numLayers;
+    private final Set<String> selfAttentionOutputNames;
+    private final Set<String> crossAttentionOutputNames;
+    private final Set<String> decodeOutputNames;
 
-    private final Map<String, Tensor> decoderSelfAttentionCache;
-    private final Map<String, Tensor> crossAttentionCache;
+    // The first decoder step's outputs: they hold the cross-attention cache for the whole generation,
+    // and the self-attention cache until the first decode step replaces it.
+    private NativeTensors firstStep = NativeTensors.empty();
+    private NativeTensors crossAttentionCache = NativeTensors.empty();
+    private NativeTensors selfAttentionCache = NativeTensors.empty();
     private Tensor encoderAttentionMask;
     private int sequenceLength;
 
@@ -71,52 +82,49 @@ public class EncoderDecoderSession implements GenerativeSession {
         this.decoderSession = decoderSession;
         this.decoderWithPastSession = decoderWithPastSession;
         this.decoderStartTokenId = decoderStartTokenId;
-        this.numLayers = (int) decoderWithPastSession.inputNames().stream()
+        int numLayers = (int) decoderWithPastSession.inputNames().stream()
                 .filter(n -> n.startsWith("past_key_values.") && n.endsWith(".decoder.key"))
                 .count();
-        this.decoderSelfAttentionCache = new LinkedHashMap<>();
-        this.crossAttentionCache = new LinkedHashMap<>();
+        Set<String> selfNames = new HashSet<>();
+        Set<String> crossNames = new HashSet<>();
+        for (int i = 0; i < numLayers; i++) {
+            selfNames.add("present." + i + ".decoder.key");
+            selfNames.add("present." + i + ".decoder.value");
+            crossNames.add("present." + i + ".encoder.key");
+            crossNames.add("present." + i + ".encoder.value");
+        }
+        this.selfAttentionOutputNames = Set.copyOf(selfNames);
+        this.crossAttentionOutputNames = Set.copyOf(crossNames);
+        selfNames.add("logits");
+        this.decodeOutputNames = Set.copyOf(selfNames);
     }
 
     @Override
     public ForwardResult prefill(long[] tokenIds) {
+        releaseCaches();
         int srcLen = tokenIds.length;
 
-        long[] attentionMask = ones(srcLen);
         Map<String, Tensor> encoderInputs = new LinkedHashMap<>();
         encoderInputs.put("input_ids", Tensor.fromLongs(tokenIds, new long[]{1, srcLen}));
-        this.encoderAttentionMask = Tensor.fromLongs(attentionMask, new long[]{1, srcLen});
+        this.encoderAttentionMask = Tensor.fromLongs(ones(srcLen), new long[]{1, srcLen});
         encoderInputs.put("attention_mask", this.encoderAttentionMask);
-
-        Map<String, Tensor> encoderOutputs = encoderSession.run(encoderInputs);
-        Tensor encoderHiddenStates = encoderOutputs.get("last_hidden_state");
 
         Map<String, Tensor> decoderInputs = new LinkedHashMap<>();
         decoderInputs.put("input_ids",
                 Tensor.fromLongs(new long[]{decoderStartTokenId}, new long[]{1, 1}));
-        decoderInputs.put("encoder_hidden_states", encoderHiddenStates);
         decoderInputs.put("encoder_attention_mask", this.encoderAttentionMask);
 
-        Map<String, Tensor> decoderOutputs = decoderSession.run(decoderInputs);
-
-        float[] logits = decoderOutputs.get("logits").slice(0, 0).slice(0, -1).toFloats();
-
-        this.crossAttentionCache.clear();
-        for (int i = 0; i < numLayers; i++) {
-            crossAttentionCache.put("past_key_values." + i + ".encoder.key",
-                    decoderOutputs.get("present." + i + ".encoder.key"));
-            crossAttentionCache.put("past_key_values." + i + ".encoder.value",
-                    decoderOutputs.get("present." + i + ".encoder.value"));
+        NativeTensors step;
+        try (NativeTensors encoderOutputs = encoderSession.runNative(
+                encoderInputs, Set.of("last_hidden_state"), NativeTensors.empty())) {
+            NativeTensors hiddenStates = encoderOutputs.rename(name -> "encoder_hidden_states");
+            step = decoderSession.runNative(decoderInputs, null, hiddenStates);
         }
 
-        this.decoderSelfAttentionCache.clear();
-        for (int i = 0; i < numLayers; i++) {
-            decoderSelfAttentionCache.put("past_key_values." + i + ".decoder.key",
-                    decoderOutputs.get("present." + i + ".decoder.key"));
-            decoderSelfAttentionCache.put("past_key_values." + i + ".decoder.value",
-                    decoderOutputs.get("present." + i + ".decoder.value"));
-        }
-
+        float[] logits = lastLogits(step);
+        this.firstStep = step;
+        this.crossAttentionCache = step.select(crossAttentionOutputNames).rename(EncoderDecoderSession::pastName);
+        this.selfAttentionCache = step.select(selfAttentionOutputNames).rename(EncoderDecoderSession::pastName);
         this.sequenceLength = 1;
 
         return new ForwardResult(logits);
@@ -126,24 +134,19 @@ public class EncoderDecoderSession implements GenerativeSession {
     public ForwardResult decode(long tokenId) {
         Map<String, Tensor> inputs = new LinkedHashMap<>();
         inputs.put("input_ids", Tensor.fromLongs(new long[]{tokenId}, new long[]{1, 1}));
-
         inputs.put("encoder_attention_mask", this.encoderAttentionMask);
 
-        inputs.putAll(decoderSelfAttentionCache);
+        NativeTensors step = decoderWithPastSession.runNative(
+                inputs, decodeOutputNames, crossAttentionCache, selfAttentionCache);
+        float[] logits = lastLogits(step);
 
-        inputs.putAll(crossAttentionCache);
-
-        Map<String, Tensor> outputs = decoderWithPastSession.run(inputs);
-
-        float[] logits = outputs.get("logits").slice(0, 0).slice(0, -1).toFloats();
-
-        for (int i = 0; i < numLayers; i++) {
-            decoderSelfAttentionCache.put("past_key_values." + i + ".decoder.key",
-                    outputs.get("present." + i + ".decoder.key"));
-            decoderSelfAttentionCache.put("past_key_values." + i + ".decoder.value",
-                    outputs.get("present." + i + ".decoder.value"));
+        NativeTensors previous = this.selfAttentionCache;
+        this.selfAttentionCache = step.select(selfAttentionOutputNames).rename(EncoderDecoderSession::pastName);
+        // The first step's self-attention cache shares its memory with the cross-attention cache,
+        // which must outlive it; it is freed with the cross-attention cache instead.
+        if (sequenceLength > 1) {
+            previous.close();
         }
-
         this.sequenceLength++;
 
         return new ForwardResult(logits);
@@ -156,17 +159,35 @@ public class EncoderDecoderSession implements GenerativeSession {
 
     @Override
     public void resetCache() {
-        decoderSelfAttentionCache.clear();
-        crossAttentionCache.clear();
-        encoderAttentionMask = null;
-        sequenceLength = 0;
+        releaseCaches();
     }
 
     @Override
     public void close() {
+        releaseCaches();
         encoderSession.close();
         decoderSession.close();
         decoderWithPastSession.close();
+    }
+
+    private void releaseCaches() {
+        selfAttentionCache.close();
+        firstStep.close();
+        selfAttentionCache = NativeTensors.empty();
+        crossAttentionCache = NativeTensors.empty();
+        firstStep = NativeTensors.empty();
+        encoderAttentionMask = null;
+        sequenceLength = 0;
+    }
+
+    /** The logits of the step's last position: the only output copied into Java. */
+    private static float[] lastLogits(NativeTensors step) {
+        return step.copy("logits").slice(0, 0).slice(0, -1).toFloats();
+    }
+
+    /** A {@code present.*} output's name as the next step's {@code past_key_values.*} input. */
+    private static String pastName(String presentName) {
+        return presentName.replace("present.", "past_key_values.");
     }
 
     private long[] ones(int length) {

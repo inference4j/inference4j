@@ -193,6 +193,9 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
 - [ ] **LangChain4j adapter** — `EmbeddingModel`, `ScoringModel`, audio document parser, PII redaction and an
       input guardrail ([#111](https://github.com/inference4j/inference4j/issues/111))
 - [ ] **Long input for generators** — sentence chunking for translation, map-reduce for summarization ([#74](https://github.com/inference4j/inference4j/issues/74))
+- [x] **Encoder-decoder KV cache stays native** — FlanT5, BART, MarianMT, CoEdIT and T5SqlGenerator keep both
+      caches in ONNX Runtime memory; heap per generated token drops from 2–21 MB to under 2 MB
+      ([#119](https://github.com/inference4j/inference4j/issues/119))
 
 ### Speech
 
