@@ -447,6 +447,60 @@ class GenerationEngineTest {
     }
 
     @Test
+    void prependsTokenAndReservesRoomForIt() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode(eq("x"), anyInt())).thenReturn(
+                new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
+
+        try (var engine = immediateEosEngine(session, tokenizer)
+                .maxInputLength(10)
+                .appendEosToInput(true)
+                .prependToInput(0)
+                .build()) {
+            GenerationResult result = engine.generate("x");
+
+            assertThat(result.promptTokens()).isEqualTo(3);
+        }
+
+        verify(tokenizer).encode("x", 8);
+        verify(session).prefill(new long[]{0, 1, 7});
+    }
+
+    @Test
+    void forcedBosTokenIsFedToTheModelButNotPartOfTheText() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        TokenDecoder decoder = mock(TokenDecoder.class);
+        when(tokenizer.encode(eq("x"), anyInt())).thenReturn(
+                new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
+        // Without forcing, the model would pick token 5 first
+        when(session.prefill(any())).thenReturn(new ForwardResult(logitsForToken(5, 10)));
+        when(session.decode(0)).thenReturn(new ForwardResult(logitsForToken(3, 10)));
+        when(session.decode(3)).thenReturn(new ForwardResult(logitsForToken(7, 10)));
+        when(decoder.decode(3)).thenReturn("Hi");
+
+        try (var engine = GenerationEngine.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .decoder(decoder)
+                .eosTokenId(7)
+                .forcedBosTokenId(0)
+                .build()) {
+            List<String> streamed = new ArrayList<>();
+            GenerationResult result = engine.generate("x", streamed::add);
+
+            assertThat(result.text()).isEqualTo("Hi");
+            assertThat(streamed).containsExactly("Hi");
+            assertThat(result.generatedTokens()).isEqualTo(1);
+        }
+
+        verify(session).decode(0);
+        verify(session, never()).decode(5);
+        verify(decoder, never()).decode(0);
+    }
+
+    @Test
     void failGuardRejectsTruncatedPrompt() throws Exception {
         GenerativeSession session = mock(GenerativeSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);

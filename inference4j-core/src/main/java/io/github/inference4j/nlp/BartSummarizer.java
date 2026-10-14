@@ -53,6 +53,9 @@ import java.util.function.Consumer;
  */
 public class BartSummarizer implements TextGenerator, Summarizer {
 
+    // The CNN checkpoints force <s> as the first generated token; the exported config.json lacks the setting
+    private static final int BOS_TOKEN_ID = 0;
+
     private final GenerationEngine engine;
 
     BartSummarizer(GenerationEngine engine) {
@@ -66,7 +69,9 @@ public class BartSummarizer implements TextGenerator, Summarizer {
      * on first use.
      */
     public static Builder distilBartCnn() {
-        return builder().modelId("inference4j/distilbart-cnn-12-6");
+        return builder()
+                .modelId("inference4j/distilbart-cnn-12-6")
+                .forcedBosTokenId(BOS_TOKEN_ID);
     }
 
     /**
@@ -77,7 +82,8 @@ public class BartSummarizer implements TextGenerator, Summarizer {
      */
     public static Builder bartLargeCnn() {
         return builder()
-                .modelId("inference4j/bart-large-cnn");
+                .modelId("inference4j/bart-large-cnn")
+                .forcedBosTokenId(BOS_TOKEN_ID);
     }
 
     /**
@@ -121,6 +127,12 @@ public class BartSummarizer implements TextGenerator, Summarizer {
         @Override
         protected TokenizerProvider defaultTokenizerProvider() {
             return DecodingBpeTokenizer.provider();
+        }
+
+        /** BART's tokenizer wraps input in {@code <s> ... </s>}; the BPE tokenizer adds neither. */
+        @Override
+        protected boolean prependBosToInput() {
+            return true;
         }
 
         @Override
