@@ -87,7 +87,7 @@ import java.util.Map;
  * <pre>{@code
  * try (Yolo26Detector detector = Yolo26Detector.builder()
  *         .modelId("my-org/my-yolo26")
- *         .modelSource(ModelSource.fromPath(localDir))
+ *         .modelSource(new LocalModelSource(modelsDir))   // resolves modelsDir/<modelId>
  *         .sessionOptions(opts -> opts.addCUDA(0))
  *         .labels(Labels.fromFile(Path.of("custom-labels.txt")))
  *         .confidenceThreshold(0.5f)

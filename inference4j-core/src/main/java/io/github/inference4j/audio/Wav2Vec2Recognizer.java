@@ -56,7 +56,7 @@ import java.util.Map;
  * <pre>{@code
  * try (Wav2Vec2Recognizer recognizer = Wav2Vec2Recognizer.builder()
  *         .modelId("my-org/my-wav2vec2")
- *         .modelSource(ModelSource.fromPath(localDir))
+ *         .modelSource(new LocalModelSource(modelsDir))   // resolves modelsDir/<modelId>
  *         .sessionOptions(opts -> opts.addCUDA(0))
  *         .vocabulary(Vocabulary.fromFile(vocabPath))
  *         .build()) {

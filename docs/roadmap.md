@@ -184,8 +184,10 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
 ### Zero-shot NLP, guardrails and RAG
 
 - [ ] **Zero-shot NER** — GLiNER: extract entity types given at call time, plus a PII-tuned model ([#101](https://github.com/inference4j/inference4j/issues/101))
-- [ ] **Prompt-injection detector** — a DeBERTa-v3 guardrail classifier (Apache-2.0 default; Llama Prompt
-      Guard 2 through a user-supplied source, since it is gated) ([#102](https://github.com/inference4j/inference4j/issues/102))
+- [x] **Prompt-injection detector** — `DebertaPromptInjectionDetector`, a DeBERTa-v3 guardrail classifier (Apache-2.0
+      default; Llama Prompt Guard 2 through a user-supplied source, since it is gated). `UnigramTokenizer` now applies
+      the `tokenizer.json` normalizer (SentencePiece `Precompiled`, `Strip`, `Replace`), matching HuggingFace token for
+      token on DeBERTa-v3 and T5 ([#102](https://github.com/inference4j/inference4j/issues/102))
 - [ ] **Zero-shot text classification** — NLI-based, labels chosen at call time ([#103](https://github.com/inference4j/inference4j/issues/103))
 - [ ] **Modern embeddings** — nomic-embed-text-v1.5 (8K context), Qwen3-Embedding-0.6B, and Matryoshka
       `.dimensions(int)` ([#104](https://github.com/inference4j/inference4j/issues/104))

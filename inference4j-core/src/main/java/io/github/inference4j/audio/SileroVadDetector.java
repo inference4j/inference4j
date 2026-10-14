@@ -62,7 +62,7 @@ import java.util.Map;
  * <pre>{@code
  * try (SileroVadDetector vad = SileroVadDetector.builder()
  *         .modelId("my-org/my-silero-vad")
- *         .modelSource(ModelSource.fromPath(localDir))
+ *         .modelSource(new LocalModelSource(modelsDir))   // resolves modelsDir/<modelId>
  *         .sessionOptions(opts -> opts.addCUDA(0))
  *         .threshold(0.6f)        // Speech probability threshold
  *         .minSpeechDuration(0.25f)  // Minimum speech segment duration

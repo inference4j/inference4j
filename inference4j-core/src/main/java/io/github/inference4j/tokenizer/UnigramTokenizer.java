@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,6 +43,8 @@ import java.util.regex.Pattern;
  *
  * <h2>Encoding</h2>
  * <ol>
+ *   <li>Normalize each segment between added tokens with the configured normalizer, if any
+ *       (from {@code tokenizer.json}: e.g. SentencePiece's {@link PrecompiledNormalizer})</li>
  *   <li>Prepend {@code ▁} and replace all spaces with {@code ▁}</li>
  *   <li>Split on added tokens (special tokens preserved atomically)</li>
  *   <li>For non-special segments: run Viterbi to find optimal segmentation</li>
@@ -79,6 +82,7 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 	private final int[] byteFallbackIds;
 	private final boolean hasByteFallback;
 	private final int unkId;
+	private final UnaryOperator<String> normalizer;
 
 	private final ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream();
 
@@ -87,6 +91,7 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 		this.scores = builder.scores;
 		this.defaultMaxLength = builder.defaultMaxLength;
 		this.unkId = builder.unkId;
+		this.normalizer = builder.normalizer;
 
 		int maxLen = 0;
 		for (String token : vocab.keySet()) {
@@ -110,7 +115,7 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 				anyByteToken = true;
 			}
 		}
-		this.hasByteFallback = anyByteToken;
+		this.hasByteFallback = anyByteToken && (builder.byteFallback == null || builder.byteFallback);
 
 		if (builder.addedTokens.isEmpty()) {
 			this.addedTokenMap = Map.of();
@@ -306,19 +311,26 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 			boolean isFirst = true;
 			while (addedMatcher.find()) {
 				if (addedMatcher.start() > lastEnd) {
-					String segment = text.substring(lastEnd, addedMatcher.start());
-					tokenizeViterbi(applySpacePrefix(segment, isFirst), tokenIds);
-					isFirst = false;
+					String segment = normalizer.apply(text.substring(lastEnd, addedMatcher.start()));
+					if (!segment.isEmpty()) {
+						tokenizeViterbi(applySpacePrefix(segment, isFirst), tokenIds);
+						isFirst = false;
+					}
 				}
 				tokenIds.add(addedTokenMap.get(addedMatcher.group()));
 				lastEnd = addedMatcher.end();
 			}
 			if (lastEnd < text.length()) {
-				String segment = text.substring(lastEnd);
-				tokenizeViterbi(applySpacePrefix(segment, isFirst), tokenIds);
+				String segment = normalizer.apply(text.substring(lastEnd));
+				if (!segment.isEmpty()) {
+					tokenizeViterbi(applySpacePrefix(segment, isFirst), tokenIds);
+				}
 			}
 		} else {
-			tokenizeViterbi(applySpacePrefix(text, true), tokenIds);
+			String normalized = normalizer.apply(text);
+			if (!normalized.isEmpty()) {
+				tokenizeViterbi(applySpacePrefix(normalized, true), tokenIds);
+			}
 		}
 
 		return tokenIds;
@@ -326,7 +338,8 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 
 	private static String applySpacePrefix(String text, boolean prependPrefix) {
 		String result = text.replace(" ", SPACE_PREFIX);
-		if (prependPrefix) {
+		// As HuggingFace's Metaspace: text already starting with a space gets no second prefix
+		if (prependPrefix && !result.startsWith(SPACE_PREFIX)) {
 			result = SPACE_PREFIX + result;
 		}
 		return result;
@@ -448,6 +461,8 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 		private int unkId = 0;
 		private final List<String> addedTokens = new ArrayList<>();
 		private int defaultMaxLength = 8192;
+		private UnaryOperator<String> normalizer = UnaryOperator.identity();
+		private Boolean byteFallback;
 
 		public Builder vocab(Map<String, Integer> vocab) {
 			this.vocab = vocab;
@@ -466,6 +481,25 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 
 		public Builder addedToken(String token) {
 			this.addedTokens.add(token);
+			return this;
+		}
+
+		/**
+		 * Normalizes text before segmentation, applied to each segment between added tokens.
+		 * Defaults to none.
+		 */
+		public Builder normalizer(UnaryOperator<String> normalizer) {
+			this.normalizer = normalizer;
+			return this;
+		}
+
+		/**
+		 * Whether characters missing from the vocabulary become {@code <0xNN>} byte tokens, as
+		 * {@code model.byte_fallback} in {@code tokenizer.json} says. {@code false} emits one unk token per
+		 * run of such characters instead. Defaults to byte fallback whenever the vocabulary has byte tokens.
+		 */
+		public Builder byteFallback(boolean byteFallback) {
+			this.byteFallback = byteFallback;
 			return this;
 		}
 

@@ -7,6 +7,7 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Capability | Wrapper | Default Model ID | Size | API |
 |------------|---------|-------------------|------|-----|
 | Text Classification | `DistilBertTextClassifier` | `inference4j/distilbert-base-uncased-finetuned-sst-2-english` | ~260 MB | `TextClassifier` |
+| Prompt-Injection Detection | `DebertaPromptInjectionDetector` | `inference4j/deberta-v3-base-prompt-injection-v2` | ~740 MB | `PromptInjectionDetector`, `TextClassifier` |
 | Named Entity Recognition | `BertNerRecognizer` | `inference4j/distilbert-NER` | ~260 MB | `NamedEntityRecognizer` |
 | Named Entity Recognition | `BertNerRecognizer` | `inference4j/bert-base-NER` | ~431 MB | `NamedEntityRecognizer` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/all-MiniLM-L6-v2` | ~90 MB | `TextEmbedder` |
