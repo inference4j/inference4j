@@ -210,8 +210,10 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
 
 ### Vision & documents
 
-- [ ] **OCR recognizer and `OcrPipeline`** — PaddleOCR mobile recognizer (CTC) with `CraftTextDetector` for
-      end-to-end OCR; replaces the earlier TrOCR plan ([#106](https://github.com/inference4j/inference4j/issues/106))
+- [x] **OCR recognizer and `OcrPipeline`** — PaddleOCR PP-OCRv6 (small and tiny) line detector and CTC recognizer,
+      composed by `OcrPipeline`; `CraftTextDetector` fits as an alternative detector
+      ([#106](https://github.com/inference4j/inference4j/issues/106)). TrOCR for handwriting follows
+      ([#128](https://github.com/inference4j/inference4j/issues/128))
 - [ ] **Apache-licensed detector** — RT-DETR / D-FINE, NMS-free, an alternative to the AGPL-3.0 Ultralytics
       models ([#107](https://github.com/inference4j/inference4j/issues/107))
 - [ ] **Promptable segmentation** — SAM 2.1 tiny, with a `SegmentationMask` result type shared with

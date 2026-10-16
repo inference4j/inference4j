@@ -1,6 +1,6 @@
 # Text Detection
 
-Detect text regions in images using the CRAFT model. Returns bounding boxes around detected text — useful as the first stage of an OCR pipeline.
+Detect text regions in images using the CRAFT model. Returns bounding boxes around detected text. To also read the text, see [OCR](ocr.md), whose default detector is PaddleOCR's line detector.
 
 ## Quick example
 
@@ -40,7 +40,7 @@ public class TextDetection {
 
 ## Custom thresholds
 
-The default thresholds (0.7, 0.4) are tuned for clean document scans. For real-world images (photos, screenshots), use lower thresholds:
+The default thresholds (0.7, 0.4) are tuned for clean document scans. For real-world images (photos, screenshots), and for clean digitally rendered text, where the defaults can find nothing, use lower thresholds:
 
 ```java
 try (var detector = CraftTextDetector.builder().build()) {
@@ -69,6 +69,7 @@ try (var detector = CraftTextDetector.builder().build()) {
 | Field | Type | Description |
 |-------|------|-------------|
 | `box()` | `BoundingBox` | Bounding box around the detected text |
+| `polygon()` | `List<Point>` | The region's outline; for CRAFT, the corners of `box()` |
 | `confidence()` | `float` | Detection confidence (0.0 to 1.0) |
 
 ## How CRAFT works
@@ -111,5 +112,5 @@ try (var detector = CraftTextDetector.builder()
 
 - Both `Path` and `BufferedImage` inputs are supported.
 - Images are automatically resized (preserving aspect ratio) to fit within `targetSize`. Dimensions are rounded to multiples of 32 (VGG16 backbone requirement).
-- CRAFT detects text *locations*, not text *content*. Pair it with a text recognition model (like TrOCR) for full OCR.
+- CRAFT detects text *locations*, not text *content*. For full OCR, use [`OcrPipeline`](ocr.md); CRAFT can be its detector, which reads each word separately.
 - Coordinates are in the original image's pixel space.

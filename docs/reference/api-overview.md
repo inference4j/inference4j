@@ -15,7 +15,7 @@
 | `io.github.inference4j.preprocessing.text` | `ModelConfig` (HuggingFace config.json parser) |
 | `io.github.inference4j.preprocessing.image` | Image transforms pipeline: `ImageTransformPipeline`, `ResizeTransform`, `CenterCropTransform`, `ImageLayout`, `Labels` |
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
-| `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `DepthAnythingEstimator`, `ImageEmbedder`, `ImageAnnotator`, `TensorImages`, `Colormap` |
+| `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `CraftTextDetector`, `PaddleTextDetector`, `PaddleTextRecognizer`, `TextRecognizer`, `OcrPipeline`, `DbPostProcessor`, `QuadCrop`, `TextLine`, `RecognizedText`, `Point`, `DepthAnythingEstimator`, `ImageEmbedder`, `ImageAnnotator`, `TensorImages`, `Colormap` |
 | `io.github.inference4j.audio` | `MoonshineRecognizer`, `TranscriptionStream`, `TranscriptListener`, `TranscriptLine`, `Wav2Vec2Recognizer`, `PunctuatedSpeechRecognizer`, `SegmentedSpeechRecognizer`, `SileroVadDetector` |
 | `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `DebertaPromptInjectionDetector`, `PromptInjectionDetector`, `InjectionCheck`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
@@ -55,8 +55,11 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 ├── Detector<I, D>                      // detect(I) → List<D>
 │   ├── ObjectDetector                  // detect(BufferedImage/Path) → List<Detection>
 │   ├── TextDetector                    // detect(BufferedImage/Path) → List<TextRegion>
+│   │                                   //   CraftTextDetector (words), PaddleTextDetector (lines)
 │   └── VoiceActivityDetector           // detect(Path/float[]) → List<VoiceSegment>
 ├── NamedEntityRecognizer                // recognize(String) → List<NamedEntity>
+├── TextRecognizer                      // recognize(BufferedImage) → RecognizedText  (one line image)
+├── OcrPipeline                         // read(BufferedImage/Path) → List<TextLine>  (class: detect + crop + recognize)
 ├── DepthEstimator                      // estimate(BufferedImage/Path) → DepthMap
 ├── TextEmbedder                        // encode(String) → float[]
 ├── ImageEmbedder                       // encode(BufferedImage/Path) → float[]
@@ -116,7 +119,10 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | `InjectionCheck` | `probability()`, `threshold()`, `isInjection()` | `DebertaPromptInjectionDetector` |
 | `NamedEntity` | `text()`, `label()`, `start()`, `end()`, `score()` | `BertNerRecognizer` |
 | `Detection` | `label()`, `classIndex()`, `confidence()`, `box()` | `YoloV8Detector`, `Yolo26Detector` |
-| `TextRegion` | `box()`, `confidence()` | `CraftTextDetector` |
+| `TextRegion` | `box()`, `polygon()`, `confidence()` | `CraftTextDetector`, `PaddleTextDetector` |
+| `TextLine` | `text()`, `confidence()`, `region()` | `OcrPipeline` |
+| `RecognizedText` | `text()`, `confidence()` | `PaddleTextRecognizer` (any `TextRecognizer`) |
+| `Point` | `x()`, `y()` | Embedded in `TextRegion.polygon()` |
 | `BoundingBox` | `x1()`, `y1()`, `x2()`, `y2()` | Embedded in `Detection`, `TextRegion` |
 | `DepthMap` | `values()`, `width()`, `height()`, `at()`, `min()`, `max()`, `toImage()` | `DepthAnythingEstimator` |
 | `Transcription` | `text()`, `segments()` | `MoonshineRecognizer`, `Wav2Vec2Recognizer`, `WhisperSpeechModel` |

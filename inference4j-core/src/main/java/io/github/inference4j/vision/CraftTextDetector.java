@@ -125,7 +125,7 @@ public class CraftTextDetector
         return run(image);
     }
 
-    @Override
+    /** Detects text with thresholds other than the configured defaults. */
     public List<TextRegion> detect(BufferedImage image, float textThreshold, float lowTextThreshold) {
         PreprocessResult result = preprocessor.process(image);
         Map<String, Tensor> outputs = session.run(result.tensors());
@@ -138,7 +138,7 @@ public class CraftTextDetector
         return detect(imagePath, defaultTextThreshold, defaultLowTextThreshold);
     }
 
-    @Override
+    /** Detects text with thresholds other than the configured defaults. */
     public List<TextRegion> detect(Path imagePath, float textThreshold, float lowTextThreshold) {
         return detect(loadImage(imagePath), textThreshold, lowTextThreshold);
     }

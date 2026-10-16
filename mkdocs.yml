@@ -63,6 +63,7 @@ nav:
     - Punctuation & Casing: use-cases/punctuation-and-casing.md
     - Voice Activity Detection: use-cases/voice-activity-detection.md
     - Text Detection: use-cases/text-detection.md
+    - OCR: use-cases/ocr.md
     - Depth Estimation: use-cases/depth-estimation.md
     - Visual Search: use-cases/visual-search.md
     - Summarization: use-cases/summarization.md
