@@ -115,8 +115,7 @@ class OcrPipelineModelTest {
     @Test
     void craftCanReplaceTheDetector() throws Exception {
         try (var withCraft = OcrPipeline.builder()
-                // As in CraftTextDetectorModelTest: CRAFT's default 0.7 finds nothing on clean rendered text
-                .detector(CraftTextDetector.builder().textThreshold(0.4f).lowTextThreshold(0.3f).build())
+                .detector(CraftTextDetector.builder().build())
                 .recognizer(PaddleTextRecognizer.small().build())
                 .build()) {
             List<TextLine> words = withCraft.read(resource("ocr-document.png"));

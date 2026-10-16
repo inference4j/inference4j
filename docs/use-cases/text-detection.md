@@ -40,14 +40,19 @@ public class TextDetection {
 
 ## Custom thresholds
 
-The default thresholds (0.7, 0.4) are tuned for clean document scans. For real-world images (photos, screenshots), and for clean digitally rendered text, where the defaults can find nothing, use lower thresholds:
+The defaults are those of the reference implementation (`clovaai/CRAFT-pytorch`). Lower `textThreshold` to find
+fainter text; raise `linkThreshold` if neighboring words merge into one region:
 
 ```java
-try (var detector = CraftTextDetector.builder().build()) {
-    List<TextRegion> regions = detector.detect(
-        Path.of("photo.jpg"), 0.4f, 0.3f);
+try (var detector = CraftTextDetector.builder()
+        .textThreshold(0.5f)
+        .linkThreshold(0.5f)
+        .build()) {
+    List<TextRegion> regions = detector.detect(Path.of("photo.jpg"));
 }
 ```
+
+`detect(image, textThreshold, lowTextThreshold)` overrides the two text thresholds for one call.
 
 ## Builder options
 
@@ -57,10 +62,12 @@ try (var detector = CraftTextDetector.builder().build()) {
 | `.modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Model resolution strategy |
 | `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | default | ONNX Runtime session config |
 | `.inputName(String)` | `String` | auto-detected | Input tensor name |
-| `.targetSize(int)` | `int` | `1280` | Long-side resize target |
-| `.textThreshold(float)` | `float` | `0.7` | Region score threshold |
-| `.lowTextThreshold(float)` | `float` | `0.4` | Affinity score threshold |
-| `.minComponentArea(int)` | `int` | `10` | Minimum region pixel area |
+| `.targetSize(int)` | `int` | `1280` | Maximum long side of the model input |
+| `.magRatio(float)` | `float` | `1.5` | How much smaller images are scaled up, at most |
+| `.textThreshold(float)` | `float` | `0.7` | Minimum highest text score for a region to be kept |
+| `.linkThreshold(float)` | `float` | `0.4` | Link score above which characters are joined into words |
+| `.lowTextThreshold(float)` | `float` | `0.4` | Text score above which a pixel belongs to a character |
+| `.minComponentArea(int)` | `int` | `10` | Minimum region area, in score-map pixels (half the input resolution) |
 
 ## Result type
 
@@ -68,28 +75,33 @@ try (var detector = CraftTextDetector.builder().build()) {
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `box()` | `BoundingBox` | Bounding box around the detected text |
-| `polygon()` | `List<Point>` | The region's outline; for CRAFT, the corners of `box()` |
-| `confidence()` | `float` | Detection confidence (0.0 to 1.0) |
+| `box()` | `BoundingBox` | Axis-aligned box around the region |
+| `polygon()` | `List<Point>` | The region's four corners, clockwise; rotated for rotated text |
+| `confidence()` | `float` | The region's highest text score (0.0 to 1.0) |
+
+Regions are listed by confidence, highest first.
 
 ## How CRAFT works
 
-CRAFT (Character Region Awareness for Text detection) produces two pixel-level heatmaps:
+CRAFT (Character Region Awareness for Text detection) produces two score maps at half the input resolution:
 
-1. **Region score** — highlights character centers
-2. **Affinity score** — highlights spacing between characters (links characters into words)
+1. **Text score** — highlights character centers
+2. **Link score** — highlights the spacing between characters of a word
 
-Connected components on the thresholded heatmaps produce text region bounding boxes. Unlike YOLO-style detectors, CRAFT doesn't use NMS — the connected component approach naturally handles overlapping text.
+A pixel belongs to text where its text score exceeds `lowTextThreshold` or its link score exceeds `linkThreshold`.
+Each connected area whose highest text score reaches `textThreshold` becomes a region: its link-only pixels are
+removed, the rest is dilated in proportion to its thickness, and the smallest rectangle around it, rotated if the
+text is, gives the region's outline. Unlike YOLO-style detectors, CRAFT needs no NMS.
 
-## Threshold tuning
+inference4j follows the reference implementation step by step, including its resizing (aspect ratio kept, padded to
+multiples of 32): on six test images (documents, a photo, a screenshot, a rotated receipt, a noisy scan) it returns
+the same 146 regions as the reference, with corners identical to a thousandth of a pixel.
 
-| Scenario | `textThreshold` | `lowTextThreshold` |
-|----------|-----------------|---------------------|
-| Clean document scans | `0.7` (default) | `0.4` (default) |
-| Real-world photos | `0.4` | `0.3` |
-| Sparse text (signs, labels) | `0.3` | `0.2` |
-
-Lower thresholds detect more text but may produce false positives. Higher thresholds are more precise but may miss faint or small text.
+!!! note "Earlier versions"
+    Earlier versions kept a region only if its *mean* text score reached `textThreshold`. A region's mean is around
+    0.55 even for clear text, so the default 0.7 found nothing, and lower thresholds kept almost everything
+    ([#130](https://github.com/inference4j/inference4j/issues/130)). Code that lowered the thresholds to work around
+    this can return to the defaults.
 
 ## Hardware acceleration
 
@@ -111,6 +123,6 @@ try (var detector = CraftTextDetector.builder()
 ## Tips
 
 - Both `Path` and `BufferedImage` inputs are supported.
-- Images are automatically resized (preserving aspect ratio) to fit within `targetSize`. Dimensions are rounded to multiples of 32 (VGG16 backbone requirement).
+- Images are resized keeping their aspect ratio (scaled up by at most `magRatio`, long side at most `targetSize`) and padded to multiples of 32 (VGG16 backbone requirement).
 - CRAFT detects text *locations*, not text *content*. For full OCR, use [`OcrPipeline`](ocr.md); CRAFT can be its detector, which reads each word separately.
 - Coordinates are in the original image's pixel space.
