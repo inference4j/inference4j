@@ -123,8 +123,9 @@ final class Quads {
     }
 
     /**
-     * OpenCV's {@code minAreaRect} for a polygon given point by point: OpenCV starts the hull at the polygon's first
-     * point that lies on it (or its last, when the polygon runs the other way round).
+     * OpenCV's {@code minAreaRect} for points in a given order: OpenCV starts the hull at the first input point that
+     * lies on it (or the last, when the points run the other way round), or at the rightmost point when the hull
+     * does not follow the input order.
      */
     static RotatedRect minAreaRectOfPolygon(double[] xs, double[] ys) {
         int n = xs.length;
@@ -151,7 +152,21 @@ final class Quads {
                 maxAt = i;
             }
         }
-        int start = ascending >= h - 1 ? minAt : ascending <= 1 ? maxAt : 0;
+        int start;
+        if (ascending >= h - 1) {
+            start = minAt;
+        } else if (ascending <= 1) {
+            start = maxAt;
+        } else {
+            // Not in input order (e.g. pixels listed row by row): OpenCV starts at the rightmost point,
+            // the lowest one on a tie
+            start = 0;
+            for (int i = 1; i < h; i++) {
+                if (hull[i][0] > hull[start][0] || (hull[i][0] == hull[start][0] && hull[i][1] > hull[start][1])) {
+                    start = i;
+                }
+            }
+        }
         return openCvMinAreaRect(rotate(hull, start));
     }
 

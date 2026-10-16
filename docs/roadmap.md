@@ -214,6 +214,9 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
       composed by `OcrPipeline`; `CraftTextDetector` fits as an alternative detector
       ([#106](https://github.com/inference4j/inference4j/issues/106)). TrOCR for handwriting follows
       ([#128](https://github.com/inference4j/inference4j/issues/128))
+- [x] **CRAFT detects with its default thresholds** — post-processing now follows the reference implementation
+      (max text score, separate link threshold, dilation, rotated boxes), matching it region for region
+      ([#130](https://github.com/inference4j/inference4j/issues/130))
 - [ ] **Apache-licensed detector** — RT-DETR / D-FINE, NMS-free, an alternative to the AGPL-3.0 Ultralytics
       models ([#107](https://github.com/inference4j/inference4j/issues/107))
 - [ ] **Promptable segmentation** — SAM 2.1 tiny, with a `SegmentationMask` result type shared with

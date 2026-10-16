@@ -36,10 +36,8 @@ class CraftTextDetectorModelTest {
 
     @BeforeAll
     void setUp() throws IOException {
-        detector = CraftTextDetector.builder()
-                .textThreshold(0.4f)
-                .lowTextThreshold(0.3f)
-                .build();
+        // The reference implementation's default thresholds (0.7 / 0.4 / 0.4)
+        detector = CraftTextDetector.builder().build();
         textImage = ImageIO.read(CraftTextDetectorModelTest.class.getResourceAsStream("/fixtures/text.jpg"));
     }
 
@@ -53,6 +51,20 @@ class CraftTextDetectorModelTest {
         List<TextRegion> regions = detector.detect(textImage);
 
         assertThat(regions.isEmpty()).as("Should detect at least one text region").isFalse();
+    }
+
+    @Test
+    void findsEveryWordTheReferenceImplementationFinds() throws Exception {
+        // clovaai/CRAFT-pytorch on the same model and image finds 56 regions with its defaults
+        BufferedImage document = ImageIO.read(CraftTextDetectorModelTest.class.getResourceAsStream("/ocr-document.png"));
+
+        List<TextRegion> regions = detector.detect(document);
+
+        assertThat(regions).hasSize(56);
+        assertThat(regions).allSatisfy(region -> {
+            assertThat(region.polygon()).hasSize(4);
+            assertThat(region.confidence()).isGreaterThanOrEqualTo(0.7f);
+        });
     }
 
     @Test

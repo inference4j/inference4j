@@ -130,8 +130,7 @@ try (var detector = PaddleTextDetector.small().build();
 ```
 
 `CraftTextDetector` also fits `OcrPipeline.builder().detector(...)`. CRAFT finds words or word groups rather than
-whole lines, so each word is read separately; its default thresholds can miss clean, digitally rendered text (see
-[Text Detection](text-detection.md)).
+whole lines, so each word is read separately (see [Text Detection](text-detection.md)).
 
 ## Measured accuracy
 
