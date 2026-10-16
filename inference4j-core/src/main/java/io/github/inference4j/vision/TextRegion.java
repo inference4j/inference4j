@@ -16,11 +16,29 @@
 
 package io.github.inference4j.vision;
 
+import java.util.List;
+
 /**
- * A detected text region in an image.
+ * A region of an image that contains text.
  *
- * @param box        bounding box in original image coordinates
- * @param confidence mean region score within the detected component (0-1)
+ * @param box        the axis-aligned box around the region
+ * @param polygon    the region's outline: four corners clockwise from the top-left for detectors that find
+ *                   rotated text, otherwise the corners of {@code box}
+ * @param confidence the detector's confidence that the region contains text
  */
-public record TextRegion(BoundingBox box, float confidence) {
+public record TextRegion(BoundingBox box, List<Point> polygon, float confidence) {
+
+    public TextRegion {
+        polygon = List.copyOf(polygon);
+    }
+
+    /** A region whose outline is its axis-aligned box. */
+    public TextRegion(BoundingBox box, float confidence) {
+        this(box, corners(box), confidence);
+    }
+
+    private static List<Point> corners(BoundingBox box) {
+        return List.of(new Point(box.x1(), box.y1()), new Point(box.x2(), box.y1()),
+                new Point(box.x2(), box.y2()), new Point(box.x1(), box.y2()));
+    }
 }

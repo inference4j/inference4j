@@ -23,25 +23,26 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Detects text regions in images and returns axis-aligned bounding boxes.
+ * Detects text regions in images.
  *
  * <p>Unlike {@link ObjectDetector},
  * text detection models output pixel-level heatmaps that are post-processed
- * into text region bounding boxes. There is no IoU threshold because connected
- * components are naturally non-overlapping.
+ * into text regions. There is no IoU threshold because connected
+ * components are naturally non-overlapping. Each {@link TextRegion} carries an axis-aligned box and
+ * its outline, which is rotated for detectors that find rotated lines.
+ *
+ * <p>Detector-specific settings, such as thresholds, belong to each implementation.
  *
  * @see TextRegion
+ * @see CraftTextDetector
+ * @see PaddleTextDetector
  */
 public interface TextDetector extends Detector<BufferedImage, TextRegion> {
 
     @Override
     List<TextRegion> detect(BufferedImage image);
 
-    List<TextRegion> detect(BufferedImage image, float textThreshold, float lowTextThreshold);
-
     List<TextRegion> detect(Path imagePath);
-
-    List<TextRegion> detect(Path imagePath, float textThreshold, float lowTextThreshold);
 
     @Override
     void close();

@@ -173,17 +173,7 @@ class Inference4jVisionAutoConfigurationTest {
 			}
 
 			@Override
-			public List<TextRegion> detect(BufferedImage image, float textThreshold, float lowTextThreshold) {
-				return List.of();
-			}
-
-			@Override
 			public List<TextRegion> detect(Path imagePath) {
-				return List.of();
-			}
-
-			@Override
-			public List<TextRegion> detect(Path imagePath, float textThreshold, float lowTextThreshold) {
 				return List.of();
 			}
 
