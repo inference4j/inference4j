@@ -247,7 +247,7 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 | Capability | Models | API |
 |---|---|---|
 | Classification | ResNet, EfficientNet | `ImageClassifier` |
-| Object Detection | YOLOv8, YOLO11, YOLO26 | `ObjectDetector` |
+| Object Detection | YOLOv8, YOLO11, YOLO26 (AGPL-3.0); D-FINE, RT-DETRv2 (Apache-2.0) | `ObjectDetector` |
 | Text Detection | CRAFT, PP-OCRv6 | `TextDetector` |
 | OCR | PP-OCRv6 detection + recognition | `OcrPipeline`, `TextRecognizer` |
 

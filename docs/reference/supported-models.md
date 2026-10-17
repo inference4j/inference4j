@@ -41,6 +41,9 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Image Classification | `EfficientNetClassifier` | `inference4j/efficientnet-lite4` | ~50 MB | `ImageClassifier` |
 | Object Detection | `YoloV8Detector` | `inference4j/yolov8n` | ~25 MB | `ObjectDetector` |
 | Object Detection | `Yolo26Detector` | `inference4j/yolo26n` | ~25 MB | `ObjectDetector` |
+| Object Detection (Apache-2.0) | `RtDetrDetector.dfineSmall()` | `inference4j/dfine-small-coco` | ~41 MB | `ObjectDetector` |
+| Object Detection (Apache-2.0) | `RtDetrDetector.dfineNano()` | `inference4j/dfine-nano-coco` | ~15 MB | `ObjectDetector` |
+| Object Detection (Apache-2.0) | `RtDetrDetector.rtDetrV2()` | `inference4j/rtdetr-v2-r18vd` | ~81 MB | `ObjectDetector` |
 | Text Detection | `CraftTextDetector` | `inference4j/craft-mlt-25k` | ~80 MB | `TextDetector` |
 | Text Detection (lines) | `PaddleTextDetector.small()` | `inference4j/pp-ocrv6-small-det` | ~10 MB | `TextDetector` |
 | Text Detection (lines) | `PaddleTextDetector.tiny()` | `inference4j/pp-ocrv6-tiny-det` | ~2 MB | `TextDetector` |

@@ -1,6 +1,26 @@
 # Object Detection
 
-Detect and locate objects in images using YOLO models. inference4j supports both NMS-based (YOLOv8, YOLO11) and NMS-free (YOLO26) architectures.
+Detect and locate objects in images. inference4j offers YOLO models (NMS-based YOLOv8/YOLO11 and NMS-free YOLO26) and
+Apache-2.0 transformer detectors (D-FINE and RT-DETRv2) that can be used in proprietary software.
+
+## Licenses
+
+The YOLO models come from Ultralytics and are released under **AGPL-3.0**: using them in a network service or a
+distributed product generally obliges you to release your own source code under the same license, unless you buy an
+Ultralytics commercial license. D-FINE and RT-DETRv2 are **Apache-2.0**, with no such obligation.
+
+| Wrapper | Models | License | COCO AP (as reported by the authors) | CPU latency* |
+|---------|--------|---------|--------------------------------------|--------------|
+| `Yolo26Detector` | YOLO26n | AGPL-3.0 | 40.9 | 17 ms |
+| `YoloV8Detector` | YOLOv8n, YOLO11 | AGPL-3.0 | — | — |
+| `RtDetrDetector.dfineNano()` | D-FINE nano | **Apache-2.0** | 42.8 | 29 ms |
+| `RtDetrDetector.dfineSmall()` (default) | D-FINE small | **Apache-2.0** | 48.5 | 54 ms |
+| `RtDetrDetector.rtDetrV2()` | RT-DETRv2 ResNet-18 | **Apache-2.0** | 48.1 | 108 ms |
+
+\*Median per image at 640 × 640 on a laptop CPU with four ONNX Runtime threads, measured with inference4j. AP figures
+come from the [D-FINE](https://github.com/Peterande/D-FINE), [RT-DETRv2](https://github.com/lyuwenyu/RT-DETR) and
+[YOLO26](https://docs.ultralytics.com/models/yolo26/) authors (COCO val2017); inference4j has not re-measured them.
+This page is not legal advice; check the licenses for your use.
 
 ## Quick example
 
@@ -63,6 +83,26 @@ try (var detector = Yolo26Detector.builder().build()) {
 !!! note
     YOLO26 accepts an `iouThreshold` parameter for API compatibility, but it is ignored — the architecture handles deduplication internally.
 
+### D-FINE and RT-DETRv2 (Apache-2.0)
+
+NMS-free transformer detectors. Each of the 300 object queries scores every class; the best (query, class) pairs
+above the threshold become detections.
+
+```java
+try (var detector = RtDetrDetector.builder().build()) {        // D-FINE small
+    detector.detect(Path.of("image.jpg"));
+}
+
+try (ObjectDetector detector = RtDetrDetector.dfineNano().build()) {   // drop-in for a YOLO detector
+    detector.detect(Path.of("image.jpg"));
+}
+```
+
+Processing follows HuggingFace `transformers` (`RTDetrImageProcessor`): the image is resized to 640 × 640 with
+Pillow's bilinear filter, without letterboxing, and scaled to [0, 1]. On six COCO photos, inference4j returns the same
+detections as `transformers` with the PyTorch models: same classes in the same order, scores within 1e-5, boxes within
+0.2 pixels. Labels default to `Labels.coco()`, as for the YOLO detectors, so swapping detectors keeps label names.
+
 ## YoloV8 builder options
 
 | Method | Type | Default | Description |
@@ -87,6 +127,19 @@ try (var detector = Yolo26Detector.builder().build()) {
 | `.inputName(String)` | `String` | auto-detected | Input tensor name |
 | `.inputSize(int)` | `int` | `640` | Model input resolution |
 | `.confidenceThreshold(float)` | `float` | `0.5` | Minimum detection confidence |
+
+## RtDetrDetector builder options
+
+| Method | Type | Default | Description |
+|--------|------|---------|-------------|
+| `.modelId(String)` | `String` | `inference4j/dfine-small-coco` | HuggingFace model ID; presets `dfineSmall()`, `dfineNano()`, `rtDetrV2()` |
+| `.modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Model resolution strategy |
+| `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | default | ONNX Runtime session config |
+| `.labels(Labels)` | `Labels` | COCO (80 classes) | Detection class labels |
+| `.inputSize(int)` | `int` | `640` | Model input resolution |
+| `.confidenceThreshold(float)` | `float` | `0.5` | Detections scoring at or below this are dropped |
+
+`detect(image, confidenceThreshold, iouThreshold)` ignores the IoU threshold: these models need no NMS.
 
 ## Result type
 
@@ -124,7 +177,10 @@ try (var detector = YoloV8Detector.builder().build()) {
 
 ## Tips
 
+- **Licensing first**: if your product is not open source under AGPL-3.0, start with `RtDetrDetector`. D-FINE small is
+  more accurate than YOLO26n by the authors' figures, at about three times the CPU time; D-FINE nano is slightly more
+  accurate than YOLO26n and a little slower (29 vs 17 ms here).
 - **YOLOv8 vs YOLO26**: YOLOv8 is the safer default — widely tested and well-understood. YOLO26 is NMS-free (potentially faster) but newer.
-- Both detectors accept `Path` or `BufferedImage` as input.
+- All detectors accept `Path` or `BufferedImage` as input.
 - Default labels are COCO (80 classes). Override with `.labels(Labels.of(yourLabels))` for custom-trained models.
-- YOLOv8 uses letterbox preprocessing (preserves aspect ratio, pads with gray). YOLO26 uses direct resize.
+- YOLOv8 uses letterbox preprocessing (preserves aspect ratio, pads with gray). YOLO26 and `RtDetrDetector` use direct resize.
