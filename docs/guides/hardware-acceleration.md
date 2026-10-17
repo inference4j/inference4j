@@ -14,6 +14,43 @@ try (var classifier = ResNetClassifier.builder()
 }
 ```
 
+### CoreML results can differ from CPU results
+
+`addCoreML()` converts the model to CoreML's older **NeuralNetwork** format. CoreML runs it on the Apple GPU or Neural
+Engine with reduced numeric precision, so scores shift slightly, and for some models the output changes. Models that
+pick their top results inside the graph, such as YOLO26's 300 proposals, are the most affected: a small change in scores
+changes which boxes survive.
+
+The newer **MLProgram** format keeps CPU-level accuracy for the models that support it:
+
+```java
+try (var detector = RtDetrDetector.builder()
+        .sessionOptions(opts -> opts.addCoreML(Map.of("ModelFormat", "MLProgram")))
+        .build()) {
+    detector.detect(Path.of("street.jpg"));
+}
+```
+
+Other CoreML provider options, such as `MLComputeUnits` (`CPUAndGPU`, `CPUAndNeuralEngine`, `ALL`), go in the same
+map; see the [ONNX Runtime CoreML documentation](https://onnxruntime.ai/docs/execution-providers/CoreML-ExecutionProvider.html).
+
+Not every model speeds up, and not every model converts. Measured with inference4j on Apple silicon (ONNX Runtime
+1.28, warm runs, per image):
+
+| Model | CPU | `addCoreML()` (NeuralNetwork) | MLProgram |
+|-------|-----|-------------------------------|-----------|
+| CRAFT (`CraftTextDetector`) | 587 ms | **214 ms**, same regions | fails to load |
+| YOLO26n (`Yolo26Detector`) | 26 ms | 15 ms, **different detections** | 25 ms, same as CPU |
+| D-FINE small (`RtDetrDetector`) | 57 ms | 112 ms, scores within 0.01 | 102 ms, same as CPU |
+| RT-DETRv2 (`RtDetrDetector.rtDetrV2()`) | 106 ms | 122 ms, some labels differ | 98 ms, same as CPU |
+| D-FINE nano (`RtDetrDetector.dfineNano()`) | 32 ms | fails when run | fails to load |
+| PP-OCRv6 small (`OcrPipeline`) | ~400 ms | ~860 ms | not measured |
+
+Small, CPU-optimized models (YOLO26n, D-FINE, PP-OCRv6) gain little or nothing from CoreML: ONNX Runtime splits them
+into many CoreML and CPU pieces, and copying data between them costs more than the GPU saves. Large convolutional
+networks such as CRAFT gain the most. Measure your model on your hardware, and compare its output with the CPU's,
+before switching.
+
 ## CUDA (Linux/Windows)
 
 For NVIDIA GPU acceleration, swap the ONNX Runtime dependency:
