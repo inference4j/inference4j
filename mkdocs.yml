@@ -55,6 +55,7 @@ nav:
   - Use Cases:
     - Sentiment Analysis: use-cases/sentiment-analysis.md
     - Prompt-Injection Detection: use-cases/guardrails.md
+    - Zero-Shot Text Classification: use-cases/zero-shot-text-classification.md
     - Named Entity Recognition: use-cases/named-entity-recognition.md
     - Semantic Search: use-cases/semantic-search.md
     - Image Classification: use-cases/image-classification.md

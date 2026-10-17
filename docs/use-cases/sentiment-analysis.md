@@ -120,7 +120,7 @@ should decide.
 | Field | Type | Description |
 |-------|------|-------------|
 | `label()` | `String` | Classification label (e.g., `POSITIVE`) |
-| `classIndex()` | `int` | Numeric class index |
+| `index()` | `int` | Numeric class index |
 | `confidence()` | `float` | Confidence score (0.0 to 1.0) |
 
 ## Using custom models

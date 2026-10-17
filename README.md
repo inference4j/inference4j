@@ -255,7 +255,7 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 
 | Capability | Models | API |
 |---|---|---|
-| Zero-Shot Classification | CLIP | `ZeroShotClassifier` |
+| Zero-Shot Classification | CLIP (images), DeBERTa-v3 NLI (text) | `ZeroShotClassifier`, `ZeroShotTextClassifier` |
 | Image Embeddings | CLIP | `ImageEmbedder` |
 | Text Embeddings | CLIP | `TextEmbedder` |
 
