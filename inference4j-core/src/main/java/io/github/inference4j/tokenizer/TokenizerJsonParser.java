@@ -215,6 +215,66 @@ public final class TokenizerJsonParser {
         }
     }
 
+    /**
+     * Reads which special tokens the {@code post_processor} of a {@code tokenizer.json} places around one text and
+     * around a pair of texts. Supports {@code TemplateProcessing}, {@code BertProcessing} and
+     * {@code RobertaProcessing}.
+     *
+     * @throws ModelSourceException if the file cannot be read or has another post-processor
+     */
+    public static SpecialTokens parseSpecialTokens(Path tokenizerJson) {
+        JsonNode post;
+        try {
+            post = new ObjectMapper().readTree(tokenizerJson.toFile()).path("post_processor");
+        } catch (IOException e) {
+            throw new ModelSourceException("Failed to parse tokenizer.json: " + e.getMessage(), e);
+        }
+        String type = post.path("type").asText();
+        switch (type) {
+            case "TemplateProcessing": {
+                long[][] single = templateParts(post, post.path("single"));
+                long[][] pair = templateParts(post, post.path("pair"));
+                return new SpecialTokens(single[0], single[1], pair[0], pair[1], pair[2]);
+            }
+            case "BertProcessing": {
+                long cls = post.path("cls").get(1).asLong();
+                long sep = post.path("sep").get(1).asLong();
+                return new SpecialTokens(new long[]{cls}, new long[]{sep}, new long[]{cls}, new long[]{sep},
+                        new long[]{sep});
+            }
+            case "RobertaProcessing": {
+                long cls = post.path("cls").get(1).asLong();
+                long sep = post.path("sep").get(1).asLong();
+                return new SpecialTokens(new long[]{cls}, new long[]{sep}, new long[]{cls}, new long[]{sep, sep},
+                        new long[]{sep});
+            }
+            default:
+                throw new ModelSourceException("Unsupported tokenizer.json post_processor '" + type
+                        + "': cannot tell which special tokens surround the input");
+        }
+    }
+
+    /** The special token ids before, between and after the sequences of a template. */
+    private static long[][] templateParts(JsonNode post, JsonNode template) {
+        List<List<Long>> parts = new ArrayList<>();
+        parts.add(new ArrayList<>());
+        for (JsonNode piece : template) {
+            if (piece.has("Sequence")) {
+                parts.add(new ArrayList<>());
+            } else if (piece.has("SpecialToken")) {
+                String name = piece.get("SpecialToken").path("id").asText();
+                for (JsonNode id : post.path("special_tokens").path(name).path("ids")) {
+                    parts.get(parts.size() - 1).add(id.asLong());
+                }
+            }
+        }
+        long[][] out = new long[parts.size()][];
+        for (int i = 0; i < parts.size(); i++) {
+            out[i] = parts.get(i).stream().mapToLong(Long::longValue).toArray();
+        }
+        return out;
+    }
+
     public static UnigramTokenizer.Builder parseUnigram(Path tokenizerJson) {
         try {
             ObjectMapper mapper = new ObjectMapper();

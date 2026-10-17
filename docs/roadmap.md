@@ -188,7 +188,9 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
       default; Llama Prompt Guard 2 through a user-supplied source, since it is gated). `UnigramTokenizer` now applies
       the `tokenizer.json` normalizer (SentencePiece `Precompiled`, `Strip`, `Replace`), matching HuggingFace token for
       token on DeBERTa-v3 and T5 ([#102](https://github.com/inference4j/inference4j/issues/102))
-- [ ] **Zero-shot text classification** — NLI-based, labels chosen at call time ([#103](https://github.com/inference4j/inference4j/issues/103))
+- [x] **Zero-shot text classification** — `DebertaZeroShotClassifier`: NLI-based, labels chosen at call time, single- or
+      multi-label; DeBERTa-v3 zero-shot v2.0 "-c" models (MIT, commercially-friendly training data), matching the
+      HuggingFace pipeline ([#103](https://github.com/inference4j/inference4j/issues/103))
 - [ ] **Modern embeddings** — nomic-embed-text-v1.5 (8K context), Qwen3-Embedding-0.6B, and Matryoshka
       `.dimensions(int)` ([#104](https://github.com/inference4j/inference4j/issues/104))
 - [ ] **Modern reranker** — bge-reranker-v2-m3, multilingual and long-context ([#105](https://github.com/inference4j/inference4j/issues/105))

@@ -16,8 +16,6 @@
 
 package io.github.inference4j.nlp;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelLoadException;
@@ -29,10 +27,10 @@ import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.WindowAggregation;
 import io.github.inference4j.session.SessionConfigurer;
+import io.github.inference4j.tokenizer.SpecialTokens;
 import io.github.inference4j.tokenizer.Tokenizer;
 import io.github.inference4j.tokenizer.TokenizerJsonParser;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -286,42 +284,10 @@ public class DebertaPromptInjectionDetector implements PromptInjectionDetector, 
                     + "; set injectionLabel() to the model's label for malicious input");
         }
 
-        /**
-         * The token ids placed before and after the text, from the {@code post_processor} of
-         * {@code tokenizer.json}: {@code [CLS]} and {@code [SEP]} for DeBERTa.
-         */
+        /** The token ids placed before and after the text: {@code [CLS]} and {@code [SEP]} for DeBERTa. */
         private static long[][] specialTokenIds(Path tokenizerJson) {
-            try {
-                JsonNode post = new ObjectMapper().readTree(tokenizerJson.toFile()).path("post_processor");
-                String type = post.path("type").asText();
-                if ("TemplateProcessing".equals(type)) {
-                    List<Long> prefix = new ArrayList<>();
-                    List<Long> suffix = new ArrayList<>();
-                    boolean afterSequence = false;
-                    for (JsonNode piece : post.path("single")) {
-                        if (piece.has("Sequence")) {
-                            afterSequence = true;
-                        } else if (piece.has("SpecialToken")) {
-                            String name = piece.get("SpecialToken").path("id").asText();
-                            for (JsonNode tokenId : post.path("special_tokens").path(name).path("ids")) {
-                                (afterSequence ? suffix : prefix).add(tokenId.asLong());
-                            }
-                        }
-                    }
-                    return new long[][]{toArray(prefix), toArray(suffix)};
-                }
-                if ("BertProcessing".equals(type) || "RobertaProcessing".equals(type)) {
-                    return new long[][]{{post.path("cls").get(1).asLong()}, {post.path("sep").get(1).asLong()}};
-                }
-                throw new ModelLoadException("Unsupported tokenizer.json post_processor '" + type
-                        + "': cannot tell which special tokens wrap the input");
-            } catch (IOException e) {
-                throw new ModelSourceException("Failed to read tokenizer.json: " + e.getMessage(), e);
-            }
-        }
-
-        private static long[] toArray(List<Long> values) {
-            return values.stream().mapToLong(Long::longValue).toArray();
+            SpecialTokens special = TokenizerJsonParser.parseSpecialTokens(tokenizerJson);
+            return new long[][]{special.singlePrefix(), special.singleSuffix()};
         }
     }
 }
