@@ -217,8 +217,9 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
 - [x] **CRAFT detects with its default thresholds** — post-processing now follows the reference implementation
       (max text score, separate link threshold, dilation, rotated boxes), matching it region for region
       ([#130](https://github.com/inference4j/inference4j/issues/130))
-- [ ] **Apache-licensed detector** — RT-DETR / D-FINE, NMS-free, an alternative to the AGPL-3.0 Ultralytics
-      models ([#107](https://github.com/inference4j/inference4j/issues/107))
+- [x] **Apache-licensed detector** — `RtDetrDetector`: D-FINE small (default) and nano, RT-DETRv2 ResNet-18; NMS-free,
+      an alternative to the AGPL-3.0 Ultralytics models, matching `transformers` detection for detection
+      ([#107](https://github.com/inference4j/inference4j/issues/107))
 - [ ] **Promptable segmentation** — SAM 2.1 tiny, with a `SegmentationMask` result type shared with
       semantic segmentation ([#108](https://github.com/inference4j/inference4j/issues/108))
 
