@@ -17,7 +17,7 @@
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
 | `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `RtDetrDetector`, `CraftTextDetector`, `PaddleTextDetector`, `PaddleTextRecognizer`, `TextRecognizer`, `OcrPipeline`, `DbPostProcessor`, `QuadCrop`, `TextLine`, `RecognizedText`, `Point`, `DepthAnythingEstimator`, `ImageEmbedder`, `ImageAnnotator`, `TensorImages`, `Colormap` |
 | `io.github.inference4j.audio` | `MoonshineRecognizer`, `TranscriptionStream`, `TranscriptListener`, `TranscriptLine`, `Wav2Vec2Recognizer`, `PunctuatedSpeechRecognizer`, `SegmentedSpeechRecognizer`, `SileroVadDetector` |
-| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `DebertaZeroShotClassifier`, `ZeroShotTextClassifier`, `DebertaPromptInjectionDetector`, `PromptInjectionDetector`, `InjectionCheck`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
+| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `DebertaZeroShotClassifier`, `ZeroShotTextClassifier`, `DebertaPromptInjectionDetector`, `PromptInjectionDetector`, `InjectionCheck`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `GlinerEntityRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `ZeroShotEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
 | `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `EncoderDecoderSession`, `ChatTemplate`, `GenerativeModel` |
 | `io.github.inference4j.sampling` | `LogitsProcessor`, `LogitsSampler`, `CategoricalSampler`, `GreedySampler` |
@@ -60,7 +60,8 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 │   ├── TextDetector                    // detect(BufferedImage/Path) → List<TextRegion>
 │   │                                   //   CraftTextDetector (words), PaddleTextDetector (lines)
 │   └── VoiceActivityDetector           // detect(Path/float[]) → List<VoiceSegment>
-├── NamedEntityRecognizer                // recognize(String) → List<NamedEntity>
+├── NamedEntityRecognizer               // recognize(String) → List<NamedEntity>
+│                                       //   BertNerRecognizer; GlinerEntityRecognizer (default labels)
 ├── TextRecognizer                      // recognize(BufferedImage) → RecognizedText  (one line image)
 ├── OcrPipeline                         // read(BufferedImage/Path) → List<TextLine>  (class: detect + crop + recognize)
 ├── DepthEstimator                      // estimate(BufferedImage/Path) → DepthMap
@@ -81,6 +82,8 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 └── SqlGenerator                        // generateSql(String, String) → String
 
 PromptInjectionDetector                 // check(String) → InjectionCheck, extends AutoCloseable
+ZeroShotEntityRecognizer                // recognize(String, List<String>) → List<NamedEntity>, extends AutoCloseable
+                                        //   GlinerEntityRecognizer
 ```
 
 ## AbstractInferenceTask
@@ -120,7 +123,7 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | `Classification` | `label()`, `index()`, `confidence()` | `ResNetClassifier`, `EfficientNetClassifier`, `ClipClassifier` |
 | `TextClassification` | `label()`, `index()`, `confidence()` | `DistilBertTextClassifier`, `DebertaPromptInjectionDetector`, `DebertaZeroShotClassifier` |
 | `InjectionCheck` | `probability()`, `threshold()`, `isInjection()` | `DebertaPromptInjectionDetector` |
-| `NamedEntity` | `text()`, `label()`, `start()`, `end()`, `score()` | `BertNerRecognizer` |
+| `NamedEntity` | `text()`, `label()`, `start()`, `end()`, `score()` | `BertNerRecognizer`, `GlinerEntityRecognizer` |
 | `Detection` | `label()`, `classIndex()`, `confidence()`, `box()` | `YoloV8Detector`, `Yolo26Detector`, `RtDetrDetector` |
 | `TextRegion` | `box()`, `polygon()`, `confidence()` | `CraftTextDetector`, `PaddleTextDetector` |
 | `TextLine` | `text()`, `confidence()`, `region()` | `OcrPipeline` |

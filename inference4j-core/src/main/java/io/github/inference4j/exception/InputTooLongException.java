@@ -16,7 +16,7 @@
 package io.github.inference4j.exception;
 
 /**
- * Thrown when input exceeds a task's token limit and the task is configured with
+ * Thrown when input exceeds a task's token (or word) limit and the task is configured with
  * {@link io.github.inference4j.processing.TruncationPolicy#FAIL}.
  */
 public class InputTooLongException extends InferenceException {
@@ -25,17 +25,26 @@ public class InputTooLongException extends InferenceException {
     private final int maxTokens;
 
     public InputTooLongException(String task, int tokenCount, int maxTokens) {
-        super(task + ": input of " + tokenCount + " tokens exceeds the limit of " + maxTokens + " tokens");
-        this.tokenCount = tokenCount;
-        this.maxTokens = maxTokens;
+        this(task, tokenCount, maxTokens, "tokens");
     }
 
-    /** Number of tokens the input produced, including special tokens. */
+    /**
+     * For limits counted in another unit, such as words.
+     *
+     * @param unit the unit of {@code count} and {@code limit}, plural (e.g. {@code "words"})
+     */
+    public InputTooLongException(String task, int count, int limit, String unit) {
+        super(task + ": input of " + count + " " + unit + " exceeds the limit of " + limit + " " + unit);
+        this.tokenCount = count;
+        this.maxTokens = limit;
+    }
+
+    /** Length of the input: tokens including special tokens, unless the message names another unit such as words. */
     public int tokenCount() {
         return tokenCount;
     }
 
-    /** The task's token limit, including special tokens. */
+    /** The task's limit, in the same unit as {@link #tokenCount()}. */
     public int maxTokens() {
         return maxTokens;
     }

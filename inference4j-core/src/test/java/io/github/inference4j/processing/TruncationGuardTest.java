@@ -80,4 +80,25 @@ class TruncationGuardTest {
         assertThat(padded.truncated()).isFalse();
         assertThatCode(() -> guard.check(padded, 77)).doesNotThrowAnyException();
     }
+
+    @Test
+    void wordCountOverTheLimitFailsWithTheUnitInTheMessage() {
+        TruncationGuard guard = new TruncationGuard("MyTask", TruncationPolicy.FAIL);
+
+        assertThatThrownBy(() -> guard.check(400, 384, "words"))
+                .isInstanceOfSatisfying(InputTooLongException.class, e -> {
+                    assertThat(e.tokenCount()).isEqualTo(400);
+                    assertThat(e.maxTokens()).isEqualTo(384);
+                    assertThat(e.getMessage()).isEqualTo("MyTask: input of 400 words exceeds the limit of 384 words");
+                });
+    }
+
+    @Test
+    void wordCountReportsWhetherInputWillBeCut() {
+        TruncationGuard guard = new TruncationGuard("MyTask", TruncationPolicy.TRUNCATE);
+
+        assertThat(guard.check(400, 384, "words")).isTrue();
+        assertThat(guard.check(384, 384, "words")).isFalse();
+        assertThat(new TruncationGuard("MyTask", TruncationPolicy.FAIL).check(384, 384, "words")).isFalse();
+    }
 }

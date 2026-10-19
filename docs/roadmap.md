@@ -183,7 +183,8 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
 
 ### Zero-shot NLP, guardrails and RAG
 
-- [ ] **Zero-shot NER** — GLiNER: extract entity types given at call time, plus a PII-tuned model ([#101](https://github.com/inference4j/inference4j/issues/101))
+- [x] **Zero-shot NER** — `GlinerEntityRecognizer`: entity types given at call time, GLiNER small v2.1 and a PII-tuned
+      model (both Apache-2.0), matching the `gliner` Python package; `ZeroShotEntityRecognizer` interface ([#101](https://github.com/inference4j/inference4j/issues/101))
 - [x] **Prompt-injection detector** — `DebertaPromptInjectionDetector`, a DeBERTa-v3 guardrail classifier (Apache-2.0
       default; Llama Prompt Guard 2 through a user-supplied source, since it is gated). `UnigramTokenizer` now applies
       the `tokenizer.json` normalizer (SentencePiece `Precompiled`, `Strip`, `Replace`), matching HuggingFace token for

@@ -76,6 +76,32 @@ public final class TruncationGuard {
         }
     }
 
+    /**
+     * Checks an input measured in units other than tokens, such as words, against the policy.
+     *
+     * @param length the input's length
+     * @param limit  the most the task accepts; longer input is cut to it
+     * @param unit   the unit, plural (e.g. {@code "words"})
+     * @return whether the input is over the limit (and, with {@code TRUNCATE}, will be cut)
+     * @throws InputTooLongException if the input is over the limit and the policy is {@code FAIL}
+     */
+    public boolean check(int length, int limit, String unit) {
+        if (length <= limit) {
+            return false;
+        }
+        if (policy == TruncationPolicy.FAIL) {
+            throw new InputTooLongException(task, length, limit, unit);
+        }
+        String message = "{}: input of {} " + unit + " truncated to {}; the remaining text was ignored. "
+                + "Use truncation(TruncationPolicy.FAIL) to reject long input instead.";
+        if (warned.compareAndSet(false, true)) {
+            logger.warn(message, task, length, limit);
+        } else {
+            logger.debug(message, task, length, limit);
+        }
+        return true;
+    }
+
     public TruncationPolicy policy() {
         return policy;
     }

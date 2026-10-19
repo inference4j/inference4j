@@ -12,6 +12,8 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Zero-Shot Text Classification | `DebertaZeroShotClassifier.large()` | `inference4j/deberta-v3-large-zeroshot-v2.0-c` | ~1.7 GB | `ZeroShotTextClassifier` |
 | Named Entity Recognition | `BertNerRecognizer` | `inference4j/distilbert-NER` | ~260 MB | `NamedEntityRecognizer` |
 | Named Entity Recognition | `BertNerRecognizer` | `inference4j/bert-base-NER` | ~431 MB | `NamedEntityRecognizer` |
+| Zero-Shot NER | `GlinerEntityRecognizer.small()` | `inference4j/gliner-small-v2.1` | ~610 MB | `ZeroShotEntityRecognizer`, `NamedEntityRecognizer` |
+| Zero-Shot NER (PII) | `GlinerEntityRecognizer.pii()` | `inference4j/gliner-pii-base-v1.0` | ~665 MB | `ZeroShotEntityRecognizer`, `NamedEntityRecognizer` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/all-MiniLM-L6-v2` | ~90 MB | `TextEmbedder` |
 | Punctuation & Casing | `PunctCapSegModel` | `inference4j/punctuation-fullstop-truecase-english` | ~210 MB | `InferenceTask<String, List<String>>` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/all-mpnet-base-v2` | ~430 MB | `TextEmbedder` |
