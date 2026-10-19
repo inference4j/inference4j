@@ -240,6 +240,8 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 | Classification | DistilBERT, BERT | `TextClassifier` |
 | Embeddings | all-MiniLM, all-mpnet | `TextEmbedder` |
 | Reranking | ms-marco-MiniLM | `SearchReranker` |
+| Named Entity Recognition | distilbert-NER, bert-base-NER | `NamedEntityRecognizer` |
+| Zero-Shot NER, PII | GLiNER small, GLiNER PII | `ZeroShotEntityRecognizer` |
 | Text Generation | GPT-2, SmolLM2, Qwen2.5 | `TextGenerator` |
 
 ### Vision

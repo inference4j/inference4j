@@ -23,7 +23,8 @@ package io.github.inference4j.nlp;
  * @param label the entity type (e.g., "LOC", "PER", "ORG", "MISC")
  * @param start character offset start in the original string
  * @param end   character offset end in the original string (exclusive)
- * @param score mean confidence of the constituent tokens
+ * @param score the recognizer's confidence (0-1): for BERT NER the mean score of the entity's tokens, for GLiNER the
+ *              probability of the whole span
  */
 public record NamedEntity(
         String text,

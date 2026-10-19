@@ -57,6 +57,7 @@ nav:
     - Prompt-Injection Detection: use-cases/guardrails.md
     - Zero-Shot Text Classification: use-cases/zero-shot-text-classification.md
     - Named Entity Recognition: use-cases/named-entity-recognition.md
+    - Zero-Shot Named Entity Recognition: use-cases/zero-shot-ner.md
     - Semantic Search: use-cases/semantic-search.md
     - Image Classification: use-cases/image-classification.md
     - Object Detection: use-cases/object-detection.md

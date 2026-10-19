@@ -2,6 +2,9 @@
 
 Extract named entities (persons, organizations, locations, miscellaneous) from text using a fine-tuned BERT model.
 
+For other entity types, such as emails, invoice numbers or medications, see
+[Zero-Shot Named Entity Recognition](zero-shot-ner.md).
+
 ## Quick example
 
 ```java

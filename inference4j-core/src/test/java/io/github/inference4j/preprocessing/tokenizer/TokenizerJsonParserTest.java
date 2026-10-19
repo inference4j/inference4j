@@ -21,8 +21,12 @@ import io.github.inference4j.tokenizer.SentencePieceBpeTokenizer;
 import io.github.inference4j.tokenizer.TokenizerJsonParser;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -91,5 +95,19 @@ class TokenizerJsonParserTest {
         }
         String decoded = tokenizer.decode(ids);
         assertThat(decoded).isEqualTo(input);
+    }
+
+    @Test
+    void parseAddedTokensReadsSpecialAndNonSpecialTokensByContent(@TempDir Path dir) throws IOException {
+        Path json = Files.writeString(dir.resolve("tokenizer.json"), """
+                {"added_tokens": [
+                  {"id": 0, "content": "[PAD]", "special": true},
+                  {"id": 128002, "content": "<<ENT>>", "special": false},
+                  {"id": 128003, "content": "<<SEP>>", "special": false}
+                ]}
+                """);
+
+        assertThat(TokenizerJsonParser.parseAddedTokens(json))
+                .containsExactly(Map.entry("[PAD]", 0), Map.entry("<<ENT>>", 128002), Map.entry("<<SEP>>", 128003));
     }
 }

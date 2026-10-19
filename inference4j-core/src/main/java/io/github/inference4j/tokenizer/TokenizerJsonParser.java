@@ -216,6 +216,25 @@ public final class TokenizerJsonParser {
     }
 
     /**
+     * Reads the {@code added_tokens} of a {@code tokenizer.json}, special or not, by content: for example the
+     * prompt markers a model was fine-tuned with, such as GLiNER's {@code <<ENT>>}.
+     *
+     * @throws ModelSourceException if the file cannot be read
+     */
+    public static Map<String, Integer> parseAddedTokens(Path tokenizerJson) {
+        try {
+            JsonNode added = new ObjectMapper().readTree(tokenizerJson.toFile()).path("added_tokens");
+            Map<String, Integer> tokens = new LinkedHashMap<>();
+            for (JsonNode token : added) {
+                tokens.put(token.path("content").asText(), token.path("id").asInt());
+            }
+            return tokens;
+        } catch (IOException e) {
+            throw new ModelSourceException("Failed to parse tokenizer.json: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Reads which special tokens the {@code post_processor} of a {@code tokenizer.json} places around one text and
      * around a pair of texts. Supports {@code TemplateProcessing}, {@code BertProcessing} and
      * {@code RobertaProcessing}.
