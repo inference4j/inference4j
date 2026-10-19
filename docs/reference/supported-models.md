@@ -16,6 +16,7 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Zero-Shot NER (PII) | `GlinerEntityRecognizer.pii()` | `inference4j/gliner-pii-base-v1.0` | ~665 MB | `ZeroShotEntityRecognizer`, `NamedEntityRecognizer` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/all-MiniLM-L6-v2` | ~90 MB | `TextEmbedder` |
 | Punctuation & Casing | `PunctCapSegModel` | `inference4j/punctuation-fullstop-truecase-english` | ~210 MB | `InferenceTask<String, List<String>>` |
+| Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/all-MiniLM-L12-v2` | ~130 MB | `TextEmbedder` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/all-mpnet-base-v2` | ~430 MB | `TextEmbedder` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/bge-base-en-v1.5` | ~430 MB | `TextEmbedder` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/gte-base` | ~430 MB | `TextEmbedder` |
@@ -33,7 +34,7 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Text-to-SQL | `T5SqlGenerator.t5LargeSpider()` | `inference4j/T5-LM-Large-text2sql-spider` | ~4.6 GB | `TextGenerator`, `SqlGenerator` |
 | Summarization | `BartSummarizer.distilBartCnn()` | `inference4j/distilbart-cnn-12-6` | ~1.2 GB | `TextGenerator`, `Summarizer` |
 | Summarization | `BartSummarizer.bartLargeCnn()` | `inference4j/bart-large-cnn` | ~1.6 GB | `TextGenerator`, `Summarizer` |
-| Translation | `MarianTranslator.builder()` | User-specified (`inference4j/opus-mt-*`) | varies | `TextGenerator`, `Translator` |
+| Translation | `MarianTranslator.builder()` | Required `.modelId(...)`: `inference4j/opus-mt-en-fr`, `opus-mt-en-de` or `opus-mt-en-es` | ~650 MB each | `TextGenerator`, `Translator` |
 | Grammar Correction | `CoeditGrammarCorrector.coeditBase()` | `inference4j/coedit-base` | ~900 MB | `TextGenerator`, `GrammarCorrector` |
 | Grammar Correction | `CoeditGrammarCorrector.coeditLarge()` | `inference4j/coedit-large` | ~3 GB | `TextGenerator`, `GrammarCorrector` |
 
@@ -68,7 +69,9 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 
 | Capability | Wrapper | Default Model ID | Size | API |
 |------------|---------|-------------------|------|-----|
-| Speech-to-Text | `MoonshineRecognizer` | `inference4j/moonshine-streaming-small-en` | ~140 MB | `SpeechRecognizer` |
+| Speech-to-Text | `MoonshineRecognizer` | `inference4j/moonshine-streaming-small-en` (default) | ~140 MB | `SpeechRecognizer` |
+| Speech-to-Text | `MoonshineRecognizer` | `inference4j/moonshine-streaming-tiny-en` | ~46 MB | `SpeechRecognizer` |
+| Speech-to-Text | `MoonshineRecognizer` | `inference4j/moonshine-streaming-medium-en` | ~260 MB | `SpeechRecognizer` |
 | Speech-to-Text | `Wav2Vec2Recognizer` | `inference4j/wav2vec2-base-960h` | ~370 MB | `SpeechRecognizer` |
 | Voice Activity Detection | `SileroVadDetector` | `inference4j/silero-vad` | ~2 MB | `VoiceActivityDetector` |
 
@@ -99,11 +102,15 @@ A comprehensive view of all supported models, organized by architecture:
 | DistilBERT NER | WordPiece (cased) | `BertNerRecognizer` | Named entity recognition |
 | BERT Base NER | WordPiece (cased) | `BertNerRecognizer` | Named entity recognition |
 | all-MiniLM-L6-v2 | WordPiece | `SentenceTransformerEmbedder` | Semantic search, embeddings |
+| all-MiniLM-L12-v2 | WordPiece | `SentenceTransformerEmbedder` | Semantic search, embeddings |
 | all-mpnet-base-v2 | WordPiece | `SentenceTransformerEmbedder` | Semantic search, embeddings |
 | BGE Base EN v1.5 | WordPiece | `SentenceTransformerEmbedder` | Semantic search, embeddings |
 | GTE Base | WordPiece | `SentenceTransformerEmbedder` | Semantic search, embeddings |
 | MiniLM-L-6 MS MARCO | WordPiece | `MiniLMSearchReranker` | Search reranking |
 | Punct-Cap-Seg English | SentencePiece Unigram | `PunctCapSegModel` | Punctuation, true-casing, sentence segmentation |
+| DeBERTa-v3 Base prompt-injection v2 | SentencePiece Unigram (`tokenizer.json`) | `DebertaPromptInjectionDetector` | Prompt-injection detection |
+| DeBERTa-v3 zero-shot v2.0-c (Base / Large) | SentencePiece Unigram (`tokenizer.json`) | `DebertaZeroShotClassifier` | Zero-shot text classification (NLI) |
+| GLiNER small v2.1, GLiNER PII base v1.0 | SentencePiece Unigram (`tokenizer.json`) | `GlinerEntityRecognizer` | Zero-shot NER, PII detection |
 
 ### Decoder-only (autoregressive)
 
@@ -135,6 +142,8 @@ A comprehensive view of all supported models, organized by architecture:
 | EfficientNet-Lite4 | N/A | `EfficientNetClassifier` | Image classification |
 | YOLOv8n | N/A | `YoloV8Detector` | Object detection |
 | YOLO26n | N/A | `Yolo26Detector` | Object detection |
+| D-FINE (nano / small, COCO) | N/A | `RtDetrDetector` | Object detection (Apache-2.0) |
+| RT-DETRv2 ResNet-18 | N/A | `RtDetrDetector` | Object detection (Apache-2.0) |
 | CRAFT | N/A | `CraftTextDetector` | Text detection in images |
 | PP-OCRv6 (small / tiny) detection | N/A | `PaddleTextDetector` | Text line detection |
 | PP-OCRv6 (small / tiny) recognition | Character dictionary (`inference.yml`) | `PaddleTextRecognizer` | Text recognition (OCR) |

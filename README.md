@@ -24,6 +24,27 @@ try (var classifier = DistilBertTextClassifier.builder().build()) {
 }
 ```
 
+### Zero-Shot Text Classification
+
+```java
+try (var classifier = DebertaZeroShotClassifier.builder().build()) {
+    List<TextClassification> result = classifier.classify(
+        "My invoice shows the same charge twice.",
+        List.of("billing", "outage", "feature request", "account access"));
+    // billing 0.97, account access 0.02, ...
+}
+```
+
+### Zero-Shot NER & PII Detection
+
+```java
+try (var ner = GlinerEntityRecognizer.builder().build()) {
+    List<NamedEntity> entities = ner.recognize(
+        "Alice Johnson paid invoice INV-2024-0042 to Acme Corp on 3 March.",
+        List.of("person", "organization", "invoice id", "date"));
+}
+```
+
 ### Text Embeddings & Semantic Search
 
 ```java
@@ -51,10 +72,28 @@ try (var detector = YoloV8Detector.builder().build()) {
 }
 ```
 
+### OCR
+
+```java
+try (var ocr = OcrPipeline.builder().build()) {
+    for (TextLine line : ocr.read(Path.of("receipt.jpg"))) {
+        System.out.println(line.text());
+    }
+}
+```
+
+### Depth Estimation
+
+```java
+try (var estimator = DepthAnythingEstimator.builder().build()) {
+    DepthMap depth = estimator.estimate(Path.of("room.jpg"));
+}
+```
+
 ### Speech-to-Text
 
 ```java
-try (var recognizer = Wav2Vec2Recognizer.builder().build()) {
+try (var recognizer = MoonshineRecognizer.builder().build()) {
     System.out.println(recognizer.transcribe(Path.of("audio.wav")).text());
 }
 ```
@@ -238,11 +277,18 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 | Capability | Models | API |
 |---|---|---|
 | Classification | DistilBERT, BERT | `TextClassifier` |
-| Embeddings | all-MiniLM, all-mpnet | `TextEmbedder` |
+| Zero-Shot Classification | DeBERTa-v3 NLI (base, large) | `ZeroShotTextClassifier` |
+| Prompt-Injection Detection | DeBERTa-v3 prompt-injection v2 | `PromptInjectionDetector` |
+| Embeddings | all-MiniLM (L6, L12), all-mpnet, BGE, GTE | `TextEmbedder` |
 | Reranking | ms-marco-MiniLM | `SearchReranker` |
 | Named Entity Recognition | distilbert-NER, bert-base-NER | `NamedEntityRecognizer` |
 | Zero-Shot NER, PII | GLiNER small, GLiNER PII | `ZeroShotEntityRecognizer` |
-| Text Generation | GPT-2, SmolLM2, Qwen2.5 | `TextGenerator` |
+| Punctuation & Casing | Punct-Cap-Seg English | `PunctCapSegModel` |
+| Summarization | BART, DistilBART, Flan-T5 | `Summarizer` |
+| Translation | MarianMT (opus-mt), Flan-T5 | `Translator` |
+| Grammar Correction | CoEdIT | `GrammarCorrector` |
+| Text-to-SQL | T5 (small, large) | `SqlGenerator` |
+| Text Generation | GPT-2, SmolLM2, Qwen2.5, TinyLlama, Gemma 2 | `TextGenerator` |
 
 ### Vision
 
@@ -252,12 +298,13 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 | Object Detection | YOLOv8, YOLO11, YOLO26 (AGPL-3.0); D-FINE, RT-DETRv2 (Apache-2.0) | `ObjectDetector` |
 | Text Detection | CRAFT, PP-OCRv6 | `TextDetector` |
 | OCR | PP-OCRv6 detection + recognition | `OcrPipeline`, `TextRecognizer` |
+| Depth Estimation | Depth Anything V2 | `DepthEstimator` |
 
 ### Multimodal
 
 | Capability | Models | API |
 |---|---|---|
-| Zero-Shot Classification | CLIP (images), DeBERTa-v3 NLI (text) | `ZeroShotClassifier`, `ZeroShotTextClassifier` |
+| Zero-Shot Image Classification | CLIP | `ZeroShotClassifier` |
 | Image Embeddings | CLIP | `ImageEmbedder` |
 | Text Embeddings | CLIP | `TextEmbedder` |
 
@@ -265,16 +312,18 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 
 | Capability | Models | API |
 |---|---|---|
-| Recognition | Wav2Vec2 | `SpeechRecognizer` |
+| Speech-to-Text | Moonshine v2 (tiny, small, medium), Wav2Vec2 | `SpeechRecognizer` |
 | Voice Activity Detection | Silero VAD | `VoiceActivityDetector` |
 
 ### Generative AI (onnxruntime-genai)
 
 | Capability | Models | API |
 |---|---|---|
-| Text Generation | Phi-3, DeepSeek-R1 | `TextGenerator` |
+| Text Generation | Phi-3 Mini, Phi-4 Mini, DeepSeek-R1 Distill, Qwen3, SmolLM3 | `TextGenerator` |
 | Vision-Language | Phi-3.5 Vision | `VisionLanguageModel` |
-| Speech-to-Text | Whisper | `WhisperSpeechModel` |
+| Speech-to-Text | Whisper (tiny, small) | `WhisperSpeechModel` |
+
+See the [full model list](https://inference4j.github.io/inference4j/reference/supported-models/) for model IDs and sizes.
 
 > **Auto-download:** All supported models are hosted under the [`inference4j`](https://huggingface.co/inference4j) HuggingFace organization. Models are automatically downloaded and cached on first use — no manual setup required. Cache location defaults to `~/.cache/inference4j/` and can be customized via `INFERENCE4J_CACHE_DIR` or `-Dinference4j.cache.dir`.
 

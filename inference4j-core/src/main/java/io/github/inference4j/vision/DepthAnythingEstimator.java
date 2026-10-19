@@ -73,7 +73,8 @@ import io.github.inference4j.session.SessionConfigurer;
  * <h2>Custom configuration</h2>
  * <pre>{@code
  * try (var estimator = DepthAnythingEstimator.builder()
- *         .modelId("inference4j/depth-anything-v2-base")
+ *         .modelSource(new LocalModelSource(Path.of("/models")))
+ *         .modelId("depth-anything-v2-base")
  *         .targetSize(700)
  *         .sessionOptions(opts -> opts.addCoreML())
  *         .build()) {
