@@ -101,6 +101,14 @@ try (var estimator = DepthAnythingEstimator.builder().build()) {
 }
 ```
 
+### Image Segmentation
+
+```java
+try (var sam = Sam2Segmenter.builder().build()) {
+    SegmentationMask mask = sam.segment(Path.of("cat.jpg"), Prompt.point(160, 160));
+}
+```
+
 ### Speech-to-Text
 
 ```java

@@ -67,6 +67,7 @@ nav:
     - Text Detection: use-cases/text-detection.md
     - OCR: use-cases/ocr.md
     - Depth Estimation: use-cases/depth-estimation.md
+    - Image Segmentation: use-cases/image-segmentation.md
     - Visual Search: use-cases/visual-search.md
     - Summarization: use-cases/summarization.md
     - Translation: use-cases/translation.md
