@@ -223,8 +223,8 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
 - [x] **Apache-licensed detector** — `RtDetrDetector`: D-FINE small (default) and nano, RT-DETRv2 ResNet-18; NMS-free,
       an alternative to the AGPL-3.0 Ultralytics models, matching `transformers` detection for detection
       ([#107](https://github.com/inference4j/inference4j/issues/107))
-- [ ] **Promptable segmentation** — SAM 2.1 tiny, with a `SegmentationMask` result type shared with
-      semantic segmentation ([#108](https://github.com/inference4j/inference4j/issues/108))
+- [x] **Promptable segmentation** — `Sam2Segmenter` (SAM 2.1 tiny): click or box prompts, encode once and prompt
+      many times, with a `SegmentationMask` result type shared with semantic segmentation ([#108](https://github.com/inference4j/inference4j/issues/108))
 
 ### Generative AI via onnxruntime-genai
 
@@ -238,6 +238,7 @@ and plain HuggingFace exports.
 
 ## Unscheduled
 
+- [ ] **Video object tracking** — SAM 2.1 memory modules; experiment, needs a four-module export first ([#137](https://github.com/inference4j/inference4j/issues/137))
 - [ ] **Semantic segmentation** — SegFormer; reuses the `SegmentationMask` type from [#108](https://github.com/inference4j/inference4j/issues/108)
 - [ ] **Super-resolution** — Real-ESRGAN. Needs denormalization before `TensorImages.toRgb`
 - [ ] **Qwen3-Reranker** — decoder-token scoring needs a new `OutputOperator`; see [#105](https://github.com/inference4j/inference4j/issues/105) for the

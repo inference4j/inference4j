@@ -15,7 +15,7 @@
 | `io.github.inference4j.preprocessing.text` | `ModelConfig` (HuggingFace config.json parser) |
 | `io.github.inference4j.preprocessing.image` | Image transforms pipeline: `ImageTransformPipeline`, `ResizeTransform`, `CenterCropTransform`, `ImageLayout`, `Labels` |
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
-| `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `RtDetrDetector`, `CraftTextDetector`, `PaddleTextDetector`, `PaddleTextRecognizer`, `TextRecognizer`, `OcrPipeline`, `DbPostProcessor`, `QuadCrop`, `TextLine`, `RecognizedText`, `Point`, `DepthAnythingEstimator`, `ImageEmbedder`, `ImageAnnotator`, `TensorImages`, `Colormap` |
+| `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `RtDetrDetector`, `CraftTextDetector`, `PaddleTextDetector`, `PaddleTextRecognizer`, `TextRecognizer`, `OcrPipeline`, `DbPostProcessor`, `QuadCrop`, `TextLine`, `RecognizedText`, `Point`, `DepthAnythingEstimator`, `Sam2Segmenter`, `Prompt`, `ImageFeatures`, `ImageEmbedder`, `ImageAnnotator`, `TensorImages`, `Colormap` |
 | `io.github.inference4j.audio` | `MoonshineRecognizer`, `TranscriptionStream`, `TranscriptListener`, `TranscriptLine`, `Wav2Vec2Recognizer`, `PunctuatedSpeechRecognizer`, `SegmentedSpeechRecognizer`, `SileroVadDetector` |
 | `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `DebertaZeroShotClassifier`, `ZeroShotTextClassifier`, `DebertaPromptInjectionDetector`, `PromptInjectionDetector`, `InjectionCheck`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `GlinerEntityRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `ZeroShotEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
@@ -65,6 +65,8 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 ├── TextRecognizer                      // recognize(BufferedImage) → RecognizedText  (one line image)
 ├── OcrPipeline                         // read(BufferedImage/Path) → List<TextLine>  (class: detect + crop + recognize)
 ├── DepthEstimator                      // estimate(BufferedImage/Path) → DepthMap
+├── PromptableSegmenter                 // encode(BufferedImage/Path) → ImageFeatures
+│                                       //   segment(ImageFeatures, Prompt) → SegmentationMask; Sam2Segmenter
 ├── TextEmbedder                        // encode(String) → float[]
 ├── ImageEmbedder                       // encode(BufferedImage/Path) → float[]
 ├── SearchReranker                      // score(String, String) → float
@@ -131,6 +133,7 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | `Point` | `x()`, `y()` | Embedded in `TextRegion.polygon()` |
 | `BoundingBox` | `x1()`, `y1()`, `x2()`, `y2()` | Embedded in `Detection`, `TextRegion` |
 | `DepthMap` | `values()`, `width()`, `height()`, `at()`, `min()`, `max()`, `toImage()` | `DepthAnythingEstimator` |
+| `SegmentationMask` | `mask()`, `width()`, `height()`, `score()`, `contains()`, `area()`, `boundingBox()`, `applyTo()`, `overlay()`, `toImage()` | `Sam2Segmenter` |
 | `Transcription` | `text()`, `segments()` | `MoonshineRecognizer`, `Wav2Vec2Recognizer`, `WhisperSpeechModel` |
 | `TranscriptLine` | `id()`, `text()`, `start()`, `end()`, `completed()` | `TranscriptionStream` (via `TranscriptListener`) |
 | `VoiceSegment` | `start()`, `end()`, `duration()`, `confidence()` | `SileroVadDetector` |

@@ -56,6 +56,7 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Text Recognition | `PaddleTextRecognizer.tiny()` | `inference4j/pp-ocrv6-tiny-rec` | ~4.5 MB | `TextRecognizer` |
 | OCR | `OcrPipeline` | Paddle detector + recognizer (small by default) | ~31 MB | `InferenceTask<BufferedImage, List<TextLine>>` |
 | Depth Estimation | `DepthAnythingEstimator` | `inference4j/depth-anything-v2-small` | ~95 MB | `DepthEstimator` |
+| Promptable Segmentation | `Sam2Segmenter` | `inference4j/sam2.1-hiera-tiny` | ~155 MB | `PromptableSegmenter` |
 
 ## Multimodal
 
@@ -148,6 +149,7 @@ A comprehensive view of all supported models, organized by architecture:
 | PP-OCRv6 (small / tiny) detection | N/A | `PaddleTextDetector` | Text line detection |
 | PP-OCRv6 (small / tiny) recognition | Character dictionary (`inference.yml`) | `PaddleTextRecognizer` | Text recognition (OCR) |
 | Depth Anything V2 Small | N/A | `DepthAnythingEstimator` | Monocular depth estimation |
+| SAM 2.1 Hiera Tiny | N/A | `Sam2Segmenter` | Promptable segmentation (click or box → mask) |
 
 ### Multimodal
 

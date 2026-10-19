@@ -90,6 +90,14 @@ try (var estimator = DepthAnythingEstimator.builder().build()) {
 }
 ```
 
+### Image Segmentation
+
+```java
+try (var sam = Sam2Segmenter.builder().build()) {
+    SegmentationMask mask = sam.segment(Path.of("cat.jpg"), Prompt.point(160, 160));
+}
+```
+
 ### Speech-to-Text
 
 ```java
@@ -299,6 +307,7 @@ We believe the Java AI ecosystem is stronger when tools do one thing well. infer
 | Text Detection | CRAFT, PP-OCRv6 | `TextDetector` |
 | OCR | PP-OCRv6 detection + recognition | `OcrPipeline`, `TextRecognizer` |
 | Depth Estimation | Depth Anything V2 | `DepthEstimator` |
+| Promptable Segmentation | SAM 2.1 | `PromptableSegmenter` |
 
 ### Multimodal
 
