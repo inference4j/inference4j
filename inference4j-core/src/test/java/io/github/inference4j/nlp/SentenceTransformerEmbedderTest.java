@@ -418,4 +418,49 @@ class SentenceTransformerEmbedderTest {
         assertThat(average[0]).isCloseTo(0.75f, within(1e-6f));
         assertThat(average[1]).isCloseTo(0.25f, within(1e-6f));
     }
+
+    // --- Matryoshka dimensions ---
+
+    private static SentenceTransformerEmbedder.Builder meanPooledBuilder() {
+        InferenceSession session = mock(InferenceSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
+        // Mean over the three tokens is [5, 6, 7, 8]
+        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f};
+        when(session.run(any())).thenReturn(
+                Map.of("output", Tensor.fromFloats(output, new long[]{1, 3, 4})));
+        return SentenceTransformerEmbedder.builder().session(session).tokenizer(tokenizer);
+    }
+
+    @Test
+    void dimensionsKeepsTheLeadingValues() {
+        try (var model = meanPooledBuilder().dimensions(2).build()) {
+            assertThat(model.encode("hello")).containsExactly(5f, 6f);
+        }
+    }
+
+    @Test
+    void dimensionsRenormalizesAfterTruncation() {
+        try (var model = meanPooledBuilder().dimensions(2).normalize().build()) {
+            float norm = (float) Math.sqrt(61);
+            assertThat(model.encode("hello")).containsExactly(new float[]{5f / norm, 6f / norm}, within(1e-6f));
+        }
+    }
+
+    @Test
+    void dimensionsLargerThanTheEmbeddingFails() {
+        try (var model = meanPooledBuilder().dimensions(5).build()) {
+            assertThatThrownBy(() -> model.encode("hello"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("embedding size (4)");
+        }
+    }
+
+    @Test
+    void dimensionsMustBePositive() {
+        assertThatThrownBy(() -> SentenceTransformerEmbedder.builder().dimensions(0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }

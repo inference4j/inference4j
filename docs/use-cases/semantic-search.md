@@ -74,6 +74,7 @@ public class SemanticSearch {
 | `.maxLength(int)` | `int` | `512` | Maximum token sequence length |
 | `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Input longer than the token limit: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
 | `.stride(int)` | `int` | off | Embed input longer than `maxLength` in full: windows sharing this many tokens (`0` = consecutive chunks), averaged by the tokens each covers |
+| `.dimensions(int)` | `int` | off (full size) | Matryoshka truncation: keep the first N values, re-normalized when `.normalize()` is on. Only for models trained for it (nomic-embed-text-v1.5) |
 
 ## Reranker builder options
 
@@ -179,6 +180,7 @@ The embedder supports three pooling strategies for converting token-level repres
 | `inference4j/all-mpnet-base-v2` | 768 | MEAN | Optional | — | 57.78 |
 | `inference4j/bge-base-en-v1.5` | 768 | CLS | Recommended | — | 63.55 |
 | `inference4j/gte-base` | 768 | CLS | Recommended | — | 61.36 |
+| `inference4j/nomic-embed-text-v1.5` | 768 (Matryoshka: 512, 256, 128, 64) | MEAN | Recommended | `search_query: ` / `search_document: ` | 62.28 |
 
 ### BGE example
 
@@ -191,6 +193,39 @@ try (var embedder = SentenceTransformerEmbedder.builder()
     float[] embedding = embedder.encode("What is machine learning?");
 }
 ```
+
+### Nomic example (long context, prefixes, smaller vectors)
+
+nomic-embed-text-v1.5 reads up to 8,192 tokens, so raise `maxLength` for long documents. It needs a task prefix: `"search_query: "` for queries and `"search_document: "` for documents, so use one embedder per side.
+
+```java
+try (var queries = SentenceTransformerEmbedder.builder()
+             .modelId("inference4j/nomic-embed-text-v1.5")
+             .textPrefix("search_query: ")
+             .normalize()
+             .build();
+     var documents = SentenceTransformerEmbedder.builder()
+             .modelId("inference4j/nomic-embed-text-v1.5")
+             .textPrefix("search_document: ")
+             .maxLength(8192)
+             .normalize()
+             .build()) {
+    float[] query = queries.encode("What is the capital of France?");
+    float[] document = documents.encode("Paris is the capital and largest city of France.");
+}
+```
+
+The model was trained with Matryoshka representation learning, so `.dimensions(int)` can shorten its vectors with little loss. Smaller vectors cut index size and search time. Use the same `dimensions` for queries and documents.
+
+| Dimensions | MTEB Avg |
+|------------|----------|
+| 768 | 62.28 |
+| 512 | 61.96 |
+| 256 | 61.04 |
+| 128 | 59.34 |
+| 64 | 56.10 |
+
+Scores are from the [model card](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5). The card applies a layer norm before truncating. inference4j truncates and re-normalizes without it; the two match to a cosine similarity of 0.9999 or better on our reference set.
 
 ### E5 example (with text prefix)
 
@@ -212,4 +247,4 @@ try (var queryEncoder = SentenceTransformerEmbedder.builder()
 - **Batch encoding**: Use `encodeBatch()` when encoding multiple texts — more efficient than calling `encode()` in a loop.
 - **L2 normalization**: Enable `.normalize()` when comparing embeddings with cosine similarity. BGE, GTE, and E5 models all recommend normalization.
 - **Text prefix**: Some models (E5, Nomic) require a text prefix. Check the model card for the correct prefix.
-- Embedding dimension depends on the model: all-MiniLM-L6-v2 produces 384-dimensional vectors, while BGE/GTE/mpnet produce 768-dimensional vectors.
+- Embedding dimension depends on the model: all-MiniLM-L6-v2 produces 384-dimensional vectors, while BGE/GTE/mpnet/Nomic produce 768-dimensional vectors. Nomic can be shortened with `.dimensions(int)`.
