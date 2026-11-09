@@ -48,6 +48,7 @@ tasks.register('modelTest', Test) {
 
     testLogging {
         events 'passed', 'skipped', 'failed'
+        exceptionFormat 'full'
         showStandardStreams = false
         afterSuite { desc, result ->
             if (!desc.parent) {
