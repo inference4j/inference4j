@@ -36,11 +36,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Expected texts come from a Python port of Moonshine's C++ runtime that matches the official
  * {@code moonshine-voice} library token for token, run on the same 16 kHz audio with the ONNX Runtime
  * version core uses (1.28). Another runtime version can flip a low-confidence punctuation token.
+ *
+ * <p>Tiny is checked by word error rate against the true transcript instead: its output has near-ties
+ * that flip between machines (CI's runner gives "ask what", a local run "as what"), see #141.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class MoonshineRecognizerModelTest {
 
     private static final String TINY = "inference4j/moonshine-streaming-tiny-en";
+    private static final String TRANSCRIPT = "And so my fellow Americans, ask not what your country can do"
+            + " for you, ask what you can do for your country.";
+    /** Tiny gets 1 or 2 of the 22 words wrong depending on the machine; 0.15 allows 3. */
+    private static final double TINY_MAX_WER = 0.15;
 
     private MoonshineRecognizer small;
     private MoonshineRecognizer tiny;
@@ -96,18 +103,16 @@ class MoonshineRecognizerModelTest {
     }
 
     @Test
-    void tinyMatchesReference() {
-        assertThat(tiny.transcribe(speech16k).text()).isEqualTo(
-                "And so, my fellow America, ask not what your country can do for you,"
-                        + " as what you can do for your country.");
+    void tinyTranscribesWithinErrorBudget() {
+        String text = tiny.transcribe(speech16k).text();
+        assertThat(WordErrorRate.of(TRANSCRIPT, text)).as("WER of \"%s\"", text).isLessThanOrEqualTo(TINY_MAX_WER);
     }
 
     @Test
-    void tinyMatchesReferenceOnLongerAudio() {
-        assertThat(tiny.transcribe(twice(), 16000).text()).isEqualTo(
-                "And so, my fellow America, ask not what your country can do for you, as what you can do"
-                        + " for your country. And so, my fellow America, ask not what your country can do for"
-                        + " you, as what you can do for your country.");
+    void tinyTranscribesLongerAudioWithinErrorBudget() {
+        String text = tiny.transcribe(twice(), 16000).text();
+        assertThat(WordErrorRate.of(TRANSCRIPT + " " + TRANSCRIPT, text))
+                .as("WER of \"%s\"", text).isLessThanOrEqualTo(TINY_MAX_WER);
     }
 
     @Test
