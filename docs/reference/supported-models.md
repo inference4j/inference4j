@@ -20,6 +20,7 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/all-mpnet-base-v2` | ~430 MB | `TextEmbedder` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/bge-base-en-v1.5` | ~430 MB | `TextEmbedder` |
 | Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/gte-base` | ~430 MB | `TextEmbedder` |
+| Text Embeddings | `SentenceTransformerEmbedder` | `inference4j/nomic-embed-text-v1.5` | ~520 MB | `TextEmbedder` |
 | Search Reranking | `MiniLMSearchReranker` | `inference4j/ms-marco-MiniLM-L-6-v2` | ~90 MB | `SearchReranker` |
 | Text Generation | `OnnxTextGenerator.gpt2()` | `inference4j/gpt2` | ~500 MB | `TextGenerator` |
 | Text Generation | `OnnxTextGenerator.smolLM2()` | `inference4j/smollm2-360m-instruct` | ~700 MB | `TextGenerator` |

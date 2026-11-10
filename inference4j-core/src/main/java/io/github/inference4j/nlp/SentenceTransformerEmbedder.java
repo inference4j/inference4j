@@ -50,7 +50,9 @@ import java.util.Set;
  * {@link PoolingStrategy#MAX MAX}), optional L2 normalization for cosine similarity, and text prefixes
  * required by some model families (E5, Nomic).
  *
- * <p>Compatible models include all-MiniLM, all-mpnet, BGE, GTE, and E5.
+ * <p>Compatible models include all-MiniLM, all-mpnet, BGE, GTE, E5 and nomic-embed-text-v1.5. Models
+ * trained with Matryoshka representation learning can return shorter vectors via
+ * {@link Builder#dimensions(int)}.
  *
  * <h2>Usage</h2>
  * <pre>{@code
@@ -75,24 +77,22 @@ public class SentenceTransformerEmbedder
     private final int maxLength;
     private final Integer stride;
     private final long[] prefixIds;
+    private final Integer dimensions;
 
     private SentenceTransformerEmbedder(InferenceSession session, Tokenizer tokenizer,
                                         PoolingStrategy poolingStrategy, boolean normalize,
                                         String textPrefix, int maxLength,
                                         TruncationGuard truncationGuard, Integer stride,
-                                        long[] prefixIds) {
+                                        long[] prefixIds, Integer dimensions) {
         super(session,
                 createPreprocessor(tokenizer, maxLength, session.inputNames(), textPrefix, truncationGuard),
                 ctx -> {
                     Tensor outputTensor = ctx.outputs().values().iterator().next();
                     Tensor attentionMaskTensor = ctx.preprocessed().get("attention_mask");
                     long[] attentionMask = attentionMaskTensor.toLongs();
-                    float[] result = applyPooling(outputTensor.toFloats(), outputTensor.shape(),
+                    float[] pooled = applyPooling(outputTensor.toFloats(), outputTensor.shape(),
                             attentionMask, poolingStrategy);
-                    if (normalize) {
-                        result = MathOps.l2Normalize(result);
-                    }
-                    return result;
+                    return finish(pooled, dimensions, normalize);
                 });
         this.tokenizer = tokenizer;
         this.poolingStrategy = poolingStrategy;
@@ -101,6 +101,23 @@ public class SentenceTransformerEmbedder
         this.maxLength = maxLength;
         this.stride = stride;
         this.prefixIds = prefixIds;
+        this.dimensions = dimensions;
+    }
+
+    /**
+     * Turns a pooled vector into the final embedding: optional Matryoshka truncation, then
+     * optional L2 normalization.
+     */
+    static float[] finish(float[] pooled, Integer dimensions, boolean normalize) {
+        float[] result = pooled;
+        if (dimensions != null) {
+            if (dimensions > result.length) {
+                throw new IllegalArgumentException("dimensions (" + dimensions
+                        + ") is larger than the model's embedding size (" + result.length + ")");
+            }
+            result = Arrays.copyOf(result, dimensions);
+        }
+        return normalize ? MathOps.l2Normalize(result) : result;
     }
 
     /**
@@ -164,8 +181,7 @@ public class SentenceTransformerEmbedder
             weights.add(window.ownedEnd() - window.ownedStart());
         }
 
-        float[] average = weightedAverage(embeddings, weights);
-        return normalize ? MathOps.l2Normalize(average) : average;
+        return finish(weightedAverage(embeddings, weights), dimensions, normalize);
     }
 
     static float[] weightedAverage(List<float[]> vectors, List<Integer> weights) {
@@ -303,6 +319,7 @@ public class SentenceTransformerEmbedder
         private int maxLength = 512;
         private TruncationPolicy truncation;
         private Integer stride;
+        private Integer dimensions;
 
         Builder session(InferenceSession session) {
             this.session = session;
@@ -411,12 +428,21 @@ public class SentenceTransformerEmbedder
         }
 
         /**
-         * Builds and returns a new {@link SentenceTransformerEmbedder} instance.
+         * Shortens embeddings to their first {@code dimensions} values (Matryoshka truncation).
+         * Only meaningful for models trained for it, such as nomic-embed-text-v1.5 (768, 512, 256,
+         * 128, 64). With {@link #normalize()}, the shortened vector is re-normalized. Off by default.
          *
-         * @return a configured embedder ready for use
-         * @throws IllegalStateException if {@code modelId} is not set
-         * @throws ModelSourceException if model files cannot be found or loaded
+         * @param dimensions the number of leading values to keep, at least 1
+         * @return this builder
          */
+        public Builder dimensions(int dimensions) {
+            if (dimensions < 1) {
+                throw new IllegalArgumentException("dimensions must be at least 1, got " + dimensions);
+            }
+            this.dimensions = dimensions;
+            return this;
+        }
+
         /**
          * Embeds input longer than {@code maxLength} in full: the text is split into windows that
          * share {@code stride} tokens, each window is embedded, and the result is the average of the
@@ -432,6 +458,13 @@ public class SentenceTransformerEmbedder
             return this;
         }
 
+        /**
+         * Builds and returns a new {@link SentenceTransformerEmbedder} instance.
+         *
+         * @return a configured embedder ready for use
+         * @throws IllegalStateException if {@code modelId} is not set
+         * @throws ModelSourceException if model files cannot be found or loaded
+         */
         public SentenceTransformerEmbedder build() {
             if (session == null) {
                 if (modelId == null) {
@@ -460,7 +493,8 @@ public class SentenceTransformerEmbedder
             }
             return new SentenceTransformerEmbedder(session, tokenizer, poolingStrategy,
                     normalize, textPrefix, maxLength,
-                    new TruncationGuard("SentenceTransformerEmbedder", truncation), stride, prefixIds);
+                    new TruncationGuard("SentenceTransformerEmbedder", truncation), stride, prefixIds,
+                    dimensions);
         }
 
         private void loadFromDirectory(Path dir) {
