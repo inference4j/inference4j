@@ -192,12 +192,10 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
 - [x] **Zero-shot text classification** — `DebertaZeroShotClassifier`: NLI-based, labels chosen at call time, single- or
       multi-label; DeBERTa-v3 zero-shot v2.0 "-c" models (MIT, commercially-friendly training data), matching the
       HuggingFace pipeline ([#103](https://github.com/inference4j/inference4j/issues/103))
-- [ ] **Modern embeddings** — nomic-embed-text-v1.5 (8K context), Qwen3-Embedding-0.6B, and Matryoshka
-      `.dimensions(int)` ([#104](https://github.com/inference4j/inference4j/issues/104))
-- [ ] **Modern reranker** — bge-reranker-v2-m3, multilingual and long-context ([#105](https://github.com/inference4j/inference4j/issues/105))
+- [x] **Modern embeddings** — nomic-embed-text-v1.5 (8K context, task prefixes) and Matryoshka
+      `.dimensions(int)` on `SentenceTransformerEmbedder` ([#104](https://github.com/inference4j/inference4j/issues/104))
 - [ ] **LangChain4j adapter** — `EmbeddingModel`, `ScoringModel`, audio document parser, PII redaction and an
       input guardrail ([#111](https://github.com/inference4j/inference4j/issues/111))
-- [ ] **Long input for generators** — sentence chunking for translation, map-reduce for summarization ([#74](https://github.com/inference4j/inference4j/issues/74))
 - [x] **Encoder-decoder KV cache stays native** — FlanT5, BART, MarianMT, CoEdIT and T5SqlGenerator keep both
       caches in ONNX Runtime memory; heap per generated token drops from 2–21 MB to under 2 MB
       ([#119](https://github.com/inference4j/inference4j/issues/119))
@@ -208,8 +206,6 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
       30-second window; works with `SegmentedSpeechRecognizer` ([#109](https://github.com/inference4j/inference4j/issues/109))
 - [x] **Live transcription** — streaming Moonshine: feed audio as it arrives, get line-by-line text while the
       speaker talks ([#118](https://github.com/inference4j/inference4j/issues/118))
-- [ ] **Kokoro TTS** — `SpeechSynthesizer` plus a permissively licensed Java phonemizer (espeak-ng is
-      GPL-3.0); replaces Piper ([#50](https://github.com/inference4j/inference4j/issues/50))
 
 ### Vision & documents
 
@@ -226,6 +222,15 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
 - [x] **Promptable segmentation** — `Sam2Segmenter` (SAM 2.1 tiny): click or box prompts, encode once and prompt
       many times, with a `SegmentationMask` result type shared with semantic segmentation ([#108](https://github.com/inference4j/inference4j/issues/108))
 
+## Planned — 0.15.0
+
+Tracked in the [0.15.0 milestone](https://github.com/inference4j/inference4j/milestone/3).
+
+### NLP
+
+- [ ] **Modern reranker** — bge-reranker-v2-m3, multilingual and long-context ([#105](https://github.com/inference4j/inference4j/issues/105))
+- [ ] **Long input for generators** — sentence chunking for translation, map-reduce for summarization ([#74](https://github.com/inference4j/inference4j/issues/74))
+
 ### Generative AI via onnxruntime-genai
 
 New LLM, vision-language and speech architectures come through `inference4j-genai` rather than being
@@ -238,6 +243,10 @@ and plain HuggingFace exports.
 
 ## Unscheduled
 
+- [ ] **More embedding models** — Qwen3-Embedding-0.6B (needs last-token pooling and a non-BERT input path) and
+      bge-m3 (needs external-data weights); left over from [#104](https://github.com/inference4j/inference4j/issues/104)
+- [ ] **Kokoro TTS** — parked: a Java English phonemizer is too much upkeep and does not carry past English
+      ([#50](https://github.com/inference4j/inference4j/issues/50))
 - [ ] **Video object tracking** — SAM 2.1 memory modules; experiment, needs a four-module export first ([#137](https://github.com/inference4j/inference4j/issues/137))
 - [ ] **Semantic segmentation** — SegFormer; reuses the `SegmentationMask` type from [#108](https://github.com/inference4j/inference4j/issues/108)
 - [ ] **Super-resolution** — Real-ESRGAN. Needs denormalization before `TensorImages.toRgb`
@@ -276,8 +285,9 @@ and plain HuggingFace exports.
 | Text | GLiNER (zero-shot NER, PII) | 0.14.0 |
 | Text | Prompt-injection detector (DeBERTa-v3) | 0.14.0 |
 | Text | Zero-shot classification (NLI) | 0.14.0 |
-| Text | nomic-embed-text-v1.5 / Qwen3-Embedding | 0.14.0 |
-| Text | bge-reranker-v2-m3 | 0.14.0 |
+| Text | nomic-embed-text-v1.5 (Matryoshka) | 0.14.0 |
+| Text | Qwen3-Embedding / bge-m3 | Unscheduled |
+| Text | bge-reranker-v2-m3 | 0.15.0 |
 | Text | Qwen3, SmolLM3, Phi-4-mini (via inference4j-genai) | v0.13.1 |
 | Text | Punctuation, casing & segmentation (punct-cap-seg) | v0.13.0 |
 | Vision | ResNet | Done |
@@ -290,10 +300,10 @@ and plain HuggingFace exports.
 | Vision | PaddleOCR recognizer + OCR Pipeline | 0.14.0 |
 | Vision | RT-DETR / D-FINE (Apache-licensed detection) | 0.14.0 |
 | Vision | SAM 2.1 tiny (promptable segmentation) | 0.14.0 |
-| Vision | Qwen VL (vision-language) | 0.14.0 |
+| Vision | Qwen VL (vision-language) | 0.15.0 |
 | Vision | Stable Diffusion (text-to-image) | Beyond — feasibility study |
 | Audio | Wav2Vec2-CTC (speech-to-text) | Done |
 | Audio | Silero VAD (voice activity detection) | Done |
-| Audio | Kokoro TTS (text-to-speech, replaces Piper) | 0.14.0 |
+| Audio | Kokoro TTS (text-to-speech) | Parked |
 | Audio | Moonshine v2 (speech-to-text, live transcription) | Done |
 | Audio | Whisper (autoregressive speech-to-text) | Done via inference4j-genai |
