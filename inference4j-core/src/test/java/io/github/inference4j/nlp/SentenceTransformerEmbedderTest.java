@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -390,6 +391,120 @@ class SentenceTransformerEmbedderTest {
         model.encode("hello");
 
         verify(tokenizer).encode("hello", 512);
+    }
+
+    // --- Per-call prefix ---
+
+    private static EncodedInput encoded(long... ids) {
+        long[] mask = new long[ids.length];
+        java.util.Arrays.fill(mask, 1L);
+        return new EncodedInput(ids, mask, new long[ids.length]);
+    }
+
+    private static InferenceSession shortSession() {
+        InferenceSession session = mock(InferenceSession.class);
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(session.run(any())).thenReturn(
+                Map.of("output", Tensor.fromFloats(new float[]{1f, 2f, 3f, 4f}, new long[]{1, 2, 2})));
+        return session;
+    }
+
+    private static Tokenizer shortTokenizer() {
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(encoded(101, 102));
+        return tokenizer;
+    }
+
+    @Test
+    void perCallPrefixReplacesTheBuilderPrefix() {
+        Tokenizer tokenizer = shortTokenizer();
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(shortSession()).tokenizer(tokenizer).textPrefix("query: ").build();
+
+        model.encode("hello", "passage: ");
+
+        verify(tokenizer).encode("passage: hello", 512);
+        verify(tokenizer, never()).encode(eq("query: hello"), anyInt());
+    }
+
+    @Test
+    void nullPerCallPrefixMeansNoPrefix() {
+        Tokenizer tokenizer = shortTokenizer();
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(shortSession()).tokenizer(tokenizer).textPrefix("query: ").build();
+
+        model.encode("hello", null);
+
+        verify(tokenizer).encode("hello", 512);
+    }
+
+    @Test
+    void encodeBatchAppliesThePerCallPrefixToEveryTextInOrder() {
+        Tokenizer tokenizer = shortTokenizer();
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(shortSession()).tokenizer(tokenizer).build();
+
+        List<float[]> embeddings = model.encodeBatch(List.of("a", "b"), "search_document: ");
+
+        assertThat(embeddings).hasSize(2);
+        var order = inOrder(tokenizer);
+        order.verify(tokenizer).encode("search_document: a", 512);
+        order.verify(tokenizer).encode("search_document: b", 512);
+    }
+
+    @Test
+    void runStillAppliesTheBuilderPrefix() {
+        Tokenizer tokenizer = shortTokenizer();
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(shortSession()).tokenizer(tokenizer).textPrefix("query: ").build();
+
+        model.run("hello");
+
+        verify(tokenizer).encode("query: hello", 512);
+    }
+
+    // maxLength 8 with a 2-token prefix leaves 4 content tokens per window; 10 content tokens with
+    // stride 2 give windows starting at 0, 2, 4 and 6.
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void strideRepeatsThePerCallPrefixInEveryWindow() {
+        InferenceSession session = mock(InferenceSession.class);
+        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        when(session.run(any())).thenReturn(
+                Map.of("output", Tensor.fromFloats(new float[8], new long[]{1, 8, 1})));
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode("p: long text", Integer.MAX_VALUE))
+                .thenReturn(encoded(101, 50, 51, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 102));
+        when(tokenizer.encode("p: ", Integer.MAX_VALUE)).thenReturn(encoded(101, 50, 51, 102));
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(session).tokenizer(tokenizer).maxLength(8).stride(2).build();
+
+        model.encode("long text", "p: ");
+
+        ArgumentCaptor<Map<String, Tensor>> inputs = ArgumentCaptor.forClass(Map.class);
+        verify(session, times(4)).run(inputs.capture());
+        List<long[]> windows = new ArrayList<>();
+        inputs.getAllValues().forEach(in -> windows.add(in.get("input_ids").toLongs()));
+        assertThat(windows).containsExactly(
+                new long[]{101, 50, 51, 1, 2, 3, 4, 102},
+                new long[]{101, 50, 51, 3, 4, 5, 6, 102},
+                new long[]{101, 50, 51, 5, 6, 7, 8, 102},
+                new long[]{101, 50, 51, 7, 8, 9, 10, 102});
+    }
+
+    @Test
+    void strideRejectsAPerCallPrefixThatLeavesNoRoomBeyondTheStride() {
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode("long prefix: long text", Integer.MAX_VALUE))
+                .thenReturn(encoded(101, 50, 51, 52, 53, 1, 2, 3, 4, 5, 6, 102));
+        when(tokenizer.encode("long prefix: ", Integer.MAX_VALUE)).thenReturn(encoded(101, 50, 51, 52, 53, 102));
+        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
+                .session(shortSession()).tokenizer(tokenizer).maxLength(8).stride(2).build();
+
+        assertThatThrownBy(() -> model.encode("long text", "long prefix: "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("stride 2");
     }
 
     // --- Close delegation ---

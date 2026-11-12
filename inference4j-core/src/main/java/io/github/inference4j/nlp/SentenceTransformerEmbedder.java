@@ -17,6 +17,7 @@
 package io.github.inference4j.nlp;
 
 import io.github.inference4j.AbstractInferenceTask;
+import io.github.inference4j.InferenceContext;
 import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
@@ -40,6 +41,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -63,6 +65,19 @@ import java.util.Set;
  * }
  * }</pre>
  *
+ * <h2>Query and document prefixes</h2>
+ * <p>Asymmetric retrieval models expect one prefix on queries and another on documents. Pass the
+ * prefix per call so one embedder, and one ONNX session, serves both sides:
+ * <pre>{@code
+ * try (var embedder = SentenceTransformerEmbedder.builder()
+ *         .modelId("inference4j/nomic-embed-text-v1.5")
+ *         .normalize()
+ *         .build()) {
+ *     float[] query = embedder.encode("What is RAG?", "search_query: ");
+ *     List<float[]> documents = embedder.encodeBatch(chunks, "search_document: ");
+ * }
+ * }</pre>
+ *
  * @see TextEmbedder
  * @see PoolingStrategy
  */
@@ -78,6 +93,7 @@ public class SentenceTransformerEmbedder
     private final Integer stride;
     private final long[] prefixIds;
     private final Integer dimensions;
+    private final io.github.inference4j.processing.Preprocessor<String, PreprocessResult> unprefixedPreprocessor;
 
     private SentenceTransformerEmbedder(InferenceSession session, Tokenizer tokenizer,
                                         PoolingStrategy poolingStrategy, boolean normalize,
@@ -102,6 +118,8 @@ public class SentenceTransformerEmbedder
         this.stride = stride;
         this.prefixIds = prefixIds;
         this.dimensions = dimensions;
+        this.unprefixedPreprocessor = createPreprocessor(tokenizer, maxLength, session.inputNames(), null,
+                truncationGuard);
     }
 
     /**
@@ -130,29 +148,77 @@ public class SentenceTransformerEmbedder
     }
 
     /**
-     * Encodes the given text into a dense vector embedding.
+     * Encodes the given text into a dense vector embedding, using the builder's
+     * {@link Builder#textPrefix(String) text prefix} if one is set.
      *
      * @param text the input text to encode
      * @return a float array representing the embedding vector
      */
     @Override
     public float[] encode(String text) {
+        return encode(text, textPrefix);
+    }
+
+    /**
+     * Encodes the given text with the given prefix instead of the builder's
+     * {@link Builder#textPrefix(String) text prefix}.
+     *
+     * <p>Use this when one model needs different prefixes for different inputs, such as
+     * {@code "search_query: "} and {@code "search_document: "} for nomic-embed-text, or
+     * {@code "query: "} and {@code "passage: "} for E5. With {@link Builder#stride(int) stride}, the
+     * prefix is repeated in every window, as the builder's prefix is.
+     *
+     * @param text   the input text to encode
+     * @param prefix the prefix to prepend, or {@code null} for none
+     * @return a float array representing the embedding vector
+     * @throws IllegalArgumentException if {@code stride} is set and the prefix leaves a window no larger
+     *                                  than {@code stride}
+     */
+    public float[] encode(String text, String prefix) {
+        String input = prefix != null ? prefix + text : text;
         if (stride == null) {
-            return run(text);
+            return embedOnce(input);
         }
-        String input = textPrefix != null ? textPrefix + text : text;
         long[] ids = tokenizer.encode(input, Integer.MAX_VALUE).inputIds();
         if (ids.length <= maxLength) {
-            return run(text);
+            return embedOnce(input);
         }
-        return encodeInWindows(ids);
+        return encodeInWindows(ids, prefixIds(prefix));
+    }
+
+    /**
+     * Embeds already-prefixed text in one pass. Mirrors {@link #run(Object)}, which adds the builder's
+     * prefix itself.
+     */
+    private float[] embedOnce(String input) {
+        PreprocessResult result = unprefixedPreprocessor.process(input);
+        Map<String, Tensor> outputs = session.run(result.tensors());
+        return postprocessor.process(new InferenceContext<>(input, result.tensors(), outputs, result.metadata()));
+    }
+
+    /** Token ids of a prefix without [CLS]/[SEP]; the builder's prefix ids are computed once at build time. */
+    private long[] prefixIds(String prefix) {
+        if (Objects.equals(prefix, textPrefix)) {
+            return prefixIds;
+        }
+        if (prefix == null || prefix.isEmpty()) {
+            return new long[0];
+        }
+        long[] encoded = tokenizer.encode(prefix, Integer.MAX_VALUE).inputIds();
+        long[] ids = Arrays.copyOfRange(encoded, 1, encoded.length - 1);
+        int windowSize = maxLength - 2 - ids.length;
+        if (stride >= windowSize) {
+            throw new IllegalArgumentException("prefix leaves " + Math.max(windowSize, 0)
+                    + " tokens per window for maxLength " + maxLength + ", which must exceed stride " + stride);
+        }
+        return ids;
     }
 
     /**
      * Embeds each window of a long input and averages the window embeddings, weighting each by the
-     * tokens it owns, so every token counts once. The text prefix is repeated in every window.
+     * tokens it owns, so every token counts once. The prefix is repeated in every window.
      */
-    private float[] encodeInWindows(long[] ids) {
+    private float[] encodeInWindows(long[] ids, long[] prefixIds) {
         int contentStart = 1 + prefixIds.length;                    // after [CLS] and the prefix
         int contentCount = ids.length - contentStart - 1;            // before [SEP]
         int windowSize = maxLength - 2 - prefixIds.length;
@@ -209,9 +275,21 @@ public class SentenceTransformerEmbedder
      */
     @Override
     public List<float[]> encodeBatch(List<String> texts) {
+        return encodeBatch(texts, textPrefix);
+    }
+
+    /**
+     * Encodes multiple texts with the given prefix instead of the builder's text prefix. Each text is
+     * encoded independently, as {@link #encode(String, String)} does.
+     *
+     * @param texts  the input texts to encode
+     * @param prefix the prefix to prepend to every text, or {@code null} for none
+     * @return a list of float arrays, one embedding per input text, in input order
+     */
+    public List<float[]> encodeBatch(List<String> texts, String prefix) {
         List<float[]> results = new ArrayList<>(texts.size());
         for (String text : texts) {
-            results.add(encode(text));
+            results.add(encode(text, prefix));
         }
         return results;
     }

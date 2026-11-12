@@ -70,7 +70,7 @@ public class SemanticSearch {
 | `.tokenizer(Tokenizer)` | `Tokenizer` | auto-loaded `WordPieceTokenizer` | Custom tokenizer |
 | `.poolingStrategy(PoolingStrategy)` | `PoolingStrategy` | `MEAN` | Pooling method: `CLS`, `MEAN`, or `MAX` |
 | `.normalize()` | — | disabled | Enables L2 normalization of output embeddings |
-| `.textPrefix(String)` | `String` | `null` | Text prefix to prepend before encoding |
+| `.textPrefix(String)` | `String` | `null` | Text prefix to prepend before encoding. `encode(String, String)` and `encodeBatch(List, String)` override it per call |
 | `.maxLength(int)` | `int` | `512` | Maximum token sequence length |
 | `.truncation(TruncationPolicy)` | `TruncationPolicy` | `TRUNCATE` | Input longer than the token limit: `TRUNCATE` keeps the first tokens and logs a warning, `FAIL` throws `InputTooLongException`. See [Input length](../reference/configuration.md#input-length) |
 | `.stride(int)` | `int` | off | Embed input longer than `maxLength` in full: windows sharing this many tokens (`0` = consecutive chunks), averaged by the tokens each covers |
@@ -196,24 +196,20 @@ try (var embedder = SentenceTransformerEmbedder.builder()
 
 ### Nomic example (long context, prefixes, smaller vectors)
 
-nomic-embed-text-v1.5 reads up to 8,192 tokens, so raise `maxLength` for long documents. It needs a task prefix: `"search_query: "` for queries and `"search_document: "` for documents, so use one embedder per side.
+nomic-embed-text-v1.5 reads up to 8,192 tokens, so raise `maxLength` for long documents. It needs a task prefix: `"search_query: "` for queries and `"search_document: "` for documents. Pass the prefix per call, so one embedder (and one model in memory) serves both sides.
 
 ```java
-try (var queries = SentenceTransformerEmbedder.builder()
-             .modelId("inference4j/nomic-embed-text-v1.5")
-             .textPrefix("search_query: ")
-             .normalize()
-             .build();
-     var documents = SentenceTransformerEmbedder.builder()
-             .modelId("inference4j/nomic-embed-text-v1.5")
-             .textPrefix("search_document: ")
-             .maxLength(8192)
-             .normalize()
-             .build()) {
-    float[] query = queries.encode("What is the capital of France?");
-    float[] document = documents.encode("Paris is the capital and largest city of France.");
+try (var embedder = SentenceTransformerEmbedder.builder()
+        .modelId("inference4j/nomic-embed-text-v1.5")
+        .maxLength(8192)
+        .normalize()
+        .build()) {
+    float[] query = embedder.encode("What is the capital of France?", "search_query: ");
+    List<float[]> documents = embedder.encodeBatch(chunks, "search_document: ");
 }
 ```
+
+A per-call prefix replaces the builder's `.textPrefix(String)` for that call; `null` means no prefix. With `.stride(int)`, the prefix is repeated in every window.
 
 The model was trained with Matryoshka representation learning, so `.dimensions(int)` can shorten its vectors with little loss. Smaller vectors cut index size and search time. Use the same `dimensions` for queries and documents.
 
@@ -232,19 +228,21 @@ Scores are from the [model card](https://huggingface.co/nomic-ai/nomic-embed-tex
 E5 models require a text prefix: `"query: "` for queries, `"passage: "` for documents.
 
 ```java
-try (var queryEncoder = SentenceTransformerEmbedder.builder()
+try (var embedder = SentenceTransformerEmbedder.builder()
         .modelId("inference4j/e5-base-v2")
-        .textPrefix("query: ")
         .normalize()
         .build()) {
-    float[] queryEmbedding = queryEncoder.encode("What is Java?");
+    float[] query = embedder.encode("What is Java?", "query: ");
+    float[] passage = embedder.encode("Java is a programming language.", "passage: ");
 }
 ```
+
+If an embedder only ever sees one kind of input, set the prefix once with `.textPrefix("query: ")` and call `encode(String)`.
 
 ## Tips
 
 - **Two-stage pipeline**: Use embeddings for fast top-K retrieval (cheap cosine similarity), then rerank the top candidates with the cross-encoder (expensive but more accurate).
 - **Batch encoding**: Use `encodeBatch()` when encoding multiple texts — more efficient than calling `encode()` in a loop.
 - **L2 normalization**: Enable `.normalize()` when comparing embeddings with cosine similarity. BGE, GTE, and E5 models all recommend normalization.
-- **Text prefix**: Some models (E5, Nomic) require a text prefix. Check the model card for the correct prefix.
+- **Text prefix**: Some models (E5, Nomic) require a text prefix. Check the model card for the correct prefix. Use `encode(text, prefix)` when queries and documents need different prefixes.
 - Embedding dimension depends on the model: all-MiniLM-L6-v2 produces 384-dimensional vectors, while BGE/GTE/mpnet/Nomic produce 768-dimensional vectors. Nomic can be shortened with `.dimensions(int)`.

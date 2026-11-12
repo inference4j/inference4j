@@ -68,6 +68,7 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 ├── PromptableSegmenter                 // encode(BufferedImage/Path) → ImageFeatures
 │                                       //   segment(ImageFeatures, Prompt) → SegmentationMask; Sam2Segmenter
 ├── TextEmbedder                        // encode(String) → float[]
+│                                       //   SentenceTransformerEmbedder.encode(String, prefix) per-call prefix
 ├── ImageEmbedder                       // encode(BufferedImage/Path) → float[]
 ├── SearchReranker                      // score(String, String) → float
 ├── SpeechRecognizer                    // transcribe(Path) → Transcription
