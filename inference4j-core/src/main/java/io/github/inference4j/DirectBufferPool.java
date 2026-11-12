@@ -24,31 +24,35 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * A simple pool of direct {@link ByteBuffer}s keyed by capacity.
+ * A pool of direct {@link ByteBuffer}s for input tensors, keyed by capacity.
  *
- * <p>Buffers are indexed in a {@link TreeMap} so that {@code lease(n)} returns
- * the smallest pooled buffer with capacity &ge; {@code n} in O(log n) time.
- * When the pool reaches {@link #MAX_POOLED_BUFFERS}, the smallest buffer is
- * evicted (it serves the fewest future requests).
+ * <p>{@code lease(n)} returns the smallest pooled buffer that holds {@code n} bytes, as long as it is
+ * at most {@value #MAX_OVERSIZE}x {@code n}; otherwise it allocates a new buffer, so a small input does
+ * not tie up a large buffer.
+ *
+ * <p>The pool keeps at most {@value #MAX_POOLED_BUFFERS} buffers and {@link #MAX_POOLED_BYTES} bytes.
+ * When it is over either limit, the largest buffers go first, so one long input does not leave its
+ * buffers pinned for the life of the session. Buffers above {@link #MAX_BUFFER_BYTES} are never pooled:
+ * allocating them costs little next to the inference they feed. Sizes are exact: a direct buffer's
+ * {@code capacity()} is the off-heap memory it holds.
  *
  * <p>Thread-safe: an {@link InferenceSession} shared between threads leases and returns buffers
- * concurrently. Each method holds the pool's lock only for a map update, which is negligible next
- * to an inference run.
+ * concurrently. The lock covers only map updates; new buffers are allocated outside it.
  */
 class DirectBufferPool {
 
     static final int MAX_POOLED_BUFFERS = 32;
+    static final long MAX_POOLED_BYTES = 32L * 1024 * 1024;
+    static final int MAX_BUFFER_BYTES = 8 * 1024 * 1024;
+    static final int MAX_OVERSIZE = 2;
 
     private final TreeMap<Integer, Deque<ByteBuffer>> pool = new TreeMap<>();
     private int totalBuffers;
+    private long totalBytes;
 
     /**
      * Returns a direct {@link ByteBuffer} with at least {@code requiredBytes}
      * capacity, in native byte order, with position at 0.
-     *
-     * <p>If the pool contains a buffer with capacity &ge; {@code requiredBytes},
-     * the smallest such buffer is removed from the pool and returned.
-     * Otherwise a fresh direct buffer is allocated.
      *
      * @param requiredBytes minimum capacity in bytes
      * @return a direct ByteBuffer in native byte order with position 0
@@ -64,35 +68,30 @@ class DirectBufferPool {
 
     private synchronized ByteBuffer takePooled(int requiredBytes) {
         Map.Entry<Integer, Deque<ByteBuffer>> entry = pool.ceilingEntry(requiredBytes);
-        if (entry == null || entry.getValue().isEmpty()) {
+        if (entry == null || (long) entry.getKey() > (long) requiredBytes * MAX_OVERSIZE) {
             return null;
         }
-        ByteBuffer buffer = entry.getValue().poll();
-        if (entry.getValue().isEmpty()) {
-            pool.remove(entry.getKey());
-        }
-        totalBuffers--;
+        ByteBuffer buffer = remove(entry);
         buffer.clear();
         return buffer;
     }
 
     /**
-     * Returns a buffer to the pool for future reuse. Ignores null and
-     * non-direct buffers.
-     *
-     * <p>If the pool is at capacity, the smallest buffer is evicted.
+     * Returns a buffer to the pool for future reuse. Ignores null, non-direct buffers and buffers
+     * above {@link #MAX_BUFFER_BYTES}. If the pool is then over a limit, its largest buffers are dropped.
      *
      * @param buffer the buffer to return (may be null)
      */
     synchronized void returnBuffer(ByteBuffer buffer) {
-        if (buffer == null || !buffer.isDirect()) {
+        if (buffer == null || !buffer.isDirect() || buffer.capacity() > MAX_BUFFER_BYTES) {
             return;
-        }
-        if (totalBuffers >= MAX_POOLED_BUFFERS) {
-            evictSmallest();
         }
         pool.computeIfAbsent(buffer.capacity(), k -> new ArrayDeque<>()).add(buffer);
         totalBuffers++;
+        totalBytes += buffer.capacity();
+        while (totalBuffers > MAX_POOLED_BUFFERS || totalBytes > MAX_POOLED_BYTES) {
+            remove(pool.lastEntry());
+        }
     }
 
     /**
@@ -101,6 +100,7 @@ class DirectBufferPool {
     synchronized void clear() {
         pool.clear();
         totalBuffers = 0;
+        totalBytes = 0;
     }
 
     /**
@@ -110,15 +110,20 @@ class DirectBufferPool {
         return totalBuffers;
     }
 
-    private void evictSmallest() {
-        Map.Entry<Integer, Deque<ByteBuffer>> first = pool.firstEntry();
-        if (first == null) {
-            return;
-        }
-        first.getValue().poll();
-        if (first.getValue().isEmpty()) {
-            pool.remove(first.getKey());
+    /**
+     * Returns the total capacity, in bytes, of the buffers currently held in the pool.
+     */
+    synchronized long pooledBytes() {
+        return totalBytes;
+    }
+
+    private ByteBuffer remove(Map.Entry<Integer, Deque<ByteBuffer>> entry) {
+        ByteBuffer buffer = entry.getValue().poll();
+        if (entry.getValue().isEmpty()) {
+            pool.remove(entry.getKey());
         }
         totalBuffers--;
+        totalBytes -= buffer.capacity();
+        return buffer;
     }
 }
