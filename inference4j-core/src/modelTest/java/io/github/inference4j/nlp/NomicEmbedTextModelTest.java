@@ -25,8 +25,10 @@ import org.junit.jupiter.api.TestInstance;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 /**
  * Checks nomic-embed-text-v1.5 against embeddings from the upstream PyTorch model, produced by
@@ -80,15 +82,25 @@ class NomicEmbedTextModelTest {
 
     @Test
     void queriesRankTheirDocumentFirst() {
-        try (var queries = SentenceTransformerEmbedder.builder().modelId(MODEL)
-                     .textPrefix("search_query: ").normalize().build();
-             var documents = SentenceTransformerEmbedder.builder().modelId(MODEL)
-                     .textPrefix("search_document: ").normalize().build()) {
-            float[] capital = queries.encode("What is the capital of France?");
-            float[] paris = documents.encode("Paris is the capital and largest city of France.");
-            float[] reef = documents.encode("The Great Barrier Reef is the world's largest coral reef system.");
+        try (var embedder = SentenceTransformerEmbedder.builder().modelId(MODEL).normalize().build()) {
+            float[] capital = embedder.encode("What is the capital of France?", "search_query: ");
+            List<float[]> documents = embedder.encodeBatch(List.of(
+                    "Paris is the capital and largest city of France.",
+                    "The Great Barrier Reef is the world's largest coral reef system."), "search_document: ");
 
-            assertThat(MathOps.dotProduct(capital, paris)).isGreaterThan(MathOps.dotProduct(capital, reef) + 0.2f);
+            assertThat(MathOps.dotProduct(capital, documents.get(0)))
+                    .isGreaterThan(MathOps.dotProduct(capital, documents.get(1)) + 0.2f);
+        }
+    }
+
+    @Test
+    void perCallPrefixMatchesTheBuilderPrefix() {
+        String text = "What is the capital of France?";
+        try (var shared = SentenceTransformerEmbedder.builder().modelId(MODEL).normalize().build();
+             var queries = SentenceTransformerEmbedder.builder().modelId(MODEL)
+                     .textPrefix("search_query: ").normalize().build()) {
+            assertThat(shared.encode(text, "search_query: "))
+                    .containsExactly(queries.encode(text), within(1e-6f));
         }
     }
 
