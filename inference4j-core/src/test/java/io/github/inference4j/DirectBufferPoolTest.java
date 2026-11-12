@@ -61,7 +61,7 @@ class DirectBufferPoolTest {
         ByteBuffer large = pool.lease(256);
         pool.returnBuffer(large);
 
-        ByteBuffer result = pool.lease(100);
+        ByteBuffer result = pool.lease(150);
 
         assertThat(result).isSameAs(large);
         assertThat(result.capacity()).isEqualTo(256);
@@ -92,27 +92,84 @@ class DirectBufferPoolTest {
     }
 
     @Test
-    void returnBuffer_evictsSmallest_whenAtCapacity() {
+    void returnBuffer_dropsTheLargest_whenOverTheBufferCount() {
         var pool = new DirectBufferPool();
-
-        // Fill pool to capacity
         ByteBuffer[] buffers = new ByteBuffer[DirectBufferPool.MAX_POOLED_BUFFERS];
         for (int i = 0; i < buffers.length; i++) {
             buffers[i] = pool.lease((i + 1) * 16);
         }
+        ByteBuffer extra = pool.lease(16);
         for (ByteBuffer buf : buffers) {
             pool.returnBuffer(buf);
         }
         assertThat(pool.size()).isEqualTo(DirectBufferPool.MAX_POOLED_BUFFERS);
 
-        // Return one more - should evict the smallest (16 bytes)
-        ByteBuffer extra = pool.lease(1024);
         pool.returnBuffer(extra);
-        assertThat(pool.size()).isEqualTo(DirectBufferPool.MAX_POOLED_BUFFERS);
 
-        // The smallest (16 bytes) was evicted, so requesting 16 should give a new buffer
-        ByteBuffer small = pool.lease(16);
-        assertThat(small).isNotSameAs(buffers[0]);
+        assertThat(pool.size()).isEqualTo(DirectBufferPool.MAX_POOLED_BUFFERS);
+        int largest = DirectBufferPool.MAX_POOLED_BUFFERS * 16;
+        assertThat(pool.lease(largest)).isNotSameAs(buffers[buffers.length - 1]);
+        assertThat(pool.lease(16)).isSameAs(buffers[0]);
+    }
+
+    @Test
+    void returnBuffer_dropsTheLargest_whenOverTheByteCap() {
+        var pool = new DirectBufferPool();
+        int big = DirectBufferPool.MAX_BUFFER_BYTES;                    // 8 MB: four fill the 32 MB cap
+        List<ByteBuffer> bigOnes = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            bigOnes.add(pool.lease(big));
+        }
+        bigOnes.forEach(pool::returnBuffer);
+        assertThat(pool.pooledBytes()).isEqualTo(DirectBufferPool.MAX_POOLED_BYTES);
+
+        ByteBuffer small = pool.lease(1024);
+        pool.returnBuffer(small);
+
+        assertThat(pool.size()).isEqualTo(4);                            // three big ones and the small one
+        assertThat(pool.pooledBytes()).isEqualTo(3L * big + 1024);
+        assertThat(pool.lease(1024)).isSameAs(small);
+    }
+
+    @Test
+    void returnBuffer_neverPoolsBuffersAboveTheSizeLimit() {
+        var pool = new DirectBufferPool();
+
+        pool.returnBuffer(pool.lease(DirectBufferPool.MAX_BUFFER_BYTES + 1));
+
+        assertThat(pool.size()).isZero();
+        assertThat(pool.pooledBytes()).isZero();
+    }
+
+    @Test
+    void lease_doesNotHandOutABufferMoreThanTwiceTheRequest() {
+        var pool = new DirectBufferPool();
+        ByteBuffer large = pool.lease(1024);
+        pool.returnBuffer(large);
+
+        ByteBuffer small = pool.lease(100);
+
+        assertThat(small).isNotSameAs(large);
+        assertThat(small.capacity()).isEqualTo(100);
+        assertThat(pool.size()).isEqualTo(1);
+        assertThat(pool.lease(512)).isSameAs(large);                      // exactly 2x still qualifies
+    }
+
+    @Test
+    void pooledBytesTracksLeasesReturnsAndClear() {
+        var pool = new DirectBufferPool();
+        ByteBuffer a = pool.lease(64);
+        ByteBuffer b = pool.lease(128);
+
+        pool.returnBuffer(a);
+        pool.returnBuffer(b);
+        assertThat(pool.pooledBytes()).isEqualTo(192);
+
+        pool.lease(128);
+        assertThat(pool.pooledBytes()).isEqualTo(64);
+
+        pool.clear();
+        assertThat(pool.pooledBytes()).isZero();
     }
 
     @Test
@@ -227,5 +284,6 @@ class DirectBufferPoolTest {
             executor.shutdownNow();
         }
         assertThat(pool.size()).isBetween(0, DirectBufferPool.MAX_POOLED_BUFFERS);
+        assertThat(pool.pooledBytes()).isBetween(0L, DirectBufferPool.MAX_POOLED_BYTES);
     }
 }
