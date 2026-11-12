@@ -88,9 +88,15 @@ EncodedInput encoded = tokenizer.encode("Hello world");
 // Decode
 String text = tokenizer.decode(new int[]{15496, 995}); // "Hello world"
 
-// Single token (for streaming)
-String fragment = tokenizer.decode(15496); // "Hello"
+// Streaming: one TokenStream per generation, fed token by token
+TokenStream stream = tokenizer.newStream();
+String fragment = stream.next(15496); // "Hello"
+String rest = stream.flush();         // bytes still held at the end, if any
 ```
+
+A character can span several tokens (byte-level BPE and `<0xNN>` byte tokens split UTF-8). A `TokenStream`
+holds those bytes until the character is complete, so `next` returns `""` in the meantime. The tokenizer itself
+is thread-safe, but each stream is not: open one per generation and use it from one thread.
 
 ### SentencePiece BPE
 

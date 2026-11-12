@@ -50,7 +50,7 @@ final class MoonshineTranscriptionStream implements TranscriptionStream {
 
     private final MoonshineModel model;
     private final TokenDecoder decoder;
-    private final Object lock;
+    private final MoonshineGuard guard;
     private final SileroVadDetector.Scorer scorer;
     private final float threshold;
     private final int window;
@@ -81,14 +81,15 @@ final class MoonshineTranscriptionStream implements TranscriptionStream {
 
     private boolean closed;
 
-    MoonshineTranscriptionStream(MoonshineModel model, TokenDecoder decoder, Object lock, SileroVadDetector vad,
+    MoonshineTranscriptionStream(MoonshineModel model, TokenDecoder decoder, MoonshineGuard guard,
+                                 SileroVadDetector vad,
                                  Duration updateInterval, Duration maxLineDuration, TranscriptListener listener) {
         if (vad.sampleRate() != SAMPLE_RATE) {
             throw new IllegalArgumentException("The VAD must run at " + SAMPLE_RATE + " Hz, got " + vad.sampleRate());
         }
         this.model = model;
         this.decoder = decoder;
-        this.lock = lock;
+        this.guard = guard;
         this.scorer = vad.newScorer();
         this.threshold = vad.threshold();
         this.window = vad.windowSizeSamples();
@@ -113,7 +114,8 @@ final class MoonshineTranscriptionStream implements TranscriptionStream {
             throw new IllegalArgumentException("Sample rate changed from " + inputSampleRate + " to " + sampleRate);
         }
         float[] audio = resampler == null ? samples : resampler.resample(samples);
-        synchronized (lock) {
+        guard.acquire();
+        try {
             int offset = 0;
             while (offset < audio.length) {
                 int take = Math.min(window - hopLength, audio.length - offset);
@@ -125,6 +127,8 @@ final class MoonshineTranscriptionStream implements TranscriptionStream {
                     hopLength = 0;
                 }
             }
+        } finally {
+            guard.release();
         }
     }
 
@@ -219,7 +223,8 @@ final class MoonshineTranscriptionStream implements TranscriptionStream {
     @Override
     public void flush() {
         ensureOpen();
-        synchronized (lock) {
+        guard.acquire();
+        try {
             if (line != null) {
                 if (hopLength > 0) {
                     appendToLine(Arrays.copyOf(hop, hopLength));
@@ -230,6 +235,8 @@ final class MoonshineTranscriptionStream implements TranscriptionStream {
             }
             // The next line starts afresh, as after a pause
             Arrays.fill(probabilities, 0f);
+        } finally {
+            guard.release();
         }
     }
 
@@ -238,7 +245,13 @@ final class MoonshineTranscriptionStream implements TranscriptionStream {
         if (closed) {
             return;
         }
-        flush();
+        if (!guard.isClosed()) {
+            flush();
+        } else if (line != null) {
+            // The recognizer is closed, so there is no model left to finish the open line with
+            line.close();
+            line = null;
+        }
         closed = true;
     }
 

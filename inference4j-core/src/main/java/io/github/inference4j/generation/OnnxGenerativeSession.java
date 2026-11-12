@@ -27,6 +27,12 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * A decoder-only {@link GenerativeSession} that keeps its KV cache in ONNX Runtime memory between steps.
+ *
+ * <p>Not thread-safe: the session holds one KV cache, so use it from one thread at a time.
+ * {@link GenerationEngine} serializes its calls for you.
+ */
 public class OnnxGenerativeSession implements GenerativeSession {
 
     private final InferenceSession session;

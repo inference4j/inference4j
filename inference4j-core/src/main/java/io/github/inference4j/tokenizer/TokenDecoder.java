@@ -24,6 +24,9 @@ package io.github.inference4j.tokenizer;
  * encoding: token IDs are mapped back to their string representations and
  * reassembled into readable text.
  *
+ * <p>Implementations are thread-safe: {@link #decode(int[])} keeps no state, and token-by-token
+ * decoding goes through a {@link TokenStream} owned by one generation.
+ *
  * @see Tokenizer
  */
 public interface TokenDecoder {
@@ -37,14 +40,10 @@ public interface TokenDecoder {
     String decode(int[] tokenIds);
 
     /**
-     * Decodes a single token ID to its text representation.
+     * Starts decoding a new generation token by token. The stream holds the bytes of characters that
+     * span several tokens; create one per generation, as it is not thread-safe.
      *
-     * <p>Useful for streaming output, where tokens are emitted one at a time.
-     * Note that individual tokens may not correspond to complete characters
-     * (e.g., multi-byte UTF-8 sequences split across tokens).
-     *
-     * @param tokenId the token ID to decode
-     * @return the text fragment for this token
+     * @return a new stream
      */
-    String decode(int tokenId);
+    TokenStream newStream();
 }

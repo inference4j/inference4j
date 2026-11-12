@@ -42,8 +42,9 @@ import java.util.regex.Pattern;
  * // Decode
  * String text = tokenizer.decode(new int[]{15496, 995});  // "Hello world"
  *
- * // Single token (for streaming)
- * String fragment = tokenizer.decode(15496);  // "Hello"
+ * // Streaming: one stream per generation
+ * TokenStream stream = tokenizer.newStream();
+ * String fragment = stream.next(15496);  // "Hello"
  * }</pre>
  *
  * @see BpeTokenizer
@@ -170,19 +171,38 @@ public class DecodingBpeTokenizer extends BpeTokenizer implements TokenDecoder {
     }
 
     @Override
-    public String decode(int tokenId) {
-        if (specialTokenIds.contains(tokenId)) {
-            return "";
-        }
-        String token = reverseVocab.get(tokenId);
-        if (token == null) {
-            return "";
-        }
-        return reverseBytePairEncoding(token);
+    public TokenStream newStream() {
+        Utf8Accumulator bytes = new Utf8Accumulator();
+        return new TokenStream() {
+            @Override
+            public String next(int tokenId) {
+                if (specialTokenIds.contains(tokenId)) {
+                    return "";
+                }
+                String token = reverseVocab.get(tokenId);
+                if (token == null) {
+                    return "";
+                }
+                byte[] tokenBytes = new byte[token.length()];
+                bytes.add(tokenBytes, toBytes(token, tokenBytes));
+                return bytes.takeComplete();
+            }
+
+            @Override
+            public String flush() {
+                return bytes.takeAll();
+            }
+        };
     }
 
     private String reverseBytePairEncoding(String bpeString) {
         byte[] bytes = new byte[bpeString.length()];
+        int byteCount = toBytes(bpeString, bytes);
+        return new String(bytes, 0, byteCount, StandardCharsets.UTF_8);
+    }
+
+    /** Maps byte-level BPE characters back to their bytes; returns how many were written. */
+    private int toBytes(String bpeString, byte[] bytes) {
         int byteCount = 0;
         for (int i = 0; i < bpeString.length(); i++) {
             Integer byteVal = unicodeToByte.get(bpeString.charAt(i));
@@ -190,6 +210,6 @@ public class DecodingBpeTokenizer extends BpeTokenizer implements TokenDecoder {
                 bytes[byteCount++] = (byte) (int) byteVal;
             }
         }
-        return new String(bytes, 0, byteCount, StandardCharsets.UTF_8);
+        return byteCount;
     }
 }

@@ -84,8 +84,6 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 	private final int unkId;
 	private final UnaryOperator<String> normalizer;
 
-	private final ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream();
-
 	private UnigramTokenizer(Builder builder) {
 		this.vocab = builder.vocab;
 		this.scores = builder.scores;
@@ -232,71 +230,33 @@ public class UnigramTokenizer implements Tokenizer, TokenDecoder {
 	}
 
 	@Override
-	public String decode(int tokenId) {
-		if (specialTokenIds.contains(tokenId)) {
-			return "";
-		}
-		String token = reverseVocab.get(tokenId);
-		if (token == null) {
-			return "";
-		}
-
-		Matcher m = BYTE_TOKEN_PATTERN.matcher(token);
-		if (m.matches()) {
-			byteBuffer.write(Integer.parseInt(m.group(1), 16));
-			return tryFlushByteBuffer();
-		}
-
-		String prefix = tryForceFlushByteBuffer();
-		String text = token.replace(SPACE_PREFIX, " ");
-		return prefix + text;
-	}
-
-	private String tryFlushByteBuffer() {
-		if (byteBuffer.size() == 0) {
-			return "";
-		}
-		byte[] bytes = byteBuffer.toByteArray();
-		if (isCompleteUtf8(bytes)) {
-			byteBuffer.reset();
-			return new String(bytes, StandardCharsets.UTF_8);
-		}
-		return "";
-	}
-
-	private String tryForceFlushByteBuffer() {
-		if (byteBuffer.size() == 0) {
-			return "";
-		}
-		byte[] bytes = byteBuffer.toByteArray();
-		byteBuffer.reset();
-		return new String(bytes, StandardCharsets.UTF_8);
-	}
-
-	private static boolean isCompleteUtf8(byte[] bytes) {
-		int i = 0;
-		while (i < bytes.length) {
-			int b = bytes[i] & 0xFF;
-			int expectedLen;
-			if (b < 0x80) {
-				expectedLen = 1;
-			} else if (b < 0xC0) {
-				return false;
-			} else if (b < 0xE0) {
-				expectedLen = 2;
-			} else if (b < 0xF0) {
-				expectedLen = 3;
-			} else if (b < 0xF8) {
-				expectedLen = 4;
-			} else {
-				return false;
+	public TokenStream newStream() {
+		Utf8Accumulator bytes = new Utf8Accumulator();
+		return new TokenStream() {
+			@Override
+			public String next(int tokenId) {
+				// Special and unknown tokens end any held character, as in decode(int[])
+				if (specialTokenIds.contains(tokenId)) {
+					return bytes.takeAll();
+				}
+				String token = reverseVocab.get(tokenId);
+				if (token == null) {
+					return bytes.takeAll();
+				}
+				Matcher m = BYTE_TOKEN_PATTERN.matcher(token);
+				if (m.matches()) {
+					bytes.add(Integer.parseInt(m.group(1), 16));
+					return bytes.takeComplete();
+				}
+				// A regular token ends any held character, complete or not
+				return bytes.takeAll() + token.replace(SPACE_PREFIX, " ");
 			}
-			if (i + expectedLen > bytes.length) {
-				return false;
+
+			@Override
+			public String flush() {
+				return bytes.takeAll();
 			}
-			i += expectedLen;
-		}
-		return true;
+		};
 	}
 
 	private List<Integer> tokenize(String text) {

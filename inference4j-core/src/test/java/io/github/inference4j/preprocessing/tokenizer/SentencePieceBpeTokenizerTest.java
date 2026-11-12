@@ -18,6 +18,7 @@ package io.github.inference4j.preprocessing.tokenizer;
 
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.SentencePieceBpeTokenizer;
+import io.github.inference4j.tokenizer.TokenStream;
 import io.github.inference4j.tokenizer.TokenizerJsonParser;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -86,7 +87,7 @@ class SentencePieceBpeTokenizerTest {
     void decode_singleToken_streaming() {
         // Token 14 is "▁hello" → should decode to "hello" (leading space stripped)
         // But in streaming mode, individual decode returns raw token text with ▁ → space
-        String result = tokenizer.decode(14);
+        String result = tokenizer.newStream().next(14);
         // ▁hello → " hello" (▁ replaced with space)
         assertThat(result).isEqualTo(" hello");
     }
@@ -165,5 +166,13 @@ class SentencePieceBpeTokenizerTest {
 
         assertThat(result.truncated()).isFalse();
         assertThat(result.originalLength()).isEqualTo(result.inputIds().length);
+    }
+
+    @Test
+    void streamHoldsByteTokensUntilTheCharacterIsComplete() {
+        TokenStream stream = tokenizer.newStream();
+        assertThat(stream.next(235)).isEmpty();                   // <0xC3>
+        assertThat(stream.next(209)).isEqualTo("\u00e9");        // <0xA9> completes 'é'
+        assertThat(stream.flush()).isEmpty();
     }
 }

@@ -16,6 +16,7 @@
 
 package io.github.inference4j.generation;
 
+import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.sampling.CategoricalSampler;
@@ -25,6 +26,7 @@ import io.github.inference4j.sampling.LogitsProcessors;
 import io.github.inference4j.sampling.LogitsSampler;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.TokenDecoder;
+import io.github.inference4j.tokenizer.TokenStream;
 import io.github.inference4j.tokenizer.Tokenizer;
 
 import java.time.Duration;
@@ -32,6 +34,7 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 /**
@@ -40,6 +43,11 @@ import java.util.function.Consumer;
  * <p>Wires together a {@link GenerativeSession} (KV cache + forward pass),
  * a {@link Tokenizer}/{@link TokenDecoder} pair, and a sampling pipeline into a
  * single {@link GenerativeTask} that accepts a prompt string and returns generated text.
+ *
+ * <p>Thread-safe: the session holds one KV cache, so calls from several threads run one at a time.
+ * For parallel generation, build one engine per thread (each holds its own cache in memory).
+ * The cache is freed after each call. Calling {@code generate} again from a token listener throws
+ * {@link IllegalStateException}, and so does any call after {@link #close()}.
  *
  * <p>Example usage:
  * <pre>{@code
@@ -73,6 +81,8 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
     private final int maxInputLength;
     private final TruncationGuard truncationGuard;
     private final boolean keepPromptEnd;
+    private final ReentrantLock lock = new ReentrantLock();
+    private boolean closed;
 
     /** Stands in for the user message when splitting a chat template into prefix and suffix. */
     private static final String MESSAGE_MARKER = "\uE000";
@@ -108,6 +118,49 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
 
     @Override
     public GenerationResult generate(String input, Consumer<String> tokenListener) {
+        if (lock.isHeldByCurrentThread()) {
+            throw new IllegalStateException("generate() was called from its own token listener");
+        }
+        try {
+            lock.lockInterruptibly();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new InferenceException("Interrupted while waiting for another generation to finish", e);
+        }
+        try {
+            if (closed) {
+                throw new IllegalStateException("The generation engine was closed");
+            }
+            GenerationResult result;
+            try {
+                result = generateExclusively(input, tokenListener);
+            } catch (RuntimeException | Error e) {
+                freeCache(e);
+                throw e;
+            }
+            freeCache(null);
+            return result;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Frees the KV cache now rather than holding it until the next call. A failure while freeing is
+     * attached to {@code failure}, the generation's own exception, rather than hiding it.
+     */
+    private void freeCache(Throwable failure) {
+        try {
+            session.resetCache();
+        } catch (RuntimeException e) {
+            if (failure == null) {
+                throw e;
+            }
+            failure.addSuppressed(e);
+        }
+    }
+
+    private GenerationResult generateExclusively(String input, Consumer<String> tokenListener) {
         long startTime = System.nanoTime();
 
         String prompt = chatTemplate != null ? chatTemplate.format(input) : input;
@@ -145,6 +198,7 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         }
 
         TokenStreamer streamer = new TokenStreamer(stopSequences, tokenListener);
+        TokenStream tokens = decoder.newStream();
         int generatedTokens = 0;
 
         for (int i = 0; i < maxNewTokens; i++) {
@@ -155,7 +209,7 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
                 break;
             }
 
-            String fragment = decoder.decode(tokenId);
+            String fragment = tokens.next(tokenId);
             streamer.accept(fragment);
             generatedTokens++;
 
@@ -167,6 +221,7 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         }
 
         if (!streamer.isStopped()) {
+            streamer.accept(tokens.flush());
             streamer.flush();
         }
 
@@ -239,7 +294,19 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
 
     @Override
     public void close() throws Exception {
-        session.close();
+        if (lock.isHeldByCurrentThread()) {
+            throw new IllegalStateException("The generation engine cannot be closed from its own token listener");
+        }
+        lock.lock();
+        try {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            session.close();
+        } finally {
+            lock.unlock();
+        }
     }
 
     public static class Builder {

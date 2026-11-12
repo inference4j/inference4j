@@ -17,8 +17,10 @@
 package io.github.inference4j.tokenizer;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -102,7 +104,7 @@ class DecodingBpeTokenizerTest {
     void decodeSingle_validToken() {
         DecodingBpeTokenizer tokenizer = createTokenizer();
 
-        String result = tokenizer.decode(0);
+        String result = tokenizer.newStream().next(0);
 
         assertThat(result).isEqualTo("h");
     }
@@ -112,7 +114,7 @@ class DecodingBpeTokenizerTest {
         DecodingBpeTokenizer tokenizer = createTokenizer(
                 "<|startoftext|>", "<|endoftext|>");
 
-        String result = tokenizer.decode(100);
+        String result = tokenizer.newStream().next(100);
 
         assertThat(result).isEmpty();
     }
@@ -134,5 +136,22 @@ class DecodingBpeTokenizerTest {
 
         EncodedInput encoded = tokenizer.encode("hello");
         assertThat(encoded.inputIds()).isNotEmpty();
+    }
+
+    @Test
+    void streamHoldsACharacterSplitAcrossByteLevelTokens(@TempDir Path dir) throws Exception {
+        // Byte-level BPE spells é (UTF-8 0xC3 0xA9) as the characters Ã and ©; here each is its own token
+        Path vocab = Files.writeString(dir.resolve("vocab.json"), "{\"\u00c3\": 0, \"\u00a9\": 1, \"a\": 2}");
+        Path merges = Files.writeString(dir.resolve("merges.txt"), "#version: 0.2\n");
+        DecodingBpeTokenizer tokenizer = DecodingBpeTokenizer.fromFiles(vocab, merges);
+
+        TokenStream stream = tokenizer.newStream();
+        assertThat(stream.next(0)).isEmpty();
+        assertThat(stream.next(1)).isEqualTo("\u00e9");
+        assertThat(stream.next(2)).isEqualTo("a");
+
+        TokenStream unfinished = tokenizer.newStream();
+        assertThat(unfinished.next(0)).isEmpty();
+        assertThat(unfinished.flush()).isEqualTo("\uFFFD");
     }
 }

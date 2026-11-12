@@ -70,6 +70,11 @@ import java.util.Objects;
  *
  * <p>The models are Moonshine AI's 8-bit quantized ONNX Runtime ({@code .ort}) graphs, MIT licensed.
  *
+ * <p>Thread-safe, one call at a time: calls to {@code transcribe} and to the streams this recognizer
+ * opens take turns on the model. A thread waiting its turn can be interrupted. {@link TranscriptListener}
+ * callbacks run while the stream holds that turn, so keep them short and do not wait in them for another
+ * transcription.
+ *
  * @see SegmentedSpeechRecognizer
  */
 public class MoonshineRecognizer implements SpeechRecognizer {
@@ -89,7 +94,7 @@ public class MoonshineRecognizer implements SpeechRecognizer {
     private final AudioTransformPipeline pipeline;
 
     /** Serializes all use of the model's sessions, by this recognizer and its streams. */
-    private final Object lock = new Object();
+    private final MoonshineGuard guard = new MoonshineGuard();
 
     private MoonshineRecognizer(MoonshineModel model, TokenDecoder decoder) {
         this.model = model;
@@ -123,13 +128,16 @@ public class MoonshineRecognizer implements SpeechRecognizer {
                     + " s; wrap the recognizer in a SegmentedSpeechRecognizer to cut long audio at pauses");
         }
         float[] samples = pipeline.transform(new AudioData(audioData, sampleRate)).samples();
-        synchronized (lock) {
+        guard.acquire();
+        try {
             try (MoonshineModel.Line line = model.newLine()) {
                 line.addAudio(samples);
                 line.encode(true);
                 int[] tokens = line.decode(maxTokens(samples.length), new int[0]);
                 return new Transcription(decoder.decode(tokens).strip());
             }
+        } finally {
+            guard.release();
         }
     }
 
@@ -165,9 +173,15 @@ public class MoonshineRecognizer implements SpeechRecognizer {
         return Math.min((int) Math.ceil(seconds * MAX_TOKENS_PER_SECOND), MAX_TOKENS);
     }
 
+    /**
+     * Waits for the transcription in progress, if any, then frees the model. Later calls, here or on a
+     * stream from this recognizer, throw {@link IllegalStateException}. Closing twice does nothing.
+     *
+     * @throws IllegalStateException if called from a {@link TranscriptListener}
+     */
     @Override
     public void close() {
-        model.close();
+        guard.close(model::close);
     }
 
     /** Configures a {@link TranscriptionStream}. */
@@ -216,7 +230,7 @@ public class MoonshineRecognizer implements SpeechRecognizer {
         }
 
         public TranscriptionStream build() {
-            return new MoonshineTranscriptionStream(model, decoder, lock, vad, updateInterval, maxLineDuration,
+            return new MoonshineTranscriptionStream(model, decoder, guard, vad, updateInterval, maxLineDuration,
                     listener);
         }
     }

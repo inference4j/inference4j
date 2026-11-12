@@ -103,4 +103,4 @@ Mirrored from [1-800-BAD-CODE/punctuation_fullstop_truecase_english](https://hug
 - English only. Supported punctuation is `.`, `,` and `?`.
 - Numbers stay as the input wrote them. The model does not convert spoken numbers (`FIVE FIVE FIVE`) into digits.
 - A character outside the model's vocabulary appears as `<unk>` in the output.
-- Not thread-safe. Use one instance per thread.
+- Thread-safe: one instance can serve the whole application.
