@@ -1,0 +1,15 @@
+description = 'LangChain4j adapters for inference4j: document parsers, transformers, scoring and embedding models'
+
+ext {
+    langchain4jVersion = '1.23.0'
+}
+
+dependencies {
+    api project(':inference4j-core')
+
+    // Users bring their own LangChain4j; we only compile against its interfaces
+    compileOnly "dev.langchain4j:langchain4j-core:${langchain4jVersion}"
+
+    testImplementation "dev.langchain4j:langchain4j-core:${langchain4jVersion}"
+    testImplementation "dev.langchain4j:langchain4j:${langchain4jVersion}"
+}
