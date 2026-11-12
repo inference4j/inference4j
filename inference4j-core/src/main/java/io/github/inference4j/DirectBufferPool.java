@@ -31,8 +31,9 @@ import java.util.TreeMap;
  * When the pool reaches {@link #MAX_POOLED_BUFFERS}, the smallest buffer is
  * evicted (it serves the fewest future requests).
  *
- * <p>Not thread-safe &mdash; intended for use within a single-threaded
- * {@link InferenceSession}.
+ * <p>Thread-safe: an {@link InferenceSession} shared between threads leases and returns buffers
+ * concurrently. Each method holds the pool's lock only for a map update, which is negligible next
+ * to an inference run.
  */
 class DirectBufferPool {
 
@@ -53,17 +54,26 @@ class DirectBufferPool {
      * @return a direct ByteBuffer in native byte order with position 0
      */
     ByteBuffer lease(int requiredBytes) {
-        Map.Entry<Integer, Deque<ByteBuffer>> entry = pool.ceilingEntry(requiredBytes);
-        if (entry != null && !entry.getValue().isEmpty()) {
-            ByteBuffer buffer = entry.getValue().poll();
-            if (entry.getValue().isEmpty()) {
-                pool.remove(entry.getKey());
-            }
-            totalBuffers--;
-            buffer.clear();
-            return buffer;
+        ByteBuffer pooled = takePooled(requiredBytes);
+        if (pooled != null) {
+            return pooled;
         }
+        // Allocate outside the lock: allocateDirect zero-fills, and near the direct-memory limit it runs GC
         return ByteBuffer.allocateDirect(requiredBytes).order(ByteOrder.nativeOrder());
+    }
+
+    private synchronized ByteBuffer takePooled(int requiredBytes) {
+        Map.Entry<Integer, Deque<ByteBuffer>> entry = pool.ceilingEntry(requiredBytes);
+        if (entry == null || entry.getValue().isEmpty()) {
+            return null;
+        }
+        ByteBuffer buffer = entry.getValue().poll();
+        if (entry.getValue().isEmpty()) {
+            pool.remove(entry.getKey());
+        }
+        totalBuffers--;
+        buffer.clear();
+        return buffer;
     }
 
     /**
@@ -74,7 +84,7 @@ class DirectBufferPool {
      *
      * @param buffer the buffer to return (may be null)
      */
-    void returnBuffer(ByteBuffer buffer) {
+    synchronized void returnBuffer(ByteBuffer buffer) {
         if (buffer == null || !buffer.isDirect()) {
             return;
         }
@@ -88,7 +98,7 @@ class DirectBufferPool {
     /**
      * Removes all pooled buffers.
      */
-    void clear() {
+    synchronized void clear() {
         pool.clear();
         totalBuffers = 0;
     }
@@ -96,7 +106,7 @@ class DirectBufferPool {
     /**
      * Returns the number of buffers currently held in the pool.
      */
-    int size() {
+    synchronized int size() {
         return totalBuffers;
     }
 

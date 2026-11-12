@@ -20,6 +20,15 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -188,5 +197,35 @@ class DirectBufferPoolTest {
 
         assertThat(result).isSameAs(buf256);
         assertThat(pool.size()).isEqualTo(2);
+    }
+
+    @Test
+    void concurrentLeasesNeverHandOutTheSameBuffer() throws Exception {
+        var pool = new DirectBufferPool();
+        Set<ByteBuffer> inUse = Collections.synchronizedSet(Collections.newSetFromMap(new IdentityHashMap<>()));
+        int threads = 8;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        try {
+            List<Future<Boolean>> results = new ArrayList<>();
+            for (int t = 0; t < threads; t++) {
+                results.add(executor.submit(() -> {
+                    for (int i = 0; i < 5_000; i++) {
+                        ByteBuffer buffer = pool.lease(64 << ThreadLocalRandom.current().nextInt(4));
+                        if (!inUse.add(buffer)) {
+                            return false;           // another thread holds this buffer
+                        }
+                        inUse.remove(buffer);
+                        pool.returnBuffer(buffer);
+                    }
+                    return true;
+                }));
+            }
+            for (Future<Boolean> result : results) {
+                assertThat(result.get()).as("no buffer leased to two threads at once").isTrue();
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+        assertThat(pool.size()).isBetween(0, DirectBufferPool.MAX_POOLED_BUFFERS);
     }
 }

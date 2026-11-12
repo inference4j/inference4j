@@ -31,6 +31,11 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -278,5 +283,89 @@ class MoonshineTranscriptionStreamModelTest {
         }
 
         assertThat(recognizer.transcribe(speech16k, 16000).text().toLowerCase()).contains(PHRASE);
+    }
+
+    @Test
+    void concurrentTranscriptionsMatchSequential() throws Exception {
+        String sequential = recognizer.transcribe(speech16k, 16000).text();
+        ExecutorService executor = Executors.newFixedThreadPool(4);
+        try {
+            List<Future<String>> results = new ArrayList<>();
+            for (int i = 0; i < 8; i++) {
+                results.add(executor.submit(() -> recognizer.transcribe(speech16k, 16000).text()));
+            }
+            for (Future<String> result : results) {
+                assertThat(result.get(60, TimeUnit.SECONDS)).isEqualTo(sequential);
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void closeWaitsForTheStreamInProgressAndLaterCallsFail() throws Exception {
+        MoonshineRecognizer own = MoonshineRecognizer.builder().modelId("inference4j/moonshine-streaming-tiny-en").build();
+        CountDownLatch inListener = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        TranscriptListener blocking = new TranscriptListener() {
+            @Override
+            public void onLineStarted(TranscriptLine line) {
+                inListener.countDown();
+                awaitQuietly(release);
+            }
+        };
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            TranscriptionStream stream = own.stream(vad).listener(blocking).build();
+            Future<?> feeding = executor.submit(() -> feed(stream, speech16k, 16000, 1600));
+            assertThat(inListener.await(30, TimeUnit.SECONDS)).isTrue();
+
+            // The stream holds the model while its listener runs, so close() must wait for it
+            Future<?> closing = executor.submit(own::close);
+            Thread.sleep(200);
+            assertThat(closing.isDone()).as("close returned while the stream was using the model").isFalse();
+
+            release.countDown();
+            closing.get(30, TimeUnit.SECONDS);
+            assertThatThrownBy(feeding::get).hasCauseInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> own.transcribe(speech16k, 16000)).isInstanceOf(IllegalStateException.class);
+            stream.close();                                   // frees the open line without the model
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            own.close();
+        }
+    }
+
+    @Test
+    void closingTheRecognizerFromAListenerFails() {
+        try (MoonshineRecognizer own = MoonshineRecognizer.builder()
+                .modelId("inference4j/moonshine-streaming-tiny-en").build()) {
+            List<Throwable> failures = new ArrayList<>();
+            TranscriptListener closing = new TranscriptListener() {
+                @Override
+                public void onLineStarted(TranscriptLine line) {
+                    try {
+                        own.close();
+                    } catch (IllegalStateException e) {
+                        failures.add(e);
+                    }
+                }
+            };
+            try (TranscriptionStream stream = own.stream(vad).listener(closing).build()) {
+                feed(stream, speech16k, 16000, 1600);
+            }
+
+            assertThat(failures).isNotEmpty();
+            assertThat(own.transcribe(speech16k, 16000).text().toLowerCase()).contains(PHRASE);
+        }
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await(30, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

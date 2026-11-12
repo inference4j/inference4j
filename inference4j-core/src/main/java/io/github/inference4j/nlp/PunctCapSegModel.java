@@ -24,12 +24,13 @@ import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.processing.Preprocessor;
 import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
-import io.github.inference4j.processing.Preprocessor;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.tokenizer.EncodedInput;
+import io.github.inference4j.tokenizer.TokenStream;
 import io.github.inference4j.tokenizer.TokenizerJsonParser;
 import io.github.inference4j.tokenizer.UnigramTokenizer;
 
@@ -61,7 +62,7 @@ import java.util.Map;
  * before tokenization. Input longer than {@code maxLength} tokens is truncated according to
  * {@link Builder#truncation(TruncationPolicy)}, or processed in full with {@link Builder#stride(int)}.
  *
- * <p>Not thread-safe: the tokenizer's streaming decoder keeps state between calls.
+ * <p>Thread-safe: one instance can serve several threads at once.
  */
 public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>> {
 
@@ -174,9 +175,11 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
 
         List<String> sentences = new ArrayList<>();
         StringBuilder sentence = new StringBuilder();
+        TokenStream tokens = tokenizer.newStream();
         for (int t = 1; t < ids.length - 1; t++) {          // skip BOS and EOS
-            // A word-initial token decodes with a leading space, which is the model's ▁ at index 0
-            String token = tokenizer.decode((int) ids[t]);
+            // A word-initial token decodes with a leading space, which is the model's ▁ at index 0.
+            // A character spelled in byte tokens arrives with its last byte, and takes that token's case.
+            String token = tokens.next((int) ids[t]);
             for (int c = 0; c < token.length(); c++) {
                 char ch = token.charAt(c);
                 boolean upper = c < CAP_CHARS_PER_TOKEN && capitals[t * CAP_CHARS_PER_TOKEN + c];
@@ -192,6 +195,7 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
                 addSentence(sentences, sentence);
             }
         }
+        sentence.append(tokens.flush());                    // an unfinished character, as U+FFFD
         addSentence(sentences, sentence);
         return sentences;
     }

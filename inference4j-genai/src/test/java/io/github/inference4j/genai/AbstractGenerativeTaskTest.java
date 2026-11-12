@@ -28,8 +28,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -96,6 +99,59 @@ class AbstractGenerativeTaskTest {
             assertThat(result.text()).isEqualTo(" country.");
             assertThat(result.generatedTokens()).isEqualTo(2);
         }
+    }
+
+    @Test
+    void generateFromTheTokenListenerFails() throws Exception {
+        try (MockedConstruction<Generator> ignored = oneTokenGenerator()) {
+            var task = new TestGenerativeTask(mock(Model.class), stream());
+
+            assertThatThrownBy(() -> task.generate("prompt", token -> task.generate("again")))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("token listener");
+        }
+    }
+
+    @Test
+    void closeFromTheTokenListenerFails() throws Exception {
+        Model model = mock(Model.class);
+        try (MockedConstruction<Generator> ignored = oneTokenGenerator()) {
+            var task = new TestGenerativeTask(model, stream());
+
+            assertThatThrownBy(() -> task.generate("prompt", token -> task.close()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("token listener");
+            verify(model, never()).close();
+        }
+    }
+
+    @Test
+    void generateAfterCloseFailsAndClosingTwiceClosesTheModelOnce() {
+        Model model = mock(Model.class);
+        var task = new TestGenerativeTask(model);
+
+        task.close();
+        task.close();
+
+        verify(model, times(1)).close();
+        assertThatThrownBy(() -> task.generate("prompt"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("closed");
+    }
+
+    private static TokenizerStream stream() throws GenAIException {
+        TokenizerStream stream = mock(TokenizerStream.class);
+        when(stream.decode(10)).thenReturn(" country");
+        return stream;
+    }
+
+    /** Generators built on this thread produce one token, 10, after a 4-token prompt. */
+    private static MockedConstruction<Generator> oneTokenGenerator() {
+        return mockConstruction(Generator.class, (generator, context) -> {
+            when(generator.isDone()).thenReturn(false, true);
+            when(generator.tokenCount()).thenReturn(4L, 5L);
+            when(generator.getLastTokenInSequence(0)).thenReturn(10);
+        });
     }
 
     /**

@@ -11,7 +11,7 @@
 | `io.github.inference4j.model` | Model resolution: `ModelSource`, `HuggingFaceModelSource`, `LocalModelSource` |
 | `io.github.inference4j.processing` | Pre/post-processing: `Preprocessor`, `Postprocessor`, `OutputOperator`, `MathOps`, `TruncationPolicy`, `TruncationGuard`, `TokenWindows`, `WindowAggregation` |
 | `io.github.inference4j.exception` | Custom exceptions: `ModelLoadException`, `InferenceException`, `InputTooLongException` |
-| `io.github.inference4j.tokenizer` | `Tokenizer`, `EncodedInput`, `WordPieceTokenizer`, `BpeTokenizer`, `DecodingBpeTokenizer`, `SentencePieceBpeTokenizer`, `UnigramTokenizer`, `PrecompiledNormalizer`, `SpecialTokens`, `TokenDecoder` |
+| `io.github.inference4j.tokenizer` | `Tokenizer`, `EncodedInput`, `WordPieceTokenizer`, `BpeTokenizer`, `DecodingBpeTokenizer`, `SentencePieceBpeTokenizer`, `UnigramTokenizer`, `PrecompiledNormalizer`, `SpecialTokens`, `TokenDecoder`, `TokenStream` |
 | `io.github.inference4j.preprocessing.text` | `ModelConfig` (HuggingFace config.json parser) |
 | `io.github.inference4j.preprocessing.image` | Image transforms pipeline: `ImageTransformPipeline`, `ResizeTransform`, `CenterCropTransform`, `ImageLayout`, `Labels` |
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
@@ -157,6 +157,34 @@ try (var task = SomeWrapper.builder()
 ```
 
 The `.session(InferenceSession)` method exists on all builders but is package-private — the public API uses `modelId` + `modelSource` + `sessionOptions`.
+
+## Thread safety
+
+Models are expensive to build and cheap to call, so build each one once and share it, for example as a Spring singleton
+bean. The split mirrors Hibernate's `SessionFactory` and `Session`:
+
+!!! note "Models are thread-safe; per-stream helpers are not"
+    - **Model wrappers and `InferenceSession` are thread-safe.** One instance can serve many threads.
+    - **Most wrappers run calls in parallel.** ONNX Runtime runs concurrent inferences on one session.
+    - **Generators run calls one at a time.** That covers `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`,
+      `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator` and the `inference4j-genai` tasks. Each keeps a
+      KV cache for the length of a generation, which can take hundreds of MB, and frees it when the call ends. A
+      thread waiting its turn can be interrupted. Calling `generate` again from a token listener throws
+      `IllegalStateException`.
+    - **`MoonshineRecognizer` also runs one call at a time.** Its `TranscriptionStream`s share those turns with
+      `transcribe`, and `TranscriptListener` callbacks run during the stream's turn, so keep them short.
+    - **Per-stream helpers are not thread-safe.** That covers `TranscriptionStream`, `TokenStream`,
+      `NativeTensors`, and the low-level `OnnxGenerativeSession` and `EncoderDecoderSession`. Use each from one
+      thread.
+    - **Closing is safe.** `close()` waits for calls in progress to finish. Later calls throw `IllegalStateException`.
+      Closing a model from its own token or transcript listener throws `IllegalStateException`.
+
+!!! tip "Parallel generation and CPU threads"
+    For parallel generation, build one generator per thread. Each instance loads its own copy of the weights, so
+    memory grows with every instance. Concurrent calls also share the CPU: by default each inference uses all cores
+    for one call. When you serve several calls at once, call `opts.setIntraOpNumThreads(n)` in
+    `sessionOptions(...)` with a lower `n`, so the calls do not compete for the same cores. See
+    [Hardware acceleration](../guides/hardware-acceleration.md).
 
 ## Functional interfaces
 

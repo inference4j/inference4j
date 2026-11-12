@@ -21,8 +21,10 @@ import ai.onnxruntime.genai.Model;
 import ai.onnxruntime.genai.TokenizerStream;
 import ai.onnxruntime.genai.GenAIException;
 
+import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.generation.GenerativeTask;
 
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 /**
@@ -50,6 +52,8 @@ import java.util.function.Consumer;
 public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, O> {
 
     protected final Model model;
+    private final ReentrantLock lock = new ReentrantLock();
+    private boolean closed;
 
     protected AbstractGenerativeTask(Model model) {
         this.model = model;
@@ -60,8 +64,35 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
         return generate(input, null);
     }
 
+    /**
+     * Generates output for {@code input}. Thread-safe: calls from several threads run one at a time,
+     * because each generation preallocates a KV cache for the model's full context, so running them in
+     * parallel would multiply memory. For parallel generation, create one task per thread. Calling
+     * {@code generate} again from the token listener throws {@link IllegalStateException}, and so does
+     * any call after {@link #close()}.
+     */
     @Override
     public final O generate(I input, Consumer<String> tokenListener) {
+        if (lock.isHeldByCurrentThread()) {
+            throw new IllegalStateException("generate() was called from its own token listener");
+        }
+        try {
+            lock.lockInterruptibly();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new InferenceException("Interrupted while waiting for another generation to finish", e);
+        }
+        try {
+            if (closed) {
+                throw new IllegalStateException("The model was closed");
+            }
+            return generateExclusively(input, tokenListener);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private O generateExclusively(I input, Consumer<String> tokenListener) {
         try {
             try (GeneratorParams params = createParams();
                  Generator generator = new Generator(model, params)) {
@@ -95,7 +126,7 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
                 return parseOutput(sb.toString(), input, tokenCount, duration);
             }
         } catch (GenAIException e) {
-            throw new io.github.inference4j.exception.InferenceException(
+            throw new InferenceException(
                     "Generation failed: " + e.getMessage(), e);
         }
     }
@@ -161,7 +192,19 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
 
     @Override
     public final void close() {
-        closeResources();
-        model.close();
+        if (lock.isHeldByCurrentThread()) {
+            throw new IllegalStateException("The model cannot be closed from its own token listener");
+        }
+        lock.lock();
+        try {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            closeResources();
+            model.close();
+        } finally {
+            lock.unlock();
+        }
     }
 }

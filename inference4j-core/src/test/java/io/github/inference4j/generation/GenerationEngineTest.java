@@ -16,16 +16,27 @@
 
 package io.github.inference4j.generation;
 
+import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.InputTooLongException;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.TokenDecoder;
+import io.github.inference4j.tokenizer.TokenStream;
 import io.github.inference4j.tokenizer.Tokenizer;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -84,6 +95,7 @@ class GenerationEngineTest {
         GenerativeSession session = mock(GenerativeSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
 
         when(tokenizer.encode(eq("Hello"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{15496}, new long[]{1}, new long[]{0}));
@@ -100,8 +112,8 @@ class GenerationEngineTest {
         when(session.decode(995)).thenReturn(
                 new ForwardResult(logitsForToken(eosTokenId, 50257)));
 
-        when(decoder.decode(318)).thenReturn(" is");
-        when(decoder.decode(995)).thenReturn(" world");
+        when(stream.next(318)).thenReturn(" is");
+        when(stream.next(995)).thenReturn(" world");
 
         try (var engine = GenerationEngine.builder()
                 .session(session)
@@ -121,7 +133,7 @@ class GenerationEngineTest {
             fail(e);
         }
 
-        verify(session).resetCache();
+        verify(session, times(2)).resetCache();   // before prefill and after the last token
         verify(session).prefill(new long[]{15496});
         verify(session).decode(318);
         verify(session).decode(995);
@@ -134,6 +146,7 @@ class GenerationEngineTest {
         GenerativeSession session = mock(GenerativeSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
 
         when(tokenizer.encode(eq("Hi"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{10}, new long[]{1}, new long[]{0}));
@@ -142,8 +155,8 @@ class GenerationEngineTest {
         when(session.decode(1)).thenReturn(new ForwardResult(logitsForToken(2, 10)));
         when(session.decode(2)).thenReturn(new ForwardResult(logitsForToken(eosTokenId, 10)));
 
-        when(decoder.decode(1)).thenReturn("A");
-        when(decoder.decode(2)).thenReturn("B");
+        when(stream.next(1)).thenReturn("A");
+        when(stream.next(2)).thenReturn("B");
 
         List<String> streamed = new ArrayList<>();
 
@@ -167,6 +180,7 @@ class GenerationEngineTest {
         GenerativeSession session = mock(GenerativeSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
 
         when(tokenizer.encode(eq("x"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
@@ -174,7 +188,7 @@ class GenerationEngineTest {
         // Always return token 5 (never EOS)
         when(session.prefill(any())).thenReturn(new ForwardResult(logitsForToken(5, 10)));
         when(session.decode(anyLong())).thenReturn(new ForwardResult(logitsForToken(5, 10)));
-        when(decoder.decode(5)).thenReturn("x");
+        when(stream.next(5)).thenReturn("x");
 
         try (var engine = GenerationEngine.builder()
                 .session(session)
@@ -199,6 +213,7 @@ class GenerationEngineTest {
         GenerativeSession session = mock(GenerativeSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
 
         when(tokenizer.encode(eq("prompt"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
@@ -207,9 +222,9 @@ class GenerationEngineTest {
         when(session.decode(10)).thenReturn(new ForwardResult(logitsForToken(11, 20)));
         when(session.decode(11)).thenReturn(new ForwardResult(logitsForToken(12, 20)));
 
-        when(decoder.decode(10)).thenReturn("Hello");
-        when(decoder.decode(11)).thenReturn(" world");
-        when(decoder.decode(12)).thenReturn("!");
+        when(stream.next(10)).thenReturn("Hello");
+        when(stream.next(11)).thenReturn(" world");
+        when(stream.next(12)).thenReturn("!");
 
         List<String> streamed = new ArrayList<>();
 
@@ -238,6 +253,7 @@ class GenerationEngineTest {
         GenerativeSession session = mock(GenerativeSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
 
         when(tokenizer.encode(eq("prompt"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
@@ -248,10 +264,10 @@ class GenerationEngineTest {
         when(session.decode(11)).thenReturn(new ForwardResult(logitsForToken(12, 20)));
         when(session.decode(12)).thenReturn(new ForwardResult(logitsForToken(13, 20)));
 
-        when(decoder.decode(10)).thenReturn("The");
-        when(decoder.decode(11)).thenReturn(" quick");
-        when(decoder.decode(12)).thenReturn(" brown");
-        when(decoder.decode(13)).thenReturn(" fox<|end|>rest");
+        when(stream.next(10)).thenReturn("The");
+        when(stream.next(11)).thenReturn(" quick");
+        when(stream.next(12)).thenReturn(" brown");
+        when(stream.next(13)).thenReturn(" fox<|end|>rest");
 
         List<String> streamed = new ArrayList<>();
 
@@ -279,6 +295,7 @@ class GenerationEngineTest {
         GenerativeSession session = mock(GenerativeSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
         ChatTemplate template = msg -> "<|user|>" + msg + "<|end|>";
 
         when(tokenizer.encode(eq("<|user|>Hi<|end|>"), anyInt())).thenReturn(
@@ -312,6 +329,7 @@ class GenerationEngineTest {
         GenerativeSession session = mock(GenerativeSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
 
         when(tokenizer.encode(eq("raw prompt"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
@@ -339,6 +357,7 @@ class GenerationEngineTest {
         GenerativeSession session = mock(GenerativeSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
 
         var engine = GenerationEngine.builder()
                 .session(session)
@@ -357,6 +376,7 @@ class GenerationEngineTest {
         GenerativeSession session = mock(GenerativeSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
 
         when(tokenizer.encode(eq("x"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
@@ -365,7 +385,7 @@ class GenerationEngineTest {
         when(session.prefill(any())).thenReturn(new ForwardResult(logitsForToken(5, 10)));
         when(session.decode(5)).thenReturn(new ForwardResult(logitsForToken(200, 300)));
 
-        when(decoder.decode(5)).thenReturn("A");
+        when(stream.next(5)).thenReturn("A");
 
         try (var engine = GenerationEngine.builder()
                 .session(session)
@@ -392,6 +412,7 @@ class GenerationEngineTest {
 
     private static GenerationEngine.Builder immediateEosEngine(GenerativeSession session, Tokenizer tokenizer) {
         TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
         when(session.prefill(any())).thenReturn(new ForwardResult(logitsForToken(7, 10)));
         return GenerationEngine.builder()
                 .session(session)
@@ -472,13 +493,14 @@ class GenerationEngineTest {
         GenerativeSession session = mock(GenerativeSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
         TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
         when(tokenizer.encode(eq("x"), anyInt())).thenReturn(
                 new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
         // Without forcing, the model would pick token 5 first
         when(session.prefill(any())).thenReturn(new ForwardResult(logitsForToken(5, 10)));
         when(session.decode(0)).thenReturn(new ForwardResult(logitsForToken(3, 10)));
         when(session.decode(3)).thenReturn(new ForwardResult(logitsForToken(7, 10)));
-        when(decoder.decode(3)).thenReturn("Hi");
+        when(stream.next(3)).thenReturn("Hi");
 
         try (var engine = GenerationEngine.builder()
                 .session(session)
@@ -497,7 +519,7 @@ class GenerationEngineTest {
 
         verify(session).decode(0);
         verify(session, never()).decode(5);
-        verify(decoder, never()).decode(0);
+        verify(stream, never()).next(0);
     }
 
     @Test
@@ -681,5 +703,248 @@ class GenerationEngineTest {
         }
         logits[tokenId] = 10.0f;
         return logits;
+    }
+
+    @Test
+    void concurrentGenerateCallsRunOneAtATime() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
+        AtomicInteger active = new AtomicInteger();
+        AtomicInteger maxActive = new AtomicInteger();
+
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
+        when(session.prefill(any())).thenAnswer(invocation -> {
+            maxActive.accumulateAndGet(active.incrementAndGet(), Math::max);
+            return new ForwardResult(logitsForToken(5, 10));
+        });
+        when(session.decode(anyLong())).thenAnswer(invocation -> {
+            Thread.sleep(2);                                  // widen the window for overlap
+            active.decrementAndGet();
+            return new ForwardResult(logitsForToken(9, 10));
+        });
+        when(stream.next(5)).thenReturn("x");
+
+        int threads = 8;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        try (var engine = GenerationEngine.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .decoder(decoder)
+                .eosTokenId(9)
+                .build()) {
+            List<Future<GenerationResult>> results = new ArrayList<>();
+            for (int t = 0; t < threads; t++) {
+                results.add(executor.submit(() -> engine.generate("x")));
+            }
+            for (Future<GenerationResult> result : results) {
+                assertThat(result.get().text()).isEqualTo("x");
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+        assertThat(maxActive.get()).as("generations overlapping on one KV cache").isEqualTo(1);
+    }
+
+    @Test
+    void freesTheCacheAfterEachGeneration() {
+        GenerativeSession session = mock(GenerativeSession.class);
+        var engine = oneTokenEngine(session);
+
+        engine.generate("x");
+
+        InOrder order = inOrder(session);
+        order.verify(session).resetCache();
+        order.verify(session).prefill(any());
+        order.verify(session).resetCache();
+    }
+
+    @Test
+    void aFailingListenerFreesTheCacheAndLeavesTheEngineUsable() {
+        GenerativeSession session = mock(GenerativeSession.class);
+        var engine = oneTokenEngine(session);
+
+        assertThatThrownBy(() -> engine.generate("x", token -> {
+            throw new IllegalArgumentException("listener failed");
+        })).hasMessage("listener failed");
+
+        verify(session, times(2)).resetCache();
+        assertThat(engine.generate("x").text()).isEqualTo("x");
+    }
+
+    @Test
+    void generateFromTheTokenListenerFails() {
+        GenerativeSession session = mock(GenerativeSession.class);
+        var engine = oneTokenEngine(session);
+
+        assertThatThrownBy(() -> engine.generate("x", token -> engine.generate("y")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("token listener");
+    }
+
+    @Test
+    void generateAfterCloseFailsAndClosingTwiceClosesTheSessionOnce() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        var engine = oneTokenEngine(session);
+
+        engine.close();
+        engine.close();
+
+        verify(session, times(1)).close();
+        assertThatThrownBy(() -> engine.generate("x"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("closed");
+    }
+
+    @Test
+    void aWaitingCallerCanBeInterrupted() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        var engine = oneTokenEngine(session);
+        CountDownLatch generating = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<GenerationResult> holder = executor.submit(() -> engine.generate("x", token -> {
+                generating.countDown();
+                awaitQuietly(release);
+            }));
+            assertThat(generating.await(5, TimeUnit.SECONDS)).isTrue();
+
+            AtomicReference<Throwable> failure = new AtomicReference<>();
+            AtomicBoolean interruptKept = new AtomicBoolean();
+            Thread waiter = new Thread(() -> {
+                try {
+                    engine.generate("y");
+                } catch (Throwable e) {
+                    failure.set(e);
+                }
+                interruptKept.set(Thread.currentThread().isInterrupted());
+            });
+            waiter.start();
+            awaitParked(waiter);
+            waiter.interrupt();
+            waiter.join(5000);
+
+            assertThat(failure.get()).isInstanceOf(InferenceException.class).hasMessageContaining("Interrupted");
+            assertThat(interruptKept).isTrue();
+
+            release.countDown();
+            assertThat(holder.get().text()).isEqualTo("x");
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void closeWaitsForTheGenerationInProgress() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        var engine = oneTokenEngine(session);
+        CountDownLatch generating = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<GenerationResult> generation = executor.submit(() -> engine.generate("x", token -> {
+                generating.countDown();
+                awaitQuietly(release);
+            }));
+            assertThat(generating.await(5, TimeUnit.SECONDS)).isTrue();
+
+            Thread closer = new Thread(() -> {
+                try {
+                    engine.close();
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            });
+            closer.start();
+            awaitParked(closer);
+            verify(session, never()).close();
+
+            release.countDown();
+            closer.join(5000);
+            assertThat(generation.get().text()).isEqualTo("x");
+            InOrder order = inOrder(session);
+            order.verify(session, times(2)).resetCache();
+            order.verify(session).close();
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void closeFromTheTokenListenerFails() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        var engine = oneTokenEngine(session);
+
+        assertThatThrownBy(() -> engine.generate("x", token -> {
+            try {
+                engine.close();
+            } catch (IllegalStateException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new IllegalStateException("unexpected", e);
+            }
+        })).isInstanceOf(IllegalStateException.class).hasMessageContaining("token listener");
+        verify(session, never()).close();
+    }
+
+    @Test
+    void aFailureWhileFreeingTheCacheDoesNotHideTheGenerationFailure() {
+        GenerativeSession session = mock(GenerativeSession.class);
+        var engine = oneTokenEngine(session);
+        doNothing().doThrow(new IllegalStateException("reset failed")).when(session).resetCache();
+
+        assertThatThrownBy(() -> engine.generate("x", token -> {
+            throw new IllegalArgumentException("listener failed");
+        })).hasMessage("listener failed")
+                .satisfies(e -> assertThat(e.getSuppressed()).singleElement()
+                        .extracting(Throwable::getMessage).isEqualTo("reset failed"));
+    }
+
+    /** Waits until {@code thread} is blocked on a lock. */
+    private static void awaitParked(Thread thread) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (thread.getState() != Thread.State.WAITING && thread.getState() != Thread.State.TIMED_WAITING) {
+            assertThat(System.nanoTime()).as("thread never blocked").isLessThan(deadline);
+            Thread.sleep(1);
+        }
+    }
+
+    /** An engine that generates the token "x" and then stops. */
+    private static GenerationEngine oneTokenEngine(GenerativeSession session) {
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
+        when(session.prefill(any())).thenReturn(new ForwardResult(logitsForToken(5, 10)));
+        when(session.decode(anyLong())).thenReturn(new ForwardResult(logitsForToken(9, 10)));
+        when(stream.next(5)).thenReturn("x");
+        return GenerationEngine.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .decoder(decoder)
+                .eosTokenId(9)
+                .build();
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /** Stubs {@code decoder} to hand out one mock stream, which the test then programs token by token. */
+    private static TokenStream streamOf(TokenDecoder decoder) {
+        TokenStream stream = mock(TokenStream.class);
+        when(decoder.newStream()).thenReturn(stream);
+        when(stream.flush()).thenReturn("");
+        return stream;
     }
 }

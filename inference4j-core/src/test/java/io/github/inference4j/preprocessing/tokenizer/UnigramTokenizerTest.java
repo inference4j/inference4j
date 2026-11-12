@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.inference4j.tokenizer.EncodedInput;
+import io.github.inference4j.tokenizer.TokenStream;
 import io.github.inference4j.tokenizer.TokenizerJsonParser;
 import io.github.inference4j.tokenizer.UnigramTokenizer;
 import org.junit.jupiter.api.BeforeAll;
@@ -108,7 +109,7 @@ class UnigramTokenizerTest {
 	@Test
 	void decode_singleToken_streaming() {
 		// Token 12 is "▁hello" → should decode to " hello" (▁ replaced with space)
-		String result = tokenizer.decode(12);
+		String result = tokenizer.newStream().next(12);
 		assertThat(result).isEqualTo(" hello");
 	}
 
@@ -333,5 +334,52 @@ class UnigramTokenizerTest {
 		Path tokenizerJson = Path.of(Objects.requireNonNull(
 				UnigramTokenizerTest.class.getResource("/test-unigram-tokenizer.json")).getPath());
 		return TokenizerJsonParser.parseUnigram(tokenizerJson);
+	}
+
+	@Test
+	void streamHoldsBytesUntilTheCharacterIsComplete() {
+		TokenStream stream = tokenizer.newStream();
+		assertThat(stream.next(236)).isEmpty();                 // <0xC3>
+		assertThat(stream.next(210)).isEqualTo("\u00e9");      // <0xA9> completes 'é'
+	}
+
+	@Test
+	void aNewStreamDoesNotInheritBytesFromAnAbandonedOne() {
+		tokenizer.newStream().next(236);                         // generation stopped mid-character
+		assertThat(tokenizer.newStream().next(12)).isEqualTo(" hello");
+	}
+
+	@Test
+	void streamsDecodeIndependently() {
+		TokenStream a = tokenizer.newStream();
+		TokenStream b = tokenizer.newStream();
+		a.next(236);
+		assertThat(b.next(236)).isEmpty();
+		assertThat(b.next(210)).isEqualTo("\u00e9");
+		assertThat(a.next(210)).isEqualTo("\u00e9");
+	}
+
+	@Test
+	void flushTurnsAnUnfinishedCharacterIntoTheReplacementCharacter() {
+		TokenStream stream = tokenizer.newStream();
+		stream.next(236);
+		assertThat(stream.flush()).isEqualTo("\ufffd");
+		assertThat(stream.flush()).isEmpty();
+	}
+
+	@Test
+	void aRegularTokenEndsAnUnfinishedCharacter() {
+		TokenStream stream = tokenizer.newStream();
+		stream.next(236);
+		assertThat(stream.next(12)).isEqualTo("\ufffd hello");
+	}
+
+	@Test
+	void aSpecialTokenEndsAnUnfinishedCharacterAsInBatchDecode() {
+		TokenStream stream = tokenizer.newStream();
+		assertThat(stream.next(236)).isEmpty();                 // <0xC3>
+		assertThat(stream.next(297)).isEqualTo("\uFFFD");      // <start_of_turn> ends it
+		assertThat(stream.flush()).isEmpty();
+		assertThat(tokenizer.decode(new int[]{236, 297})).isEqualTo("\uFFFD");
 	}
 }

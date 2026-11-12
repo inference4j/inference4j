@@ -42,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Manages an ONNX Runtime session for running model inference.
@@ -52,6 +53,9 @@ import java.util.Set;
  *
  * <p>Sessions are expensive to create (they load and optimize the model graph)
  * but cheap to call repeatedly. Create one session and reuse it across requests.
+ *
+ * <p>Thread-safe: {@link #run} and {@link #runNative} can be called from several threads at once.
+ * {@link #close()} waits for runs in progress, and later runs fail with {@link IllegalStateException}.
  *
  * <p>Example usage:
  * <pre>{@code
@@ -70,6 +74,9 @@ public class InferenceSession implements AutoCloseable {
     private final OrtEnvironment environment;
     private final OrtSession session;
     private final DirectBufferPool bufferPool;
+    // Runs hold the read lock, so they proceed in parallel; close() takes the write lock and waits for them
+    private final ReentrantReadWriteLock closeLock = new ReentrantReadWriteLock();
+    private volatile boolean closed;
     private volatile ModelMetadata metadata;
 
     private InferenceSession(OrtEnvironment environment, OrtSession session) {
@@ -229,9 +236,15 @@ public class InferenceSession implements AutoCloseable {
      *
      * @return the model metadata
      * @throws InferenceException if the metadata cannot be read
+     * @throws IllegalStateException if the session was closed before the metadata was first read
      */
     public ModelMetadata metadata() {
-        if (metadata == null) {
+        if (metadata != null) {
+            return metadata;
+        }
+        closeLock.readLock().lock();
+        try {
+            ensureOpen();
             try {
                 OnnxModelMetadata ortMeta = session.getMetadata();
                 metadata = new ModelMetadata(
@@ -245,8 +258,10 @@ public class InferenceSession implements AutoCloseable {
                 throw new InferenceException(
                         "Failed to read model metadata: " + e.getMessage(), e);
             }
+            return metadata;
+        } finally {
+            closeLock.readLock().unlock();
         }
-        return metadata;
     }
 
     /**
@@ -274,6 +289,16 @@ public class InferenceSession implements AutoCloseable {
      * @throws InferenceException if inference fails or an output name is unknown
      */
     public Map<String, Tensor> run(Map<String, Tensor> inputs, Set<String> outputNames) {
+        closeLock.readLock().lock();
+        try {
+            ensureOpen();
+            return runOpen(inputs, outputNames);
+        } finally {
+            closeLock.readLock().unlock();
+        }
+    }
+
+    private Map<String, Tensor> runOpen(Map<String, Tensor> inputs, Set<String> outputNames) {
         Map<String, OnnxTensor> onnxInputs = new HashMap<>();
         List<ByteBuffer> leasedBuffers = new ArrayList<>();
         try {
@@ -338,6 +363,23 @@ public class InferenceSession implements AutoCloseable {
      *                            share a name
      */
     public NativeTensors runNative(Map<String, Tensor> inputs, Set<String> outputNames, NativeTensors... nativeInputs) {
+        closeLock.readLock().lock();
+        try {
+            ensureOpen();
+            return runNativeOpen(inputs, outputNames, nativeInputs);
+        } finally {
+            closeLock.readLock().unlock();
+        }
+    }
+
+    private void ensureOpen() {
+        if (closed) {
+            throw new IllegalStateException("The inference session was closed");
+        }
+    }
+
+    private NativeTensors runNativeOpen(Map<String, Tensor> inputs, Set<String> outputNames,
+                                        NativeTensors... nativeInputs) {
         Map<String, OnnxTensor> converted = new HashMap<>();
         List<ByteBuffer> leasedBuffers = new ArrayList<>();
         try {
@@ -464,13 +506,27 @@ public class InferenceSession implements AutoCloseable {
         };
     }
 
+    /**
+     * Closes the session and frees its native memory. Waits for runs already in progress to finish;
+     * later calls to {@link #run} or {@link #runNative} throw {@link IllegalStateException}. Closing
+     * twice does nothing.
+     */
     @Override
     public void close() {
+        closeLock.writeLock().lock();
         try {
-            session.close();
-        } catch (OrtException e) {
-            // Silently ignore close errors
+            if (closed) {
+                return;
+            }
+            closed = true;
+            try {
+                session.close();
+            } catch (OrtException e) {
+                // Silently ignore close errors
+            }
+            bufferPool.clear();
+        } finally {
+            closeLock.writeLock().unlock();
         }
-        bufferPool.clear();
     }
 }

@@ -46,6 +46,9 @@ import java.util.Set;
  *
  * <p>Both caches, and the encoder hidden states, stay in ONNX Runtime memory between runs;
  * only the logits of each step are copied into Java.
+ *
+ * <p>Not thread-safe: the session holds one set of caches, so use it from one thread at a time.
+ * {@link GenerationEngine} serializes its calls for you.
  */
 public class EncoderDecoderSession implements GenerativeSession {
 
