@@ -63,6 +63,7 @@ def publishedModules = [
     'inference4j-runtime',
     'inference4j-spring-boot-starter',
     'inference4j-genai',
+    'inference4j-langchain4j',
 ]
 
 // Aggregate coverage report across library modules only
