@@ -21,9 +21,9 @@ import java.util.List;
 /**
  * Result of a speech-to-text transcription.
  *
- * <p>For models that produce timestamps (e.g. Whisper), the {@link #segments} list contains
- * timed segments with start and end times in seconds. For models that produce only plain text
- * (e.g. Wav2Vec2), the segments list is empty.
+ * <p>The {@link #segments} list contains timed segments with start and end times in seconds, when
+ * timing is available. Recognizers on their own return plain text with an empty list;
+ * {@link SegmentedSpeechRecognizer} adds one segment per piece of audio it transcribes.
  *
  * @param text the full transcribed text
  * @param segments timed segments of the transcription, empty if timestamps are not available

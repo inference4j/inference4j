@@ -53,7 +53,29 @@ class SegmentedSpeechRecognizerTest {
 
         assertThat(recognizer.pieceSeconds).containsExactly(20f);
         assertThat(result.text()).isEqualTo("piece-1");
+        assertThat(result.segments()).containsExactly(new Transcription.Segment("piece-1", 0f, 20f));
         verify(vad, never()).detect(any(float[].class), anyInt());
+    }
+
+    @Test
+    void blankAudioThatFitsGivesNoSegments() {
+        recognizer.texts.add("   ");
+
+        Transcription result = segmented.transcribe(seconds(5), RATE);
+
+        assertThat(result.segments()).isEmpty();
+    }
+
+    @Test
+    void eachPieceBecomesOneSegmentOnTheRecordingTimeline() {
+        speech(0, 12, 13, 28, 29, 45, 46, 58, 60, 70);
+
+        Transcription result = segmented.transcribe(seconds(70), RATE);
+
+        assertThat(result.segments()).containsExactly(
+                new Transcription.Segment("piece-1", 0f, 28.5f),
+                new Transcription.Segment("piece-2", 28.5f, 45.5f),
+                new Transcription.Segment("piece-3", 45.5f, 70f));
     }
 
     @Test
@@ -104,6 +126,9 @@ class SegmentedSpeechRecognizerTest {
         Transcription result = segmented.transcribe(seconds(70), RATE);
 
         assertThat(result.text()).isEqualTo("Marie Curie moved to Paris. She won.");
+        assertThat(result.segments()).containsExactly(
+                new Transcription.Segment("Marie Curie moved to Paris.", 0f, 30f),
+                new Transcription.Segment("She won.", 60f, 70f));
     }
 
     @Test

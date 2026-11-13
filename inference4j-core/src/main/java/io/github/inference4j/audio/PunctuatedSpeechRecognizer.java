@@ -19,6 +19,8 @@ package io.github.inference4j.audio;
 import io.github.inference4j.nlp.PunctCapSegModel;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A {@link SpeechRecognizer} that adds punctuation, casing and sentence boundaries to another
@@ -36,8 +38,8 @@ import java.nio.file.Path;
  * }
  * }</pre>
  *
- * <p>Only {@link Transcription#text()} is formatted; segments are passed through unchanged.
- * Closing this recognizer closes both the wrapped recognizer and the model.
+ * <p>The text and each segment's text are formatted; segment times are kept. Each non-blank segment
+ * costs one extra model call. Closing this recognizer closes both the wrapped recognizer and the model.
  *
  * <p>The model processes at most 256 tokens (roughly 200 words) per call. Longer transcripts are
  * truncated, unless the model is built with {@link PunctCapSegModel.Builder#stride(int)}, which
@@ -67,8 +69,18 @@ public class PunctuatedSpeechRecognizer implements SpeechRecognizer {
         if (transcription.text() == null || transcription.text().isBlank()) {
             return transcription;
         }
-        String text = String.join(" ", model.infer(transcription.text()));
-        return new Transcription(text, transcription.segments());
+        List<Transcription.Segment> segments = new ArrayList<>(transcription.segments().size());
+        for (Transcription.Segment segment : transcription.segments()) {
+            segments.add(new Transcription.Segment(format(segment.text()), segment.startTime(), segment.endTime()));
+        }
+        return new Transcription(format(transcription.text()), segments);
+    }
+
+    private String format(String text) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        return String.join(" ", model.infer(text));
     }
 
     @Override

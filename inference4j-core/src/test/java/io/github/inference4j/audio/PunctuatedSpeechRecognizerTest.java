@@ -68,14 +68,36 @@ class PunctuatedSpeechRecognizerTest {
     }
 
     @Test
-    void preservesSegments() {
-        List<Transcription.Segment> segments = List.of(new Transcription.Segment("HELLO", 0f, 1f));
-        recognizer.result = new Transcription("HELLO", segments);
+    void formatsEachSegmentAndKeepsItsTimes() {
+        recognizer.result = new Transcription("MARIE CURIE MOVED TO PARIS SHE WON", List.of(
+                new Transcription.Segment("MARIE CURIE MOVED TO PARIS", 0f, 30f),
+                new Transcription.Segment("SHE WON", 30f, 41.5f)));
+        when(model.infer("MARIE CURIE MOVED TO PARIS SHE WON"))
+                .thenReturn(List.of("Marie Curie moved to Paris.", "She won."));
+        when(model.infer("MARIE CURIE MOVED TO PARIS")).thenReturn(List.of("Marie Curie moved to Paris."));
+        when(model.infer("SHE WON")).thenReturn(List.of("She won."));
+
+        Transcription result = punctuated.transcribe(Path.of("speech.wav"));
+
+        assertThat(result.text()).isEqualTo("Marie Curie moved to Paris. She won.");
+        assertThat(result.segments()).containsExactly(
+                new Transcription.Segment("Marie Curie moved to Paris.", 0f, 30f),
+                new Transcription.Segment("She won.", 30f, 41.5f));
+    }
+
+    @Test
+    void blankSegmentsAreKeptWithoutCallingTheModel() {
+        recognizer.result = new Transcription("HELLO", List.of(
+                new Transcription.Segment("HELLO", 0f, 1f),
+                new Transcription.Segment(" ", 1f, 2f)));
         when(model.infer("HELLO")).thenReturn(List.of("Hello."));
 
         Transcription result = punctuated.transcribe(Path.of("speech.wav"));
 
-        assertThat(result.segments()).isEqualTo(segments);
+        assertThat(result.segments()).containsExactly(
+                new Transcription.Segment("Hello.", 0f, 1f),
+                new Transcription.Segment(" ", 1f, 2f));
+        verify(model, never()).infer(" ");
     }
 
     @Test

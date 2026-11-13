@@ -44,8 +44,14 @@ import java.util.Objects;
  *
  * <p>Each piece ends at the midpoint of the latest pause that fits within the maximum segment
  * length (30 seconds by default). When a stretch of speech has no pause, it is cut at the maximum
- * length. Audio that already fits is passed to the wrapped recognizer unchanged. The pieces'
- * transcripts are joined with spaces, and their segments are shifted to the recording's timeline.
+ * length. Audio that already fits is passed to the wrapped recognizer in one piece. The pieces'
+ * transcripts are joined with spaces.
+ *
+ * <p>The result always carries timed {@link Transcription#segments() segments} on the recording's
+ * timeline. When the wrapped recognizer returns segments, they are shifted by the piece's offset.
+ * When it returns none, as most recognizers do, each non-blank piece becomes one segment spanning
+ * the piece. Pieces are cut halfway through pauses, so these times include up to half a pause of
+ * silence on either side of the speech.
  *
  * <p>Closing this recognizer closes both the wrapped recognizer and the voice activity detector.
  */
@@ -89,7 +95,10 @@ public class SegmentedSpeechRecognizer implements SpeechRecognizer {
     public Transcription transcribe(float[] audioData, int sampleRate) {
         int maxSamples = toSamples(maxSegment, sampleRate);
         if (audioData.length <= maxSamples) {
-            return recognizer.transcribe(audioData, sampleRate);
+            Transcription whole = recognizer.transcribe(audioData, sampleRate);
+            List<Transcription.Segment> segments = new ArrayList<>();
+            addSegments(whole, 0, audioData.length, sampleRate, segments);
+            return new Transcription(whole.text(), segments);
         }
 
         List<Integer> pauses = pauseMidpoints(vad.detect(audioData, sampleRate), sampleRate);
@@ -109,13 +118,26 @@ public class SegmentedSpeechRecognizer implements SpeechRecognizer {
                 }
                 text.append(piece.text().strip());
             }
-            float offset = (float) start / sampleRate;
-            for (Transcription.Segment s : piece.segments()) {
-                segments.add(new Transcription.Segment(s.text(), s.startTime() + offset, s.endTime() + offset));
-            }
+            addSegments(piece, start, end, sampleRate, segments);
             start = end;
         }
         return new Transcription(text.toString(), segments);
+    }
+
+    /**
+     * Adds a piece's segments, shifted to the recording's timeline, or one segment spanning the piece
+     * when the recognizer returned none and the piece has text.
+     */
+    private static void addSegments(Transcription piece, int start, int end, int sampleRate,
+                                    List<Transcription.Segment> segments) {
+        float offset = (float) start / sampleRate;
+        if (!piece.segments().isEmpty()) {
+            for (Transcription.Segment s : piece.segments()) {
+                segments.add(new Transcription.Segment(s.text(), s.startTime() + offset, s.endTime() + offset));
+            }
+        } else if (piece.text() != null && !piece.text().isBlank()) {
+            segments.add(new Transcription.Segment(piece.text().strip(), offset, (float) end / sampleRate));
+        }
     }
 
     /** Sample positions halfway between consecutive speech segments. */

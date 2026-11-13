@@ -28,9 +28,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 /**
  * Expected texts come from a Python port of Moonshine's C++ runtime that matches the official
@@ -138,9 +140,19 @@ class MoonshineRecognizerModelTest {
         try (SpeechRecognizer recognizer = new SegmentedSpeechRecognizer(
                 MoonshineRecognizer.builder().build(), SileroVadDetector.builder().build(),
                 Duration.ofSeconds(15))) {
-            String text = recognizer.transcribe(longAudio, 16000).text().toLowerCase();
+            Transcription result = recognizer.transcribe(longAudio, 16000);
+            String text = result.text().toLowerCase();
 
             assertThat(text.split("what your country can do for you", -1)).hasSize(5);
+            List<Transcription.Segment> segments = result.segments();
+            assertThat(segments).hasSizeGreaterThan(1);
+            assertThat(segments).allSatisfy(segment -> assertThat(segment.text()).isNotBlank());
+            assertThat(segments.get(0).startTime()).isZero();
+            for (int i = 1; i < segments.size(); i++) {
+                assertThat(segments.get(i).startTime()).isEqualTo(segments.get(i - 1).endTime());
+            }
+            assertThat(segments.get(segments.size() - 1).endTime())
+                    .isCloseTo((float) longAudio.length / 16000, within(0.001f));
         }
     }
 }
