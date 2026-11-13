@@ -83,7 +83,7 @@ try (SpeechRecognizer recognizer = new PunctuatedSpeechRecognizer(
 }
 ```
 
-The wrapper is itself a `SpeechRecognizer`, so it can be used anywhere a recognizer is expected. It formats only the transcript text, and closing it closes both the recognizer and the punctuation model. `stride(64)` lets the punctuation model format transcripts of any length; without it, text beyond about 200 words is truncated.
+The wrapper is itself a `SpeechRecognizer`, so it can be used anywhere a recognizer is expected. It formats the transcript text and each segment's text, keeping segment times; each segment costs one extra model call. Closing it closes both the recognizer and the punctuation model. `stride(64)` lets the punctuation model format transcripts of any length; without it, text beyond about 200 words is truncated.
 
 The showcase app shows the difference on the same recording: the formatted transcript, with the raw Wav2Vec2 output below it for comparison.
 
@@ -241,10 +241,21 @@ How it cuts:
 2. Each piece ends at the midpoint of the latest pause that fits within the maximum length
    (30 seconds by default; pass a `Duration` as the third constructor argument to change it).
 3. A stretch of speech with no pause at all is cut at the maximum length.
-4. The pieces' transcripts are joined with spaces, and their segments are shifted to the
-   recording's timeline.
+4. The pieces' transcripts are joined with spaces.
 
-Audio that already fits is passed through unchanged. Closing the wrapper closes both the
+The result carries timed `segments()` on the recording's timeline. When the recognizer returns its
+own segments, they are shifted by the piece's start time. When it returns none, as Moonshine,
+Wav2Vec2 and Whisper do, each non-blank piece becomes one segment that spans the piece. Pieces are
+cut halfway through pauses, so a segment's times include up to half a pause of silence around the
+speech. Audio that already fits is transcribed in one piece and gets one segment.
+
+```java
+for (Transcription.Segment segment : recognizer.transcribe(Path.of("meeting.wav")).segments()) {
+    System.out.printf("%6.1f–%6.1f s  %s%n", segment.startTime(), segment.endTime(), segment.text());
+}
+```
+
+Closing the wrapper closes both the
 recognizer and the detector. It is itself a `SpeechRecognizer`, so it combines with
 `PunctuatedSpeechRecognizer` for Wav2Vec2.
 
@@ -307,7 +318,7 @@ For `Wav2Vec2Recognizer` (see [Whisper](../generative-ai/whisper.md#builder-opti
 | Field | Type | Description |
 |-------|------|-------------|
 | `text()` | `String` | The transcribed text |
-| `segments()` | `List<Segment>` | Timed segments (empty for Moonshine, Wav2Vec2 and Whisper) |
+| `segments()` | `List<Segment>` | Timed segments. Recognizers on their own return none; [`SegmentedSpeechRecognizer`](#long-recordings) adds one per piece |
 
 ## Audio requirements
 

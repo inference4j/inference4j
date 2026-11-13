@@ -101,7 +101,7 @@ try (var whisper = WhisperSpeechModel.builder()
 | Field | Type | Description |
 |-------|------|-------------|
 | `text()` | `String` | The transcribed or translated text |
-| `segments()` | `List<Segment>` | Timed segments — always empty for Whisper, which runs without timestamps |
+| `segments()` | `List<Segment>` | Timed segments: empty for Whisper on its own, which runs without timestamps; one per piece when wrapped in `SegmentedSpeechRecognizer` |
 
 Each `Segment` contains:
 
