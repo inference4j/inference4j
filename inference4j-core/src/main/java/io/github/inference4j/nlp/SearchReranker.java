@@ -47,4 +47,7 @@ public interface SearchReranker extends InferenceTask<QueryDocumentPair, Float> 
         }
         return scores;
     }
+
+    @Override
+    void close();
 }
