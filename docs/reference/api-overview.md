@@ -37,6 +37,26 @@
 |---------|----------|
 | `io.github.inference4j.routing` | `ModelRouter`, `Route`, `RoutingStrategy`, `WeightedRoutingStrategy`, `RouterMetrics` |
 
+### inference4j-langchain4j
+
+| Package | Contents |
+|---------|----------|
+| `io.github.inference4j.langchain4j` | LangChain4j adapters: `Inference4jEmbeddingModel`, `Inference4jScoringModel`, `Inference4jPiiRedactor`, `Inference4jPromptInjectionGuardrail`, `Inference4jOcrDocumentParser`, `Inference4jAudioDocumentParser` |
+
+Each adapter implements a LangChain4j interface over an inference4j model:
+
+| Adapter | LangChain4j interface | Wraps |
+|---------|----------------------|-------|
+| `Inference4jEmbeddingModel` | `EmbeddingModel` (extends `DimensionAwareEmbeddingModel`) | `SentenceTransformerEmbedder` |
+| `Inference4jScoringModel` | `ScoringModel` | `SearchReranker` |
+| `Inference4jPiiRedactor` | `DocumentTransformer`; `asTextSegmentTransformer()` gives a `TextSegmentTransformer` | `NamedEntityRecognizer` |
+| `Inference4jPromptInjectionGuardrail` | `InputGuardrail` | `PromptInjectionDetector` |
+| `Inference4jOcrDocumentParser` | `DocumentParser` | `OcrPipeline` |
+| `Inference4jAudioDocumentParser` | `DocumentParser`, plus `parseSegments(InputStream)` | `SpeechRecognizer` |
+
+All adapters are `AutoCloseable` and own the model they wrap (`close()` closes it). LangChain4j is
+a `compileOnly` dependency of the module. See the [LangChain4j guide](../guides/langchain4j/index.md).
+
 ### inference4j-spring-boot-starter
 
 | Package | Contents |

@@ -104,6 +104,30 @@ if you are still on Boot 3.
 
 See the [Spring Boot guide](../guides/spring-boot.md) for configuration details.
 
+## LangChain4j
+
+To use inference4j models through LangChain4j's interfaces (`EmbeddingModel`, `ScoringModel`, `DocumentParser`,
+`DocumentTransformer`, `InputGuardrail`), add the adapter module. It includes `inference4j-core`. LangChain4j is
+supplied by the application.
+
+=== "Gradle"
+
+    ```groovy
+    implementation 'io.github.inference4j:inference4j-langchain4j:${inference4jVersion}'
+    ```
+
+=== "Maven"
+
+    ```xml
+    <dependency>
+        <groupId>io.github.inference4j</groupId>
+        <artifactId>inference4j-langchain4j</artifactId>
+        <version>${inference4jVersion}</version>
+    </dependency>
+    ```
+
+See the [LangChain4j guide](../guides/langchain4j/index.md).
+
 ## Pre-release snapshots (JitPack)
 
 To try features merged to `main` before they reach Maven Central, build them through

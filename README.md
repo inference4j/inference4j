@@ -414,6 +414,7 @@ See the [Roadmap](https://inference4j.github.io/inference4j/roadmap/) for detail
 | `inference4j-genai` | Generative AI via [onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai) — Phi-3, DeepSeek-R1, Whisper, Phi-3.5 Vision |
 | `inference4j-runtime` | Operational layer — model routing, A/B testing, Micrometer metrics |
 | `inference4j-spring-boot-starter` | Spring Boot auto-configuration, health indicators |
+| `inference4j-langchain4j` | [LangChain4j](https://docs.langchain4j.dev/) adapters — `EmbeddingModel`, `ScoringModel`, PII redaction, prompt-injection guardrail, OCR and audio document parsers ([guide](https://inference4j.github.io/inference4j/guides/langchain4j/)) |
 | `inference4j-examples` | Runnable examples ([see README](inference4j-examples/README.md)) |
 
 ## Build

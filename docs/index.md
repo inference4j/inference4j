@@ -277,6 +277,20 @@ Java has great tools for building AI-powered applications. [Spring AI](https://s
 
 Learn more about the pipeline architecture in [How It Works](getting-started/how-it-works.md).
 
+## Using LangChain4j?
+
+!!! tip "LangChain4j adapters"
+    The `inference4j-langchain4j` module provides inference4j models as implementations of LangChain4j interfaces,
+    running in-process:
+
+    - **PII redaction** as a `DocumentTransformer`
+    - **Prompt-injection detection** as an `InputGuardrail`
+    - **OCR** and **speech-to-text** as `DocumentParser`s
+    - **Embeddings** as an `EmbeddingModel` and **reranking** as a `ScoringModel`
+
+    See [inference4j for LangChain4j](guides/langchain4j/index.md) and
+    [RAG, end to end](guides/langchain4j/rag-pipeline.md).
+
 ## Try the showcase
 
 Want to see inference4j in action before writing any code? The [inference4j-showcase](https://github.com/inference4j/inference4j-showcase) is a local demo app with interactive demos for every capability — sentiment analysis, NER, translation, text-to-SQL, grammar correction, object detection, and more. Clone, run, and explore.

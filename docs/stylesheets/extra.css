@@ -16,3 +16,13 @@
 .md-nav--primary > .md-nav__list > .md-nav__item--nested .md-nav .md-nav__link {
   padding-left: 2rem;
 }
+
+/* Indent third-level items under nested sub-sections */
+.md-nav--primary > .md-nav__list > .md-nav__item--nested .md-nav .md-nav .md-nav__link {
+  padding-left: 3rem;
+}
+
+/* Section-index containers: pad the container only, not the link and toggle inside it */
+.md-nav--primary > .md-nav__list > .md-nav__item--nested .md-nav .md-nav__container > .md-nav__link {
+  padding-left: 0;
+}
