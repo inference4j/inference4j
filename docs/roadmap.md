@@ -177,11 +177,9 @@ super-resolution are unblocked behind it.
 - [x] **Newer genai LLMs** — Qwen3-0.6B, SmolLM3-3B and Phi-4-mini presets
       ([#87](https://github.com/inference4j/inference4j/issues/87))
 
-## Planned — 0.14.0
+### v0.14.0 — Zero-shot NLP, guardrails, OCR & LangChain4j
 
-Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/milestone/2).
-
-### Zero-shot NLP, guardrails and RAG
+**Zero-shot NLP, guardrails and RAG**
 
 - [x] **Zero-shot NER** — `GlinerEntityRecognizer`: entity types given at call time, GLiNER small v2.1 and a PII-tuned
       model (both Apache-2.0), matching the `gliner` Python package; `ZeroShotEntityRecognizer` interface ([#101](https://github.com/inference4j/inference4j/issues/101))
@@ -194,20 +192,22 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
       HuggingFace pipeline ([#103](https://github.com/inference4j/inference4j/issues/103))
 - [x] **Modern embeddings** — nomic-embed-text-v1.5 (8K context, task prefixes) and Matryoshka
       `.dimensions(int)` on `SentenceTransformerEmbedder` ([#104](https://github.com/inference4j/inference4j/issues/104))
-- [ ] **LangChain4j adapter** — `EmbeddingModel`, `ScoringModel`, audio document parser, PII redaction and an
-      input guardrail ([#111](https://github.com/inference4j/inference4j/issues/111))
+- [x] **LangChain4j adapter** — `inference4j-langchain4j`: `EmbeddingModel`, `ScoringModel`, OCR and audio document
+      parsers, PII redaction and a prompt-injection input guardrail
+      ([#111](https://github.com/inference4j/inference4j/issues/111)); see the [LangChain4j guide](guides/langchain4j/index.md)
+      ([#152](https://github.com/inference4j/inference4j/issues/152))
 - [x] **Encoder-decoder KV cache stays native** — FlanT5, BART, MarianMT, CoEdIT and T5SqlGenerator keep both
       caches in ONNX Runtime memory; heap per generated token drops from 2–21 MB to under 2 MB
       ([#119](https://github.com/inference4j/inference4j/issues/119))
 
-### Speech
+**Speech**
 
 - [x] **Moonshine v2 speech-to-text** — `MoonshineRecognizer` (tiny, small, medium; English) with no fixed
       30-second window; works with `SegmentedSpeechRecognizer` ([#109](https://github.com/inference4j/inference4j/issues/109))
 - [x] **Live transcription** — streaming Moonshine: feed audio as it arrives, get line-by-line text while the
       speaker talks ([#118](https://github.com/inference4j/inference4j/issues/118))
 
-### Vision & documents
+**Vision & documents**
 
 - [x] **OCR recognizer and `OcrPipeline`** — PaddleOCR PP-OCRv6 (small and tiny) line detector and CTC recognizer,
       composed by `OcrPipeline`; `CraftTextDetector` fits as an alternative detector
@@ -225,6 +225,11 @@ Tracked in the [0.14.0 milestone](https://github.com/inference4j/inference4j/mil
 ## Planned — 0.15.0
 
 Tracked in the [0.15.0 milestone](https://github.com/inference4j/inference4j/milestone/3).
+
+### LangChain4j
+
+- [ ] **End-to-end LangChain4j demo** — showcase app combining the adapters in a RAG assistant
+      ([#152](https://github.com/inference4j/inference4j/issues/152))
 
 ### NLP
 

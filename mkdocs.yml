@@ -84,9 +84,18 @@ nav:
       - Whisper Speech-to-Text: generative-ai/whisper.md
   - Guides:
     - Tokenizers: guides/tokenizers.md
+    - Model Loading: guides/model-loading.md
     - Hardware Acceleration: guides/hardware-acceleration.md
     - Spring Boot: guides/spring-boot.md
-    - Model Loading: guides/model-loading.md
+    - LangChain4j:
+      - Overview: guides/langchain4j/index.md
+      - Embedding Model: guides/langchain4j/embeddings.md
+      - Reranking: guides/langchain4j/reranking.md
+      - OCR Document Parser: guides/langchain4j/ocr-parser.md
+      - Audio Document Parser: guides/langchain4j/audio-parser.md
+      - PII Redaction: guides/langchain4j/pii-redaction.md
+      - Prompt-Injection Guardrail: guides/langchain4j/prompt-injection-guardrail.md
+      - RAG, End to End: guides/langchain4j/rag-pipeline.md
   - Reference:
     - Supported Models: reference/supported-models.md
     - Configuration: reference/configuration.md
