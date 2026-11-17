@@ -289,7 +289,7 @@ Learn more about the pipeline architecture in [How It Works](getting-started/how
     - **Embeddings** as an `EmbeddingModel` and **reranking** as a `ScoringModel`
 
     See [inference4j for LangChain4j](guides/langchain4j/index.md) and
-    [RAG, end to end](guides/langchain4j/rag-pipeline.md).
+    [RAG pipelines](guides/langchain4j/rag-pipeline.md).
 
 ## Try the showcase
 
