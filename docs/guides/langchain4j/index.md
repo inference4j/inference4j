@@ -15,7 +15,7 @@ or Python.
 | Embed text, with query and document prefixes applied from the input type | `Inference4jEmbeddingModel` | `EmbeddingModel` | [Embedding model](embeddings.md) |
 | Rerank retrieved content with a cross-encoder | `Inference4jScoringModel` | `ScoringModel` | [Reranking](reranking.md) |
 
-[RAG, end to end](rag-pipeline.md) combines all six in one pipeline.
+[RAG pipelines](rag-pipeline.md) shows how the adapters fit together, with examples for recordings and scanned documents.
 
 ## Comparison with LangChain4j's built-in options
 

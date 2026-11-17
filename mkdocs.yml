@@ -95,7 +95,7 @@ nav:
       - Audio Document Parser: guides/langchain4j/audio-parser.md
       - PII Redaction: guides/langchain4j/pii-redaction.md
       - Prompt-Injection Guardrail: guides/langchain4j/prompt-injection-guardrail.md
-      - RAG, End to End: guides/langchain4j/rag-pipeline.md
+      - RAG Pipelines: guides/langchain4j/rag-pipeline.md
   - Reference:
     - Supported Models: reference/supported-models.md
     - Configuration: reference/configuration.md
