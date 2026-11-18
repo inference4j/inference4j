@@ -21,10 +21,7 @@ import io.github.inference4j.generation.GenerativeModel;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Factory for preconfigured {@link GenerativeModel} instances for generative AI models.
@@ -71,7 +68,7 @@ public final class ModelSources {
                         "special_tokens_map.json",
                         "added_tokens.json"
                 )),
-                message -> "<|user|>\n" + message + "<|end|>\n<|assistant|>\n"
+                PresetChatTemplates.phi3()
         );
     }
 
@@ -93,8 +90,7 @@ public final class ModelSources {
                         "tokenizer_config.json",
                         "special_tokens_map.json"
                 )),
-                message -> "<\uFF5Cbegin\u2581of\u2581sentence\uFF5C>"
-                        + "<\uFF5CUser\uFF5C>" + message + "<\uFF5CAssistant\uFF5C>"
+                PresetChatTemplates.deepSeekR1()
         );
     }
 
@@ -145,8 +141,7 @@ public final class ModelSources {
                         "tokenizer.json",
                         "tokenizer_config.json"
                 )),
-                message -> "<|im_start|>user\n" + message + "<|im_end|>\n"
-                        + "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+                PresetChatTemplates.qwen3NonThinking()
         );
     }
 
@@ -168,16 +163,7 @@ public final class ModelSources {
                         "tokenizer.json",
                         "tokenizer_config.json"
                 )),
-                // SmolLM3's own template; like the original, the system block has no <|im_end|>
-                message -> "<|im_start|>system\n## Metadata\n\n"
-                        + "Knowledge Cutoff Date: June 2025\n"
-                        + "Today Date: " + LocalDate.now().format(
-                                DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH)) + "\n"
-                        + "Reasoning Mode: /no_think\n\n"
-                        + "## Custom Instructions\n\n"
-                        + "You are a helpful AI assistant named SmolLM, trained by Hugging Face.\n\n"
-                        + "<|im_start|>user\n" + message + "<|im_end|>\n"
-                        + "<|im_start|>assistant\n<think>\n\n</think>\n"
+                PresetChatTemplates.smolLM3NonThinking()
         );
     }
 
@@ -200,7 +186,7 @@ public final class ModelSources {
                         "added_tokens.json",
                         "special_tokens_map.json"
                 )),
-                message -> "<|user|>" + message + "<|end|><|assistant|>"
+                PresetChatTemplates.phi4()
         );
     }
 

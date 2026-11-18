@@ -75,6 +75,20 @@ try (var generator = TextGenerator.builder()
 The final `GenerationResult` is still returned after generation completes, containing
 the full text and timing information.
 
+## Conversations
+
+`chat` generates the next assistant message of a conversation, with system and earlier assistant messages:
+
+```java
+GenerationResult result = gen.chat(List.of(
+        ChatMessage.system("Answer in one sentence."),
+        ChatMessage.user("What is Java?")));
+```
+
+`chat(List<ChatMessage>, Consumer<String>)` streams the answer. The conversation is formatted with the chat
+template's conversation format; see [Chat templates](chat-templates.md#conversations). To use a `TextGenerator`
+from LangChain4j, see [Chat model](../guides/langchain4j/chat-model.md).
+
 ## Builder options
 
 | Method | Type | Default | Description |

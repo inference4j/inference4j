@@ -16,6 +16,7 @@
 package io.github.inference4j.genai.nlp;
 
 import io.github.inference4j.genai.nlp.TextGenerator;
+import io.github.inference4j.generation.ChatMessage;
 import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.genai.ModelSources;
 import org.junit.jupiter.api.Test;
@@ -103,6 +104,23 @@ class TextGeneratorModelTest {
             String streamed = String.join("", streamedTokens);
             assertThat(result.text().contains(streamed) || streamed.contains(result.text()))
                     .as("Streamed tokens should match final result").isTrue();
+        }
+    }
+
+    @Test
+    void chatFollowsTheSystemMessage() {
+        try (var generator = TextGenerator.builder()
+                .model(ModelSources.phi4Mini())
+                .intraOpThreads(4)
+                .maxNewTokens(20)
+                .temperature(0)
+                .build()) {
+
+            GenerationResult result = generator.chat(List.of(
+                    ChatMessage.system("Reply with the single word PONG, in capitals, and nothing else."),
+                    ChatMessage.user("ping")));
+
+            assertThat(result.text().strip()).isEqualTo("PONG");
         }
     }
 }

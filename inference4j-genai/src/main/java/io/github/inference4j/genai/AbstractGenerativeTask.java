@@ -27,16 +27,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.github.inference4j.exception.InferenceException;
+import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.generation.GenerativeTask;
 import io.github.inference4j.generation.TokenStreamer;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Base class for autoregressive generation tasks backed by onnxruntime-genai.
@@ -84,6 +87,41 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
      */
     @Override
     public final O generate(I input, Consumer<String> tokenListener) {
+        return exclusively(() -> {
+            Generated generated = run(generator -> prepareGenerator(input, generator), tokenListener);
+            return parseOutput(generated.text(), input, generated.promptTokens(), generated.generatedTokens(),
+                    generated.durationMillis());
+        });
+    }
+
+    /**
+     * Runs the generate loop on a generator that {@code input} prepares, for subclasses with more than one kind of
+     * input. Same locking, limits and stop sequences as {@link #generate(Object, Consumer)}.
+     *
+     * @param input         feeds the generator before the loop starts
+     * @param tokenListener receives each decoded fragment; may be {@code null}
+     * @return the generated text with prompt and generated token counts
+     */
+    protected final GenerationResult generateFrom(GeneratorInput input, Consumer<String> tokenListener) {
+        return exclusively(() -> {
+            Generated generated = run(input, tokenListener);
+            return new GenerationResult(generated.text(), generated.promptTokens(), generated.generatedTokens(),
+                    Duration.ofMillis(generated.durationMillis()));
+        });
+    }
+
+    /** Feeds a generator before the generate loop starts. */
+    @FunctionalInterface
+    protected interface GeneratorInput {
+
+        void prepare(Generator generator) throws GenAIException;
+
+    }
+
+    private record Generated(String text, int promptTokens, int generatedTokens, long durationMillis) {
+    }
+
+    private <R> R exclusively(Supplier<R> work) {
         if (lock.isHeldByCurrentThread()) {
             throw new IllegalStateException("generate() was called from its own token listener");
         }
@@ -97,17 +135,17 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
             if (closed) {
                 throw new IllegalStateException("The model was closed");
             }
-            return generateExclusively(input, tokenListener);
+            return work.get();
         } finally {
             lock.unlock();
         }
     }
 
-    private O generateExclusively(I input, Consumer<String> tokenListener) {
+    private Generated run(GeneratorInput input, Consumer<String> tokenListener) {
         try {
             try (GeneratorParams params = createParams();
                  Generator generator = new Generator(model, params)) {
-                prepareGenerator(input, generator);
+                input.prepare(generator);
 
                 long start = System.currentTimeMillis();
                 int maxNewTokens = maxNewTokens();
@@ -139,8 +177,8 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
                 }
                 streamer.flush();
 
-                long duration = System.currentTimeMillis() - start;
-                return parseOutput(streamer.getText(), input, promptTokens, tokenCount, duration);
+                return new Generated(streamer.getText(), promptTokens, tokenCount,
+                        System.currentTimeMillis() - start);
             }
         } catch (GenAIException e) {
             throw new InferenceException(

@@ -16,7 +16,7 @@
 /**
  * LangChain4j adapters for inference4j: run inference4j models in-process behind LangChain4j's
  * interfaces ({@code EmbeddingModel}, {@code ScoringModel}, {@code DocumentParser},
- * {@code DocumentTransformer}, {@code InputGuardrail}).
+ * {@code DocumentTransformer}, {@code InputGuardrail}, {@code ChatModel}, {@code StreamingChatModel}).
  *
  * <h2>Rules every adapter follows</h2>
  * <ul>
@@ -28,6 +28,7 @@
  * </ul>
  *
  * <p>LangChain4j is a {@code compileOnly} dependency: applications bring their own LangChain4j
- * (built and tested against 1.23).
+ * (built and tested against 1.23). {@code inference4j-genai} is {@code compileOnly} too: the chat model adapters
+ * need it on the classpath.
  */
 package io.github.inference4j.langchain4j;

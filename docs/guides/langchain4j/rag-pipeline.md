@@ -240,9 +240,19 @@ RetrievalAugmentor augmentor = DefaultRetrievalAugmentor.builder()
 
 ## The chat model
 
-Any LangChain4j `ChatModel` or `StreamingChatModel` works. The showcase runs Phi-4-mini in the same JVM, through
-inference4j's genai module. A small local model answered single lookups from one or two sources well there; it was
-not reliable when asked to combine figures from several records.
+Any LangChain4j `ChatModel` or `StreamingChatModel` works, including [`Inference4jChatModel`](chat-model.md), which
+runs the LLM in the same JVM:
+
+```java
+ChatModel chatModel = new Inference4jChatModel(TextGenerator.builder()
+        .model(ModelSources.phi4Mini())
+        .maxNewTokens(200)
+        .temperature(0)
+        .build());
+```
+
+In the showcase, Phi-4-mini answered single lookups from one or two sources well; it was not reliable when asked to
+combine figures from several records.
 
 ## Close on shutdown
 

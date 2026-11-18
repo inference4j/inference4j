@@ -25,6 +25,7 @@ import ai.onnxruntime.genai.TokenizerStream;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.genai.AbstractGenerativeTask;
+import io.github.inference4j.generation.ChatMessage;
 import io.github.inference4j.generation.ChatTemplate;
 import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.generation.GenerativeModel;
@@ -33,7 +34,9 @@ import io.github.inference4j.model.ModelSource;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Autoregressive text generator backed by onnxruntime-genai.
@@ -61,6 +64,13 @@ import java.util.Set;
  *         .build()) {
  *     gen.generate("Explain recursion.", token -> System.out.print(token));
  * }
+ * }</pre>
+ *
+ * <p>A conversation, with a system message:
+ * <pre>{@code
+ * GenerationResult result = gen.chat(List.of(
+ *         ChatMessage.system("Answer in one sentence."),
+ *         ChatMessage.user("What is Java?")));
  * }</pre>
  *
  * <p>Limiting the answer length and threads, with greedy decoding:
@@ -134,9 +144,57 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
         return stopSequences;
     }
 
-    @Override
-    protected int maxNewTokens() {
+
+    /**
+     * Generates the next assistant message of a conversation.
+     *
+     * @param messages the conversation, oldest message first
+     * @return the generated text
+     * @see #chat(List, Consumer)
+     */
+    public GenerationResult chat(List<ChatMessage> messages) {
+        return chat(messages, null);
+    }
+
+    /**
+     * Generates the next assistant message of a conversation, streaming each decoded fragment to
+     * {@code tokenListener}. Thread-safe, with the same locking as {@link #generate(Object, Consumer)}.
+     *
+     * <p>The conversation is formatted with the chat template's {@link ChatTemplate#format(List)}, which the
+     * templates of the models in {@code ModelSources} implement.
+     *
+     * @param messages      the conversation, oldest message first
+     * @param tokenListener receives each decoded fragment; may be {@code null}
+     * @return the generated text
+     * @throws IllegalArgumentException if {@code messages} is empty
+     * @throws UnsupportedOperationException if the chat template formats single user messages only
+     */
+    public GenerationResult chat(List<ChatMessage> messages, Consumer<String> tokenListener) {
+        if (messages == null || messages.isEmpty()) {
+            throw new IllegalArgumentException("messages must not be empty");
+        }
+        List<ChatMessage> conversation = List.copyOf(messages);
+        return generateFrom(generator -> generator.appendTokenSequences(tokenizer.encode(format(conversation))),
+                tokenListener);
+    }
+
+    /** The total number of tokens, prompt included, of one generation. */
+    public int maxLength() {
+        return maxLength;
+    }
+
+    /** The maximum number of tokens generated per call, or 0 when only {@link #maxLength()} applies. */
+    public int maxNewTokens() {
         return maxNewTokens;
+    }
+
+    private String format(List<ChatMessage> messages) {
+        try {
+            return chatTemplate.format(messages);
+        } catch (UnsupportedOperationException e) {
+            throw new UnsupportedOperationException("The chat template formats single user messages only. Use a "
+                    + "model from ModelSources, or a ChatTemplate that implements format(List<ChatMessage>)", e);
+        }
     }
 
     @Override

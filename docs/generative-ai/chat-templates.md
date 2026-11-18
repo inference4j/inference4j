@@ -96,6 +96,40 @@ The template format for a given model is defined in its `tokenizer_config.json` 
 on HuggingFace, under the `chat_template` field. It's typically a Jinja2 template —
 you only need to translate the user-message portion into a Java lambda.
 
+## Conversations
+
+`TextGenerator.chat(List<ChatMessage>)` formats a whole conversation, with system and assistant messages, through a
+second method of `ChatTemplate`:
+
+```java
+default String format(List<ChatMessage> messages)
+```
+
+The templates of the models in `ModelSources` implement it. A template written as a lambda formats single user
+messages only, and `chat` throws `UnsupportedOperationException` with it. For a custom model, implement both
+methods:
+
+```java
+ChatTemplate chatMl = new ChatTemplate() {
+    @Override
+    public String format(String userMessage) {
+        return format(List.of(ChatMessage.user(userMessage)));
+    }
+
+    @Override
+    public String format(List<ChatMessage> messages) {
+        StringBuilder prompt = new StringBuilder();
+        for (ChatMessage message : messages) {
+            prompt.append("<|im_start|>").append(message.role().name().toLowerCase(Locale.ROOT)).append('\n')
+                    .append(message.content()).append("<|im_end|>\n");
+        }
+        return prompt.append("<|im_start|>assistant\n").toString();
+    }
+};
+```
+
+The LangChain4j [chat model adapters](../guides/langchain4j/chat-model.md) use `chat`, so they need such a template.
+
 ## Adding support for a new model
 
 When a new model family uses a chat template that isn't covered by `ModelSources`,
