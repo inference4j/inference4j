@@ -57,6 +57,19 @@ import java.util.Objects;
  * }
  * }</pre>
  *
+ * <p>Pieces of a few seconds often hold too little text to match a question. {@link Builder#mergeSegments(int)}
+ * joins consecutive segments into excerpts of up to a number of characters, each still pointing to where it starts:
+ *
+ * <pre>{@code
+ * var parser = Inference4jAudioDocumentParser.builder()
+ *         .recognizer(new SegmentedSpeechRecognizer(
+ *                 MoonshineRecognizer.builder().build(),
+ *                 SileroVadDetector.builder().build(),
+ *                 Duration.ofSeconds(8)))
+ *         .mergeSegments(300)
+ *         .build();
+ * }</pre>
+ *
  * <p>Input must be WAV (8- or 16-bit PCM, mono or stereo, any sample rate). Compressed audio and video
  * need converting first, for example with ffmpeg.
  *
@@ -75,13 +88,23 @@ public class Inference4jAudioDocumentParser implements DocumentParser, AutoClose
     public static final String END_MS = "end_ms";
 
     private final SpeechRecognizer recognizer;
+    private final int mergeMaxChars;          // 0: one document per segment
 
     /**
      * @param recognizer the recognizer to transcribe with, typically a {@link SegmentedSpeechRecognizer};
      *                   closed by {@link #close()}
      */
     public Inference4jAudioDocumentParser(SpeechRecognizer recognizer) {
+        this(recognizer, 0);
+    }
+
+    private Inference4jAudioDocumentParser(SpeechRecognizer recognizer, int mergeMaxChars) {
         this.recognizer = Objects.requireNonNull(recognizer, "recognizer is required");
+        this.mergeMaxChars = mergeMaxChars;
+    }
+
+    public static Builder builder() {
+        return new Builder();
     }
 
     /**
@@ -110,6 +133,11 @@ public class Inference4jAudioDocumentParser implements DocumentParser, AutoClose
      * audio. A recognizer that returns none yields a single document spanning the whole recording.
      * Segments without speech are skipped, so silent audio gives an empty list.
      *
+     * <p>With {@link Builder#mergeSegments(int)}, consecutive segments are joined with a space until the next one
+     * would make the text longer than the limit. A joined document has the {@value #START_MS} of its first segment
+     * and the {@value #END_MS} of its last; {@value #SEGMENT_INDEX} counts the joined documents. A single segment
+     * longer than the limit stays whole.
+     *
      * @throws InferenceException if the stream is not readable WAV
      */
     public List<Document> parseSegments(InputStream inputStream) {
@@ -120,17 +148,39 @@ public class Inference4jAudioDocumentParser implements DocumentParser, AutoClose
         }
 
         List<Document> documents = new ArrayList<>(segments.size());
+        StringBuilder text = new StringBuilder();
+        float start = 0;
+        float end = 0;
         for (Transcription.Segment segment : segments) {
             if (segment.text() == null || segment.text().isBlank()) {
                 continue;
             }
-            Metadata metadata = new Metadata()
-                    .put(SEGMENT_INDEX, documents.size())
-                    .put(START_MS, Math.round(segment.startTime() * 1000d))
-                    .put(END_MS, Math.round(segment.endTime() * 1000d));
-            documents.add(Document.from(segment.text().strip(), metadata));
+            String piece = segment.text().strip();
+            boolean fits = mergeMaxChars > 0 && text.length() + 1 + piece.length() <= mergeMaxChars;
+            if (!text.isEmpty() && !fits) {
+                documents.add(document(text, documents.size(), start, end));
+                text.setLength(0);
+            }
+            if (text.isEmpty()) {
+                start = segment.startTime();
+            } else {
+                text.append(' ');
+            }
+            text.append(piece);
+            end = segment.endTime();
+        }
+        if (!text.isEmpty()) {
+            documents.add(document(text, documents.size(), start, end));
         }
         return documents;
+    }
+
+    private static Document document(CharSequence text, int index, float startSeconds, float endSeconds) {
+        Metadata metadata = new Metadata()
+                .put(SEGMENT_INDEX, index)
+                .put(START_MS, Math.round(startSeconds * 1000d))
+                .put(END_MS, Math.round(endSeconds * 1000d));
+        return Document.from(text.toString(), metadata);
     }
 
     /**
@@ -165,5 +215,46 @@ public class Inference4jAudioDocumentParser implements DocumentParser, AutoClose
     }
 
     private record TranscribedAudio(Transcription transcription, float seconds) {
+    }
+
+    /**
+     * Builder for {@link Inference4jAudioDocumentParser}.
+     */
+    public static class Builder {
+
+        private SpeechRecognizer recognizer;
+        private int mergeMaxChars;
+
+        private Builder() {
+        }
+
+        /**
+         * The recognizer to transcribe with, typically a {@link SegmentedSpeechRecognizer}. Required; closed by
+         * the parser's {@link Inference4jAudioDocumentParser#close()}.
+         */
+        public Builder recognizer(SpeechRecognizer recognizer) {
+            this.recognizer = recognizer;
+            return this;
+        }
+
+        /**
+         * Joins consecutive segments returned by
+         * {@link Inference4jAudioDocumentParser#parseSegments(InputStream)} into documents of up to
+         * {@code maxChars} characters. Off by default: one document per segment.
+         */
+        public Builder mergeSegments(int maxChars) {
+            if (maxChars < 1) {
+                throw new IllegalArgumentException("maxChars must be at least 1");
+            }
+            this.mergeMaxChars = maxChars;
+            return this;
+        }
+
+        /**
+         * @throws NullPointerException if no recognizer is set
+         */
+        public Inference4jAudioDocumentParser build() {
+            return new Inference4jAudioDocumentParser(recognizer, mergeMaxChars);
+        }
     }
 }

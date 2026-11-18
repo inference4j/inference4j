@@ -46,11 +46,38 @@ try (InputStream in = Files.newInputStream(Path.of("meeting.wav"))) {
 
 Without a document splitter, the ingestor stores each segment document as one text segment, with its metadata.
 
+### Merging short segments
+
+Pieces of a few seconds often hold too little text to match a question. `mergeSegments(int)` on the builder joins
+consecutive segments into documents of up to that many characters:
+
+```java
+var parser = Inference4jAudioDocumentParser.builder()
+        .recognizer(new SegmentedSpeechRecognizer(
+                MoonshineRecognizer.builder().build(),
+                SileroVadDetector.builder().build(),
+                Duration.ofSeconds(8)))
+        .mergeSegments(300)
+        .build();
+```
+
+A merged document has the `start_ms` of its first segment and the `end_ms` of its last, so it still points to where
+it starts in the recording. `segment_index` counts the merged documents. A single segment longer than the limit
+stays whole. Short segments with merging keep answers close to the moment they came from; long segments lose that
+precision.
+
+| Builder option | Default | Description |
+|----------------|---------|-------------|
+| `.recognizer(SpeechRecognizer)` | — (required) | The recognizer, typically a `SegmentedSpeechRecognizer`; closed by the parser |
+| `.mergeSegments(int)` | off | Join consecutive segments from `parseSegments` into documents of up to this many characters |
+
+The constructor `new Inference4jAudioDocumentParser(recognizer)` is the same as the builder without merging.
+
 ### Segment metadata
 
 | Key | Type | Value |
 |-----|------|-------|
-| `segment_index` (`Inference4jAudioDocumentParser.SEGMENT_INDEX`) | `int` | Position of the segment in the recording, from 0 |
+| `segment_index` (`Inference4jAudioDocumentParser.SEGMENT_INDEX`) | `int` | Position of the segment (or merged document) in the recording, from 0 |
 | `start_ms` (`Inference4jAudioDocumentParser.START_MS`) | `long` | Where the segment starts, in milliseconds |
 | `end_ms` (`Inference4jAudioDocumentParser.END_MS`) | `long` | Where the segment ends, in milliseconds |
 
