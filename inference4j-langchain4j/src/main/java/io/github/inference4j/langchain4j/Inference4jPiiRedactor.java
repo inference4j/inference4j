@@ -34,6 +34,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -63,6 +65,17 @@ import java.util.stream.Collectors;
  *       redacted. Build the recognizer with {@code stride(...)} so long text is read in full.</li>
  * </ul>
  *
+ * <p>Entities that a {@link Builder#keep(Predicate) keep} rule matches stay in the text and are not counted, for
+ * values that look like personal data but are not, such as order or booking numbers:
+ *
+ * <pre>{@code
+ * var redactor = Inference4jPiiRedactor.builder()
+ *         .recognizer(GlinerEntityRecognizer.pii().threshold(0.3f).stride(64).build())
+ *         .minScore("person", 0.5f)                         // stricter for names than the recognizer's 0.3
+ *         .keep(Pattern.compile("LB-\\d{4}"))                // booking numbers are not ID numbers
+ *         .build();
+ * }</pre>
+ *
  * <p>Spans that overlap or touch, and spans with the same label separated only by whitespace (such as
  * "John" and "Smith"), become one placeholder. A merged span takes the label of its highest-scoring part.
  *
@@ -84,6 +97,8 @@ public class Inference4jPiiRedactor implements DocumentTransformer, AutoCloseabl
     private final NamedEntityRecognizer recognizer;
     private final Set<String> labels;          // lower case; null means every label
     private final Float minScore;
+    private final Map<String, Float> labelMinScores;   // lower-case label to minimum score
+    private final Predicate<NamedEntity> keep;
     private final Function<NamedEntity, String> placeholder;
     private final TextSegmentTransformer segmentTransformer = this::transform;
 
@@ -93,6 +108,8 @@ public class Inference4jPiiRedactor implements DocumentTransformer, AutoCloseabl
                 .map(label -> label.toLowerCase(Locale.ROOT))
                 .collect(Collectors.toUnmodifiableSet());
         this.minScore = builder.minScore;
+        this.labelMinScores = Map.copyOf(builder.labelMinScores);
+        this.keep = builder.keep.stream().reduce(entity -> false, Predicate::or);
         this.placeholder = builder.placeholder;
     }
 
@@ -158,17 +175,23 @@ public class Inference4jPiiRedactor implements DocumentTransformer, AutoCloseabl
         return new Redaction(redacted.toString(), spans);
     }
 
-    /** Entities that pass the label and score filters and lie inside the text, ordered by position. */
+    /**
+     * Entities that pass the label, score and keep filters and lie inside the text, ordered by position.
+     */
     private List<NamedEntity> selected(String text) {
         List<NamedEntity> kept = new ArrayList<>();
         for (NamedEntity entity : recognizer.recognize(text)) {
             if (labels != null && !labels.contains(entity.label().toLowerCase(Locale.ROOT))) {
                 continue;
             }
-            if (minScore != null && entity.score() < minScore) {
+            Float threshold = labelMinScores.getOrDefault(entity.label().toLowerCase(Locale.ROOT), minScore);
+            if (threshold != null && entity.score() < threshold) {
                 continue;
             }
             if (entity.start() < 0 || entity.end() > text.length() || entity.start() >= entity.end()) {
+                continue;
+            }
+            if (keep.test(entity)) {
                 continue;
             }
             kept.add(entity);
@@ -229,6 +252,8 @@ public class Inference4jPiiRedactor implements DocumentTransformer, AutoCloseabl
         private NamedEntityRecognizer recognizer;
         private Collection<String> labels;
         private Float minScore;
+        private final Map<String, Float> labelMinScores = new TreeMap<>();
+        private final List<Predicate<NamedEntity>> keep = new ArrayList<>();
         private Function<NamedEntity, String> placeholder =
                 entity -> "[" + snakeCase(entity.label()).toUpperCase(Locale.ROOT) + "]";
 
@@ -261,6 +286,38 @@ public class Inference4jPiiRedactor implements DocumentTransformer, AutoCloseabl
         public Builder minScore(float minScore) {
             this.minScore = minScore;
             return this;
+        }
+
+        /**
+         * Redacts entities labelled {@code label} (case-insensitive) only when they score at least
+         * {@code minScore}, overriding {@link #minScore(float)} for that label. Can be called once per label.
+         * Like {@code minScore(float)}, it applies on top of the recognizer's threshold, so it can only make a label
+         * stricter: set the recognizer's threshold to the lowest value any label needs.
+         */
+        public Builder minScore(String label, float minScore) {
+            Objects.requireNonNull(label, "label");
+            this.labelMinScores.put(label.toLowerCase(Locale.ROOT), minScore);
+            return this;
+        }
+
+        /**
+         * Leaves entities that {@code rule} matches in the text, unredacted and uncounted. Can be called several
+         * times; an entity matching any rule is kept. Rules see each entity as the recognizer found it, before
+         * neighbouring spans are merged.
+         */
+        public Builder keep(Predicate<NamedEntity> rule) {
+            this.keep.add(Objects.requireNonNull(rule, "rule"));
+            return this;
+        }
+
+        /**
+         * Leaves entities whose whole text matches {@code pattern} in the text, unredacted and uncounted. For
+         * example {@code Pattern.compile("LB-\\d{4}")} keeps booking numbers. Same as
+         * {@code keep(entity -> pattern.matcher(entity.text()).matches())}.
+         */
+        public Builder keep(Pattern pattern) {
+            Objects.requireNonNull(pattern, "pattern");
+            return keep(entity -> pattern.matcher(entity.text()).matches());
         }
 
         /**

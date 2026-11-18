@@ -194,8 +194,8 @@ try {
 ```
 
 Part of a stored form from the showcase, after redaction. The customer's name, phone, email and ID number were
-replaced. The showcase adds the label `identity document number` and keeps the booking number with a placeholder
-function:
+replaced. The showcase adds the label `identity document number`; the booking number stays, as with
+`keep(Pattern.compile("LB-\\d{4}"))` on the redactor builder:
 
 ```text
 Booking:
@@ -278,7 +278,7 @@ threads per model with `sessionOptions(...)`; see [Hardware acceleration](../har
 
 - **Redaction is probabilistic** and applies to ingested documents, not to chat messages. Labels and threshold
   need tuning for the data: the showcase adds `identity document number`, leaves out `address`, which mostly
-  matched the shop's own locations, and keeps its reference numbers with a placeholder function. See [PII redaction](pii-redaction.md).
+  matched the shop's own locations. Reference numbers that look like ID numbers can be kept with `keep(...)`. See [PII redaction](pii-redaction.md).
 - **Segment length decides what an audio answer can point to.** Long segments lose precision; very short ones
   carry too little text to match a question. See [Audio document parser](audio-parser.md).
 - **Retrieved content is not checked for injected instructions.** The guardrail checks the user's message. See
