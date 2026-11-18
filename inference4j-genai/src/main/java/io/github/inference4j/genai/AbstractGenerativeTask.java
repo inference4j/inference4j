@@ -15,15 +15,26 @@
  */
 package io.github.inference4j.genai;
 
+import ai.onnxruntime.genai.Config;
 import ai.onnxruntime.genai.Generator;
 import ai.onnxruntime.genai.GeneratorParams;
 import ai.onnxruntime.genai.Model;
 import ai.onnxruntime.genai.TokenizerStream;
 import ai.onnxruntime.genai.GenAIException;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.generation.GenerativeTask;
+import io.github.inference4j.generation.TokenStreamer;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
@@ -99,12 +110,21 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
                 prepareGenerator(input, generator);
 
                 long start = System.currentTimeMillis();
+                int maxNewTokens = maxNewTokens();
                 int tokenCount = 0;
-                StringBuilder sb = new StringBuilder();
+                // Holds back text that could be the start of a stop sequence, so a stop sequence is never emitted
+                TokenStreamer streamer = new TokenStreamer(stopSequences(),
+                        tokenListener == null ? text -> { } : text -> {
+                            if (!text.isEmpty()) {
+                                tokenListener.accept(text);
+                            }
+                        });
 
+                long sequenceLength = generator.tokenCount();
+                int promptTokens = Math.toIntExact(sequenceLength);
                 try (TokenizerStream stream = createStream()) {
-                    long sequenceLength = generator.tokenCount();
-                    while (!generator.isDone()) {
+                    while (!generator.isDone() && !streamer.isStopped()
+                            && (maxNewTokens <= 0 || tokenCount < maxNewTokens)) {
                         generator.generateNextToken();
                         long newLength = generator.tokenCount();
                         if (newLength == sequenceLength) {
@@ -113,22 +133,39 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
                         }
                         sequenceLength = newLength;
                         int token = generator.getLastTokenInSequence(0);
-                        String text = stream.decode(token);
-                        sb.append(text);
                         tokenCount++;
-                        if (tokenListener != null && !text.isEmpty()) {
-                            tokenListener.accept(text);
-                        }
+                        streamer.accept(stream.decode(token));
                     }
                 }
+                streamer.flush();
 
                 long duration = System.currentTimeMillis() - start;
-                return parseOutput(sb.toString(), input, tokenCount, duration);
+                return parseOutput(streamer.getText(), input, promptTokens, tokenCount, duration);
             }
         } catch (GenAIException e) {
             throw new InferenceException(
                     "Generation failed: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Strings that end generation when they appear in the output. The stop sequence and anything after it are left
+     * out of the result and are not passed to the token listener. The default is none.
+     *
+     * @return the stop sequences; empty for none
+     */
+    protected Set<String> stopSequences() {
+        return Set.of();
+    }
+
+    /**
+     * The maximum number of tokens to generate per call, not counting the prompt. Generation also stops at the
+     * model's {@code max_length}, whichever comes first. The default, 0, sets no limit of its own.
+     *
+     * @return the limit, or 0 for none
+     */
+    protected int maxNewTokens() {
+        return 0;
     }
 
     /**
@@ -157,13 +194,14 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
     /**
      * Convert the generated text and metadata into the domain output type.
      *
-     * @param generatedText  the full generated text
+     * @param generatedText  the full generated text, without any stop sequence
      * @param input          the original domain input
+     * @param promptTokens   number of tokens in the input sequence before generation
      * @param tokenCount     number of tokens generated
      * @param durationMillis wall-clock generation time in milliseconds
      * @return the domain output
      */
-    protected abstract O parseOutput(String generatedText, I input,
+    protected abstract O parseOutput(String generatedText, I input, int promptTokens,
                                      int tokenCount, long durationMillis);
 
     /**
@@ -178,6 +216,46 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
      */
     protected GeneratorParams createParams() throws GenAIException {
         return new GeneratorParams(model);
+    }
+
+    /**
+     * Loads a genai model from {@code modelDirectory}. With {@code intraOpThreads > 0}, every ONNX Runtime session
+     * the model's {@code genai_config.json} declares (decoder, encoder, vision, embedding) is limited to that many
+     * threads, through a config overlay; the files on disk are not changed.
+     *
+     * @param modelDirectory the directory holding {@code genai_config.json}
+     * @param intraOpThreads the number of threads per session, or 0 for ONNX Runtime's default (all cores)
+     * @return the loaded model
+     * @throws GenAIException if the model cannot be loaded
+     * @throws IOException    if {@code genai_config.json} cannot be read
+     */
+    protected static Model loadModel(Path modelDirectory, int intraOpThreads) throws GenAIException, IOException {
+        if (intraOpThreads <= 0) {
+            return new Model(modelDirectory.toString());
+        }
+        String overlay = threadsOverlay(modelDirectory.resolve("genai_config.json"), intraOpThreads);
+        try (Config config = new Config(modelDirectory.toString())) {
+            config.overlay(overlay);
+            return new Model(config);
+        }
+    }
+
+    private static String threadsOverlay(Path genaiConfig, int intraOpThreads) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode sections = mapper.readTree(genaiConfig.toFile()).path("model");
+        ObjectNode overlay = mapper.createObjectNode();
+        ObjectNode model = overlay.putObject("model");
+        Iterator<Map.Entry<String, JsonNode>> fields = sections.fields();
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> section = fields.next();
+            // A section with a model file is an ONNX Runtime session
+            if (section.getValue().isObject() && section.getValue().has("filename")) {
+                model.putObject(section.getKey())
+                        .putObject("session_options")
+                        .put("intra_op_num_threads", intraOpThreads);
+            }
+        }
+        return mapper.writeValueAsString(overlay);
     }
 
     /**

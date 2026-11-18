@@ -26,6 +26,7 @@ import org.mockito.MockedConstruction;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -102,6 +103,60 @@ class AbstractGenerativeTaskTest {
     }
 
     @Test
+    void resultCountsThePromptTokens() throws Exception {
+        try (MockedConstruction<Generator> ignored = oneTokenGenerator()) {
+            GenerationResult result = new TestGenerativeTask(mock(Model.class), stream()).generate("prompt");
+
+            assertThat(result.promptTokens()).isEqualTo(4);
+            assertThat(result.generatedTokens()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void stopSequenceEndsGenerationAndIsNotEmitted() throws Exception {
+        TokenizerStream stream = mock(TokenizerStream.class);
+        when(stream.decode(10)).thenReturn(" country");
+        when(stream.decode(11)).thenReturn(".<|e");
+        when(stream.decode(12)).thenReturn("nd|> more");
+        List<String> streamed = new ArrayList<>();
+
+        try (MockedConstruction<Generator> constructed = mockConstruction(Generator.class, (generator, context) -> {
+            when(generator.isDone()).thenReturn(false);
+            when(generator.tokenCount()).thenReturn(4L, 5L, 6L, 7L, 8L);
+            when(generator.getLastTokenInSequence(0)).thenReturn(10, 11, 12, 13);
+        })) {
+            var task = new TestGenerativeTask(mock(Model.class), stream);
+            task.stopSequences = Set.of("<|end|>");
+            GenerationResult result = task.generate("prompt", streamed::add);
+
+            assertThat(result.text()).isEqualTo(" country.");
+            assertThat(String.join("", streamed)).isEqualTo(" country.");
+            assertThat(result.generatedTokens()).isEqualTo(3);
+            verify(constructed.constructed().get(0), times(3)).generateNextToken();
+        }
+    }
+
+    @Test
+    void maxNewTokensEndsGeneration() throws Exception {
+        TokenizerStream stream = mock(TokenizerStream.class);
+        when(stream.decode(10)).thenReturn(" a");
+
+        try (MockedConstruction<Generator> constructed = mockConstruction(Generator.class, (generator, context) -> {
+            when(generator.isDone()).thenReturn(false);
+            when(generator.tokenCount()).thenReturn(4L, 5L, 6L, 7L);
+            when(generator.getLastTokenInSequence(0)).thenReturn(10);
+        })) {
+            var task = new TestGenerativeTask(mock(Model.class), stream);
+            task.maxNewTokens = 2;
+            GenerationResult result = task.generate("prompt");
+
+            assertThat(result.text()).isEqualTo(" a a");
+            assertThat(result.generatedTokens()).isEqualTo(2);
+            verify(constructed.constructed().get(0), times(2)).generateNextToken();
+        }
+    }
+
+    @Test
     void generateFromTheTokenListenerFails() throws Exception {
         try (MockedConstruction<Generator> ignored = oneTokenGenerator()) {
             var task = new TestGenerativeTask(mock(Model.class), stream());
@@ -161,6 +216,8 @@ class AbstractGenerativeTaskTest {
 
         private final TokenizerStream stream;
         boolean closeResourcesCalled = false;
+        Set<String> stopSequences = Set.of();
+        int maxNewTokens;
 
         TestGenerativeTask(Model model) {
             this(model, null);
@@ -187,10 +244,20 @@ class AbstractGenerativeTaskTest {
         }
 
         @Override
-        protected GenerationResult parseOutput(String generatedText, String input,
+        protected GenerationResult parseOutput(String generatedText, String input, int promptTokens,
                                                int tokenCount, long durationMillis) {
-            return new GenerationResult(generatedText, 0, tokenCount,
+            return new GenerationResult(generatedText, promptTokens, tokenCount,
                     java.time.Duration.ofMillis(durationMillis));
+        }
+
+        @Override
+        protected Set<String> stopSequences() {
+            return stopSequences;
+        }
+
+        @Override
+        protected int maxNewTokens() {
+            return maxNewTokens;
         }
 
         @Override

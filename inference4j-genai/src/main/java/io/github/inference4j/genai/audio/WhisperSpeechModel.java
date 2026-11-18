@@ -225,7 +225,7 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 	}
 
 	@Override
-	protected Transcription parseOutput(String generatedText, Path input,
+	protected Transcription parseOutput(String generatedText, Path input, int promptTokens,
 										int tokenCount, long durationMillis) {
 		return new Transcription(generatedText.strip());
 	}
@@ -271,6 +271,7 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 		private double temperature = 0.0;
 		private int topK = 0;
 		private double topP = 0.0;
+		private int intraOpThreads;
 
 		// Package-private for testing
 		Model model;
@@ -316,6 +317,18 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 			return this;
 		}
 
+		/**
+		 * Limits each ONNX Runtime session of the model to {@code intraOpThreads} threads. Defaults to ONNX
+		 * Runtime's choice, which uses every core.
+		 */
+		public Builder intraOpThreads(int intraOpThreads) {
+			if (intraOpThreads < 1) {
+				throw new IllegalArgumentException("intraOpThreads must be at least 1");
+			}
+			this.intraOpThreads = intraOpThreads;
+			return this;
+		}
+
 		public WhisperSpeechModel build() {
 			if (model == null) {
 				if (modelId == null) {
@@ -327,10 +340,10 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 				Path modelDir = source.resolve(modelId, MODEL_FILES);
 				Model m = null;
 				try {
-					m = new Model(modelDir.toString());
+					m = loadModel(modelDir, intraOpThreads);
 					model = m;
 					processor = new MultiModalProcessor(m);
-				} catch (GenAIException e) {
+				} catch (GenAIException | IOException e) {
 					if (m != null) {
 						m.close();
 					}

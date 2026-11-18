@@ -86,6 +86,10 @@ the full text and timing information.
 | `.temperature(double)` | `double` | `1.0` | Sampling temperature (higher = more random) |
 | `.topK(int)` | `int` | `0` (disabled) | Top-K sampling (keep K most probable tokens) |
 | `.topP(double)` | `double` | `0.0` (disabled) | Nucleus sampling (keep tokens summing to P probability) |
+| `.maxNewTokens(int)` | `int` | no limit of its own | Maximum number of tokens to generate per call, not counting the prompt. Generation also stops at `maxLength` |
+| `.repetitionPenalty(double)` | `double` | model default | Values above 1 make repeated tokens less likely |
+| `.stopSequence(String)` | `String` | none | Ends generation when the string appears. The stop sequence and anything after it are left out of the result and are not streamed. Can be called several times |
+| `.intraOpThreads(int)` | `int` | all cores | Threads per ONNX Runtime session. Applied as an overlay on the model's `genai_config.json`; the files on disk are not changed |
 
 ## Result type
 
@@ -94,7 +98,7 @@ the full text and timing information.
 | Field | Type | Description |
 |-------|------|-------------|
 | `text()` | `String` | The generated text |
-| `promptTokens()` | `int` | Number of tokens in the input prompt (0 if unknown) |
+| `promptTokens()` | `int` | Number of tokens in the input prompt, after the chat template is applied |
 | `generatedTokens()` | `int` | Number of tokens generated |
 | `duration()` | `Duration` | Wall-clock generation time |
 
@@ -121,5 +125,7 @@ generation loop, KV cache, and why this architecture differs from single-pass wr
   onnxruntime-genai **allocates the key/value cache for the full `maxLength` up front**. For
   SmolLM3-3B we measured a peak of 2.8 GB at `maxLength(256)`, but 12.3 GB at its full
   65,536-token context.
+- With long prompts, such as retrieved documents, set `maxNewTokens` to bound the answer. `maxLength` alone
+  counts the prompt too, so a longer prompt leaves less room for the answer.
 - `temperature` below 1.0 gives more focused output; above 1.0 gives more varied output.
 - Reuse `TextGenerator` instances across prompts — each one holds the model in memory.

@@ -52,6 +52,42 @@ class TextGeneratorModelTest {
     }
 
     @Test
+    void generationOptionsLimitTheAnswer() {
+        try (var generator = TextGenerator.builder()
+                .model(ModelSources.phi3Mini())
+                .intraOpThreads(2)
+                .maxNewTokens(8)
+                .repetitionPenalty(1.1)
+                .temperature(0)
+                .build()) {
+
+            GenerationResult result = generator.generate("Count from one to twenty in words, separated by commas.");
+
+            assertThat(result.promptTokens()).isGreaterThan(0);
+            assertThat(result.generatedTokens()).isEqualTo(8);
+        }
+    }
+
+    @Test
+    void stopSequenceIsLeftOutOfTheAnswer() {
+        try (var generator = TextGenerator.builder()
+                .model(ModelSources.phi3Mini())
+                .intraOpThreads(2)
+                .maxNewTokens(60)
+                .temperature(0)
+                .stopSequence("five")
+                .build()) {
+
+            List<String> streamed = new ArrayList<>();
+            GenerationResult result = generator.generate(
+                    "Count from one to ten in words, separated by commas.", streamed::add);
+
+            assertThat(result.text()).containsIgnoringCase("four").doesNotContain("five").doesNotContain("six");
+            assertThat(String.join("", streamed)).isEqualTo(result.text());
+        }
+    }
+
+    @Test
     void generateWithStreamingCollectsAllTokens() {
         try (var generator = TextGenerator.builder()
                 .model(ModelSources.phi3Mini())

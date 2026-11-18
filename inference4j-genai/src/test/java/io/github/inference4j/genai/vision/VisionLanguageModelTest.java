@@ -45,7 +45,7 @@ class VisionLanguageModelTest {
 		GenerationResult result = vlm.parseOutput(
 				"  A cat sitting on a mat.  ",
 				new VisionInput(Path.of("cat.jpg"), "Describe this image."),
-				10, 250);
+				700, 10, 250);
 
 		assertThat(result.text()).isEqualTo("A cat sitting on a mat.");
 		assertThat(result.generatedTokens()).isEqualTo(10);
