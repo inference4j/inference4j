@@ -1,0 +1,28 @@
+/* Nav section headers — visual weight */
+.md-nav--primary > .md-nav__list > .md-nav__item--nested > .md-nav__link {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+/* Center mermaid diagrams */
+.mermaid {
+  text-align: center;
+}
+
+/* Indent child items under sections */
+.md-nav--primary > .md-nav__list > .md-nav__item--nested .md-nav .md-nav__link {
+  padding-left: 2rem;
+}
+
+/* Indent third-level items under nested sub-sections */
+.md-nav--primary > .md-nav__list > .md-nav__item--nested .md-nav .md-nav .md-nav__link {
+  padding-left: 3rem;
+}
+
+/* Section-index containers: pad the container only, not the link and toggle inside it */
+.md-nav--primary > .md-nav__list > .md-nav__item--nested .md-nav .md-nav__container > .md-nav__link {
+  padding-left: 0;
+}
