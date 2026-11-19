@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static io.github.inference4j.langchain4j.Inference4jPiiRedactor.REDACTED_COUNT;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -182,6 +183,40 @@ class Inference4jPiiRedactorTest {
         var redactor = Inference4jPiiRedactor.builder().recognizer(recognizer).minScore(0.5f).build();
 
         assertThat(redactor.redact("Marie: marie@example.com")).isEqualTo("Marie: [EMAIL]");
+    }
+
+    @Test
+    void perLabelMinScoreOverridesTheGlobalOne() {
+        var redactor = Inference4jPiiRedactor.builder()
+                .recognizer(new PhraseRecognizer()
+                        .find("Alice", "person", 0.4f)
+                        .find("D4829-1736", "identity document number", 0.4f)
+                        .find("alice@example.com", "email", 0.6f))
+                .minScore(0.5f)
+                .minScore("Identity Document Number", 0.3f)
+                .minScore("email", 0.7f)
+                .build();
+
+        assertThat(redactor.redact("Alice, D4829-1736, alice@example.com"))
+                .isEqualTo("Alice, [IDENTITY_DOCUMENT_NUMBER], alice@example.com");
+    }
+
+    @Test
+    void keptEntitiesStayAndAreNotCounted() {
+        var redactor = Inference4jPiiRedactor.builder()
+                .recognizer(new PhraseRecognizer()
+                        .find("LB-4471", "identity document number")
+                        .find("D4829-1736", "identity document number")
+                        .find("Lakeside", "person"))
+                .keep(Pattern.compile("LB-\\d{4}"))
+                .keep(entity -> entity.text().equals("Lakeside"))
+                .build();
+
+        Document redacted = redactor.transform(Document.from("Booking LB-4471 at Lakeside, ID D4829-1736"));
+
+        assertThat(redacted.text()).isEqualTo("Booking LB-4471 at Lakeside, ID [IDENTITY_DOCUMENT_NUMBER]");
+        assertThat(redacted.metadata().getInteger(REDACTED_COUNT)).isEqualTo(1);
+        assertThat(redacted.metadata().getInteger("pii_redacted_person")).isNull();
     }
 
     @Test

@@ -68,6 +68,9 @@ The view shares the redactor's recognizer and stops working when the redactor is
 | `.recognizer(NamedEntityRecognizer)` | `NamedEntityRecognizer` | — (required) | The model that finds personal data. Typically `GlinerEntityRecognizer.pii().threshold(0.3f).stride(64).build()` |
 | `.labels(Collection<String>)` | `Collection<String>` | every entity found | Redact only these labels (case-insensitive), e.g. `List.of("email", "phone number")` |
 | `.minScore(float)` | `float` | unset | Redact only entities scoring at least this, on top of the recognizer's threshold. To find more entities, lower the recognizer's threshold |
+| `.minScore(String, float)` | `String`, `float` | unset | Minimum score for one label (case-insensitive), overriding `minScore(float)` for it. Can only make a label stricter than the recognizer's threshold: set that threshold to the lowest value any label needs |
+| `.keep(Pattern)` | `Pattern` | none | Leaves entities whose whole text matches the pattern unredacted and uncounted, e.g. `Pattern.compile("LB-\\d{4}")` for booking numbers |
+| `.keep(Predicate<NamedEntity>)` | `Predicate` | none | Same, with any rule. `keep` can be called several times; an entity matching any rule is kept |
 | `.placeholder(Function<NamedEntity, String>)` | `Function` | `[LABEL]` in upper snake case | What replaces each span, e.g. `entity -> "<redacted>"` |
 
 ## What gets redacted
