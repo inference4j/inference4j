@@ -20,12 +20,25 @@ import ai.onnxruntime.genai.Tokenizer;
 import io.github.inference4j.genai.nlp.TextGenerator;
 import io.github.inference4j.generation.ChatTemplate;
 import io.github.inference4j.generation.GenerationResult;
+import ai.onnxruntime.genai.Generator;
+import ai.onnxruntime.genai.GeneratorParams;
+import ai.onnxruntime.genai.Sequences;
+import ai.onnxruntime.genai.TokenizerStream;
+import io.github.inference4j.generation.ChatMessage;
+import ai.onnxruntime.genai.GenAIException;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedConstruction;
+
+import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class TextGeneratorTest {
 
@@ -66,6 +79,70 @@ class TextGeneratorTest {
         assertThatThrownBy(() -> builder.maxNewTokens(0)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> builder.repetitionPenalty(0)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> builder.stopSequence("")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void chatFormatsTheConversationWithTheTemplate() throws Exception {
+        Tokenizer tokenizer = tokenizer();
+        TextGenerator gen = new TextGenerator(mock(Model.class), tokenizer,
+                io.github.inference4j.genai.ModelSources.phi4Mini().chatTemplate(), 100, 0, 0, 0);
+
+        try (MockedConstruction<GeneratorParams> params = mockConstruction(GeneratorParams.class);
+             MockedConstruction<Generator> generators = oneTokenGenerator()) {
+            GenerationResult result = gen.chat(List.of(ChatMessage.system("Be brief."), ChatMessage.user("Hi")));
+
+            assertThat(result.text()).isEqualTo("Hello");
+            assertThat(result.promptTokens()).isEqualTo(4);
+        }
+        verify(tokenizer).encode("<|system|>Be brief.<|end|><|user|>Hi<|end|><|assistant|>");
+    }
+
+    @Test
+    void chatNeedsATemplateThatFormatsConversations() {
+        TextGenerator gen = new TextGenerator(mock(Model.class), mock(Tokenizer.class), DUMMY_TEMPLATE,
+                100, 0, 0, 0);
+
+        try (MockedConstruction<GeneratorParams> params = mockConstruction(GeneratorParams.class);
+             MockedConstruction<Generator> generators = oneTokenGenerator()) {
+            assertThatThrownBy(() -> gen.chat(List.of(ChatMessage.user("Hi"))))
+                    .isInstanceOf(UnsupportedOperationException.class)
+                    .hasMessageContaining("format(List<ChatMessage>)");
+        }
+    }
+
+    @Test
+    void chatRejectsAnEmptyConversation() {
+        TextGenerator gen = new TextGenerator(mock(Model.class), mock(Tokenizer.class), DUMMY_TEMPLATE,
+                100, 0, 0, 0);
+
+        assertThatThrownBy(() -> gen.chat(List.of())).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void exposesItsLimits() {
+        TextGenerator gen = new TextGenerator(mock(Model.class), mock(Tokenizer.class), DUMMY_TEMPLATE,
+                512, 0, 0, 0, 64, 0, Set.of());
+
+        assertThat(gen.maxLength()).isEqualTo(512);
+        assertThat(gen.maxNewTokens()).isEqualTo(64);
+    }
+
+    private static Tokenizer tokenizer() throws GenAIException {
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode(anyString())).thenReturn(mock(Sequences.class));
+        TokenizerStream stream = mock(TokenizerStream.class);
+        when(stream.decode(10)).thenReturn("Hello");
+        when(tokenizer.createStream()).thenReturn(stream);
+        return tokenizer;
+    }
+
+    /** Generators produce one token, 10, after a 4-token prompt. */
+    private static MockedConstruction<Generator> oneTokenGenerator() {
+        return mockConstruction(Generator.class, (generator, context) -> {
+            when(generator.isDone()).thenReturn(false, true);
+            when(generator.tokenCount()).thenReturn(4L, 5L);
+            when(generator.getLastTokenInSequence(0)).thenReturn(10);
+        });
     }
 
     @Test

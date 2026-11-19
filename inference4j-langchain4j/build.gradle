@@ -9,7 +9,10 @@ dependencies {
 
     // Users bring their own LangChain4j; we only compile against its interfaces
     compileOnly "dev.langchain4j:langchain4j-core:${langchain4jVersion}"
+    // Only the chat model adapters need genai (LLMs via onnxruntime-genai); applications add it when they use them
+    compileOnly project(':inference4j-genai')
 
     testImplementation "dev.langchain4j:langchain4j-core:${langchain4jVersion}"
     testImplementation "dev.langchain4j:langchain4j:${langchain4jVersion}"
+    testImplementation project(':inference4j-genai')
 }

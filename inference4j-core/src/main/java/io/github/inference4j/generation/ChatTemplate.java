@@ -16,13 +16,16 @@
 
 package io.github.inference4j.generation;
 
+import java.util.List;
+
 /**
  * Formats a user message into the model's expected prompt format.
  *
  * <p>Different models use different chat template formats (e.g., Phi-3 uses
  * {@code <|user|>} markers, Qwen/DeepSeek uses {@code <|User|>} markers).
  * This interface abstracts the formatting so text generators can work with
- * any model.
+ * any model. Templates that also implement {@link #format(List)} can format a whole conversation, with system
+ * and assistant messages.
  *
  * @see GenerativeModel
  */
@@ -36,4 +39,18 @@ public interface ChatTemplate {
      * @return the formatted prompt ready for tokenization
      */
     String format(String userMessage);
+
+    /**
+     * Formats a conversation into the model's expected prompt string, ending with an open assistant turn.
+     *
+     * <p>The default implementation throws {@link UnsupportedOperationException}, so a template written as a lambda
+     * formats single user messages only. The templates of the preconfigured models implement both methods.
+     *
+     * @param messages the conversation, oldest message first
+     * @return the formatted prompt ready for tokenization
+     * @throws UnsupportedOperationException if this template formats single user messages only
+     */
+    default String format(List<ChatMessage> messages) {
+        throw new UnsupportedOperationException("This chat template formats single user messages only");
+    }
 }

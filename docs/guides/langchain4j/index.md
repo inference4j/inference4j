@@ -14,6 +14,7 @@ or Python.
 | Transcribe recordings into documents with timestamps | `Inference4jAudioDocumentParser` | `DocumentParser` | [Audio document parser](audio-parser.md) |
 | Embed text, with query and document prefixes applied from the input type | `Inference4jEmbeddingModel` | `EmbeddingModel` | [Embedding model](embeddings.md) |
 | Rerank retrieved content with a cross-encoder | `Inference4jScoringModel` | `ScoringModel` | [Reranking](reranking.md) |
+| Run the LLM in-process: Phi-4-mini, Phi-3-mini, DeepSeek-R1, Qwen3, SmolLM3 | `Inference4jChatModel`, `Inference4jStreamingChatModel` | `ChatModel`, `StreamingChatModel` | [Chat model](chat-model.md) |
 
 [RAG pipelines](rag-pipeline.md) shows how the adapters fit together, with examples for recordings and scanned documents.
 
@@ -27,7 +28,7 @@ or Python.
 | Speech to documents | `AudioTranscriptionModel`, implemented by hosted providers; responses carry no timestamps | Moonshine, Whisper or Wav2Vec2 in-process, one `Document` per timed segment |
 | Local embeddings | Packaged in-process ONNX models (all-MiniLM-L6-v2, bge-small, e5-small) and `OnnxEmbeddingModel` for a custom file | bge-base, gte-base, nomic-embed-text-v1.5 (8K context, Matryoshka sizes); query/document prefixes from `EmbeddingInputType` |
 | Local reranking | `OnnxScoringModel`, given paths to a model file and a `tokenizer.json` | Cross-encoder downloaded and cached automatically; MaxP for long segments |
-| Local chat model | Ollama, Jlama and others | Not provided as a `ChatModel` |
+| Local chat model | Ollama (separate server), Jlama (in-process) and others | onnxruntime-genai in-process, INT4 models downloaded and cached automatically; no tool calling |
 
 ### Choosing an embedding or scoring model
 
@@ -76,7 +77,8 @@ Add the adapter module next to the LangChain4j dependencies. It includes `infere
 - LangChain4j is a `compileOnly` dependency of the module. The application supplies its own LangChain4j version.
 - ONNX Runtime requires the JVM flag `--enable-native-access=ALL-UNNAMED`. See
   [Installation](../../getting-started/installation.md#jvm-flags).
-- `WhisperSpeechModel` requires `inference4j-genai`. All other models on these pages are in `inference4j-core`.
+- The chat model adapters and `WhisperSpeechModel` require `inference4j-genai`. All other models on these pages are
+  in `inference4j-core`.
 
 !!! note "Experimental LangChain4j APIs"
     LangChain4j marks guardrails and the embedding request API (`EmbeddingInputType`) as experimental. They may
@@ -112,7 +114,7 @@ interface Assistant {
     String chat(String message);
 }
 
-ChatModel chatModel = ...;          // OpenAI, Anthropic, Ollama: any LangChain4j chat model
+ChatModel chatModel = ...;          // any LangChain4j chat model, or Inference4jChatModel
 List<Document> documents = ...;     // loaded with any LangChain4j document loader
 
 var embeddingModel = Inference4jEmbeddingModel.builder()
@@ -158,4 +160,4 @@ Models are downloaded from HuggingFace on first use and cached under `~/.cache/i
 - **Scanned PDFs.** The OCR parser reads images. PDF pages must be rasterized first; see [OCR document parser](ocr-parser.md#scanned-pdfs).
 - **Chat messages.** The PII redactor implements the ingestion interfaces only. See [PII redaction](pii-redaction.md#chat-messages).
 - **Compressed audio and video.** The audio parser reads WAV.
-- **Chat models.** inference4j's text generators are not available as a LangChain4j `ChatModel`.
+- **Tool calling.** The chat model adapters do not support tools. See [Chat model](chat-model.md#notes).

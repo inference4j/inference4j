@@ -19,7 +19,7 @@
 | `io.github.inference4j.audio` | `MoonshineRecognizer`, `TranscriptionStream`, `TranscriptListener`, `TranscriptLine`, `Wav2Vec2Recognizer`, `PunctuatedSpeechRecognizer`, `SegmentedSpeechRecognizer`, `SileroVadDetector` |
 | `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `DebertaZeroShotClassifier`, `ZeroShotTextClassifier`, `DebertaPromptInjectionDetector`, `PromptInjectionDetector`, `InjectionCheck`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `GlinerEntityRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `ZeroShotEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
-| `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `EncoderDecoderSession`, `ChatTemplate`, `GenerativeModel` |
+| `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `EncoderDecoderSession`, `ChatTemplate`, `ChatMessage`, `GenerativeModel`, `TokenStreamer` |
 | `io.github.inference4j.sampling` | `LogitsProcessor`, `LogitsSampler`, `CategoricalSampler`, `GreedySampler` |
 
 ### inference4j-genai
@@ -41,7 +41,7 @@
 
 | Package | Contents |
 |---------|----------|
-| `io.github.inference4j.langchain4j` | LangChain4j adapters: `Inference4jEmbeddingModel`, `Inference4jScoringModel`, `Inference4jPiiRedactor`, `Inference4jPromptInjectionGuardrail`, `Inference4jOcrDocumentParser`, `Inference4jAudioDocumentParser` |
+| `io.github.inference4j.langchain4j` | LangChain4j adapters: `Inference4jEmbeddingModel`, `Inference4jScoringModel`, `Inference4jPiiRedactor`, `Inference4jPromptInjectionGuardrail`, `Inference4jOcrDocumentParser`, `Inference4jAudioDocumentParser`, `Inference4jChatModel`, `Inference4jStreamingChatModel` |
 
 Each adapter implements a LangChain4j interface over an inference4j model:
 
@@ -127,7 +127,7 @@ Exceptions: `SileroVadDetector` (stateful hidden state), `MoonshineRecognizer` (
 ```
 GenerativeTask<I, O>                    // generate(I) → O, extends AutoCloseable
 └── AbstractGenerativeTask<I, O>        // owns the autoregressive loop
-    ├── TextGenerator                   // generate(String) → GenerationResult
+    ├── TextGenerator                   // generate(String), chat(List<ChatMessage>) → GenerationResult
     ├── WhisperSpeechModel              // SpeechRecognizer: transcribe(Path) → Transcription
     └── VisionLanguageModel             // generate(VisionInput) → GenerationResult
 ```
@@ -216,4 +216,4 @@ bean. The split mirrors Hibernate's `SessionFactory` and `Session`:
 | `Preprocessor<I, O>` | `O process(I input)` | Input transformation |
 | `Postprocessor<I, O>` | `O process(I input)` | Output transformation |
 | `OutputOperator` | `float[] apply(float[] values)` | Activation function (softmax, sigmoid, identity) |
-| `ChatTemplate` | `String format(String userMessage)` | Prompt formatting for generative models |
+| `ChatTemplate` | `String format(String userMessage)`, `String format(List<ChatMessage> messages)` (default: unsupported) | Prompt formatting for generative models |
