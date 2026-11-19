@@ -92,12 +92,15 @@ interface Assistant {
 Support calls are transcribed, redacted and stored. Each answer can point to the moment in a call it is based on.
 
 ```java
-var audioParser = new Inference4jAudioDocumentParser(new SegmentedSpeechRecognizer(
-        MoonshineRecognizer.builder().build(),
-        SileroVadDetector.builder().build(),
-        Duration.ofSeconds(8)));                                 // at most 8 s per segment
+var audioParser = Inference4jAudioDocumentParser.builder()
+        .recognizer(new SegmentedSpeechRecognizer(
+                MoonshineRecognizer.builder().build(),
+                SileroVadDetector.builder().build(),
+                Duration.ofSeconds(8)))                          // cut at pauses, at most 8 s per piece
+        .mergeSegments(300)                                      // join pieces into excerpts of up to 300 characters
+        .build();
 
-// One document per timed segment, each with start_ms and end_ms
+// One document per excerpt, each with start_ms and end_ms
 List<Document> documents = new ArrayList<>();
 for (Path call : List.of(Path.of("calls/call-2026-10-29.wav"), Path.of("calls/call-2026-11-02.wav"))) {
     try (InputStream in = Files.newInputStream(call)) {
@@ -145,8 +148,9 @@ e-14 and it's due back at seven tonight ...
 ... If anything changes, you can call me back on [PHONE_NUMBER]. Perfect see you this evening.
 ```
 
-Segments of a few seconds can be too short to answer a question alone. The showcase joins consecutive segments
-into excerpts of up to 300 characters and keeps the first `start_ms`, so each excerpt still points to a moment.
+Pieces of a few seconds can be too short to answer a question alone, so `mergeSegments(300)` joins consecutive
+pieces into excerpts of up to 300 characters. Each excerpt keeps the `start_ms` of its first piece, so it still points
+to a moment. See [Merging short segments](audio-parser.md#merging-short-segments).
 
 ## Example: scanned documents
 

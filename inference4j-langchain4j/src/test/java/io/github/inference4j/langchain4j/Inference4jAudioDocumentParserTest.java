@@ -124,6 +124,48 @@ class Inference4jAudioDocumentParserTest {
     }
 
     @Test
+    void mergeSegmentsJoinsConsecutiveSegmentsUpToTheLimit() throws IOException {
+        var recognizer = new StubRecognizer(new Transcription("", List.of(
+                new Transcription.Segment("Bring it back", 0f, 1f),                 // 13 characters
+                new Transcription.Segment(" by eight.", 1f, 2f),                    // 9: joined gives 23
+                new Transcription.Segment("  ", 2f, 2.5f),                          // blank, skipped
+                new Transcription.Segment("No late fee.", 2.5f, 3.5f),              // 12: 36 would exceed 30
+                new Transcription.Segment("Thanks.", 3.5f, 4f))));                  // 7: joined gives 20
+
+        var parser = Inference4jAudioDocumentParser.builder().recognizer(recognizer).mergeSegments(30).build();
+        List<Document> documents = parseSegments(parser);
+
+        assertThat(documents).extracting(Document::text)
+                .containsExactly("Bring it back by eight.", "No late fee. Thanks.");
+        assertThat(documents.get(0).metadata().getInteger(SEGMENT_INDEX)).isZero();
+        assertThat(documents.get(0).metadata().getLong(START_MS)).isZero();
+        assertThat(documents.get(0).metadata().getLong(END_MS)).isEqualTo(2000L);
+        assertThat(documents.get(1).metadata().getInteger(SEGMENT_INDEX)).isEqualTo(1);
+        assertThat(documents.get(1).metadata().getLong(START_MS)).isEqualTo(2500L);
+        assertThat(documents.get(1).metadata().getLong(END_MS)).isEqualTo(4000L);
+    }
+
+    @Test
+    void aSegmentLongerThanTheMergeLimitStaysWhole() throws IOException {
+        var recognizer = new StubRecognizer(new Transcription("", List.of(
+                new Transcription.Segment("A long sentence of speech.", 0f, 2f),
+                new Transcription.Segment("Short.", 2f, 3f))));
+
+        var parser = Inference4jAudioDocumentParser.builder().recognizer(recognizer).mergeSegments(10).build();
+
+        assertThat(parseSegments(parser)).extracting(Document::text)
+                .containsExactly("A long sentence of speech.", "Short.");
+    }
+
+    @Test
+    void builderValidatesItsOptions() {
+        assertThatThrownBy(() -> Inference4jAudioDocumentParser.builder().mergeSegments(0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Inference4jAudioDocumentParser.builder().build())
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
     void parseSegmentsSkipsBlankSegmentsAndKeepsIndexesContiguous() throws IOException {
         var recognizer = new StubRecognizer(new Transcription("first second", List.of(
                 new Transcription.Segment("first", 0f, 0.5f),
