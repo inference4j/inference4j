@@ -20,7 +20,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
@@ -317,23 +316,13 @@ public class DebertaZeroShotClassifier implements ZeroShotTextClassifier {
             Tokenizer tokenizer = TokenizerJsonParser.parseUnigram(tokenizerPath).build();
             SpecialTokens special = TokenizerJsonParser.parseSpecialTokens(tokenizerPath);
             ModelConfig config = ModelConfig.fromFile(configPath);
-            int entailment = -1;
-            for (int i = 0; i < config.numLabels(); i++) {
-                if (config.label(i).toLowerCase().startsWith("entail")) {
-                    entailment = i;
-                }
-            }
-            if (entailment < 0) {
-                throw new ModelLoadException("No entailment label in config.json id2label; is this an NLI model?");
-            }
-            // HuggingFace's choice: the last class when entailment is the first, otherwise the first
-            int contradiction = entailment == 0 ? config.numLabels() - 1 : 0;
+            NliLabels nli = NliLabels.from(config);
 
             InferenceSession session = sessionConfigurer != null
                     ? InferenceSession.create(modelPath, sessionConfigurer)
                     : InferenceSession.create(modelPath);
-            return new DebertaZeroShotClassifier(this, session, tokenizer, special, entailment, contradiction,
-                    padTokenId(configPath));
+            return new DebertaZeroShotClassifier(this, session, tokenizer, special, nli.entailment(),
+                    nli.contradiction(), padTokenId(configPath));
         }
 
         private static long padTokenId(Path configPath) {

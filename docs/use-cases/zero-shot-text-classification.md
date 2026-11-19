@@ -91,6 +91,19 @@ against 0.497 for `facebook/bart-large-mnli`.
 Both are [Moritz Laurer's zero-shot v2.0 "-c" models](https://huggingface.co/MoritzLaurer/deberta-v3-base-zeroshot-v2.0-c):
 MIT-licensed and trained **only on commercially-friendly data** (synthetic data plus the MNLI and FEVER-NLI datasets).
 
+### Other NLI models
+
+`.modelId(String)` accepts other NLI models exported to ONNX with a Unigram `tokenizer.json`. The classes are read
+from `id2label` in `config.json`:
+
+- the **entailment** class is the label starting with "entail", and is required;
+- the class it is scored against in multi-label mode, or with a single label, is the label starting with
+  "contradict". A model without one, such as `{0: entailment, 1: not_entailment}`, uses the other class: the last
+  class when entailment is first, otherwise the first.
+
+The order of the classes does not matter: `{0: entailment, 1: contradiction, 2: neutral}` and
+`{0: contradiction, 1: neutral, 2: entailment}` both score entailment against contradiction.
+
 ## Builder options
 
 | Method | Type | Default | Description |
