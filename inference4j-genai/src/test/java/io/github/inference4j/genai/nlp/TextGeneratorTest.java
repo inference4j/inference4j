@@ -38,9 +38,10 @@ class TextGeneratorTest {
 
         TextGenerator gen = new TextGenerator(model, tokenizer, DUMMY_TEMPLATE,
                 100, 1.0, 0, 0.0);
-        GenerationResult result = gen.parseOutput("Hello world", "prompt", 5, 120);
+        GenerationResult result = gen.parseOutput("Hello world", "prompt", 12, 5, 120);
 
         assertThat(result.text()).isEqualTo("Hello world");
+        assertThat(result.promptTokens()).isEqualTo(12);
         assertThat(result.generatedTokens()).isEqualTo(5);
         assertThat(result.duration()).isEqualTo(java.time.Duration.ofMillis(120));
     }
@@ -56,6 +57,15 @@ class TextGeneratorTest {
 
         verify(tokenizer).close();
         verify(model).close();
+    }
+
+    @Test
+    void builderRejectsInvalidOptions() {
+        TextGenerator.Builder builder = TextGenerator.builder();
+        assertThatThrownBy(() -> builder.intraOpThreads(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> builder.maxNewTokens(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> builder.repetitionPenalty(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> builder.stopSequence("")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

@@ -93,6 +93,7 @@ try (var whisper = WhisperSpeechModel.builder()
 | `.temperature(double)` | `double` | `0.0` | Sampling temperature (0 = greedy) |
 | `.topK(int)` | `int` | `0` (disabled) | Top-K sampling |
 | `.topP(double)` | `double` | `0.0` (disabled) | Nucleus sampling |
+| `.intraOpThreads(int)` | `int` | all cores | Threads per ONNX Runtime session. Applied as an overlay on the model's `genai_config.json`; the files on disk are not changed |
 
 ## Result type
 

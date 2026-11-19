@@ -26,8 +26,11 @@ import java.util.function.Consumer;
  *
  * <p>All string operations are bounded by the longest stop sequence length,
  * giving O(1) per-token cost regardless of total generated length.
+ *
+ * <p>Used by generation loops, including those of {@code inference4j-genai}. One instance serves one generation
+ * and is not thread-safe.
  */
-class TokenStreamer {
+public class TokenStreamer {
 
     private final Set<String> stopSequences;
     private final Consumer<String> listener;
@@ -36,7 +39,11 @@ class TokenStreamer {
     private final StringBuilder flushed = new StringBuilder();
     private boolean stopped;
 
-    TokenStreamer(Set<String> stopSequences, Consumer<String> listener) {
+    /**
+     * @param stopSequences strings that end the generation; may be empty
+     * @param listener      receives text that is known not to be part of a stop sequence
+     */
+    public TokenStreamer(Set<String> stopSequences, Consumer<String> listener) {
         this.stopSequences = stopSequences;
         this.listener = listener;
         this.maxStopLength = stopSequences.stream()
@@ -45,7 +52,8 @@ class TokenStreamer {
                 .orElse(0);
     }
 
-    void accept(String fragment) {
+    /** Adds a decoded fragment; emits what is safe and detects a stop sequence. */
+    public void accept(String fragment) {
         buffer.append(fragment);
 
         if (checkStop()) {
@@ -55,7 +63,8 @@ class TokenStreamer {
         flushSafePrefix();
     }
 
-    void flush() {
+    /** Emits the held-back text at the end of generation, unless a stop sequence was found. */
+    public void flush() {
         if (stopped || buffer.isEmpty()) {
             return;
         }
@@ -65,11 +74,13 @@ class TokenStreamer {
         buffer.setLength(0);
     }
 
-    boolean isStopped() {
+    /** Whether a stop sequence was found. */
+    public boolean isStopped() {
         return stopped;
     }
 
-    String getText() {
+    /** The text emitted so far, without any stop sequence. */
+    public String getText() {
         return flushed.toString();
     }
 

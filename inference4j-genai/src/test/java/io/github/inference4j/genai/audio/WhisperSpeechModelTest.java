@@ -37,7 +37,7 @@ class WhisperSpeechModelTest {
                 model, processor, "en", WhisperTask.TRANSCRIBE, 448, 1.0, 0, 0.0);
 
         Transcription result = whisper.parseOutput(
-                "  Hello world  ", null, 5, 100);
+                "  Hello world  ", null, 4, 5, 100);
 
         assertThat(result.text()).isEqualTo("Hello world");
         assertThat(result.segments()).isEmpty();

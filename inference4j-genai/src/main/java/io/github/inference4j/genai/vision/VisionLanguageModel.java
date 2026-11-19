@@ -32,6 +32,7 @@ import io.github.inference4j.generation.GenerativeModel;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 
+import java.io.IOException;
 import java.nio.file.Path;
 
 /**
@@ -129,9 +130,9 @@ public class VisionLanguageModel extends AbstractGenerativeTask<VisionInput, Gen
 	}
 
 	@Override
-	protected GenerationResult parseOutput(String generatedText, VisionInput input,
+	protected GenerationResult parseOutput(String generatedText, VisionInput input, int promptTokens,
 										   int tokenCount, long durationMillis) {
-		return new GenerationResult(generatedText.strip(), 0, tokenCount,
+		return new GenerationResult(generatedText.strip(), promptTokens, tokenCount,
 				java.time.Duration.ofMillis(durationMillis));
 	}
 
@@ -167,6 +168,7 @@ public class VisionLanguageModel extends AbstractGenerativeTask<VisionInput, Gen
 		private double temperature = 0.0;
 		private int topK = 0;
 		private double topP = 0.0;
+		private int intraOpThreads;
 
 		// Package-private for testing
 		Model model;
@@ -213,6 +215,18 @@ public class VisionLanguageModel extends AbstractGenerativeTask<VisionInput, Gen
 			return this;
 		}
 
+		/**
+		 * Limits each ONNX Runtime session of the model to {@code intraOpThreads} threads. Defaults to ONNX
+		 * Runtime's choice, which uses every core.
+		 */
+		public Builder intraOpThreads(int intraOpThreads) {
+			if (intraOpThreads < 1) {
+				throw new IllegalArgumentException("intraOpThreads must be at least 1");
+			}
+			this.intraOpThreads = intraOpThreads;
+			return this;
+		}
+
 		public VisionLanguageModel build() {
 			if (model == null) {
 				if (modelSource == null && modelId == null) {
@@ -231,10 +245,10 @@ public class VisionLanguageModel extends AbstractGenerativeTask<VisionInput, Gen
 				Path modelDir = source.resolve(id);
 				Model m = null;
 				try {
-					m = new Model(modelDir.toString());
+					m = loadModel(modelDir, intraOpThreads);
 					model = m;
 					processor = new MultiModalProcessor(m);
-				} catch (GenAIException e) {
+				} catch (GenAIException | IOException e) {
 					if (m != null) {
 						m.close();
 					}
