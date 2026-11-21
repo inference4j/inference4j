@@ -15,7 +15,7 @@
 | `io.github.inference4j.preprocessing.text` | `ModelConfig` (HuggingFace config.json parser) |
 | `io.github.inference4j.preprocessing.image` | Image transforms pipeline: `ImageTransformPipeline`, `ResizeTransform`, `CenterCropTransform`, `ImageLayout`, `Labels` |
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
-| `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `RtDetrDetector`, `CraftTextDetector`, `PaddleTextDetector`, `PaddleTextRecognizer`, `TextRecognizer`, `OcrPipeline`, `DbPostProcessor`, `QuadCrop`, `TextLine`, `RecognizedText`, `Point`, `DepthAnythingEstimator`, `Sam2Segmenter`, `Prompt`, `ImageFeatures`, `ImageEmbedder`, `ImageAnnotator`, `TensorImages`, `Colormap` |
+| `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `DetrDetector`, `CraftTextDetector`, `PaddleTextDetector`, `PaddleTextRecognizer`, `TextRecognizer`, `OcrPipeline`, `DbPostProcessor`, `QuadCrop`, `TextLine`, `RecognizedText`, `Point`, `DepthAnythingEstimator`, `Sam2Segmenter`, `Prompt`, `ImageFeatures`, `ImageEmbedder`, `ImageAnnotator`, `TensorImages`, `Colormap` |
 | `io.github.inference4j.audio` | `MoonshineRecognizer`, `TranscriptionStream`, `TranscriptListener`, `TranscriptLine`, `Wav2Vec2Recognizer`, `PunctuatedSpeechRecognizer`, `SegmentedSpeechRecognizer`, `SileroVadDetector` |
 | `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `DebertaZeroShotClassifier`, `ZeroShotTextClassifier`, `DebertaPromptInjectionDetector`, `PromptInjectionDetector`, `InjectionCheck`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `GlinerEntityRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `ZeroShotEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
@@ -76,7 +76,7 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 │                                       //   DebertaZeroShotClassifier (NLI); ClipClassifier is the image counterpart
 ├── Detector<I, D>                      // detect(I) → List<D>
 │   ├── ObjectDetector                  // detect(BufferedImage/Path) → List<Detection>
-│   │                                   //   YoloV8Detector, Yolo26Detector (AGPL-3.0); RtDetrDetector (Apache-2.0)
+│   │                                   //   YoloV8Detector, Yolo26Detector (AGPL-3.0); DetrDetector (Apache-2.0)
 │   ├── TextDetector                    // detect(BufferedImage/Path) → List<TextRegion>
 │   │                                   //   CraftTextDetector (words), PaddleTextDetector (lines)
 │   └── VoiceActivityDetector           // detect(Path/float[]) → List<VoiceSegment>
@@ -147,7 +147,7 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | `TextClassification` | `label()`, `index()`, `confidence()` | `DistilBertTextClassifier`, `DebertaPromptInjectionDetector`, `DebertaZeroShotClassifier` |
 | `InjectionCheck` | `probability()`, `threshold()`, `isInjection()` | `DebertaPromptInjectionDetector` |
 | `NamedEntity` | `text()`, `label()`, `start()`, `end()`, `score()` | `BertNerRecognizer`, `GlinerEntityRecognizer` |
-| `Detection` | `label()`, `classIndex()`, `confidence()`, `box()` | `YoloV8Detector`, `Yolo26Detector`, `RtDetrDetector` |
+| `Detection` | `label()`, `classIndex()`, `confidence()`, `box()` | `YoloV8Detector`, `Yolo26Detector`, `DetrDetector` |
 | `TextRegion` | `box()`, `polygon()`, `confidence()` | `CraftTextDetector`, `PaddleTextDetector` |
 | `TextLine` | `text()`, `confidence()`, `region()` | `OcrPipeline` |
 | `RecognizedText` | `text()`, `confidence()` | `PaddleTextRecognizer` (any `TextRecognizer`) |

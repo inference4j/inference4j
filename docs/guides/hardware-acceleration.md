@@ -24,7 +24,7 @@ changes which boxes survive.
 The newer **MLProgram** format keeps CPU-level accuracy for the models that support it:
 
 ```java
-try (var detector = RtDetrDetector.builder()
+try (var detector = DetrDetector.builder()
         .sessionOptions(opts -> opts.addCoreML(Map.of("ModelFormat", "MLProgram")))
         .build()) {
     detector.detect(Path.of("street.jpg"));
@@ -41,9 +41,9 @@ Not every model speeds up, and not every model converts. Measured with inference
 |-------|-----|-------------------------------|-----------|
 | CRAFT (`CraftTextDetector`) | 587 ms | **214 ms**, same regions | fails to load |
 | YOLO26n (`Yolo26Detector`) | 26 ms | 15 ms, **different detections** | 25 ms, same as CPU |
-| D-FINE small (`RtDetrDetector`) | 57 ms | 112 ms, scores within 0.01 | 102 ms, same as CPU |
-| RT-DETRv2 (`RtDetrDetector.rtDetrV2()`) | 106 ms | 122 ms, some labels differ | 98 ms, same as CPU |
-| D-FINE nano (`RtDetrDetector.dfineNano()`) | 32 ms | fails when run | fails to load |
+| D-FINE small (`DetrDetector`) | 57 ms | 112 ms, scores within 0.01 | 102 ms, same as CPU |
+| RT-DETRv2 (`DetrDetector.rtDetrV2()`) | 106 ms | 122 ms, some labels differ | 98 ms, same as CPU |
+| D-FINE nano (`DetrDetector.dfineNano()`) | 32 ms | fails when run | fails to load |
 | PP-OCRv6 small (`OcrPipeline`) | ~400 ms | ~860 ms | not measured |
 
 Small, CPU-optimized models (YOLO26n, D-FINE, PP-OCRv6) gain little or nothing from CoreML: ONNX Runtime splits them

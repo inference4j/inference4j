@@ -48,7 +48,7 @@ public class CutOutPeople {
     public static void main(String[] args) throws Exception {
         BufferedImage image = ImageIO.read(new File("street.jpg"));
 
-        try (var detector = RtDetrDetector.builder().build();
+        try (var detector = DetrDetector.builder().build();
              var sam = Sam2Segmenter.builder().build()) {
 
             ImageFeatures features = sam.encode(image);

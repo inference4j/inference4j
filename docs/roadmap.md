@@ -216,7 +216,7 @@ super-resolution are unblocked behind it.
 - [x] **CRAFT detects with its default thresholds** — post-processing now follows the reference implementation
       (max text score, separate link threshold, dilation, rotated boxes), matching it region for region
       ([#130](https://github.com/inference4j/inference4j/issues/130))
-- [x] **Apache-licensed detector** — `RtDetrDetector`: D-FINE small (default) and nano, RT-DETRv2 ResNet-18; NMS-free,
+- [x] **Apache-licensed detector** — `RtDetrDetector` (`DetrDetector` since 0.15.0): D-FINE small (default) and nano, RT-DETRv2 ResNet-18; NMS-free,
       an alternative to the AGPL-3.0 Ultralytics models, matching `transformers` detection for detection
       ([#107](https://github.com/inference4j/inference4j/issues/107))
 - [x] **Promptable segmentation** — `Sam2Segmenter` (SAM 2.1 tiny): click or box prompts, encode once and prompt
@@ -235,6 +235,22 @@ Tracked in the [0.15.0 milestone](https://github.com/inference4j/inference4j/mil
 
 - [ ] **Modern reranker** — bge-reranker-v2-m3, multilingual and long-context ([#105](https://github.com/inference4j/inference4j/issues/105))
 - [ ] **Long input for generators** — sentence chunking for translation, map-reduce for summarization ([#74](https://github.com/inference4j/inference4j/issues/74))
+
+### Vision: permissive object detection
+
+Make the Apache-2.0 detectors the default everywhere and complete the lineup, behind one `ObjectDetector`
+interface. Tracked in [#197](https://github.com/inference4j/inference4j/issues/197).
+
+- [ ] **`DetrDetector`** — `RtDetrDetector` renamed, the old name deprecated ([#180](https://github.com/inference4j/inference4j/issues/180))
+- [ ] **Apache-2.0 defaults** — docs, examples and the Spring Boot starter use D-FINE small
+      ([#181](https://github.com/inference4j/inference4j/issues/181), [#182](https://github.com/inference4j/inference4j/issues/182))
+- [ ] **YOLO license notice** — AGPL-3.0 notice and warning on the YOLO wrappers ([#189](https://github.com/inference4j/inference4j/issues/189))
+- [ ] **One detector API** — swap contract, shared helpers and builder options, license per preset
+      ([#183](https://github.com/inference4j/inference4j/issues/183), [#184](https://github.com/inference4j/inference4j/issues/184),
+      [#185](https://github.com/inference4j/inference4j/issues/185), [#188](https://github.com/inference4j/inference4j/issues/188))
+- [ ] **Accurate tier** — D-FINE medium and large, Objects365-pretrained presets
+      ([#186](https://github.com/inference4j/inference4j/issues/186), [#187](https://github.com/inference4j/inference4j/issues/187))
+- [ ] **Detector benchmarks** ([#191](https://github.com/inference4j/inference4j/issues/191))
 
 ### Generative AI via onnxruntime-genai
 
