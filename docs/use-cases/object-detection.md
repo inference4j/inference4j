@@ -13,9 +13,9 @@ Ultralytics commercial license. D-FINE and RT-DETRv2 are **Apache-2.0**, with no
 |---------|--------|---------|--------------------------------------|--------------|
 | `Yolo26Detector` | YOLO26n | AGPL-3.0 | 40.9 | 17 ms |
 | `YoloV8Detector` | YOLOv8n, YOLO11 | AGPL-3.0 | — | — |
-| `RtDetrDetector.dfineNano()` | D-FINE nano | **Apache-2.0** | 42.8 | 29 ms |
-| `RtDetrDetector.dfineSmall()` (default) | D-FINE small | **Apache-2.0** | 48.5 | 54 ms |
-| `RtDetrDetector.rtDetrV2()` | RT-DETRv2 ResNet-18 | **Apache-2.0** | 48.1 | 108 ms |
+| `DetrDetector.dfineNano()` | D-FINE nano | **Apache-2.0** | 42.8 | 29 ms |
+| `DetrDetector.dfineSmall()` (default) | D-FINE small | **Apache-2.0** | 48.5 | 54 ms |
+| `DetrDetector.rtDetrV2()` | RT-DETRv2 ResNet-18 | **Apache-2.0** | 48.1 | 108 ms |
 
 \*Median per image at 640 × 640 on a laptop CPU with four ONNX Runtime threads, measured with inference4j. AP figures
 come from the [D-FINE](https://github.com/Peterande/D-FINE), [RT-DETRv2](https://github.com/lyuwenyu/RT-DETR) and
@@ -89,11 +89,11 @@ NMS-free transformer detectors. Each of the 300 object queries scores every clas
 above the threshold become detections.
 
 ```java
-try (var detector = RtDetrDetector.builder().build()) {        // D-FINE small
+try (var detector = DetrDetector.builder().build()) {        // D-FINE small
     detector.detect(Path.of("image.jpg"));
 }
 
-try (ObjectDetector detector = RtDetrDetector.dfineNano().build()) {   // drop-in for a YOLO detector
+try (ObjectDetector detector = DetrDetector.dfineNano().build()) {   // drop-in for a YOLO detector
     detector.detect(Path.of("image.jpg"));
 }
 ```
@@ -128,7 +128,11 @@ detections as `transformers` with the PyTorch models: same classes in the same o
 | `.inputSize(int)` | `int` | `640` | Model input resolution |
 | `.confidenceThreshold(float)` | `float` | `0.5` | Minimum detection confidence |
 
-## RtDetrDetector builder options
+## DetrDetector builder options
+
+!!! note "Renamed in 0.15.0"
+    `DetrDetector` was called `RtDetrDetector` before 0.15.0. The old name still works, with the same presets and
+    options, but is deprecated and will be removed in 0.16.0.
 
 | Method | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -177,10 +181,10 @@ try (var detector = YoloV8Detector.builder().build()) {
 
 ## Tips
 
-- **Licensing first**: if your product is not open source under AGPL-3.0, start with `RtDetrDetector`. D-FINE small is
+- **Licensing first**: if your product is not open source under AGPL-3.0, start with `DetrDetector`. D-FINE small is
   more accurate than YOLO26n by the authors' figures, at about three times the CPU time; D-FINE nano is slightly more
   accurate than YOLO26n and a little slower (29 vs 17 ms here).
 - **YOLOv8 vs YOLO26**: YOLOv8 is the safer default — widely tested and well-understood. YOLO26 is NMS-free (potentially faster) but newer.
 - All detectors accept `Path` or `BufferedImage` as input.
 - Default labels are COCO (80 classes). Override with `.labels(Labels.of(yourLabels))` for custom-trained models.
-- YOLOv8 uses letterbox preprocessing (preserves aspect ratio, pads with gray). YOLO26 and `RtDetrDetector` use direct resize.
+- YOLOv8 uses letterbox preprocessing (preserves aspect ratio, pads with gray). YOLO26 and `DetrDetector` use direct resize.

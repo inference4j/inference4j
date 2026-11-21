@@ -33,18 +33,18 @@ import static org.assertj.core.data.Offset.offset;
  * post-processing, threshold 0.5) for the PyTorch models the mirrors were made from.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class RtDetrDetectorModelTest {
+class DetrDetectorModelTest {
 
     private BufferedImage cat;
 
     @BeforeAll
     void setUp() throws IOException {
-        cat = ImageIO.read(RtDetrDetectorModelTest.class.getResourceAsStream("/fixtures/cat.jpg"));
+        cat = ImageIO.read(DetrDetectorModelTest.class.getResourceAsStream("/fixtures/cat.jpg"));
     }
 
     @Test
     void dfineSmallFindsTheCatLikeTheReference() {
-        try (ObjectDetector detector = RtDetrDetector.builder().build()) {
+        try (ObjectDetector detector = DetrDetector.builder().build()) {
             Detection top = detector.detect(cat).get(0);
 
             assertThat(top.label()).isEqualTo("cat");
@@ -55,7 +55,7 @@ class RtDetrDetectorModelTest {
 
     @Test
     void dfineNanoFindsTheCatLikeTheReference() {
-        try (ObjectDetector detector = RtDetrDetector.dfineNano().build()) {
+        try (ObjectDetector detector = DetrDetector.dfineNano().build()) {
             List<Detection> detections = detector.detect(cat);
 
             assertThat(detections).singleElement().satisfies(d -> {
@@ -68,7 +68,7 @@ class RtDetrDetectorModelTest {
 
     @Test
     void rtDetrV2FindsTheCatLikeTheReference() {
-        try (ObjectDetector detector = RtDetrDetector.rtDetrV2().build()) {
+        try (ObjectDetector detector = DetrDetector.rtDetrV2().build()) {
             List<Detection> detections = detector.detect(cat);
 
             assertThat(detections).singleElement().satisfies(d -> {
@@ -81,9 +81,21 @@ class RtDetrDetectorModelTest {
 
     @Test
     void aHigherThresholdDropsLessConfidentDetections() {
-        try (var detector = RtDetrDetector.dfineSmall().build()) {
+        try (var detector = DetrDetector.dfineSmall().build()) {
             assertThat(detector.detect(cat, 0.5f, 0f)).hasSizeGreaterThanOrEqualTo(1);
             assertThat(detector.detect(cat, 0.95f, 0f)).isEmpty();
+        }
+    }
+
+    @Test
+    @SuppressWarnings("removal")
+    void theDeprecatedRtDetrDetectorNameBuildsTheSameDetector() {
+        try (RtDetrDetector detector = RtDetrDetector.dfineNano().confidenceThreshold(0.5f).build()) {
+            assertThat(detector).isInstanceOf(DetrDetector.class);
+            assertThat(detector.detect(cat)).singleElement().satisfies(d -> {
+                assertThat(d.label()).isEqualTo("cat");
+                assertThat(d.confidence()).isCloseTo(0.9536f, offset(1e-3f));
+            });
         }
     }
 
