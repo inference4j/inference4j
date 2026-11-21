@@ -24,9 +24,6 @@ import io.github.inference4j.preprocessing.image.Labels;
 import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -302,17 +299,17 @@ class YoloV8DetectorTest {
 
     @Test
     void buildWarnsOnceAboutAgplForDefaultWeights() {
-        String log = captureStdErr(() -> buildIgnoringMissingModel(null));
+        List<String> warnings = WarningLog.of(YoloV8Detector.class, () -> buildIgnoringMissingModel(null));
 
-        assertThat(log).contains("WARN", "inference4j/yolov8n", "AGPL-3.0", "DetrDetector");
-        assertThat(log.split("AGPL-3.0", -1)).hasSize(2);
+        assertThat(warnings).singleElement().asString()
+                .contains("inference4j/yolov8n", "AGPL-3.0", "DetrDetector");
     }
 
     @Test
     void buildDoesNotWarnForCustomModelId() {
-        String log = captureStdErr(() -> buildIgnoringMissingModel("my-org/my-detector"));
+        List<String> warnings = WarningLog.of(YoloV8Detector.class, () -> buildIgnoringMissingModel("my-org/my-detector"));
 
-        assertThat(log).doesNotContain("AGPL-3.0");
+        assertThat(warnings).isEmpty();
     }
 
     private static void buildIgnoringMissingModel(String modelId) {
@@ -324,18 +321,5 @@ class YoloV8DetectorTest {
             builder.modelId(modelId);
         }
         assertThatThrownBy(builder::build).isInstanceOf(ModelSourceException.class);
-    }
-
-    // slf4j-simple, the test logging backend, writes to whatever System.err is at log time
-    private static String captureStdErr(Runnable action) {
-        PrintStream original = System.err;
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        System.setErr(new PrintStream(buffer, true, StandardCharsets.UTF_8));
-        try {
-            action.run();
-        } finally {
-            System.setErr(original);
-        }
-        return buffer.toString(StandardCharsets.UTF_8);
     }
 }
