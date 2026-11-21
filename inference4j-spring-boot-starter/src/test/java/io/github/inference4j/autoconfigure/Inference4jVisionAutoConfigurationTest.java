@@ -16,15 +16,25 @@
 package io.github.inference4j.autoconfigure;
 
 import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 
+import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.vision.Classification;
 import io.github.inference4j.vision.Detection;
+import io.github.inference4j.vision.DetrDetector;
 import io.github.inference4j.vision.ImageClassifier;
 import io.github.inference4j.vision.ObjectDetector;
 import io.github.inference4j.vision.TextDetector;
 import io.github.inference4j.vision.TextRegion;
+import io.github.inference4j.vision.Yolo26Detector;
+import io.github.inference4j.vision.YoloV8Detector;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -33,11 +43,32 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class Inference4jVisionAutoConfigurationTest {
 
 	private final ApplicationContextRunner runner = new ApplicationContextRunner()
 		.withConfiguration(AutoConfigurations.of(Inference4jVisionAutoConfiguration.class));
+
+	/**
+	 * Seeds the model cache that the build points {@code inference4j.cache.dir} at: a tiny stub model under
+	 * each default id, and an unreadable model under the custom ids, so no test downloads anything.
+	 */
+	@BeforeAll
+	static void seedModelCache() throws IOException {
+		Path cache = Path.of(System.getProperty("inference4j.cache.dir"));
+		for (String modelId : List.of("inference4j/dfine-small-coco", "inference4j/yolov8n", "inference4j/yolo26n")) {
+			Path dir = Files.createDirectories(cache.resolve(modelId));
+			try (InputStream stub = Inference4jVisionAutoConfigurationTest.class
+				.getResourceAsStream("/detector-stub.onnx")) {
+				Files.copy(stub, dir.resolve("model.onnx"), StandardCopyOption.REPLACE_EXISTING);
+			}
+		}
+		for (String modelId : List.of("acme/custom-detr", "acme/custom-yolov8", "acme/custom-yolo26")) {
+			Path dir = Files.createDirectories(cache.resolve(modelId));
+			Files.writeString(dir.resolve("model.onnx"), "not an onnx model", StandardCharsets.UTF_8);
+		}
+	}
 
 	@Test
 	void noBeansWhenDisabled() {
@@ -59,6 +90,71 @@ class Inference4jVisionAutoConfigurationTest {
 				assertThat(ctx).doesNotHaveBean(ObjectDetector.class);
 				assertThat(ctx).doesNotHaveBean(TextDetector.class);
 			});
+	}
+
+	@Test
+	void defaultObjectDetectorIsDfineSmall() {
+		runner.withPropertyValues("inference4j.vision.object-detector.enabled=true")
+			.run(ctx -> assertThat(ctx.getBean(ObjectDetector.class)).isInstanceOf(DetrDetector.class));
+	}
+
+	@Test
+	void detrArchitectureBuildsDetrDetector() {
+		runner.withPropertyValues(
+				"inference4j.vision.object-detector.enabled=true",
+				"inference4j.vision.object-detector.architecture=detr")
+			.run(ctx -> assertThat(ctx.getBean(ObjectDetector.class)).isInstanceOf(DetrDetector.class));
+	}
+
+	@Test
+	void yolov8ArchitectureBuildsYoloV8DetectorWithItsOwnDefaultModel() {
+		runner.withPropertyValues(
+				"inference4j.vision.object-detector.enabled=true",
+				"inference4j.vision.object-detector.architecture=yolov8")
+			.run(ctx -> assertThat(ctx.getBean(ObjectDetector.class)).isInstanceOf(YoloV8Detector.class));
+	}
+
+	@Test
+	void yolo26ArchitectureBuildsYolo26DetectorWithItsOwnDefaultModel() {
+		runner.withPropertyValues(
+				"inference4j.vision.object-detector.enabled=true",
+				"inference4j.vision.object-detector.architecture=yolo26")
+			.run(ctx -> assertThat(ctx.getBean(ObjectDetector.class)).isInstanceOf(Yolo26Detector.class));
+	}
+
+	@Test
+	void detrArchitectureLoadsTheConfiguredModelId() {
+		assertLoadsConfiguredModel("detr", "acme/custom-detr", "DetrDetector$Builder");
+	}
+
+	@Test
+	void yolov8ArchitectureLoadsTheConfiguredModelId() {
+		assertLoadsConfiguredModel("yolov8", "acme/custom-yolov8", "YoloV8Detector$Builder");
+	}
+
+	@Test
+	void yolo26ArchitectureLoadsTheConfiguredModelId() {
+		assertLoadsConfiguredModel("yolo26", "acme/custom-yolo26", "Yolo26Detector$Builder");
+	}
+
+	@Test
+	void objectDetectorBeanIsLazy() {
+		runner.withPropertyValues("inference4j.vision.object-detector.enabled=true")
+			.run(ctx -> {
+				assertThat(ctx).hasNotFailed();
+				assertThat(ctx.getBeanFactory().getBeanDefinition("objectDetector").isLazyInit()).isTrue();
+			});
+	}
+
+	private void assertLoadsConfiguredModel(String architecture, String modelId, String builder) {
+		runner.withPropertyValues(
+				"inference4j.vision.object-detector.enabled=true",
+				"inference4j.vision.object-detector.architecture=" + architecture,
+				"inference4j.vision.object-detector.model-id=" + modelId)
+			.run(ctx -> assertThatThrownBy(() -> ctx.getBean(ObjectDetector.class))
+				.hasStackTraceContaining(ModelLoadException.class.getName() + ": Failed to load model from")
+				.hasStackTraceContaining(Path.of(modelId, "model.onnx").toString())
+				.hasStackTraceContaining(builder));
 	}
 
 	@Test

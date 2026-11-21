@@ -72,8 +72,9 @@ inference4j:
 | `inference4j.nlp.named-entity-recognizer.model-id` | `String` | `inference4j/distilbert-NER` | Model ID |
 | `inference4j.vision.image-classifier.enabled` | `boolean` | `false` | Enable ResNet image classifier |
 | `inference4j.vision.image-classifier.model-id` | `String` | `inference4j/resnet50-v1-7` | Model ID |
-| `inference4j.vision.object-detector.enabled` | `boolean` | `false` | Enable YOLOv8 object detector |
-| `inference4j.vision.object-detector.model-id` | `String` | `inference4j/yolov8n` | Model ID |
+| `inference4j.vision.object-detector.enabled` | `boolean` | `false` | Enable the object detector |
+| `inference4j.vision.object-detector.architecture` | `String` | `detr` | Wrapper that builds the bean: `detr` (`DetrDetector`), `yolov8` (`YoloV8Detector`) or `yolo26` (`Yolo26Detector`). See [Object detection](#object-detection) |
+| `inference4j.vision.object-detector.model-id` | `String` | the architecture's default | Model ID. Unset, it is `inference4j/dfine-small-coco` for `detr`, `inference4j/yolov8n` for `yolov8` and `inference4j/yolo26n` for `yolo26` |
 | `inference4j.vision.text-detector.enabled` | `boolean` | `false` | Enable CRAFT text detector |
 | `inference4j.vision.text-detector.model-id` | `String` | `inference4j/craft-mlt-25k` | Model ID |
 | `inference4j.audio.speech-recognizer.enabled` | `boolean` | `false` | Enable Wav2Vec2 speech recognizer |
@@ -111,6 +112,32 @@ public class SentimentController {
     }
 }
 ```
+
+### Object detection
+
+`inference4j.vision.object-detector.enabled=true` registers an `ObjectDetector` built with
+`DetrDetector` and D-FINE small (`inference4j/dfine-small-coco`, Apache-2.0 weights). Its default
+confidence threshold is 0.5.
+
+To use a YOLO model, set `architecture`. Without a `model-id`, each architecture loads its own
+default model, so the D-FINE weights are never handed to a YOLO wrapper:
+
+```yaml
+inference4j:
+  vision:
+    object-detector:
+      enabled: true
+      architecture: yolov8          # loads inference4j/yolov8n (AGPL-3.0 weights)
+```
+
+A `model-id` must match the `architecture`: other DETR-family models such as
+`inference4j/dfine-nano-coco` or `inference4j/rtdetr-v2-r18vd` work with `detr`, and a YOLOv8
+checkpoint needs `architecture: yolov8`.
+
+!!! warning "Changed in 0.15.0"
+    Before 0.15.0 the bean was always `YoloV8Detector` with `inference4j/yolov8n` and a confidence
+    threshold of 0.25. Applications that set a YOLO `model-id` must now also set `architecture`,
+    or the model is loaded by `DetrDetector`.
 
 ### Generative models
 
