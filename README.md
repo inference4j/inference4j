@@ -66,7 +66,7 @@ try (var classifier = ResNetClassifier.builder().build()) {
 ### Object Detection
 
 ```java
-try (var detector = YoloV8Detector.builder().build()) {
+try (ObjectDetector detector = DetrDetector.builder().build()) {      // D-FINE small, Apache-2.0
     List<Detection> detections = detector.detect(Path.of("street.jpg"));
     // [Detection[label=car, confidence=0.94, box=BoundingBox[...]], ...]
 }

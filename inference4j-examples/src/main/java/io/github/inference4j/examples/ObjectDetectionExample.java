@@ -17,14 +17,16 @@
 package io.github.inference4j.examples;
 
 import io.github.inference4j.vision.Detection;
+import io.github.inference4j.vision.DetrDetector;
+import io.github.inference4j.vision.ObjectDetector;
 import io.github.inference4j.vision.Yolo26Detector;
-import io.github.inference4j.vision.YoloV8Detector;
 
 import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Demonstrates object detection with YOLOv8n and YOLO26n.
+ * Demonstrates object detection with D-FINE small (Apache-2.0, the default) and swapping in YOLO26n through the same
+ * {@link ObjectDetector} interface. YOLO26n's weights are AGPL-3.0.
  *
  * Requires ONNX models and a sample image — see inference4j-examples/README.md for setup.
  *
@@ -35,43 +37,25 @@ public class ObjectDetectionExample {
     public static void main(String[] args) throws Exception {
         Path imagePath = Path.of(ObjectDetectionExample.class.getResource("/fixtures/sample.jpg").toURI());
 
-        // --- YOLOv8n (NMS-based) ---
-        System.out.println("=== YOLOv8n Object Detection ===");
-        try (YoloV8Detector yolo = YoloV8Detector.builder().build()) {
-            System.out.println("YOLOv8n loaded successfully.");
-            System.out.println();
-
-            List<Detection> detections = yolo.detect(imagePath);
-
-            System.out.println("Detections (default thresholds):");
-            printDetections(detections);
+        // --- D-FINE small (Apache-2.0, NMS-free) ---
+        System.out.println("=== D-FINE small Object Detection ===");
+        try (ObjectDetector detector = DetrDetector.builder().build()) {
+            System.out.println("Detections (default threshold=0.5):");
+            printDetections(detector.detect(imagePath));
 
             System.out.println();
 
-            // --- Custom thresholds ---
-            System.out.println("Detections (confidence=0.5, IoU=0.4):");
-            List<Detection> filtered = yolo.detect(imagePath, 0.5f, 0.4f);
-            printDetections(filtered);
+            System.out.println("Detections (confidence=0.8):");
+            printDetections(detector.detect(imagePath, 0.8f, 0f));
         }
 
         System.out.println();
 
-        // --- YOLO26n (NMS-free) ---
-        System.out.println("=== YOLO26n Object Detection (NMS-free) ===");
-        try (Yolo26Detector yolo = Yolo26Detector.builder().build()) {
-            System.out.println("YOLO26n loaded successfully.");
-            System.out.println();
-
-            List<Detection> detections = yolo.detect(imagePath);
-
+        // --- YOLO26n (AGPL-3.0 weights), same interface ---
+        System.out.println("=== YOLO26n Object Detection (AGPL-3.0 weights) ===");
+        try (ObjectDetector detector = Yolo26Detector.builder().build()) {
             System.out.println("Detections (default threshold=0.5):");
-            printDetections(detections);
-
-            System.out.println();
-
-            System.out.println("Detections (confidence=0.7):");
-            List<Detection> filtered = yolo.detect(imagePath, 0.7f, 0f);
-            printDetections(filtered);
+            printDetections(detector.detect(imagePath));
         }
     }
 
