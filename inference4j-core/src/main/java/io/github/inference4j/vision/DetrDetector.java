@@ -144,15 +144,10 @@ public class DetrDetector implements ObjectDetector {
                 confidenceThreshold, width, height);
     }
 
+    /** Detects objects with a confidence threshold other than the configured one. */
     @Override
-    public List<Detection> detect(Path imagePath) {
-        return detect(PaddleImages.read(imagePath));
-    }
-
-    /** Detects objects with a confidence threshold other than the configured one; {@code iouThreshold} is ignored. */
-    @Override
-    public List<Detection> detect(Path imagePath, float confidenceThreshold, float iouThreshold) {
-        return detect(PaddleImages.read(imagePath), confidenceThreshold, iouThreshold);
+    public List<Detection> detect(BufferedImage image, float confidenceThreshold) {
+        return detect(image, confidenceThreshold, 0f);
     }
 
     @Override

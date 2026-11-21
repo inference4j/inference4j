@@ -24,7 +24,6 @@ import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.preprocessing.image.ImageLayout;
 import io.github.inference4j.preprocessing.image.Labels;
@@ -32,10 +31,8 @@ import io.github.inference4j.preprocessing.image.Labels;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -164,14 +161,10 @@ public class YoloV8Detector
                 inputSize, image.getWidth(), image.getHeight());
     }
 
+    /** Detects objects with a confidence threshold other than the configured one, and the configured IoU threshold. */
     @Override
-    public List<Detection> detect(Path imagePath) {
-        return detect(imagePath, defaultConfidenceThreshold, defaultIouThreshold);
-    }
-
-    @Override
-    public List<Detection> detect(Path imagePath, float confidenceThreshold, float iouThreshold) {
-        return detect(loadImage(imagePath), confidenceThreshold, iouThreshold);
+    public List<Detection> detect(BufferedImage image, float confidenceThreshold) {
+        return detect(image, confidenceThreshold, defaultIouThreshold);
     }
 
     // --- Preprocessing ---
@@ -329,18 +322,6 @@ public class YoloV8Detector
     }
 
     // --- Utilities ---
-
-    private static BufferedImage loadImage(Path path) {
-        try {
-            BufferedImage image = ImageIO.read(path.toFile());
-            if (image == null) {
-                throw new InferenceException("Unsupported image format: " + path);
-            }
-            return image;
-        } catch (IOException e) {
-            throw new InferenceException("Failed to read image: " + path, e);
-        }
-    }
 
     public static class Builder {
         private InferenceSession session;

@@ -171,19 +171,35 @@ Coordinates are in the original image's pixel space (not normalized).
 
 ## Custom thresholds
 
-Override thresholds per call. The third argument is the NMS IoU threshold; only `YoloV8Detector` uses it, the
-NMS-free detectors ignore it.
+Override the confidence threshold per call. Each detector keeps its configured IoU threshold:
 
 ```java
 try (ObjectDetector detector = DetrDetector.builder().build()) {
-    List<Detection> confident = detector.detect(Path.of("image.jpg"), 0.7f, 0f);
+    List<Detection> confident = detector.detect(Path.of("image.jpg"), 0.7f);
 }
+```
 
+The three-argument form also sets the NMS IoU threshold. Only `YoloV8Detector` uses it; the NMS-free detectors
+(`DetrDetector`, `Yolo26Detector`) ignore it:
+
+```java
 try (var detector = YoloV8Detector.builder().build()) {
     // Stricter confidence, tighter NMS
     List<Detection> detections = detector.detect(Path.of("image.jpg"), 0.5f, 0.3f);
 }
 ```
+
+## Swap contract
+
+Every detector follows the same contract, checked by one test that runs against every preset:
+
+- boxes are in pixel coordinates of the original image (not normalized), inside the image;
+- detections are sorted by descending confidence;
+- with the default labels, `classIndex` is a contiguous COCO index (0 to 79) and `label` is
+  `Labels.coco().get(classIndex)`;
+- `Path` and `BufferedImage` inputs give the same detections for the same image.
+
+So replacing one detector with another changes only the builder line, when variables are typed as `ObjectDetector`.
 
 ## Tips
 

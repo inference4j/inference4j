@@ -32,10 +32,8 @@ import io.github.inference4j.preprocessing.image.Labels;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -162,20 +160,10 @@ public class Yolo26Detector
                 image.getWidth(), image.getHeight());
     }
 
+    /** Detects objects with a confidence threshold other than the configured one. */
     @Override
-    public List<Detection> detect(Path imagePath) {
-        return detect(imagePath, defaultConfidenceThreshold, 0f);
-    }
-
-    /**
-     * Detects objects in the given image file.
-     *
-     * <p>The {@code iouThreshold} parameter is accepted for interface compatibility but
-     * is ignored — YOLO26 uses an NMS-free architecture.
-     */
-    @Override
-    public List<Detection> detect(Path imagePath, float confidenceThreshold, float iouThreshold) {
-        return detect(loadImage(imagePath), confidenceThreshold, iouThreshold);
+    public List<Detection> detect(BufferedImage image, float confidenceThreshold) {
+        return detect(image, confidenceThreshold, 0f);
     }
 
     // --- Preprocessing ---
@@ -301,18 +289,6 @@ public class Yolo26Detector
     }
 
     // --- Utilities ---
-
-    private static BufferedImage loadImage(Path path) {
-        try {
-            BufferedImage image = ImageIO.read(path.toFile());
-            if (image == null) {
-                throw new InferenceException("Unsupported image format: " + path);
-            }
-            return image;
-        } catch (IOException e) {
-            throw new InferenceException("Failed to read image: " + path, e);
-        }
-    }
 
     public static class Builder {
         private InferenceSession session;
