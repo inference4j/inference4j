@@ -16,11 +16,8 @@
 
 package io.github.inference4j.vision;
 
-import io.github.inference4j.exception.InferenceException;
 
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.nio.file.Path;
 
 /**
@@ -140,14 +137,6 @@ final class PaddleImages {
     }
 
     static BufferedImage read(Path path) {
-        try {
-            BufferedImage image = ImageIO.read(path.toFile());
-            if (image == null) {
-                throw new InferenceException("Unsupported image format: " + path);
-            }
-            return image;
-        } catch (IOException e) {
-            throw new InferenceException("Failed to read image: " + path, e);
-        }
+        return ImageFiles.read(path);
     }
 }

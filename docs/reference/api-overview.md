@@ -75,7 +75,7 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 │   └── ZeroShotTextClassifier          // classify(String, List<String>) → List<TextClassification>
 │                                       //   DebertaZeroShotClassifier (NLI); ClipClassifier is the image counterpart
 ├── Detector<I, D>                      // detect(I) → List<D>
-│   ├── ObjectDetector                  // detect(BufferedImage/Path) → List<Detection>
+│   ├── ObjectDetector                  // detect(BufferedImage/Path[, confidence[, iou]]) → List<Detection>
 │   │                                   //   YoloV8Detector, Yolo26Detector (AGPL-3.0); DetrDetector (Apache-2.0)
 │   ├── TextDetector                    // detect(BufferedImage/Path) → List<TextRegion>
 │   │                                   //   CraftTextDetector (words), PaddleTextDetector (lines)
