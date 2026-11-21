@@ -122,7 +122,7 @@ public class YoloV8Detector
     private static final Logger logger = LoggerFactory.getLogger(YoloV8Detector.class);
 
     private static final String DEFAULT_MODEL_ID = "inference4j/yolov8n";
-    private static final float LETTERBOX_PAD_VALUE = 114f / 255f;
+    private static final Color PAD_COLOR = new Color(114, 114, 114);
 
     private final Labels labels;
     private final String inputName;
@@ -182,51 +182,16 @@ public class YoloV8Detector
     }
 
     static LetterboxResult letterbox(BufferedImage image, int targetSize) {
-        int origW = image.getWidth();
-        int origH = image.getHeight();
-
-        float scale = Math.min((float) targetSize / origW, (float) targetSize / origH);
-        int scaledW = Math.round(origW * scale);
-        int scaledH = Math.round(origH * scale);
-
-        float padX = (targetSize - scaledW) / 2f;
-        float padY = (targetSize - scaledH) / 2f;
-
-        BufferedImage result = new BufferedImage(targetSize, targetSize, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = result.createGraphics();
-
-        // Fill with gray padding
-        int padGray = Math.round(114f);
-        g.setColor(new Color(padGray, padGray, padGray));
-        g.fillRect(0, 0, targetSize, targetSize);
-
-        // Draw scaled image centered
-        g.drawImage(image, Math.round(padX), Math.round(padY), scaledW, scaledH, null);
-        g.dispose();
-
-        return new LetterboxResult(result, scale, padX, padY);
+        DetectionOps.Letterbox letterbox = DetectionOps.Letterbox.centered(image.getWidth(), image.getHeight(),
+                targetSize);
+        return new LetterboxResult(letterbox.apply(image, PAD_COLOR), letterbox.scale(), letterbox.padX(),
+                letterbox.padY());
     }
 
     private static Tensor imageToTensor(BufferedImage image) {
         int w = image.getWidth();
         int h = image.getHeight();
-        float[] data = new float[3 * h * w];
-
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int rgb = image.getRGB(x, y);
-                float r = ((rgb >> 16) & 0xFF) / 255f;
-                float g = ((rgb >> 8) & 0xFF) / 255f;
-                float b = (rgb & 0xFF) / 255f;
-
-                // NCHW layout, no mean/std normalization (just /255)
-                data[0 * h * w + y * w + x] = r;
-                data[1 * h * w + y * w + x] = g;
-                data[2 * h * w + y * w + x] = b;
-            }
-        }
-
-        return Tensor.fromFloats(data, new long[]{1, 3, h, w});
+        return Tensor.fromFloats(DetectionOps.toChw(DetectionOps.pixels(image), w, h), new long[]{1, 3, h, w});
     }
 
     // --- Post-processing ---
@@ -238,11 +203,10 @@ public class YoloV8Detector
                                                      int origWidth, int origHeight) {
         Tensor outputTensor = outputs.values().iterator().next();
 
-        float scale = Math.min((float) inputSize / origWidth, (float) inputSize / origHeight);
-        int scaledW = Math.round(origWidth * scale);
-        int scaledH = Math.round(origHeight * scale);
-        float padX = (inputSize - scaledW) / 2f;
-        float padY = (inputSize - scaledH) / 2f;
+        DetectionOps.Letterbox letterbox = DetectionOps.Letterbox.centered(origWidth, origHeight, inputSize);
+        float scale = letterbox.scale();
+        float padX = letterbox.padX();
+        float padY = letterbox.padY();
 
         return postProcess(outputTensor.toFloats(), outputTensor.shape(),
                 labels, confThreshold, iouThreshold,
@@ -258,10 +222,8 @@ public class YoloV8Detector
         int numCandidates = (int) outputShape[2];
         int numClasses = numOutputs - 4;
 
-        List<float[]> boxList = new ArrayList<>();
-        List<Float> scoreList = new ArrayList<>();
-        List<Integer> classList = new ArrayList<>();
-
+        DetectionOps.Letterbox letterbox = new DetectionOps.Letterbox(scale, padX, padY, 0, 0, 0);
+        List<Detection> candidates = new ArrayList<>();
         for (int c = 0; c < numCandidates; c++) {
             int bestClass = -1;
             float bestScore = -1f;
@@ -277,48 +239,15 @@ public class YoloV8Detector
                 continue;
             }
 
-            float cx = rawOutput[0 * numCandidates + c];
-            float cy = rawOutput[1 * numCandidates + c];
-            float bw = rawOutput[2 * numCandidates + c];
-            float bh = rawOutput[3 * numCandidates + c];
-
-            float[] xyxy = MathOps.cxcywh2xyxy(new float[]{cx, cy, bw, bh});
-
-            xyxy[0] = Math.max(0, Math.min((xyxy[0] - padX) / scale, origWidth));
-            xyxy[1] = Math.max(0, Math.min((xyxy[1] - padY) / scale, origHeight));
-            xyxy[2] = Math.max(0, Math.min((xyxy[2] - padX) / scale, origWidth));
-            xyxy[3] = Math.max(0, Math.min((xyxy[3] - padY) / scale, origHeight));
-
-            boxList.add(xyxy);
-            scoreList.add(bestScore);
-            classList.add(bestClass);
+            float[] xyxy = MathOps.cxcywh2xyxy(new float[]{
+                    rawOutput[c], rawOutput[numCandidates + c],
+                    rawOutput[2 * numCandidates + c], rawOutput[3 * numCandidates + c]});
+            candidates.add(new Detection(letterbox.toOriginal(xyxy, origWidth, origHeight),
+                    labels.get(bestClass), bestClass, bestScore));
         }
 
-        if (boxList.isEmpty()) {
-            return List.of();
-        }
-
-        float[] allBoxes = new float[boxList.size() * 4];
-        float[] allScores = new float[scoreList.size()];
-        for (int i = 0; i < boxList.size(); i++) {
-            System.arraycopy(boxList.get(i), 0, allBoxes, i * 4, 4);
-            allScores[i] = scoreList.get(i);
-        }
-
-        int[] kept = MathOps.nms(allBoxes, allScores, iouThreshold);
-
-        List<Detection> detections = new ArrayList<>(kept.length);
-        for (int idx : kept) {
-            float[] box = boxList.get(idx);
-            detections.add(new Detection(
-                    new BoundingBox(box[0], box[1], box[2], box[3]),
-                    labels.get(classList.get(idx)),
-                    classList.get(idx),
-                    scoreList.get(idx)
-            ));
-        }
-
-        return detections;
+        // Class-agnostic, as before: one box per object whatever its class
+        return DetectionOps.nms(candidates, iouThreshold, false, Integer.MAX_VALUE);
     }
 
     // --- Utilities ---
