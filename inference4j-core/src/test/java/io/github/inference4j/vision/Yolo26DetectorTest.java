@@ -24,6 +24,9 @@ import io.github.inference4j.preprocessing.image.Labels;
 import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -303,5 +306,46 @@ class Yolo26DetectorTest {
         model.close();
 
         verify(session).close();
+    }
+
+    // --- License warning ---
+
+    @Test
+    void buildWarnsOnceAboutAgplForDefaultWeights() {
+        String log = captureStdErr(() -> buildIgnoringMissingModel(null));
+
+        assertThat(log).contains("WARN", "inference4j/yolo26n", "AGPL-3.0", "DetrDetector");
+        assertThat(log.split("AGPL-3.0", -1)).hasSize(2);
+    }
+
+    @Test
+    void buildDoesNotWarnForCustomModelId() {
+        String log = captureStdErr(() -> buildIgnoringMissingModel("my-org/my-detector"));
+
+        assertThat(log).doesNotContain("AGPL-3.0");
+    }
+
+    private static void buildIgnoringMissingModel(String modelId) {
+        ModelSource missing = id -> Path.of("/nonexistent/path/" + id);
+        Yolo26Detector.Builder builder = Yolo26Detector.builder()
+                .inputName("images")
+                .modelSource(missing);
+        if (modelId != null) {
+            builder.modelId(modelId);
+        }
+        assertThatThrownBy(builder::build).isInstanceOf(ModelSourceException.class);
+    }
+
+    // slf4j-simple, the test logging backend, writes to whatever System.err is at log time
+    private static String captureStdErr(Runnable action) {
+        PrintStream original = System.err;
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        System.setErr(new PrintStream(buffer, true, StandardCharsets.UTF_8));
+        try {
+            action.run();
+        } finally {
+            System.setErr(original);
+        }
+        return buffer.toString(StandardCharsets.UTF_8);
     }
 }

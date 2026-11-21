@@ -8,6 +8,9 @@ Apache-2.0 transformer detectors (D-FINE and RT-DETRv2) that can be used in prop
 The YOLO models come from Ultralytics and are released under **AGPL-3.0**: using them in a network service or a
 distributed product generally obliges you to release your own source code under the same license, unless you buy an
 Ultralytics commercial license. D-FINE and RT-DETRv2 are **Apache-2.0**, with no such obligation.
+The wrapper code is Apache-2.0 in every case. When `YoloV8Detector` or `Yolo26Detector` loads its default AGPL-3.0
+weights (`inference4j/yolov8n`, `inference4j/yolo26n`), `build()` logs a warning that points to `DetrDetector`; it
+does not warn for other model ids.
 
 | Wrapper | Models | License | COCO AP (as reported by the authors) | CPU latency* |
 |---------|--------|---------|--------------------------------------|--------------|

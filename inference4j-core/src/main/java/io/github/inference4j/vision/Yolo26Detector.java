@@ -29,6 +29,9 @@ import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.preprocessing.image.ImageLayout;
 import io.github.inference4j.preprocessing.image.Labels;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -96,13 +99,25 @@ import java.util.Map;
  * }
  * }</pre>
  *
+ * <h2>License</h2>
+ * <p>The wrapper code is Apache-2.0. The default weights, {@code inference4j/yolo26n}
+ * (mirrored from <a href="https://huggingface.co/onnx-community/yolo26n-ONNX">onnx-community/yolo26n-ONNX</a>,
+ * an <a href="https://www.ultralytics.com/license">Ultralytics</a> model), are licensed under
+ * AGPL-3.0. {@link Builder#build()} logs a warning when it loads these default weights; it
+ * does not warn for other model ids. {@link DetrDetector} (D-FINE / RT-DETRv2 weights,
+ * Apache-2.0) is the permissive alternative. This note is not legal advice; check the
+ * license of the weights you deploy.
+ *
  * @see Detection
  * @see BoundingBox
  * @see YoloV8Detector
+ * @see DetrDetector
  */
 public class Yolo26Detector
         extends AbstractInferenceTask<BufferedImage, List<Detection>>
         implements ObjectDetector {
+
+    private static final Logger logger = LoggerFactory.getLogger(Yolo26Detector.class);
 
     private static final String DEFAULT_MODEL_ID = "inference4j/yolo26n";
 
@@ -363,6 +378,10 @@ public class Yolo26Detector
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
+                if (DEFAULT_MODEL_ID.equals(id)) {
+                    logger.warn("Yolo26Detector is using the default weights '{}', which are licensed "
+                            + "under AGPL-3.0 (Ultralytics). DetrDetector is an Apache-2.0 alternative.", id);
+                }
                 Path dir = source.resolve(id, List.of("model.onnx"));
                 loadFromDirectory(dir);
             }

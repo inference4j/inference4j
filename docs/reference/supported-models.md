@@ -45,8 +45,8 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 |------------|---------|-------------------|------|-----|
 | Image Classification | `ResNetClassifier` | `inference4j/resnet50-v1-7` | ~100 MB | `ImageClassifier` |
 | Image Classification | `EfficientNetClassifier` | `inference4j/efficientnet-lite4` | ~50 MB | `ImageClassifier` |
-| Object Detection | `YoloV8Detector` | `inference4j/yolov8n` | ~25 MB | `ObjectDetector` |
-| Object Detection | `Yolo26Detector` | `inference4j/yolo26n` | ~25 MB | `ObjectDetector` |
+| Object Detection (AGPL-3.0) | `YoloV8Detector` | `inference4j/yolov8n` | ~25 MB | `ObjectDetector` |
+| Object Detection (AGPL-3.0) | `Yolo26Detector` | `inference4j/yolo26n` | ~25 MB | `ObjectDetector` |
 | Object Detection (Apache-2.0) | `DetrDetector.dfineSmall()` | `inference4j/dfine-small-coco` | ~41 MB | `ObjectDetector` |
 | Object Detection (Apache-2.0) | `DetrDetector.dfineNano()` | `inference4j/dfine-nano-coco` | ~15 MB | `ObjectDetector` |
 | Object Detection (Apache-2.0) | `DetrDetector.rtDetrV2()` | `inference4j/rtdetr-v2-r18vd` | ~81 MB | `ObjectDetector` |
@@ -142,8 +142,8 @@ A comprehensive view of all supported models, organized by architecture:
 |-------|-----------|---------|-----------|
 | ResNet-50 | N/A | `ResNetClassifier` | Image classification |
 | EfficientNet-Lite4 | N/A | `EfficientNetClassifier` | Image classification |
-| YOLOv8n | N/A | `YoloV8Detector` | Object detection |
-| YOLO26n | N/A | `Yolo26Detector` | Object detection |
+| YOLOv8n | N/A | `YoloV8Detector` | Object detection (AGPL-3.0) |
+| YOLO26n | N/A | `Yolo26Detector` | Object detection (AGPL-3.0) |
 | D-FINE (nano / small, COCO) | N/A | `DetrDetector` | Object detection (Apache-2.0) |
 | RT-DETRv2 ResNet-18 | N/A | `DetrDetector` | Object detection (Apache-2.0) |
 | CRAFT | N/A | `CraftTextDetector` | Text detection in images |
