@@ -32,7 +32,7 @@ Sample images and audio files are bundled in `src/main/resources/fixtures/` — 
 # Image classification — classify an image with ResNet-50
 ./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.ImageClassificationExample
 
-# Object detection — detect objects with YOLOv8n
+# Object detection — detect objects with D-FINE small (Apache-2.0), then YOLO26n
 ./gradlew :inference4j-examples:run -PmainClass=io.github.inference4j.examples.ObjectDetectionExample
 
 # Text classification — sentiment analysis with DistilBERT
@@ -63,7 +63,7 @@ Sample images and audio files are bundled in `src/main/resources/fixtures/` — 
 | `ModelRouterExample` | A/B tests MiniLM-L6 vs L12 with round-robin routing and per-request metrics |
 | `ModelComparisonExample` | Runs semantic search with two models and compares their rankings side by side |
 | `ImageClassificationExample` | Classifies an image with ResNet-50 and EfficientNet-B0, printing top-5 predictions |
-| `ObjectDetectionExample` | Detects objects in an image with YOLOv8n and YOLO26n, printing bounding boxes and labels |
+| `ObjectDetectionExample` | Detects objects in an image with D-FINE small (Apache-2.0), then YOLO26n through the same `ObjectDetector` interface, printing bounding boxes and labels |
 | `TextClassificationExample` | Classifies text sentiment with DistilBERT fine-tuned on SST-2 |
 | `CrossEncoderRerankerExample` | Reranks search result candidates using ms-marco-MiniLM cross-encoder |
 | `SpeechToTextExample` | Transcribes a WAV audio file to text using Wav2Vec2-CTC |
