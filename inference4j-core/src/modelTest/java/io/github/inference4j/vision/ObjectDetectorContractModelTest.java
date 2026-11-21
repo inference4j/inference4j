@@ -54,6 +54,8 @@ class ObjectDetectorContractModelTest {
         return Stream.of(
                 detector("D-FINE small", () -> DetrDetector.dfineSmall().sessionOptions(FOUR_THREADS).build()),
                 detector("D-FINE nano", () -> DetrDetector.dfineNano().sessionOptions(FOUR_THREADS).build()),
+                detector("D-FINE medium", () -> DetrDetector.dfineMedium().sessionOptions(FOUR_THREADS).build()),
+                detector("D-FINE large", () -> DetrDetector.dfineLarge().sessionOptions(FOUR_THREADS).build()),
                 detector("RT-DETRv2", () -> DetrDetector.rtDetrV2().sessionOptions(FOUR_THREADS).build()),
                 detector("YOLOv8n", () -> YoloV8Detector.builder().sessionOptions(FOUR_THREADS).build()),
                 detector("YOLO26n", () -> Yolo26Detector.builder().sessionOptions(FOUR_THREADS).build()));

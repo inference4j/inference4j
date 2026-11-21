@@ -67,6 +67,33 @@ class DetrDetectorModelTest {
     }
 
     @Test
+    void dfineMediumFindsTheCatLikeTheReference() {
+        try (ObjectDetector detector = DetrDetector.dfineMedium().build()) {
+            List<Detection> detections = detector.detect(cat);
+
+            // transformers reports x1 = -0.1; inference4j clamps boxes to the image
+            assertThat(detections).singleElement().satisfies(d -> {
+                assertThat(d.label()).isEqualTo("cat");
+                assertThat(d.confidence()).isCloseTo(0.9230f, offset(1e-3f));
+                assertBox(d.box(), 0.0f, 0.3f, 257.8f, 319.6f);
+            });
+        }
+    }
+
+    @Test
+    void dfineLargeFindsTheCatLikeTheReference() {
+        try (ObjectDetector detector = DetrDetector.dfineLarge().build()) {
+            List<Detection> detections = detector.detect(cat);
+
+            assertThat(detections).singleElement().satisfies(d -> {
+                assertThat(d.label()).isEqualTo("cat");
+                assertThat(d.confidence()).isCloseTo(0.9454f, offset(1e-3f));
+                assertBox(d.box(), 0.0f, 0.6f, 255.0f, 319.5f);
+            });
+        }
+    }
+
+    @Test
     void rtDetrV2FindsTheCatLikeTheReference() {
         try (ObjectDetector detector = DetrDetector.rtDetrV2().build()) {
             List<Detection> detections = detector.detect(cat);

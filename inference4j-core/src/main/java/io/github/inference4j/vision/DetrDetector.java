@@ -45,6 +45,8 @@ import java.util.Set;
  *     List<Detection> detections = detector.detect(Path.of("street.jpg"));
  * }
  * DetrDetector.dfineNano()    // D-FINE nano, 15 MB, fastest
+ * DetrDetector.dfineMedium()  // D-FINE medium, 79 MB, more accurate
+ * DetrDetector.dfineLarge()   // D-FINE large, 125 MB, the most accurate
  * DetrDetector.rtDetrV2()     // RT-DETRv2 ResNet-18, 81 MB
  * }</pre>
  *
@@ -64,8 +66,10 @@ public class DetrDetector implements ObjectDetector {
 
     private static final String DFINE_SMALL = "inference4j/dfine-small-coco";
     private static final String DFINE_NANO = "inference4j/dfine-nano-coco";
+    private static final String DFINE_MEDIUM = "inference4j/dfine-medium-coco";
+    private static final String DFINE_LARGE = "inference4j/dfine-large-coco";
     private static final String RTDETR_V2 = "inference4j/rtdetr-v2-r18vd";
-    private static final Set<String> PRESETS = Set.of(DFINE_SMALL, DFINE_NANO, RTDETR_V2);
+    private static final Set<String> PRESETS = Set.of(DFINE_SMALL, DFINE_NANO, DFINE_MEDIUM, DFINE_LARGE, RTDETR_V2);
 
     private final InferenceSession session;
     private final String inputName;
@@ -96,6 +100,16 @@ public class DetrDetector implements ObjectDetector {
     /** D-FINE nano (15 MB): the fastest, slightly less accurate. */
     public static Builder dfineNano() {
         return new Builder().modelId(DFINE_NANO);
+    }
+
+    /** D-FINE medium (79 MB): more accurate than small (52.3 against 48.5 COCO AP, the authors' figures), slower. */
+    public static Builder dfineMedium() {
+        return new Builder().modelId(DFINE_MEDIUM);
+    }
+
+    /** D-FINE large (125 MB): the most accurate preset (54.0 COCO AP, the authors' figure), and the slowest. */
+    public static Builder dfineLarge() {
+        return new Builder().modelId(DFINE_LARGE);
     }
 
     /** RT-DETRv2 with a ResNet-18 backbone (81 MB). */
