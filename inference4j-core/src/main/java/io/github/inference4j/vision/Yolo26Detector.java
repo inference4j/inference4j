@@ -20,7 +20,6 @@ import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
-import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
@@ -36,7 +35,6 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -189,23 +187,7 @@ public class Yolo26Detector
     private static Tensor imageToTensor(BufferedImage image) {
         int w = image.getWidth();
         int h = image.getHeight();
-        float[] data = new float[3 * h * w];
-
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int rgb = image.getRGB(x, y);
-                float r = ((rgb >> 16) & 0xFF) / 255f;
-                float g = ((rgb >> 8) & 0xFF) / 255f;
-                float b = (rgb & 0xFF) / 255f;
-
-                // NCHW layout, no mean/std normalization (just /255)
-                data[0 * h * w + y * w + x] = r;
-                data[1 * h * w + y * w + x] = g;
-                data[2 * h * w + y * w + x] = b;
-            }
-        }
-
-        return Tensor.fromFloats(data, new long[]{1, 3, h, w});
+        return Tensor.fromFloats(DetectionOps.toChw(DetectionOps.pixels(image), w, h), new long[]{1, 3, h, w});
     }
 
     // --- Post-processing ---
@@ -242,50 +224,9 @@ public class Yolo26Detector
                                        float[] boxesData, long[] boxesShape,
                                        Labels labels, float confThreshold,
                                        int origWidth, int origHeight) {
-        int numProposals = (int) logitsShape[1];
-        int numClasses = (int) logitsShape[2];
-
-        List<Detection> detections = new ArrayList<>();
-
-        for (int p = 0; p < numProposals; p++) {
-            int bestClass = -1;
-            float bestScore = -1f;
-            for (int cls = 0; cls < numClasses; cls++) {
-                float logit = logitsData[p * numClasses + cls];
-                float score = (float) (1.0 / (1.0 + Math.exp(-logit)));
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestClass = cls;
-                }
-            }
-
-            if (bestScore < confThreshold) {
-                continue;
-            }
-
-            float cx = boxesData[p * 4];
-            float cy = boxesData[p * 4 + 1];
-            float bw = boxesData[p * 4 + 2];
-            float bh = boxesData[p * 4 + 3];
-
-            float[] xyxy = MathOps.cxcywh2xyxy(new float[]{cx, cy, bw, bh});
-
-            xyxy[0] = Math.max(0, Math.min(xyxy[0] * origWidth, origWidth));
-            xyxy[1] = Math.max(0, Math.min(xyxy[1] * origHeight, origHeight));
-            xyxy[2] = Math.max(0, Math.min(xyxy[2] * origWidth, origWidth));
-            xyxy[3] = Math.max(0, Math.min(xyxy[3] * origHeight, origHeight));
-
-            detections.add(new Detection(
-                    new BoundingBox(xyxy[0], xyxy[1], xyxy[2], xyxy[3]),
-                    labels.get(bestClass),
-                    bestClass,
-                    bestScore
-            ));
-        }
-
-        detections.sort((a, b) -> Float.compare(b.confidence(), a.confidence()));
-
-        return detections;
+        return DetectionOps.decodeQueries(logitsData, boxesData, (int) logitsShape[1], (int) logitsShape[2],
+                confThreshold, origWidth, origHeight, labels, DetectionOps.QueryDecoding.BEST_CLASS_PER_QUERY,
+                Integer.MAX_VALUE);
     }
 
     // --- Utilities ---

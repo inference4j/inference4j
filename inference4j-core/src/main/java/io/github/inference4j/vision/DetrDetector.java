@@ -28,7 +28,6 @@ import io.github.inference4j.session.SessionConfigurer;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -65,7 +64,6 @@ public class DetrDetector implements ObjectDetector {
     private static final String DFINE_SMALL = "inference4j/dfine-small-coco";
     private static final String DFINE_NANO = "inference4j/dfine-nano-coco";
     private static final String RTDETR_V2 = "inference4j/rtdetr-v2-r18vd";
-    private static final double RESCALE = 0.00392156862745098;   // HuggingFace's 1/255
 
     private final InferenceSession session;
     private final String inputName;
@@ -115,14 +113,7 @@ public class DetrDetector implements ObjectDetector {
         int width = image.getWidth();
         int height = image.getHeight();
         int[] resized = PilImages.resizeBilinear(PaddleImages.pixels(image), width, height, inputSize, inputSize);
-        int plane = inputSize * inputSize;
-        float[] input = new float[3 * plane];
-        for (int i = 0; i < plane; i++) {
-            int rgb = resized[i];
-            input[i] = (float) (((rgb >> 16) & 0xFF) * RESCALE);
-            input[plane + i] = (float) (((rgb >> 8) & 0xFF) * RESCALE);
-            input[2 * plane + i] = (float) ((rgb & 0xFF) * RESCALE);
-        }
+        float[] input = DetectionOps.toChw(resized, inputSize, inputSize);   // equals HuggingFace's rescale by 1/255
         Map<String, Tensor> outputs = session.run(Map.of(inputName,
                 Tensor.fromFloats(input, new long[]{1, 3, inputSize, inputSize})));
 
@@ -140,8 +131,10 @@ public class DetrDetector implements ObjectDetector {
             throw new InferenceException("Expected logits and box outputs, got " + outputs.keySet());
         }
         long[] shape = logits.shape();
-        return decode(logits.toFloats(), boxes.toFloats(), (int) shape[1], (int) shape[2],
-                confidenceThreshold, width, height);
+        // HuggingFace's post_process_object_detection for RT-DETR with focal loss
+        return DetectionOps.decodeQueries(logits.toFloats(), boxes.toFloats(), (int) shape[1], (int) shape[2],
+                confidenceThreshold, width, height, labels, DetectionOps.QueryDecoding.TOP_PAIRS,
+                Integer.MAX_VALUE);
     }
 
     /** Detects objects with a confidence threshold other than the configured one. */
@@ -153,45 +146,6 @@ public class DetrDetector implements ObjectDetector {
     @Override
     public void close() {
         session.close();
-    }
-
-    /**
-     * HuggingFace's {@code post_process_object_detection} for RT-DETR with focal loss: the {@code queries} best
-     * (query, class) scores overall, above the threshold, best first.
-     */
-    private List<Detection> decode(float[] logits, float[] boxes, int queries, int classes,
-                                   float threshold, int width, int height) {
-        List<float[]> candidates = new ArrayList<>();   // score, query, class
-        for (int q = 0; q < queries; q++) {
-            for (int c = 0; c < classes; c++) {
-                float score = (float) (1.0 / (1.0 + Math.exp(-logits[q * classes + c])));
-                if (score > threshold) {
-                    candidates.add(new float[]{score, q, c});
-                }
-            }
-        }
-        // Taking the best `queries` above the threshold equals HuggingFace's top-k followed by the threshold
-        candidates.sort((a, b) -> Float.compare(b[0], a[0]));
-        List<Detection> detections = new ArrayList<>();
-        for (int i = 0; i < Math.min(queries, candidates.size()); i++) {
-            float[] candidate = candidates.get(i);
-            int q = (int) candidate[1];
-            int c = (int) candidate[2];
-            float cx = boxes[q * 4];
-            float cy = boxes[q * 4 + 1];
-            float w = boxes[q * 4 + 2];
-            float h = boxes[q * 4 + 3];
-            float x1 = clamp((cx - 0.5f * w) * width, width);
-            float y1 = clamp((cy - 0.5f * h) * height, height);
-            float x2 = clamp((cx + 0.5f * w) * width, width);
-            float y2 = clamp((cy + 0.5f * h) * height, height);
-            detections.add(new Detection(new BoundingBox(x1, y1, x2, y2), labels.get(c), c, candidate[0]));
-        }
-        return detections;
-    }
-
-    private static float clamp(float value, int max) {
-        return Math.max(0, Math.min(value, max));
     }
 
     public static class Builder {

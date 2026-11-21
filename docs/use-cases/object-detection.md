@@ -201,6 +201,17 @@ Every detector follows the same contract, checked by one test that runs against 
 
 So replacing one detector with another changes only the builder line, when variables are typed as `ObjectDetector`.
 
+## Custom detectors
+
+`DetectionOps` holds the building blocks the detectors share, for implementing `ObjectDetector` over another model:
+
+| Method | Purpose |
+|--------|---------|
+| `Letterbox.centered(w, h, size)`, `Letterbox.topLeft(w, h, size)` | Aspect-preserving scale into a square input; `apply(image, padColor)` draws it, `toOriginal(box, w, h)` maps a box back |
+| `pixels(image)`, `toChw(pixels, w, h)` | Planar RGB floats in [0, 1]; an overload adds mean/std normalization and BGR order |
+| `nms(detections, iou, classAware, maxDetections)` | Non-maximum suppression, across classes or per class |
+| `decodeQueries(logits, boxes, ...)` | DETR-style query outputs to detections: `TOP_PAIRS` (D-FINE, RT-DETR) or `BEST_CLASS_PER_QUERY` (YOLO26) |
+
 ## Tips
 
 - **Type variables as `ObjectDetector`** to keep the model swappable: changing the builder line is then the only

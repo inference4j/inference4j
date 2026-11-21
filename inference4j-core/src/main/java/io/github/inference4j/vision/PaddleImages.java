@@ -30,7 +30,7 @@ final class PaddleImages {
     }
 
     static int[] pixels(BufferedImage image) {
-        return image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+        return DetectionOps.pixels(image);
     }
 
     /**
