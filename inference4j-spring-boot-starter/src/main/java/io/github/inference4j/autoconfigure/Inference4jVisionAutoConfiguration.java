@@ -15,11 +15,14 @@
  */
 package io.github.inference4j.autoconfigure;
 
+import io.github.inference4j.autoconfigure.Inference4jProperties.ObjectDetectorProperties;
 import io.github.inference4j.vision.CraftTextDetector;
+import io.github.inference4j.vision.DetrDetector;
 import io.github.inference4j.vision.ImageClassifier;
 import io.github.inference4j.vision.ObjectDetector;
 import io.github.inference4j.vision.ResNetClassifier;
 import io.github.inference4j.vision.TextDetector;
+import io.github.inference4j.vision.Yolo26Detector;
 import io.github.inference4j.vision.YoloV8Detector;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -53,9 +56,13 @@ public class Inference4jVisionAutoConfiguration {
 	@ConditionalOnMissingBean(ObjectDetector.class)
 	@ConditionalOnProperty(prefix = "inference4j.vision.object-detector", name = "enabled", havingValue = "true")
 	public ObjectDetector objectDetector(Inference4jProperties properties) {
-		return YoloV8Detector.builder()
-			.modelId(properties.getVision().getObjectDetector().getModelId())
-			.build();
+		ObjectDetectorProperties detector = properties.getVision().getObjectDetector();
+		String modelId = detector.getModelId();
+		return switch (detector.getArchitecture()) {
+			case DETR -> DetrDetector.builder().modelId(modelId).build();
+			case YOLOV8 -> YoloV8Detector.builder().modelId(modelId).build();
+			case YOLO26 -> Yolo26Detector.builder().modelId(modelId).build();
+		};
 	}
 
 	@Bean

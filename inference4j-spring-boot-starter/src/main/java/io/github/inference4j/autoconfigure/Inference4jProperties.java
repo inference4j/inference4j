@@ -125,7 +125,7 @@ public class Inference4jProperties {
 
 		private TaskProperties imageClassifier = new TaskProperties("inference4j/resnet50-v1-7");
 
-		private TaskProperties objectDetector = new TaskProperties("inference4j/yolov8n");
+		private ObjectDetectorProperties objectDetector = new ObjectDetectorProperties();
 
 		private TaskProperties textDetector = new TaskProperties("inference4j/craft-mlt-25k");
 
@@ -137,11 +137,11 @@ public class Inference4jProperties {
 			this.imageClassifier = imageClassifier;
 		}
 
-		public TaskProperties getObjectDetector() {
+		public ObjectDetectorProperties getObjectDetector() {
 			return objectDetector;
 		}
 
-		public void setObjectDetector(TaskProperties objectDetector) {
+		public void setObjectDetector(ObjectDetectorProperties objectDetector) {
 			this.objectDetector = objectDetector;
 		}
 
@@ -386,6 +386,70 @@ public class Inference4jProperties {
 
 		public void setModelId(String modelId) {
 			this.modelId = modelId;
+		}
+
+	}
+
+	/**
+	 * The object detector: which wrapper builds the bean, and which model it loads.
+	 *
+	 * <p>When {@code model-id} is not set, the chosen architecture's own default model is used, so
+	 * switching {@code architecture} to {@code yolov8} alone loads {@code inference4j/yolov8n} rather
+	 * than the D-FINE weights.
+	 */
+	public static class ObjectDetectorProperties extends TaskProperties {
+
+		private ObjectDetectorArchitecture architecture = ObjectDetectorArchitecture.DETR;
+
+		public ObjectDetectorArchitecture getArchitecture() {
+			return architecture;
+		}
+
+		public void setArchitecture(ObjectDetectorArchitecture architecture) {
+			this.architecture = architecture;
+		}
+
+		/**
+		 * Returns the configured model id, or the architecture's default model when none is set.
+		 */
+		@Override
+		public String getModelId() {
+			String modelId = super.getModelId();
+			if (modelId != null && !modelId.isBlank()) {
+				return modelId;
+			}
+			return architecture.getDefaultModelId();
+		}
+
+	}
+
+	/**
+	 * The detector families the starter can build an {@code ObjectDetector} from.
+	 */
+	public enum ObjectDetectorArchitecture {
+
+		/** DETR-family models through {@code DetrDetector}, such as D-FINE and RT-DETRv2 (Apache-2.0). */
+		DETR("inference4j/dfine-small-coco"),
+
+		/** YOLOv8 models through {@code YoloV8Detector} (AGPL-3.0 weights). */
+		YOLOV8("inference4j/yolov8n"),
+
+		/** YOLO26 models through {@code Yolo26Detector} (AGPL-3.0 weights). */
+		YOLO26("inference4j/yolo26n");
+
+		private final String defaultModelId;
+
+		ObjectDetectorArchitecture(String defaultModelId) {
+			this.defaultModelId = defaultModelId;
+		}
+
+		/**
+		 * Returns the model loaded when {@code model-id} is not set.
+		 *
+		 * @return the default HuggingFace model id for this architecture
+		 */
+		public String getDefaultModelId() {
+			return defaultModelId;
 		}
 
 	}

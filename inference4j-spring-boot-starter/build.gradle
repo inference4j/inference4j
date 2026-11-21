@@ -21,3 +21,8 @@ dependencies {
     testImplementation "org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}"
     testImplementation 'io.micrometer:micrometer-core:1.14.4'
 }
+
+tasks.named('test') {
+    // The object detector tests seed this model cache with a stub model, so building the beans never downloads
+    systemProperty 'inference4j.cache.dir', layout.buildDirectory.dir('test-model-cache').get().asFile.absolutePath
+}

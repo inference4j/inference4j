@@ -18,6 +18,10 @@ package io.github.inference4j.autoconfigure;
 
 import org.junit.jupiter.api.Test;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Configuration;
+
 import static org.assertj.core.api.Assertions.*;
 
 class Inference4jPropertiesTest {
@@ -43,6 +47,64 @@ class Inference4jPropertiesTest {
 
         assertThat(properties.getVision().getImageClassifier().getModelId())
                 .isEqualTo("inference4j/resnet50-v1-7");
+    }
+
+    @Test
+    void defaultsVisionObjectDetectorIsDfineSmall() {
+        Inference4jProperties properties = new Inference4jProperties();
+
+        assertThat(properties.getVision().getObjectDetector().getArchitecture())
+                .isEqualTo(Inference4jProperties.ObjectDetectorArchitecture.DETR);
+        assertThat(properties.getVision().getObjectDetector().getModelId())
+                .isEqualTo("inference4j/dfine-small-coco");
+    }
+
+    @Test
+    void objectDetectorFallsBackToTheArchitectureDefaultModelId() {
+        Inference4jProperties.ObjectDetectorProperties detector = new Inference4jProperties.ObjectDetectorProperties();
+
+        detector.setArchitecture(Inference4jProperties.ObjectDetectorArchitecture.YOLOV8);
+        assertThat(detector.getModelId()).isEqualTo("inference4j/yolov8n");
+
+        detector.setArchitecture(Inference4jProperties.ObjectDetectorArchitecture.YOLO26);
+        assertThat(detector.getModelId()).isEqualTo("inference4j/yolo26n");
+    }
+
+    @Test
+    void objectDetectorKeepsAnExplicitModelIdAcrossArchitectures() {
+        Inference4jProperties.ObjectDetectorProperties detector = new Inference4jProperties.ObjectDetectorProperties();
+
+        detector.setModelId("inference4j/dfine-nano-coco");
+        detector.setArchitecture(Inference4jProperties.ObjectDetectorArchitecture.YOLOV8);
+
+        assertThat(detector.getModelId()).isEqualTo("inference4j/dfine-nano-coco");
+    }
+
+    @Test
+    void objectDetectorPropertiesBindFromRelaxedNames() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(PropertiesConfig.class)
+                .withPropertyValues(
+                        "inference4j.vision.object-detector.enabled=true",
+                        "inference4j.vision.object-detector.architecture=yolo26",
+                        "inference4j.vision.object-detector.model-id=acme/my-yolo26")
+                .run(ctx -> {
+                    Inference4jProperties.ObjectDetectorProperties detector =
+                            ctx.getBean(Inference4jProperties.class).getVision().getObjectDetector();
+                    assertThat(detector.isEnabled()).isTrue();
+                    assertThat(detector.getArchitecture())
+                            .isEqualTo(Inference4jProperties.ObjectDetectorArchitecture.YOLO26);
+                    assertThat(detector.getModelId()).isEqualTo("acme/my-yolo26");
+                });
+    }
+
+    @Test
+    void objectDetectorArchitectureBindsWithoutModelId() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(PropertiesConfig.class)
+                .withPropertyValues("inference4j.vision.object-detector.architecture=yolov8")
+                .run(ctx -> assertThat(ctx.getBean(Inference4jProperties.class)
+                        .getVision().getObjectDetector().getModelId()).isEqualTo("inference4j/yolov8n"));
     }
 
     @Test
@@ -98,5 +160,10 @@ class Inference4jPropertiesTest {
         assertThat(properties.getAudio()).isNotNull();
         assertThat(properties.getAudio().getSpeechRecognizer()).isNotNull();
         assertThat(properties.getAudio().getVad()).isNotNull();
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(Inference4jProperties.class)
+    static class PropertiesConfig {
     }
 }
