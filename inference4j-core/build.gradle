@@ -3,6 +3,14 @@ description = 'Low-level ONNX Runtime abstractions for inference4j'
 dependencies {
     api 'com.microsoft.onnxruntime:onnxruntime:1.28.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.3'
+
+    // Tests assert on log output through Logback's ListAppender
+    testImplementation 'ch.qos.logback:logback-classic:1.5.18'
+}
+
+// Logback replaces the shared slf4j-simple test backend in this module
+configurations.matching { it.name in ['testRuntimeClasspath', 'modelTestRuntimeClasspath'] }.configureEach {
+    exclude group: 'org.slf4j', module: 'slf4j-simple'
 }
 
 // Ships the third-party notices (Moonshine port, MIT) with the jar
