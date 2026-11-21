@@ -25,7 +25,6 @@ import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.preprocessing.image.ImageLayout;
 import io.github.inference4j.preprocessing.image.Labels;
 
 import org.slf4j.Logger;
@@ -121,13 +120,15 @@ public class Yolo26Detector
     private final String inputName;
     private final int inputSize;
     private final float defaultConfidenceThreshold;
+    private final int maxDetections;
 
     private Yolo26Detector(InferenceSession session, Labels labels, String inputName,
-                           int inputSize, float defaultConfidenceThreshold) {
+                           int inputSize, float defaultConfidenceThreshold, int maxDetections) {
         super(session,
                 createPreprocessor(inputName, inputSize),
-                ctx -> decodeDetections(ctx.outputs(), labels, defaultConfidenceThreshold,
+                ctx -> decodeDetections(ctx.outputs(), labels, defaultConfidenceThreshold, maxDetections,
                         ctx.input().getWidth(), ctx.input().getHeight()));
+        this.maxDetections = maxDetections;
         this.labels = labels;
         this.inputName = inputName;
         this.inputSize = inputSize;
@@ -154,7 +155,7 @@ public class Yolo26Detector
     public List<Detection> detect(BufferedImage image, float confidenceThreshold, float iouThreshold) {
         PreprocessResult result = preprocessor.process(image);
         Map<String, Tensor> outputs = session.run(result.tensors());
-        return decodeDetections(outputs, labels, confidenceThreshold,
+        return decodeDetections(outputs, labels, confidenceThreshold, maxDetections,
                 image.getWidth(), image.getHeight());
     }
 
@@ -193,7 +194,7 @@ public class Yolo26Detector
     // --- Post-processing ---
 
     private static List<Detection> decodeDetections(Map<String, Tensor> outputs,
-                                                     Labels labels, float confThreshold,
+                                                     Labels labels, float confThreshold, int maxDetections,
                                                      int origWidth, int origHeight) {
         float[] logitsData = null;
         long[] logitsShape = null;
@@ -217,16 +218,24 @@ public class Yolo26Detector
         }
 
         return postProcess(logitsData, logitsShape, boxesData, boxesShape,
-                labels, confThreshold, origWidth, origHeight);
+                labels, confThreshold, maxDetections, origWidth, origHeight);
     }
 
     static List<Detection> postProcess(float[] logitsData, long[] logitsShape,
                                        float[] boxesData, long[] boxesShape,
                                        Labels labels, float confThreshold,
                                        int origWidth, int origHeight) {
+        return postProcess(logitsData, logitsShape, boxesData, boxesShape, labels, confThreshold,
+                Integer.MAX_VALUE, origWidth, origHeight);
+    }
+
+    static List<Detection> postProcess(float[] logitsData, long[] logitsShape,
+                                       float[] boxesData, long[] boxesShape,
+                                       Labels labels, float confThreshold, int maxDetections,
+                                       int origWidth, int origHeight) {
         return DetectionOps.decodeQueries(logitsData, boxesData, (int) logitsShape[1], (int) logitsShape[2],
                 confThreshold, origWidth, origHeight, labels, DetectionOps.QueryDecoding.BEST_CLASS_PER_QUERY,
-                Integer.MAX_VALUE);
+                maxDetections);
     }
 
     // --- Utilities ---
@@ -236,9 +245,10 @@ public class Yolo26Detector
         private ModelSource modelSource;
         private String modelId;
         private SessionConfigurer sessionConfigurer;
-        private Labels labels = Labels.coco();
+        private Labels labels;
         private String inputName;
-        private int inputSize = 640;
+        private Integer inputSize;
+        private int maxDetections = DetectorModels.DEFAULT_MAX_DETECTIONS;
         private float confidenceThreshold = 0.5f;
 
         Builder session(InferenceSession session) {
@@ -261,8 +271,18 @@ public class Yolo26Detector
             return this;
         }
 
+        /**
+         * Class names by class index. When not set: a {@code labels.txt} or the {@code id2label} of a
+         * {@code config.json} next to a custom model, otherwise the 80 COCO classes.
+         */
         public Builder labels(Labels labels) {
             this.labels = labels;
+            return this;
+        }
+
+        /** The most detections returned per image, the most confident first. Defaults to 300. */
+        public Builder maxDetections(int maxDetections) {
+            this.maxDetections = DetectorModels.maxDetections(maxDetections);
             return this;
         }
 
@@ -271,6 +291,10 @@ public class Yolo26Detector
             return this;
         }
 
+        /**
+         * Side of the square model input, in pixels. A model with a fixed input size uses that size, and a different
+         * value fails at {@link #build()}; otherwise defaults to 640.
+         */
         public Builder inputSize(int inputSize) {
             this.inputSize = inputSize;
             return this;
@@ -291,21 +315,32 @@ public class Yolo26Detector
         }
 
         public Yolo26Detector build() {
+            String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
+            Path dir = null;
             if (session == null) {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
                 if (DEFAULT_MODEL_ID.equals(id)) {
                     logger.warn("Yolo26Detector is using the default weights '{}', which are licensed "
                             + "under AGPL-3.0 (Ultralytics). DetrDetector is an Apache-2.0 alternative.", id);
                 }
-                Path dir = source.resolve(id, List.of("model.onnx"));
+                dir = source.resolve(id, List.of("model.onnx"));
                 loadFromDirectory(dir);
             }
-            if (inputName == null) {
-                inputName = session.inputNames().iterator().next();
+            try {
+                if (inputName == null) {
+                    inputName = session.inputNames().iterator().next();
+                }
+                int fixedSize = dir != null ? DetectorModels.fixedSize(session.inputShape(inputName)) : -1;
+                int size = DetectorModels.inputSize(inputSize, fixedSize, id);
+                Labels resolved = DetectorModels.labels(labels, dir, DEFAULT_MODEL_ID.equals(id));
+                return new Yolo26Detector(session, resolved, inputName, size, confidenceThreshold, maxDetections);
+            } catch (RuntimeException e) {
+                if (dir != null) {
+                    session.close();
+                }
+                throw e;
             }
-            return new Yolo26Detector(session, labels, inputName, inputSize, confidenceThreshold);
         }
 
         private void loadFromDirectory(Path dir) {
@@ -321,24 +356,6 @@ public class Yolo26Detector
             this.session = sessionConfigurer != null
                     ? InferenceSession.create(modelPath, sessionConfigurer)
                     : InferenceSession.create(modelPath);
-            try {
-                if (this.inputName == null) {
-                    this.inputName = session.inputNames().iterator().next();
-                }
-
-                Path labelsPath = dir.resolve("labels.txt");
-                if (Files.exists(labelsPath)) {
-                    this.labels = Labels.fromFile(labelsPath);
-                }
-
-                long[] inputShape = session.inputShape(this.inputName);
-                ImageLayout layout = ImageLayout.detect(inputShape);
-                this.inputSize = layout.imageSize(inputShape);
-            } catch (Exception e) {
-                this.session.close();
-                this.session = null;
-                throw e;
-            }
         }
     }
 }

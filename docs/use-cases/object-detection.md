@@ -131,9 +131,21 @@ All detector builders share these options:
 | `.modelId(String)` | `String` | HuggingFace model ID |
 | `.modelSource(ModelSource)` | `ModelSource` | Model resolution strategy; defaults to `HuggingFaceModelSource` |
 | `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | ONNX Runtime session config |
-| `.labels(Labels)` | `Labels` | Class names by class index; defaults to COCO (80 classes) |
-| `.inputSize(int)` | `int` | Model input resolution; defaults to `640` |
-| `.confidenceThreshold(float)` | `float` | Detections scoring at or below this are dropped |
+| `.labels(Labels)` | `Labels` | Class names by class index; see [Labels](#labels) |
+| `.inputSize(int)` | `int` | Side of the square model input. A model with a fixed input size uses it, and a different value fails at `build()`; otherwise defaults to `640` |
+| `.confidenceThreshold(float)` | `float` | Minimum detection confidence |
+| `.maxDetections(int)` | `int` | Most detections returned per image, the most confident first; defaults to `300` |
+
+### Labels
+
+The first match wins:
+
+1. labels set with `.labels(...)`;
+2. for the presets (`dfineSmall()`, `dfineNano()`, `rtDetrV2()`, the YOLO defaults), the 80 COCO classes from
+   `Labels.coco()`, so every preset reports the same names;
+3. for a custom model, a `labels.txt` in its directory, one name per line;
+4. the `id2label` map of its `config.json`, as exported by HuggingFace `transformers`;
+5. the 80 COCO classes.
 
 Defaults and extra options per detector:
 

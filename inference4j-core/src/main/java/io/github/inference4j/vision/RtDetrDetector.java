@@ -16,7 +16,6 @@
 
 package io.github.inference4j.vision;
 
-import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.preprocessing.image.Labels;
 import io.github.inference4j.session.SessionConfigurer;
@@ -30,8 +29,8 @@ import io.github.inference4j.session.SessionConfigurer;
 @Deprecated(since = "0.15.0", forRemoval = true)
 public class RtDetrDetector extends DetrDetector {
 
-    private RtDetrDetector(InferenceSession session, Labels labels, int inputSize, float defaultThreshold) {
-        super(session, labels, inputSize, defaultThreshold);
+    private RtDetrDetector(Loaded loaded) {
+        super(loaded);
     }
 
     /** @deprecated Use {@link DetrDetector#dfineSmall()}. */
@@ -101,8 +100,14 @@ public class RtDetrDetector extends DetrDetector {
         }
 
         @Override
+        public Builder maxDetections(int maxDetections) {
+            super.maxDetections(maxDetections);
+            return this;
+        }
+
+        @Override
         public RtDetrDetector build() {
-            return new RtDetrDetector(openSession(), labels, inputSize, confidenceThreshold);
+            return new RtDetrDetector(load());
         }
     }
 }
