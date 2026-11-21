@@ -30,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Transformer object detector for the DETR family: D-FINE and RT-DETRv2, both <strong>Apache-2.0</strong>.
@@ -64,19 +65,27 @@ public class DetrDetector implements ObjectDetector {
     private static final String DFINE_SMALL = "inference4j/dfine-small-coco";
     private static final String DFINE_NANO = "inference4j/dfine-nano-coco";
     private static final String RTDETR_V2 = "inference4j/rtdetr-v2-r18vd";
+    private static final Set<String> PRESETS = Set.of(DFINE_SMALL, DFINE_NANO, RTDETR_V2);
 
     private final InferenceSession session;
     private final String inputName;
     private final Labels labels;
     private final int inputSize;
     private final float defaultThreshold;
+    private final int maxDetections;
 
-    DetrDetector(InferenceSession session, Labels labels, int inputSize, float defaultThreshold) {
-        this.session = session;
-        this.inputName = session.inputNames().iterator().next();
-        this.labels = labels;
-        this.inputSize = inputSize;
-        this.defaultThreshold = defaultThreshold;
+    DetrDetector(Loaded loaded) {
+        this.session = loaded.session();
+        this.inputName = loaded.inputName();
+        this.labels = loaded.labels();
+        this.inputSize = loaded.inputSize();
+        this.defaultThreshold = loaded.confidenceThreshold();
+        this.maxDetections = loaded.maxDetections();
+    }
+
+    /** What a builder resolved: the open session and the settings the detector runs with. */
+    record Loaded(InferenceSession session, String inputName, Labels labels, int inputSize,
+                  float confidenceThreshold, int maxDetections) {
     }
 
     /** D-FINE small (41 MB), the default. */
@@ -134,7 +143,7 @@ public class DetrDetector implements ObjectDetector {
         // HuggingFace's post_process_object_detection for RT-DETR with focal loss
         return DetectionOps.decodeQueries(logits.toFloats(), boxes.toFloats(), (int) shape[1], (int) shape[2],
                 confidenceThreshold, width, height, labels, DetectionOps.QueryDecoding.TOP_PAIRS,
-                Integer.MAX_VALUE);
+                maxDetections);
     }
 
     /** Detects objects with a confidence threshold other than the configured one. */
@@ -152,9 +161,10 @@ public class DetrDetector implements ObjectDetector {
         ModelSource modelSource;
         String modelId = DFINE_SMALL;
         SessionConfigurer sessionConfigurer;
-        Labels labels = Labels.coco();
-        int inputSize = 640;
+        Labels labels;
+        Integer inputSize;
         float confidenceThreshold = 0.5f;
+        int maxDetections = DetectorModels.DEFAULT_MAX_DETECTIONS;
 
         public Builder modelSource(ModelSource modelSource) {
             this.modelSource = modelSource;
@@ -171,13 +181,19 @@ public class DetrDetector implements ObjectDetector {
             return this;
         }
 
-        /** Class names, by class index. Defaults to the 80 COCO classes. */
+        /**
+         * Class names, by class index. When not set: the 80 COCO classes for the presets, and for a custom model
+         * a {@code labels.txt} or the {@code id2label} of its {@code config.json}, falling back to COCO.
+         */
         public Builder labels(Labels labels) {
             this.labels = labels;
             return this;
         }
 
-        /** Side of the square model input, in pixels. Defaults to 640, the size the models were trained at. */
+        /**
+         * Side of the square model input, in pixels. A model with a fixed input size uses that size, and a different
+         * value fails at {@link #build()}; otherwise defaults to 640, the size the presets were trained at.
+         */
         public Builder inputSize(int inputSize) {
             this.inputSize = inputSize;
             return this;
@@ -189,20 +205,46 @@ public class DetrDetector implements ObjectDetector {
             return this;
         }
 
-        public DetrDetector build() {
-            return new DetrDetector(openSession(), labels, inputSize, confidenceThreshold);
+        /** The most detections returned per image, the most confident first. Defaults to 300. */
+        public Builder maxDetections(int maxDetections) {
+            this.maxDetections = DetectorModels.maxDetections(maxDetections);
+            return this;
         }
 
-        InferenceSession openSession() {
+        public DetrDetector build() {
+            return new DetrDetector(load());
+        }
+
+        Loaded load() {
             ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-            Path dir = source.resolve(modelId, List.of("model.onnx"));
+            boolean preset = PRESETS.contains(modelId);
+            Path dir = preset ? source.resolve(modelId, List.of("model.onnx")) : resolveCustom(source);
             Path modelPath = dir.resolve("model.onnx");
             if (!Files.exists(modelPath)) {
                 throw new ModelSourceException("Model file not found: " + modelPath);
             }
-            return sessionConfigurer != null
+            InferenceSession session = sessionConfigurer != null
                     ? InferenceSession.create(modelPath, sessionConfigurer)
                     : InferenceSession.create(modelPath);
+            try {
+                String inputName = session.inputNames().iterator().next();
+                int size = DetectorModels.inputSize(inputSize,
+                        DetectorModels.fixedSize(session.inputShape(inputName)), modelId);
+                return new Loaded(session, inputName, DetectorModels.labels(labels, dir, preset), size,
+                        confidenceThreshold, maxDetections);
+            } catch (RuntimeException e) {
+                session.close();
+                throw e;
+            }
+        }
+
+        /** A custom model's directory, with its {@code config.json} when the repository has one. */
+        private Path resolveCustom(ModelSource source) {
+            try {
+                return source.resolve(modelId, List.of("model.onnx", "config.json"));
+            } catch (ModelSourceException e) {
+                return source.resolve(modelId, List.of("model.onnx"));
+            }
         }
     }
 }

@@ -25,7 +25,6 @@ import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.preprocessing.image.ImageLayout;
 import io.github.inference4j.preprocessing.image.Labels;
 
 import org.slf4j.Logger;
@@ -129,14 +128,17 @@ public class YoloV8Detector
     private final int inputSize;
     private final float defaultConfidenceThreshold;
     private final float defaultIouThreshold;
+    private final int maxDetections;
 
     private YoloV8Detector(InferenceSession session, Labels labels, String inputName,
-                           int inputSize, float defaultConfidenceThreshold, float defaultIouThreshold) {
+                           int inputSize, float defaultConfidenceThreshold, float defaultIouThreshold,
+                           int maxDetections) {
         super(session,
                 createPreprocessor(inputName, inputSize),
                 ctx -> decodeDetections(ctx.outputs(), labels,
-                        defaultConfidenceThreshold, defaultIouThreshold,
+                        defaultConfidenceThreshold, defaultIouThreshold, maxDetections,
                         inputSize, ctx.input().getWidth(), ctx.input().getHeight()));
+        this.maxDetections = maxDetections;
         this.labels = labels;
         this.inputName = inputName;
         this.inputSize = inputSize;
@@ -157,7 +159,7 @@ public class YoloV8Detector
     public List<Detection> detect(BufferedImage image, float confidenceThreshold, float iouThreshold) {
         PreprocessResult result = preprocessor.process(image);
         Map<String, Tensor> outputs = session.run(result.tensors());
-        return decodeDetections(outputs, labels, confidenceThreshold, iouThreshold,
+        return decodeDetections(outputs, labels, confidenceThreshold, iouThreshold, maxDetections,
                 inputSize, image.getWidth(), image.getHeight());
     }
 
@@ -199,7 +201,7 @@ public class YoloV8Detector
     private static List<Detection> decodeDetections(Map<String, Tensor> outputs,
                                                      Labels labels,
                                                      float confThreshold, float iouThreshold,
-                                                     int inputSize,
+                                                     int maxDetections, int inputSize,
                                                      int origWidth, int origHeight) {
         Tensor outputTensor = outputs.values().iterator().next();
 
@@ -209,13 +211,22 @@ public class YoloV8Detector
         float padY = letterbox.padY();
 
         return postProcess(outputTensor.toFloats(), outputTensor.shape(),
-                labels, confThreshold, iouThreshold,
+                labels, confThreshold, iouThreshold, maxDetections,
                 scale, padX, padY, origWidth, origHeight);
     }
 
     static List<Detection> postProcess(float[] rawOutput, long[] outputShape,
                                        Labels labels,
                                        float confThreshold, float iouThreshold,
+                                       float scale, float padX, float padY,
+                                       int origWidth, int origHeight) {
+        return postProcess(rawOutput, outputShape, labels, confThreshold, iouThreshold, Integer.MAX_VALUE,
+                scale, padX, padY, origWidth, origHeight);
+    }
+
+    static List<Detection> postProcess(float[] rawOutput, long[] outputShape,
+                                       Labels labels,
+                                       float confThreshold, float iouThreshold, int maxDetections,
                                        float scale, float padX, float padY,
                                        int origWidth, int origHeight) {
         int numOutputs = (int) outputShape[1];
@@ -247,7 +258,7 @@ public class YoloV8Detector
         }
 
         // Class-agnostic, as before: one box per object whatever its class
-        return DetectionOps.nms(candidates, iouThreshold, false, Integer.MAX_VALUE);
+        return DetectionOps.nms(candidates, iouThreshold, false, maxDetections);
     }
 
     // --- Utilities ---
@@ -257,9 +268,10 @@ public class YoloV8Detector
         private ModelSource modelSource;
         private String modelId;
         private SessionConfigurer sessionConfigurer;
-        private Labels labels = Labels.coco();
+        private Labels labels;
         private String inputName;
-        private int inputSize = 640;
+        private Integer inputSize;
+        private int maxDetections = DetectorModels.DEFAULT_MAX_DETECTIONS;
         private float confidenceThreshold = 0.25f;
         private float iouThreshold = 0.45f;
 
@@ -283,8 +295,18 @@ public class YoloV8Detector
             return this;
         }
 
+        /**
+         * Class names by class index. When not set: a {@code labels.txt} or the {@code id2label} of a
+         * {@code config.json} next to a custom model, otherwise the 80 COCO classes.
+         */
         public Builder labels(Labels labels) {
             this.labels = labels;
+            return this;
+        }
+
+        /** The most detections returned per image, the most confident first. Defaults to 300. */
+        public Builder maxDetections(int maxDetections) {
+            this.maxDetections = DetectorModels.maxDetections(maxDetections);
             return this;
         }
 
@@ -293,6 +315,10 @@ public class YoloV8Detector
             return this;
         }
 
+        /**
+         * Side of the square model input, in pixels. A model with a fixed input size uses that size, and a different
+         * value fails at {@link #build()}; otherwise defaults to 640.
+         */
         public Builder inputSize(int inputSize) {
             this.inputSize = inputSize;
             return this;
@@ -309,22 +335,32 @@ public class YoloV8Detector
         }
 
         public YoloV8Detector build() {
+            String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
+            Path dir = null;
             if (session == null) {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
                 if (DEFAULT_MODEL_ID.equals(id)) {
                     logger.warn("YoloV8Detector is using the default weights '{}', which are licensed "
                             + "under AGPL-3.0 (Ultralytics). DetrDetector is an Apache-2.0 alternative.", id);
                 }
-                Path dir = source.resolve(id, List.of("model.onnx"));
+                dir = source.resolve(id, List.of("model.onnx"));
                 loadFromDirectory(dir);
             }
-            if (inputName == null) {
-                inputName = session.inputNames().iterator().next();
+            try {
+                if (inputName == null) {
+                    inputName = session.inputNames().iterator().next();
+                }
+                int fixedSize = dir != null ? DetectorModels.fixedSize(session.inputShape(inputName)) : -1;
+                int size = DetectorModels.inputSize(inputSize, fixedSize, id);
+                Labels resolved = DetectorModels.labels(labels, dir, DEFAULT_MODEL_ID.equals(id));
+                return new YoloV8Detector(session, resolved, inputName, size, confidenceThreshold, iouThreshold, maxDetections);
+            } catch (RuntimeException e) {
+                if (dir != null) {
+                    session.close();
+                }
+                throw e;
             }
-            return new YoloV8Detector(session, labels, inputName, inputSize,
-                    confidenceThreshold, iouThreshold);
         }
 
         private void loadFromDirectory(Path dir) {
@@ -340,24 +376,6 @@ public class YoloV8Detector
             this.session = sessionConfigurer != null
                     ? InferenceSession.create(modelPath, sessionConfigurer)
                     : InferenceSession.create(modelPath);
-            try {
-                if (this.inputName == null) {
-                    this.inputName = session.inputNames().iterator().next();
-                }
-
-                Path labelsPath = dir.resolve("labels.txt");
-                if (Files.exists(labelsPath)) {
-                    this.labels = Labels.fromFile(labelsPath);
-                }
-
-                long[] inputShape = session.inputShape(this.inputName);
-                ImageLayout layout = ImageLayout.detect(inputShape);
-                this.inputSize = layout.imageSize(inputShape);
-            } catch (Exception e) {
-                this.session.close();
-                this.session = null;
-                throw e;
-            }
         }
     }
 }
