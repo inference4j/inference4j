@@ -18,15 +18,18 @@ try (ObjectDetector detector = DetrDetector.builder().build()) {      // D-FINE 
 |--------|-------|-----------------|-------------------|-----------|--------------|
 | `DetrDetector.dfineNano()` | D-FINE nano | **Apache-2.0** | 42.8 | 15 MB | 29 ms |
 | `DetrDetector.dfineSmall()` (default) | D-FINE small | **Apache-2.0** | 48.5 | 41 MB | 54 ms |
+| `DetrDetector.dfineMedium()` | D-FINE medium | **Apache-2.0** | 52.3 | 79 MB | — |
+| `DetrDetector.dfineLarge()` | D-FINE large | **Apache-2.0** | 54.0 | 125 MB | — |
 | `DetrDetector.rtDetrV2()` | RT-DETRv2 ResNet-18 | **Apache-2.0** | 48.1 | 81 MB | 108 ms |
 | `Yolo26Detector.builder()` | YOLO26n | AGPL-3.0 | 40.9 | 10 MB | 17 ms |
 | `YoloV8Detector.builder()` | YOLOv8n (also loads YOLO11 exports) | AGPL-3.0 | — | 13 MB | — |
 
 \*Median per image at 640 × 640 on a laptop CPU with four ONNX Runtime threads, measured with inference4j. AP figures
 come from the [D-FINE](https://github.com/Peterande/D-FINE), [RT-DETRv2](https://github.com/lyuwenyu/RT-DETR) and
-[YOLO26](https://docs.ultralytics.com/models/yolo26/) authors (COCO val2017); inference4j has not re-measured them.
+[YOLO26](https://docs.ultralytics.com/models/yolo26/) authors (COCO val2017); inference4j has not re-measured them. Latency for D-FINE medium and large is not measured yet.
 
-- **Start with D-FINE small**: the most accurate preset, and Apache-2.0.
+- **Start with D-FINE small**: a good balance of accuracy and speed, and Apache-2.0.
+- **D-FINE medium or large** when accuracy matters more than speed.
 - **D-FINE nano** when speed or size matters most.
 - **YOLO26n** is the fastest, but its weights are AGPL-3.0; see [Licenses](#licenses).
 
@@ -66,7 +69,7 @@ downloads:
 
 | Weights | License | Source |
 |---------|---------|--------|
-| D-FINE nano, small | Apache-2.0 | [D-FINE license](https://github.com/Peterande/D-FINE/blob/master/LICENSE) |
+| D-FINE nano, small, medium, large | Apache-2.0 | [D-FINE license](https://github.com/Peterande/D-FINE/blob/master/LICENSE) |
 | RT-DETRv2 ResNet-18 | Apache-2.0 | [RT-DETR license](https://github.com/lyuwenyu/RT-DETR/blob/main/LICENSE) |
 | YOLOv8n, YOLO26n | AGPL-3.0 | [Ultralytics license](https://github.com/ultralytics/ultralytics/blob/main/LICENSE) |
 
@@ -141,7 +144,7 @@ All detector builders share these options:
 The first match wins:
 
 1. labels set with `.labels(...)`;
-2. for the presets (`dfineSmall()`, `dfineNano()`, `rtDetrV2()`, the YOLO defaults), the 80 COCO classes from
+2. for the presets (`dfineSmall()`, `dfineNano()`, `dfineMedium()`, `dfineLarge()`, `rtDetrV2()`, the YOLO defaults), the 80 COCO classes from
    `Labels.coco()`, so every preset reports the same names;
 3. for a custom model, a `labels.txt` in its directory, one name per line;
 4. the `id2label` map of its `config.json`, as exported by HuggingFace `transformers`;
@@ -151,7 +154,7 @@ Defaults and extra options per detector:
 
 | Detector | Default `modelId` | Default `confidenceThreshold` | Extra options |
 |----------|-------------------|-------------------------------|---------------|
-| `DetrDetector` | `inference4j/dfine-small-coco`; presets `dfineSmall()`, `dfineNano()`, `rtDetrV2()` | `0.5` | none |
+| `DetrDetector` | `inference4j/dfine-small-coco`; presets `dfineSmall()`, `dfineNano()`, `dfineMedium()`, `dfineLarge()`, `rtDetrV2()` | `0.5` | none |
 | `Yolo26Detector` | `inference4j/yolo26n` | `0.5` | `.inputName(String)`: input tensor name, auto-detected |
 | `YoloV8Detector` | `inference4j/yolov8n` | `0.25` | `.inputName(String)`; `.iouThreshold(float)`: NMS IoU threshold, `0.45` |
 

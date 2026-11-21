@@ -245,9 +245,9 @@ interface. Tracked in [#197](https://github.com/inference4j/inference4j/issues/1
 - [ ] **Apache-2.0 defaults** — docs, examples and the Spring Boot starter use D-FINE small
       ([#181](https://github.com/inference4j/inference4j/issues/181), [#182](https://github.com/inference4j/inference4j/issues/182))
 - [ ] **YOLO license notice** — AGPL-3.0 notice and warning on the YOLO wrappers ([#189](https://github.com/inference4j/inference4j/issues/189))
-- [ ] **One detector API** — swap contract, shared helpers and builder options, license per preset
+- [ ] **One detector API** — swap contract, shared helpers and builder options
       ([#183](https://github.com/inference4j/inference4j/issues/183), [#184](https://github.com/inference4j/inference4j/issues/184),
-      [#185](https://github.com/inference4j/inference4j/issues/185), [#188](https://github.com/inference4j/inference4j/issues/188))
+      [#185](https://github.com/inference4j/inference4j/issues/185))
 - [ ] **Accurate tier** — D-FINE medium and large, Objects365-pretrained presets
       ([#186](https://github.com/inference4j/inference4j/issues/186), [#187](https://github.com/inference4j/inference4j/issues/187))
 - [ ] **Detector benchmarks** ([#191](https://github.com/inference4j/inference4j/issues/191))
