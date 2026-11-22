@@ -114,6 +114,7 @@ class GenerationEngineTest {
 
         when(stream.next(318)).thenReturn(" is");
         when(stream.next(995)).thenReturn(" world");
+        when(decoder.decode(new int[]{318})).thenReturn(" is");   // byte-level BPE keeps the space
 
         try (var engine = GenerationEngine.builder()
                 .session(session)
@@ -173,6 +174,39 @@ class GenerationEngineTest {
         }
 
         assertThat(streamed).isEqualTo(List.of("A", "B"));
+    }
+
+    @Test
+    void firstTextDropsTheLeadingSpaceTheDecoderDrops() throws Exception {
+        int eosTokenId = 0;
+        GenerativeSession session = mock(GenerativeSession.class);
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
+
+        when(tokenizer.encode(eq("Hi"), anyInt())).thenReturn(
+                new EncodedInput(new long[]{10}, new long[]{1}, new long[]{0}));
+        when(session.prefill(any())).thenReturn(new ForwardResult(logitsForToken(1, 10)));
+        when(session.decode(1)).thenReturn(new ForwardResult(logitsForToken(2, 10)));
+        when(session.decode(2)).thenReturn(new ForwardResult(logitsForToken(eosTokenId, 10)));
+
+        // SentencePiece: the stream gives "▁Die" as " Die", decode strips it at the start
+        when(stream.next(1)).thenReturn(" Die");
+        when(stream.next(2)).thenReturn(" Karte");
+        when(decoder.decode(new int[]{1})).thenReturn("Die");
+
+        List<String> streamed = new ArrayList<>();
+        try (var engine = GenerationEngine.builder()
+                .session(session)
+                .tokenizer(tokenizer)
+                .decoder(decoder)
+                .eosTokenId(eosTokenId)
+                .build()) {
+            GenerationResult result = engine.generate("Hi", streamed::add);
+
+            assertThat(result.text()).isEqualTo("Die Karte");
+        }
+        assertThat(streamed).isEqualTo(List.of("Die", " Karte"));
     }
 
     @Test

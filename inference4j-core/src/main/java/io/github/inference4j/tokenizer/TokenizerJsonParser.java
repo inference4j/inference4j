@@ -235,6 +235,21 @@ public final class TokenizerJsonParser {
     }
 
     /**
+     * Reads the tokenizer model type of a {@code tokenizer.json}: {@code model.type}, such as {@code "BPE"} or
+     * {@code "Unigram"}.
+     *
+     * @return the type, or an empty string when the file does not name one
+     * @throws ModelSourceException if the file cannot be read
+     */
+    public static String modelType(Path tokenizerJson) {
+        try {
+            return new ObjectMapper().readTree(tokenizerJson.toFile()).path("model").path("type").asText();
+        } catch (IOException e) {
+            throw new ModelSourceException("Failed to parse tokenizer.json: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Reads which special tokens the {@code post_processor} of a {@code tokenizer.json} places around one text and
      * around a pair of texts. Supports {@code TemplateProcessing}, {@code BertProcessing} and
      * {@code RobertaProcessing}.
