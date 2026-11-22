@@ -61,7 +61,9 @@ class ObjectDetectorContractModelTest {
                 detector("YOLO26n", () -> Yolo26Detector.builder().sessionOptions(FOUR_THREADS).build()),
                 detector("YOLOX-Nano", () -> YoloXDetector.nano().sessionOptions(FOUR_THREADS).build()),
                 detector("YOLOX-Tiny", () -> YoloXDetector.tiny().sessionOptions(FOUR_THREADS).build()),
-                detector("YOLOX-S", () -> YoloXDetector.s().sessionOptions(FOUR_THREADS).build()));
+                detector("YOLOX-S", () -> YoloXDetector.s().sessionOptions(FOUR_THREADS).build()),
+                detector("PicoDet S", () -> PicoDetDetector.s().sessionOptions(FOUR_THREADS).build()),
+                detector("PicoDet M", () -> PicoDetDetector.m().sessionOptions(FOUR_THREADS).build()));
     }
 
     private static Arguments detector(String name, Supplier<ObjectDetector> factory) {

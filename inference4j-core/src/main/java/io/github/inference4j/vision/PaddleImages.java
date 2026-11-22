@@ -22,7 +22,7 @@ import java.nio.file.Path;
 
 /**
  * Image handling shared by the PaddleOCR wrappers, matching OpenCV where PaddleOCR relies on it: pixels as
- * packed RGB and bilinear resizing as {@code cv2.resize} does it.
+ * packed RGB, and bilinear and bicubic resizing as {@code cv2.resize} does them.
  */
 final class PaddleImages {
 
@@ -100,6 +100,91 @@ final class PaddleImages {
     }
 
     private static final int COEF_SCALE = 2048;   // OpenCV's INTER_RESIZE_COEF_SCALE
+
+    /**
+     * Bicubic resize, as OpenCV 4.x's {@code cv2.resize(..., INTER_CUBIC)} on 8-bit images: pixel centers aligned,
+     * the Keys kernel with a = -0.75 in 11-bit fixed point, edge pixels repeated beyond the border. Unlike Pillow,
+     * OpenCV does not widen the kernel when shrinking.
+     */
+    static int[] resizeCubic(int[] src, int srcWidth, int srcHeight, int dstWidth, int dstHeight) {
+        if (srcWidth == dstWidth && srcHeight == dstHeight) {
+            return src.clone();
+        }
+        double scaleX = 1.0 / ((double) dstWidth / srcWidth);
+        double scaleY = 1.0 / ((double) dstHeight / srcHeight);
+
+        int[] xOffsets = new int[dstWidth];
+        int[][] alpha = new int[dstWidth][];
+        for (int dx = 0; dx < dstWidth; dx++) {
+            float fx = (float) ((dx + 0.5) * scaleX - 0.5);
+            int sx = (int) Math.floor(fx);
+            xOffsets[dx] = sx;
+            alpha[dx] = cubicCoefficients(fx - sx);
+        }
+
+        // Horizontally resized rows, computed once per source row
+        int[][] rows = new int[srcHeight][];
+        int[] dst = new int[dstWidth * dstHeight];
+        for (int dy = 0; dy < dstHeight; dy++) {
+            float fy = (float) ((dy + 0.5) * scaleY - 0.5);
+            int sy = (int) Math.floor(fy);
+            int[] beta = cubicCoefficients(fy - sy);
+            float[] betaF = new float[4];
+            for (int k = 0; k < 4; k++) {
+                betaF[k] = beta[k] * (1f / (COEF_SCALE * COEF_SCALE));
+            }
+            int[][] taps = new int[4][];
+            for (int k = 0; k < 4; k++) {
+                int row = Math.max(0, Math.min(sy - 1 + k, srcHeight - 1));
+                if (rows[row] == null) {
+                    rows[row] = horizontalCubic(src, row * srcWidth, srcWidth, xOffsets, alpha);
+                }
+                taps[k] = rows[row];
+            }
+            for (int dx = 0; dx < dstWidth; dx++) {
+                int pixel = 0;
+                for (int c = 0; c < 3; c++) {
+                    int i = 3 * dx + c;
+                    // OpenCV's vectorized VResizeCubicVec_32s8u: float weights, fused multiply-adds, round to even
+                    float sum = taps[3][i] * betaF[3];
+                    sum = Math.fma((float) taps[2][i], betaF[2], sum);
+                    sum = Math.fma((float) taps[1][i], betaF[1], sum);
+                    sum = Math.fma((float) taps[0][i], betaF[0], sum);
+                    int value = (int) Math.rint(sum);
+                    pixel |= Math.max(0, Math.min(255, value)) << (16 - 8 * c);
+                }
+                dst[dy * dstWidth + dx] = pixel;
+            }
+        }
+        return dst;
+    }
+
+    /** OpenCV's {@code interpolateCubic} in float, then {@code saturate_cast<short>} of the 11-bit scaled weights. */
+    private static int[] cubicCoefficients(float x) {
+        final float a = -0.75f;
+        float c0 = ((a * (x + 1) - 5 * a) * (x + 1) + 8 * a) * (x + 1) - 4 * a;
+        float c1 = ((a + 2) * x - (a + 3)) * x * x + 1;
+        float c2 = ((a + 2) * (1 - x) - (a + 3)) * (1 - x) * (1 - x) + 1;
+        float c3 = 1f - c0 - c1 - c2;
+        return new int[]{(int) Math.rint(c0 * COEF_SCALE), (int) Math.rint(c1 * COEF_SCALE),
+                (int) Math.rint(c2 * COEF_SCALE), (int) Math.rint(c3 * COEF_SCALE)};
+    }
+
+    /** One source row resized horizontally with the cubic weights: channels R, G, B per output pixel. */
+    private static int[] horizontalCubic(int[] src, int rowStart, int srcWidth, int[] xOffsets, int[][] alpha) {
+        int[] out = new int[3 * xOffsets.length];
+        for (int dx = 0; dx < xOffsets.length; dx++) {
+            for (int j = 0; j < 4; j++) {
+                int x = Math.max(0, Math.min(xOffsets[dx] - 1 + j, srcWidth - 1));
+                int p = src[rowStart + x];
+                int weight = alpha[dx][j];
+                out[3 * dx] += weight * ((p >> 16) & 0xFF);
+                out[3 * dx + 1] += weight * ((p >> 8) & 0xFF);
+                out[3 * dx + 2] += weight * (p & 0xFF);
+            }
+        }
+        return out;
+    }
 
     /** One source row resized horizontally, in OpenCV's fixed point: channels R, G, B per output pixel. */
     private static void horizontal(int[] src, int rowStart, int srcWidth, int[] xOffsets, int[] alpha0, int[] alpha1,
