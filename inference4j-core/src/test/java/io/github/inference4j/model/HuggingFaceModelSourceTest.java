@@ -45,7 +45,7 @@ class HuggingFaceModelSourceTest {
         Files.writeString(repoDir.resolve("model.onnx"), "fake model");
         Files.writeString(repoDir.resolve("vocab.txt"), "fake vocab");
 
-        HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
+        HuggingFaceModelSource source = offlineSource(tempDir);
         Path resolved = source.resolve("org/model", List.of("model.onnx", "vocab.txt"));
 
         assertThat(resolved).isEqualTo(repoDir);
@@ -57,7 +57,7 @@ class HuggingFaceModelSourceTest {
         Files.createDirectories(repoDir);
         Files.writeString(repoDir.resolve("vision_model.onnx"), "fake model");
 
-        HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
+        HuggingFaceModelSource source = offlineSource(tempDir);
         Path resolved = source.resolve("org/vision", List.of("vision_model.onnx"));
 
         assertThat(resolved).isEqualTo(repoDir);
@@ -69,7 +69,7 @@ class HuggingFaceModelSourceTest {
         Files.createDirectories(repoDir);
         Files.writeString(repoDir.resolve("model.onnx"), "fake model");
 
-        HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
+        HuggingFaceModelSource source = offlineSource(tempDir);
         Path resolved = source.resolve("org/model");
 
         assertThat(resolved).isEqualTo(repoDir);
@@ -77,24 +77,10 @@ class HuggingFaceModelSourceTest {
 
     @Test
     void resolve_singleArg_throwsWhenDirectoryDoesNotExist() {
-        HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
+        HuggingFaceModelSource source = offlineSource(tempDir);
 
         assertThatThrownBy(() -> source.resolve("org/nonexistent"))
                 .isInstanceOf(ModelSourceException.class);
-    }
-
-    @Test
-    void resolve_triggersDownloadWhenFileMissing() {
-        HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
-
-        // Will attempt to download from HuggingFace (no server), but directory gets created
-        try {
-            source.resolve("org/new-model", List.of("model.onnx"));
-        } catch (Exception ignored) {
-            // Expected: network call fails
-        }
-
-        assertThat(Files.exists(tempDir.resolve("org/new-model"))).isTrue();
     }
 
     @Test
@@ -104,7 +90,7 @@ class HuggingFaceModelSourceTest {
         Files.writeString(repoDir.resolve("model.onnx"), "fake");
         Files.writeString(repoDir.resolve("labels.txt"), "cat\ndog");
 
-        HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
+        HuggingFaceModelSource source = offlineSource(tempDir);
 
         // Should return immediately without any HTTP call
         Path resolved = source.resolve("org/cached", List.of("model.onnx", "labels.txt"));
@@ -116,5 +102,10 @@ class HuggingFaceModelSourceTest {
         HuggingFaceModelSource first = HuggingFaceModelSource.defaultInstance();
         HuggingFaceModelSource second = HuggingFaceModelSource.defaultInstance();
         assertThat(second).isSameAs(first);
+    }
+
+    /** A source that never contacts the Hub, so these cache tests make no network calls. */
+    private static HuggingFaceModelSource offlineSource(Path cacheDir) {
+        return HuggingFaceModelSource.builder().cacheDir(cacheDir).offline(true).build();
     }
 }

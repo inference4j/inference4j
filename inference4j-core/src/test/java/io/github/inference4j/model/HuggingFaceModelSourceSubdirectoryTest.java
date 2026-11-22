@@ -39,7 +39,7 @@ class HuggingFaceModelSourceSubdirectoryTest {
         Files.writeString(subDir.resolve("genai_config.json"), "{}");
         Files.writeString(subDir.resolve("model.onnx"), "fake");
 
-        HuggingFaceModelSource source = new HuggingFaceModelSource(cacheDir);
+        HuggingFaceModelSource source = offlineSource(cacheDir);
         Path resolved = source.resolve(
                 "microsoft/Phi-3-mini-4k-instruct-onnx",
                 "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4");
@@ -54,5 +54,10 @@ class HuggingFaceModelSourceSubdirectoryTest {
         ModelSource local = id -> cacheDir.resolve(id);
         Path result = local.resolve("my-model", "sub/dir");
         assertThat(result).isEqualTo(cacheDir.resolve("my-model").resolve("sub/dir"));
+    }
+
+    /** A source that never contacts the Hub, so these cache tests make no network calls. */
+    private static HuggingFaceModelSource offlineSource(Path cacheDir) {
+        return HuggingFaceModelSource.builder().cacheDir(cacheDir).offline(true).build();
     }
 }

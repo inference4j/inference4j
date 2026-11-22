@@ -11,6 +11,9 @@ Models are downloaded from HuggingFace and cached locally. The cache directory i
 | 3 | Environment variable | `INFERENCE4J_CACHE_DIR=/path/to/cache` |
 | 4 | Default | `~/.cache/inference4j/` |
 
+Cached models are checked against the Hub at most once a day, and files that changed there are downloaded
+again; see [Model loading](../guides/model-loading.md#updates).
+
 ## JVM flags
 
 ONNX Runtime requires native access:
@@ -30,12 +33,19 @@ Or, on the module path:
 | Property | Description | Default |
 |----------|-------------|---------|
 | `inference4j.cache.dir` | Model cache directory | `~/.cache/inference4j/` |
+| `inference4j.cache.check-interval` | How often cached models are checked for updates (ISO-8601 duration) | `P1D` |
+| `inference4j.offline` | Never contact the Hub; use cached files as they are | `false` |
+| `inference4j.hf.endpoint` | Hugging Face Hub endpoint, such as a mirror | `https://huggingface.co` |
 
 ## Environment variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `INFERENCE4J_CACHE_DIR` | Model cache directory | `~/.cache/inference4j/` |
+| `INFERENCE4J_CACHE_CHECK_INTERVAL` | How often cached models are checked for updates (ISO-8601 duration) | `P1D` |
+| `INFERENCE4J_OFFLINE` | Never contact the Hub; use cached files as they are | `false` |
+| `HF_HUB_OFFLINE` | Same as `INFERENCE4J_OFFLINE` when set to `1` (the Hugging Face convention) | unset |
+| `HF_ENDPOINT` | Hugging Face Hub endpoint, such as a mirror | `https://huggingface.co` |
 
 ## Spring Boot properties
 

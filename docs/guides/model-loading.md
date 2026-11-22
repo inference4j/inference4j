@@ -40,7 +40,34 @@ var source = HuggingFaceModelSource.defaultInstance();
 
 // Or specify a custom cache directory
 var source = new HuggingFaceModelSource(Path.of("/custom/cache"));
+
+// Or set every option
+var source = HuggingFaceModelSource.builder()
+        .cacheDir(Path.of("/custom/cache"))
+        .checkInterval(Duration.ofHours(1))   // default: a day
+        .offline(false)
+        .endpoint(URI.create("https://hf-mirror.example.com"))
+        .build();
 ```
+
+### Updates
+
+Cached models stay in sync with the Hub. At most once per check interval (a day by default), resolving a
+cached model asks the Hub for the repo's current revision, with one small API call. Files whose content
+changed on the Hub are downloaded again, at that revision; unchanged files are kept, so a model card edit
+never re-downloads a model. The commit and each file's id are recorded in `.inference4j-revision.json`
+in the model's cache directory.
+
+- **Caches from before 0.15.0** have no record yet. On the first check, the cached files are hashed once
+  and compared with the Hub's, and only those that differ are downloaded again.
+- **Hub unreachable:** if the check fails (no network, timeout, an error response), the cached files are
+  used and a warning is logged once. Missing files still need the Hub.
+- **Offline mode** never contacts the Hub: cached files are used as they are, and a model that is not fully
+  cached fails to load. Turn it on with `INFERENCE4J_OFFLINE=true`, `-Dinference4j.offline=true`,
+  `HF_HUB_OFFLINE=1` or `.offline(true)`.
+- **Check interval:** `INFERENCE4J_CACHE_CHECK_INTERVAL` or `-Dinference4j.cache.check-interval` take an
+  ISO-8601 duration, such as `PT1H` or `P7D`; `PT0S` checks on every load.
+- **Mirrors:** `HF_ENDPOINT` or `-Dinference4j.hf.endpoint` point to a Hub mirror.
 
 ### Cache directory resolution
 
@@ -106,5 +133,6 @@ The model repository must contain the required files listed above.
 
 - `LocalModelSource` does no downloading — it expects files to already exist at the resolved path.
 - `HuggingFaceModelSource` is thread-safe. Concurrent requests for the same model wait for the first download to complete.
-- Models are cached permanently. To re-download, delete the cached directory.
+- Cached models are checked for updates once a day (see [Updates](#updates)). To force a full re-download,
+  delete the model's cached directory.
 - The model ID is just a string — it can be any identifier meaningful to your `ModelSource` implementation.
