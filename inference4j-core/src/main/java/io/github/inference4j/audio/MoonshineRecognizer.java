@@ -70,10 +70,10 @@ import java.util.Objects;
  *
  * <p>The models are Moonshine AI's 8-bit quantized ONNX Runtime ({@code .ort}) graphs, MIT licensed.
  *
- * <p>Thread-safe, one call at a time: calls to {@code transcribe} and to the streams this recognizer
- * opens take turns on the model. A thread waiting its turn can be interrupted. {@link TranscriptListener}
- * callbacks run while the stream holds that turn, so keep them short and do not wait in them for another
- * transcription.
+ * <p>Thread-safe: calls to {@code transcribe} and the streams this recognizer opens run in parallel on
+ * the same model, each with its own caches, so memory grows with the number of calls and open lines in
+ * progress. {@link TranscriptListener} callbacks run on the stream's thread with no lock held: a slow
+ * listener delays only its own stream.
  *
  * @see SegmentedSpeechRecognizer
  */
@@ -93,7 +93,7 @@ public class MoonshineRecognizer implements SpeechRecognizer {
     private final TokenDecoder decoder;
     private final AudioTransformPipeline pipeline;
 
-    /** Serializes all use of the model's sessions, by this recognizer and its streams. */
+    /** Keeps the model open while this recognizer or its streams use it. */
     private final MoonshineGuard guard = new MoonshineGuard();
 
     private MoonshineRecognizer(MoonshineModel model, TokenDecoder decoder) {
@@ -158,8 +158,7 @@ public class MoonshineRecognizer implements SpeechRecognizer {
      * }</pre>
      *
      * <p>The stream uses this recognizer and {@code vad} but does not own them: closing the stream leaves
-     * both open, and one recognizer can serve several streams. Work for streams of the same recognizer is
-     * serialized.
+     * both open, and one recognizer can serve several streams, which run in parallel.
      *
      * @param vad finds the pauses that end lines; each stream keeps its own detection state
      */
@@ -174,10 +173,10 @@ public class MoonshineRecognizer implements SpeechRecognizer {
     }
 
     /**
-     * Waits for the transcription in progress, if any, then frees the model. Later calls, here or on a
-     * stream from this recognizer, throw {@link IllegalStateException}. Closing twice does nothing.
-     *
-     * @throws IllegalStateException if called from a {@link TranscriptListener}
+     * Waits for the model work in progress, then frees the model. A stream's work is waited for one 32 ms
+     * hop at a time, and listeners are not waited for. Later calls, here or on a stream from this recognizer,
+     * throw {@link IllegalStateException}; closing such a stream still succeeds. Can be called from a
+     * {@link TranscriptListener}. Closing twice does nothing.
      */
     @Override
     public void close() {

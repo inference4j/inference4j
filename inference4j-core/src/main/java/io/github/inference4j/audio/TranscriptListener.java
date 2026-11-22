@@ -24,6 +24,10 @@ package io.github.inference4j.audio;
  * {@link TranscriptionStream#flush()} or {@link TranscriptionStream#close()}. For one line they always come
  * in this order: {@code onLineStarted}, any number of {@code onLineTextChanged}, then
  * {@code onLineCompleted}. Only one line is open at a time.
+ *
+ * <p>Events fire with no lock held, so a slow listener delays only its own stream. A listener may call
+ * {@link TranscriptionStream#flush()} or {@link TranscriptionStream#close()} on its stream, or close the
+ * recognizer; it must not call {@link TranscriptionStream#addAudio(float[], int)}.
  */
 public interface TranscriptListener {
 

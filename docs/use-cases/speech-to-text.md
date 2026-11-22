@@ -197,8 +197,10 @@ released. Lines carry their `start` and `end` on the stream's timeline.
 
 All work happens inside `addAudio`, on the calling thread, and listener events fire on that
 thread. Updates take tens of milliseconds, so read the microphone on one thread and pass its audio
-to the stream on another through a queue. One recognizer can serve several streams; their work is
-serialized. Closing a stream leaves the recognizer and the detector open.
+to the stream on another through a queue. One recognizer can serve several streams, each on its own
+thread, and they run in parallel; each open line holds its own caches. Listener events fire with no
+lock held: a listener may call `flush()` or `close()` on its stream, but not `addAudio`. Closing a
+stream leaves the recognizer and the detector open.
 
 Measured by feeding the two TED-LIUM talks below in 100 ms pieces, on an Apple M4 Pro CPU limited
 to 4 threads:

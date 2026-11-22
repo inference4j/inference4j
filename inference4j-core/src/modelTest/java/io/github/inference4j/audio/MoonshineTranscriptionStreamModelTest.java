@@ -303,7 +303,225 @@ class MoonshineTranscriptionStreamModelTest {
     }
 
     @Test
-    void closeWaitsForTheStreamInProgressAndLaterCallsFail() throws Exception {
+    void concurrentStreamsEachTranscribeTheirOwnAudio() throws Exception {
+        float[] audio = concat(new float[16000], speech16k, new float[16000]);
+        Recorder baseline = new Recorder();
+        try (TranscriptionStream stream = recognizer.stream(vad).listener(baseline).build()) {
+            feed(stream, audio, 16000, 1600);
+        }
+
+        int streams = 4;
+        // Every stream waits in its first onLineStarted until all have started a line: four lines open at once
+        CountDownLatch allStarted = new CountDownLatch(streams);
+        ExecutorService executor = Executors.newFixedThreadPool(streams);
+        try {
+            List<Recorder> recorders = new ArrayList<>();
+            List<Future<Boolean>> results = new ArrayList<>();
+            for (int i = 0; i < streams; i++) {
+                Recorder recorder = new Recorder();
+                recorders.add(recorder);
+                results.add(executor.submit(() -> {
+                    boolean[] metTheOthers = new boolean[1];
+                    TranscriptListener listener = new TranscriptListener() {
+                        @Override
+                        public void onLineStarted(TranscriptLine line) {
+                            recorder.onLineStarted(line);
+                            if (line.id() == 0) {
+                                allStarted.countDown();
+                                metTheOthers[0] = awaitQuietly(allStarted);
+                            }
+                        }
+
+                        @Override
+                        public void onLineTextChanged(TranscriptLine line) {
+                            recorder.onLineTextChanged(line);
+                        }
+
+                        @Override
+                        public void onLineCompleted(TranscriptLine line) {
+                            recorder.onLineCompleted(line);
+                        }
+                    };
+                    try (TranscriptionStream stream = recognizer.stream(vad).listener(listener).build()) {
+                        feed(stream, audio, 16000, 1600);
+                    }
+                    return metTheOthers[0];
+                }));
+            }
+            for (Future<Boolean> result : results) {
+                assertThat(result.get(120, TimeUnit.SECONDS)).as("all streams had a line open at once").isTrue();
+            }
+            for (Recorder recorder : recorders) {
+                assertThat(recorder.text()).isEqualTo(baseline.text());
+                assertThat(recorder.events).isEqualTo(baseline.events);
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void aSlowListenerDoesNotBlockOtherCalls() throws Exception {
+        CountDownLatch inListener = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        TranscriptListener blocking = new TranscriptListener() {
+            @Override
+            public void onLineStarted(TranscriptLine line) {
+                inListener.countDown();
+                awaitQuietly(release);
+            }
+        };
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+        try {
+            Future<?> slow = executor.submit(() -> {
+                try (TranscriptionStream stream = recognizer.stream(vad).listener(blocking).build()) {
+                    feed(stream, speech16k, 16000, 1600);
+                }
+            });
+            assertThat(inListener.await(30, TimeUnit.SECONDS)).isTrue();
+
+            Future<String> transcription = executor.submit(() -> recognizer.transcribe(speech16k, 16000).text());
+            Recorder other = new Recorder();
+            Future<?> otherStream = executor.submit(() -> {
+                try (TranscriptionStream stream = recognizer.stream(vad).listener(other).build()) {
+                    feed(stream, concat(new float[16000], speech16k, new float[16000]), 16000, 1600);
+                }
+            });
+
+            assertThat(transcription.get(30, TimeUnit.SECONDS).toLowerCase()).contains(PHRASE);
+            otherStream.get(30, TimeUnit.SECONDS);
+            assertThat(other.completed).isNotEmpty();
+            assertThat(slow.isDone()).as("the slow listener is still running").isFalse();
+
+            release.countDown();
+            slow.get(30, TimeUnit.SECONDS);
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void closeDuringConcurrentCallsEndsThemCleanly() throws Exception {
+        MoonshineRecognizer own = MoonshineRecognizer.builder().modelId("inference4j/moonshine-streaming-tiny-en").build();
+        int transcribers = 3;
+        CountDownLatch running = new CountDownLatch(transcribers + 1);
+        ExecutorService executor = Executors.newFixedThreadPool(transcribers + 1);
+        try {
+            List<Future<Throwable>> results = new ArrayList<>();
+            for (int i = 0; i < transcribers; i++) {
+                results.add(executor.submit(() -> {
+                    running.countDown();
+                    while (true) {
+                        try {
+                            own.transcribe(speech16k, 16000);
+                        } catch (RuntimeException e) {
+                            return e;
+                        }
+                    }
+                }));
+            }
+            Future<Throwable> streaming = executor.submit(() -> {
+                TranscriptionStream stream = own.stream(vad).build();
+                running.countDown();
+                Throwable failure;
+                while (true) {
+                    try {
+                        feed(stream, speech16k, 16000, 1600);
+                    } catch (RuntimeException e) {
+                        failure = e;
+                        break;
+                    }
+                }
+                stream.close();                               // frees the open line without the model
+                return failure;
+            });
+            results.add(streaming);
+
+            assertThat(running.await(30, TimeUnit.SECONDS)).isTrue();
+            Thread.sleep(500);
+            own.close();
+
+            // A call cut off halfway would fail in a closed session instead, with another message
+            for (Future<Throwable> result : results) {
+                assertThat(result.get(60, TimeUnit.SECONDS))
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessage("The speech recognizer was closed");
+            }
+            own.close();
+        } finally {
+            executor.shutdownNow();
+            own.close();
+        }
+    }
+
+    @Test
+    void listenerCanFlushItsStream() {
+        Recorder recorder = new Recorder();
+        TranscriptionStream[] holder = new TranscriptionStream[1];
+        TranscriptListener flushing = new TranscriptListener() {
+            @Override
+            public void onLineStarted(TranscriptLine line) {
+                recorder.onLineStarted(line);
+                if (line.id() == 0) {
+                    holder[0].flush();
+                }
+            }
+
+            @Override
+            public void onLineTextChanged(TranscriptLine line) {
+                recorder.onLineTextChanged(line);
+            }
+
+            @Override
+            public void onLineCompleted(TranscriptLine line) {
+                recorder.onLineCompleted(line);
+            }
+        };
+
+        try (TranscriptionStream stream = recognizer.stream(vad).listener(flushing).build()) {
+            holder[0] = stream;
+            feed(stream, concat(new float[16000], speech16k, new float[16000]), 16000, 1600);
+        }
+
+        // Line 0 is completed at once; the speech goes on in the lines after it
+        assertThat(recorder.events).startsWith("started:0", "completed:0", "started:1");
+        assertThat(recorder.completed).hasSizeGreaterThanOrEqualTo(2);
+        assertThat(recorder.events.get(recorder.events.size() - 1)).startsWith("completed:");
+        assertThat(recorder.text()).isNotBlank();
+    }
+
+    @Test
+    void listenerCanCloseItsStream() {
+        Recorder recorder = new Recorder();
+        TranscriptionStream[] holder = new TranscriptionStream[1];
+        TranscriptListener closing = new TranscriptListener() {
+            @Override
+            public void onLineCompleted(TranscriptLine line) {
+                recorder.onLineCompleted(line);
+                holder[0].close();
+            }
+        };
+        float[] audio = concat(new float[16000], speech16k, new float[32000], speech16k);
+
+        TranscriptionStream stream = recognizer.stream(vad).listener(closing).build();
+        holder[0] = stream;
+        int offset = 0;
+        while (recorder.completed.isEmpty() && offset < audio.length) {
+            stream.addAudio(Arrays.copyOfRange(audio, offset, Math.min(audio.length, offset + 1600)), 16000);
+            offset += 1600;
+        }
+
+        assertThat(recorder.completed).hasSize(1);
+        assertThatThrownBy(() -> stream.addAudio(new float[1600], 16000))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("The transcription stream is closed");
+        stream.close();
+        assertThat(recorder.completed).hasSize(1);
+    }
+
+    @Test
+    void closeDoesNotWaitForAListenerAndLaterCallsFail() throws Exception {
         MoonshineRecognizer own = MoonshineRecognizer.builder().modelId("inference4j/moonshine-streaming-tiny-en").build();
         CountDownLatch inListener = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -320,14 +538,13 @@ class MoonshineTranscriptionStreamModelTest {
             Future<?> feeding = executor.submit(() -> feed(stream, speech16k, 16000, 1600));
             assertThat(inListener.await(30, TimeUnit.SECONDS)).isTrue();
 
-            // The stream holds the model while its listener runs, so close() must wait for it
-            Future<?> closing = executor.submit(own::close);
-            Thread.sleep(200);
-            assertThat(closing.isDone()).as("close returned while the stream was using the model").isFalse();
+            // Listeners run with no lock held, so close() does not wait for this one
+            executor.submit(own::close).get(30, TimeUnit.SECONDS);
 
             release.countDown();
-            closing.get(30, TimeUnit.SECONDS);
-            assertThatThrownBy(feeding::get).hasCauseInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> feeding.get(30, TimeUnit.SECONDS))
+                    .hasCauseInstanceOf(IllegalStateException.class)
+                    .cause().hasMessage("The speech recognizer was closed");
             assertThatThrownBy(() -> own.transcribe(speech16k, 16000)).isInstanceOf(IllegalStateException.class);
             stream.close();                                   // frees the open line without the model
         } finally {
@@ -338,34 +555,29 @@ class MoonshineTranscriptionStreamModelTest {
     }
 
     @Test
-    void closingTheRecognizerFromAListenerFails() {
-        try (MoonshineRecognizer own = MoonshineRecognizer.builder()
-                .modelId("inference4j/moonshine-streaming-tiny-en").build()) {
-            List<Throwable> failures = new ArrayList<>();
-            TranscriptListener closing = new TranscriptListener() {
-                @Override
-                public void onLineStarted(TranscriptLine line) {
-                    try {
-                        own.close();
-                    } catch (IllegalStateException e) {
-                        failures.add(e);
-                    }
-                }
-            };
-            try (TranscriptionStream stream = own.stream(vad).listener(closing).build()) {
-                feed(stream, speech16k, 16000, 1600);
+    void closingTheRecognizerFromAListenerEndsTheStream() {
+        MoonshineRecognizer own = MoonshineRecognizer.builder().modelId("inference4j/moonshine-streaming-tiny-en").build();
+        TranscriptListener closing = new TranscriptListener() {
+            @Override
+            public void onLineStarted(TranscriptLine line) {
+                own.close();
             }
-
-            assertThat(failures).isNotEmpty();
-            assertThat(own.transcribe(speech16k, 16000).text().toLowerCase()).contains(PHRASE);
+        };
+        try (TranscriptionStream stream = own.stream(vad).listener(closing).build()) {
+            assertThatThrownBy(() -> feed(stream, speech16k, 16000, 1600))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("The speech recognizer was closed");
         }
+
+        assertThatThrownBy(() -> own.transcribe(speech16k, 16000)).isInstanceOf(IllegalStateException.class);
     }
 
-    private static void awaitQuietly(CountDownLatch latch) {
+    private static boolean awaitQuietly(CountDownLatch latch) {
         try {
-            latch.await(30, TimeUnit.SECONDS);
+            return latch.await(30, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            return false;
         }
     }
 }

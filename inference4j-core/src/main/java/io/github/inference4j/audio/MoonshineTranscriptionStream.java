@@ -37,6 +37,11 @@ import java.util.Arrays;
  * the average drops below the threshold, the line is encoded and decoded one last time and completed.
  * Past two thirds of the maximum line length, the speech score fades linearly to zero at the maximum, so
  * a speaker who never pauses still gets lines that end at a natural dip.
+ *
+ * <p>Model work for each 32 ms hop holds the recognizer open (see {@link MoonshineGuard}), so streams of one
+ * recognizer run in parallel and the recognizer cannot be closed mid-hop. Listener events fire after the hop,
+ * with no lock held and the stream's state final, so a listener may flush or close this stream, or close the
+ * recognizer.
  */
 final class MoonshineTranscriptionStream implements TranscriptionStream {
 
@@ -113,26 +118,37 @@ final class MoonshineTranscriptionStream implements TranscriptionStream {
         } else if (sampleRate != inputSampleRate) {
             throw new IllegalArgumentException("Sample rate changed from " + inputSampleRate + " to " + sampleRate);
         }
+        if (guard.isClosed()) {
+            throw new IllegalStateException("The speech recognizer was closed");
+        }
         float[] audio = resampler == null ? samples : resampler.resample(samples);
-        guard.acquire();
-        try {
-            int offset = 0;
-            while (offset < audio.length) {
-                int take = Math.min(window - hopLength, audio.length - offset);
-                System.arraycopy(audio, offset, hop, hopLength, take);
-                hopLength += take;
-                offset += take;
-                if (hopLength == window) {
-                    processHop();
+        int offset = 0;
+        while (offset < audio.length) {
+            int take = Math.min(window - hopLength, audio.length - offset);
+            System.arraycopy(audio, offset, hop, hopLength, take);
+            hopLength += take;
+            offset += take;
+            if (hopLength == window) {
+                Event event;
+                guard.acquire();
+                try {
+                    // The hop is used up even if processing it fails, so it is never counted twice
                     hopLength = 0;
+                    event = processHop();
+                } finally {
+                    guard.release();
+                }
+                fire(event);
+                if (closed) {
+                    // The listener closed this stream
+                    return;
                 }
             }
-        } finally {
-            guard.release();
         }
     }
 
-    private void processHop() {
+    /** Scores one hop and moves the open line along; returns the event it produced, or {@code null}. */
+    private Event processHop() {
         samplesProcessed += window;
         System.arraycopy(lookBehind, window, lookBehind, 0, LOOK_BEHIND_SAMPLES - window);
         System.arraycopy(hop, 0, lookBehind, LOOK_BEHIND_SAMPLES - window, window);
@@ -151,22 +167,24 @@ final class MoonshineTranscriptionStream implements TranscriptionStream {
         }
         boolean voice = smoothed > threshold;
 
+        Event event = null;
         if (voice && !speaking) {
             int behind = (int) Math.min(LOOK_BEHIND_SAMPLES, samplesProcessed);
-            startLine(Arrays.copyOfRange(lookBehind, LOOK_BEHIND_SAMPLES - behind, LOOK_BEHIND_SAMPLES));
+            event = startLine(Arrays.copyOfRange(lookBehind, LOOK_BEHIND_SAMPLES - behind, LOOK_BEHIND_SAMPLES));
         } else if (voice) {
             appendToLine(hop);
             if (samplesSinceUpdate >= updateSamples) {
-                updateLine();
+                event = updateLine();
             }
         } else if (speaking) {
             appendToLine(hop);
-            completeLine();
+            event = completeLine();
         }
         speaking = voice;
+        return event;
     }
 
-    private void startLine(float[] audio) {
+    private Event startLine(float[] audio) {
         line = model.newLine();
         lineId++;
         lineStartSample = samplesProcessed - audio.length;
@@ -175,7 +193,7 @@ final class MoonshineTranscriptionStream implements TranscriptionStream {
         draft = new int[0];
         text = "";
         appendToLine(audio);
-        listener.onLineStarted(snapshot(false));
+        return new Event(EventKind.STARTED, snapshot(false));
     }
 
     private void appendToLine(float[] audio) {
@@ -184,22 +202,20 @@ final class MoonshineTranscriptionStream implements TranscriptionStream {
         samplesSinceUpdate += audio.length;
     }
 
-    private void updateLine() {
+    private Event updateLine() {
         samplesSinceUpdate = 0;
         line.encode(false);
-        if (decode()) {
-            listener.onLineTextChanged(snapshot(false));
-        }
+        return decode() ? new Event(EventKind.TEXT_CHANGED, snapshot(false)) : null;
     }
 
-    private void completeLine() {
+    private Event completeLine() {
         line.encode(true);
         decode();
         TranscriptLine completed = snapshot(true);
         line.close();
         line = null;
         speaking = false;
-        listener.onLineCompleted(completed);
+        return new Event(EventKind.COMPLETED, completed);
     }
 
     /** Decodes the open line; returns whether its text changed. */
@@ -223,21 +239,30 @@ final class MoonshineTranscriptionStream implements TranscriptionStream {
     @Override
     public void flush() {
         ensureOpen();
+        Event event;
         guard.acquire();
         try {
-            if (line != null) {
-                if (hopLength > 0) {
-                    appendToLine(Arrays.copyOf(hop, hopLength));
-                    samplesProcessed += hopLength;
-                    hopLength = 0;
-                }
-                completeLine();
-            }
-            // The next line starts afresh, as after a pause
-            Arrays.fill(probabilities, 0f);
+            event = finishLine();
         } finally {
             guard.release();
         }
+        fire(event);
+    }
+
+    /** Completes the open line, if any, with the audio of the partial hop. Call while holding the model. */
+    private Event finishLine() {
+        Event event = null;
+        if (line != null) {
+            if (hopLength > 0) {
+                appendToLine(Arrays.copyOf(hop, hopLength));
+                samplesProcessed += hopLength;
+                hopLength = 0;
+            }
+            event = completeLine();
+        }
+        // The next line starts afresh, as after a pause
+        Arrays.fill(probabilities, 0f);
+        return event;
     }
 
     @Override
@@ -245,19 +270,46 @@ final class MoonshineTranscriptionStream implements TranscriptionStream {
         if (closed) {
             return;
         }
-        if (!guard.isClosed()) {
-            flush();
-        } else if (line != null) {
-            // The recognizer is closed, so there is no model left to finish the open line with
-            line.close();
-            line = null;
+        Event event = null;
+        try {
+            if (guard.acquireIfOpen()) {
+                try {
+                    event = finishLine();
+                } finally {
+                    guard.release();
+                }
+            }
+        } finally {
+            if (line != null) {
+                // The recognizer is closed, or finishing the line failed: free it without a last decode
+                line.close();
+                line = null;
+            }
+            closed = true;
         }
-        closed = true;
+        fire(event);
+    }
+
+    private void fire(Event event) {
+        if (event == null) {
+            return;
+        }
+        switch (event.kind()) {
+            case STARTED -> listener.onLineStarted(event.line());
+            case TEXT_CHANGED -> listener.onLineTextChanged(event.line());
+            case COMPLETED -> listener.onLineCompleted(event.line());
+        }
     }
 
     private void ensureOpen() {
         if (closed) {
             throw new IllegalStateException("The transcription stream is closed");
         }
+    }
+
+    private enum EventKind { STARTED, TEXT_CHANGED, COMPLETED }
+
+    /** A listener event produced while holding the model, fired after releasing it. */
+    private record Event(EventKind kind, TranscriptLine line) {
     }
 }

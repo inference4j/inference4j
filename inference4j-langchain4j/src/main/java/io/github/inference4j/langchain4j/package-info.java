@@ -23,8 +23,8 @@
  *   <li><b>Adapters own their model.</b> Closing an adapter closes the inference4j model it wraps.
  *       Give each adapter its own model instance; do not wrap one instance in two adapters.</li>
  *   <li><b>Safe to share across threads.</b> Adapters delegate straight to inference4j models, which are
- *       thread-safe, so one adapter instance can serve a whole application. Generators and
- *       {@code MoonshineRecognizer} run one call at a time; other models run calls in parallel.</li>
+ *       thread-safe, so one adapter instance can serve a whole application. Generators run one call at
+ *       a time; other models run calls in parallel.</li>
  * </ul>
  *
  * <p>LangChain4j is a {@code compileOnly} dependency: applications bring their own LangChain4j
