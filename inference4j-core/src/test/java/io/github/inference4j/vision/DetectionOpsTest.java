@@ -58,6 +58,15 @@ class DetectionOpsTest {
     }
 
     @Test
+    void topLeftLetterboxTruncatesTheScaledSizeLikeYolox() {
+        // 230 * 416 / 352 = 271.8: YOLOX's int() keeps 271
+        Letterbox letterbox = Letterbox.topLeft(352, 230, 416);
+
+        assertThat(letterbox.scaledWidth()).isEqualTo(416);
+        assertThat(letterbox.scaledHeight()).isEqualTo(271);
+    }
+
+    @Test
     void applyDrawsTheImageOnThePaddedCanvas() {
         BufferedImage white = new BufferedImage(200, 100, BufferedImage.TYPE_INT_RGB);
         for (int y = 0; y < 100; y++) {
