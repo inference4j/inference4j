@@ -23,7 +23,8 @@ import java.util.List;
  * @param removed    the snapshots deleted
  * @param inUse      the snapshots kept because a model uses them, or because they are younger than the minimum
  *                   age and another process may be loading them
- * @param freedBytes the disk space freed; files still linked from a kept snapshot do not count
+ * @param freedBytes the disk space freed; a file still hard-linked from a kept snapshot, as by earlier builds,
+ *                   does not count
  */
 public record EvictionResult(List<ModelRevision> removed, List<ModelRevision> inUse, long freedBytes) {
 

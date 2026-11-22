@@ -30,7 +30,8 @@ import java.util.Objects;
  * @param remoteRevision  the Hub's commit at that check, or {@code null} if never checked
  * @param updateAvailable whether that check found cached files that changed and have not been downloaded yet
  * @param snapshots       its snapshots, the current one included
- * @param sizeBytes       the disk space its snapshots use, counting each linked file once
+ * @param sizeBytes       the disk space its snapshots use; a file hard-linked into several of them, as by
+ *                        earlier builds, counts once
  */
 public record CachedModel(String repoId, String revision, Instant lastChecked, String remoteRevision,
                           boolean updateAvailable, List<CachedSnapshot> snapshots, long sizeBytes) {

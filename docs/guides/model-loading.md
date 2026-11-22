@@ -84,10 +84,22 @@ Each repo is cached as one or more snapshots, one per Hub commit:
       repo.json                   the last update check
 ```
 
-A snapshot only gains files. An update writes a new snapshot next to the current one and switches `refs/main` to it
-once every file is in place, so a model never reads files from two revisions. Files that did not change are hard
-links to the older snapshot's files, so an update only takes the space of the files that changed (where the file
-system has no hard links, such as FAT, they are copied).
+An update writes a new snapshot next to the current one and switches `refs/main` to it once every file is in place,
+so a model never reads files from two revisions. Files that did not change are reused, never downloaded again:
+
+- **Moved** from the old snapshot when no model in this JVM uses it and it is older than the
+  [minimum age](#pruning-and-snapshots-in-use). The update then only takes the space of the files that changed. The
+  old snapshot keeps only its versions of the changed files, is never served again, and is pruned like any
+  superseded snapshot.
+- **Copied** when a model in this JVM still uses the old snapshot, or the snapshot is younger than the minimum age,
+  so that the running model keeps its files. An update while the old revision is in use needs disk space for both
+  copies of the unchanged files until the old snapshot is pruned.
+
+The cache never hard-links model files: ONNX Runtime refuses external data (`model.onnx.data`) that has more than one
+hard link. A snapshot file that has other hard links, as caches written by development builds before 0.15.0 have, is
+replaced by a private copy when it is opened, and a link back to the flat layout is removed instead (logged once per
+repo at INFO). Where the link count cannot be read, as on Windows, files are left as they are; a snapshot that a
+loaded model uses is left as it is too, with a warning.
 
 `resolve(...)` returns the current snapshot's directory, such as
 `~/.cache/inference4j/hub/models--inference4j--silero-vad/snapshots/{commit}/`. Code that built paths as
@@ -99,7 +111,8 @@ system has no hard links, such as FAT, they are copied).
 Cached models stay in sync with the Hub. At most once per check interval (a day by default), opening a cached model
 asks the Hub for the repo's current revision, with one small API call.
 
-- **Changed files** are downloaded at the new commit into a new snapshot; unchanged files are linked. A model card
+- **Changed files** are downloaded at the new commit into a new snapshot; unchanged files are moved or copied into
+  it. A model card
   edit changes no cached file, so it creates no snapshot and downloads nothing; the check is recorded in `repo.json`.
 - **Files requested between checks**, such as a file a second wrapper needs from the same repo, are downloaded at the
   commit of the current snapshot, never at the Hub's latest.
@@ -122,12 +135,13 @@ asks the Hub for the repo's current revision, with one small API call.
 Versions before 0.15.0 cached files flat, in `{cacheDir}/{org}/{name}/`. These caches are adopted the first time
 each repo is opened, without downloading again:
 
-- **Online:** each cached file is hashed once and compared with the Hub's id. Files that match are hard-linked into
-  the new snapshot; files that differ are downloaded.
-- **Offline:** the files are linked into a snapshot named `unknown`, and checked against the Hub at the next online
+- **Online:** each cached file is hashed once and compared with the Hub's id. Files that match are moved into the
+  new snapshot; files that differ are downloaded.
+- **Offline:** the files are moved into a snapshot named `unknown`, and checked against the Hub at the next online
   open, which promotes them to a snapshot named after the Hub's commit.
-- The flat files stay in place, so an older version sharing the cache keeps working. `ModelCache.prune()` deletes
-  the flat files that were adopted.
+- Adopted files leave the flat layout, so they take no extra disk space. An older inference4j version sharing the
+  cache no longer finds them there and downloads them again. Where a file cannot be moved (another file system), it
+  is copied and the flat file deleted. `ModelCache.prune()` deletes flat files left at the paths of adopted ones.
 - **Read-only cache:** when the cache directory cannot be written, cached files (flat or snapshot) are read in place,
   without update checks or eviction protection, and a warning is logged once.
 
@@ -163,8 +177,8 @@ cache.prune();                                    // deletes superseded snapshot
 
 `CachedModel.stale()` is true when a model still loaded in this JVM reads an older snapshot whose files differ from
 the current one: it serves an older version of the model than a model loaded now would. Evictions return an
-`EvictionResult` with the snapshots removed, those kept because they are in use, and the bytes freed (files still
-linked from a kept snapshot do not count).
+`EvictionResult` with the snapshots removed, those kept because they are in use, and the bytes freed (a file still
+hard-linked from a kept snapshot, as by development builds before 0.15.0, does not count).
 
 In a Spring Boot application, the starter's [`models` actuator endpoint](spring-boot.md#model-cache-endpoint)
 offers these operations over HTTP, and its health indicator reports stale models and available updates.
@@ -181,7 +195,8 @@ A snapshot is in use while a handle on it is open: a builder holds one while it 
   loading cannot be seen as in use. Pruning and eviction therefore never delete a snapshot younger than the minimum
   age, 10 minutes by default, counted from its creation. Set it with `.minimumSnapshotAge(Duration)`.
 - **Other processes:** a process that loaded an older snapshot and keeps running is not protected once that
-  snapshot is past the minimum age. On Linux and macOS, files deleted while open (such as memory-mapped external
+  snapshot is past the minimum age: an update may move its unchanged files into the new snapshot, and pruning may
+  delete it. On Linux and macOS, files moved or deleted while open (such as memory-mapped external
   weights in `model.onnx.data`) stay readable until closed; single-file models are read into memory when the session
   is built. On Windows, a snapshot with open files cannot be deleted; it is reported as in use and left for a later
   prune.

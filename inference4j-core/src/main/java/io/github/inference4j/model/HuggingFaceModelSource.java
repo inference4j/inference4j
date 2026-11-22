@@ -58,10 +58,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p><b>Snapshots.</b> Files are downloaded from
  * {@code https://huggingface.co/{repoId}/resolve/{commit}/{filename}} into a snapshot of the repo at that
- * commit, under {@code {cacheDir}/hub/models--{org}--{name}/snapshots/{commit}/}. A snapshot only gains
- * files; an update writes a new snapshot next to it, linking the files that did not change, and switches
- * {@code refs/main} to it once it is complete. A model that is loaded keeps reading the snapshot it was
- * loaded from, so an update never mixes files of two revisions.
+ * commit, under {@code {cacheDir}/hub/models--{org}--{name}/snapshots/{commit}/}. An update writes a new
+ * snapshot next to the current one and switches {@code refs/main} to it once it is complete. The files that did
+ * not change are moved into it from the old snapshot, or copied when a model in this JVM uses the old snapshot or
+ * it is younger than the {@linkplain Builder#minimumSnapshotAge minimum age}; they are never hard links, which
+ * ONNX Runtime refuses for external data. A model that is loaded keeps reading the snapshot it was loaded from,
+ * so an update never mixes files of two revisions.
  *
  * <p><b>Updates.</b> At most once per {@linkplain Builder#checkInterval(Duration) check interval}
  * (a day by default), opening a cached repo asks the Hub for its current revision: one small
@@ -76,11 +78,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * which protects a model another process is loading. {@link #cache()} lists, checks, updates and evicts cached
  * models.
  *
- * <p><b>Older caches.</b> Files cached in the older flat layout, {@code {cacheDir}/{org}/{name}/}, are adopted
- * into snapshots as hard links without downloading them again: online, when their hash matches the Hub's;
- * offline, as a snapshot of {@value ModelRevision#UNKNOWN} revision, checked at the next online open. The flat
- * files stay until {@link ModelCache#prune()}. A cache directory that is not writable is read in place,
- * without update checks or eviction protection.
+ * <p><b>Older caches.</b> Files cached in the older flat layout, {@code {cacheDir}/{org}/{name}/}, are moved
+ * into snapshots without downloading them again: online, when their hash matches the Hub's; offline, as a
+ * snapshot of {@value ModelRevision#UNKNOWN} revision, checked at the next online open. An older version of the
+ * library sharing the cache downloads them again. A snapshot file that has other hard links, as caches written by
+ * earlier builds have, is given a private copy when it is opened. A cache directory that is not writable is read
+ * in place, without update checks or eviction protection.
  *
  * <p><b>Offline.</b> With {@code INFERENCE4J_OFFLINE=true}, {@code -Dinference4j.offline=true},
  * {@code HF_HUB_OFFLINE=1} or {@link Builder#offline(boolean)}, the Hub is never contacted:
@@ -321,6 +324,7 @@ public class HuggingFaceModelSource implements ModelSource {
         }
         try (lock) {
             String revision = sync(repo, entry, request, false);
+            repairLinks(repo, entry, revision, request);
             entry.acquire(revision);
             return new CacheRegistry.Lease(entry, revision, request.directory(repo.snapshot(revision)));
         }
@@ -460,7 +464,7 @@ public class HuggingFaceModelSource implements ModelSource {
             if (!changed.isEmpty()) {
                 logger.info("{} changed on the Hub (revision {}); updating {}", repo.repoId, target, changed);
             }
-            buildSnapshot(repo, target, wanted, request, remote, subdirectories, hashes);
+            buildSnapshot(repo, entry, target, wanted, request, remote, subdirectories, hashes);
         } catch (ModelSourceException e) {
             if (force || !complete) {
                 throw e;
@@ -501,31 +505,53 @@ public class HuggingFaceModelSource implements ModelSource {
         return changed;
     }
 
-    /** Fills snapshot {@code target} with {@code wanted} files at {@code remote}'s commit, then records it. */
-    private void buildSnapshot(RepoLayout repo, String target, Set<String> wanted, Request request,
-                               Revision remote, Set<String> subdirectories, Map<String, String> hashes) {
+    /**
+     * Fills snapshot {@code target} with {@code wanted} files at {@code remote}'s commit, then records it. Files
+     * another snapshot or the flat layout already holds are reused: copied out of a snapshot that may still be in
+     * use, otherwise moved, once every download succeeded, so that a failed update leaves the current snapshot
+     * whole.
+     */
+    private void buildSnapshot(RepoLayout repo, CacheRegistry.Repo entry, String target, Set<String> wanted,
+                               Request request, Revision remote, Set<String> subdirectories,
+                               Map<String, String> hashes) {
         Path dir = repo.snapshot(target);
         Map<String, SnapshotManifest> manifests = new HashMap<>();
         List<String> others = repo.snapshotNames().stream().filter(n -> !n.equals(target)).toList();
-        Map<String, SnapshotManifest.Entry> entries = new LinkedHashMap<>();
+        Map<String, Revision.RemoteFile> placed = new LinkedHashMap<>();
+        List<Reusable> moves = new ArrayList<>();
         boolean announced = false;
-        for (String path : wanted) {
-            Revision.RemoteFile file = remote.files().get(path);
-            boolean requested = request.files() != null && request.files().contains(path);
-            if (file == null && !requested) {
-                continue;   // deleted on the Hub
-            }
-            Path local = dir.resolve(path);
-            if (!Files.isRegularFile(local) && !reuse(repo, path, file, local, others, manifests, hashes)) {
-                if (!announced) {
-                    logger.info("Downloading model files for {} to {}", repo.repoId, dir);
-                    announced = true;
+        try {
+            for (String path : wanted) {
+                Revision.RemoteFile file = remote.files().get(path);
+                boolean requested = request.files() != null && request.files().contains(path);
+                if (file == null && !requested) {
+                    continue;   // deleted on the Hub
                 }
-                download(repo, target, path, local);
+                Path local = dir.resolve(path);
+                if (!Files.isRegularFile(local)) {
+                    Reusable reusable = reusable(repo, entry, path, file, others, manifests, hashes);
+                    if (reusable == null) {
+                        if (!announced) {
+                            logger.info("Downloading model files for {} to {}", repo.repoId, dir);
+                            announced = true;
+                        }
+                        download(repo, target, path, local);
+                    } else if (reusable.movable()) {
+                        moves.add(reusable);
+                    } else {
+                        CacheFiles.copy(reusable.source(), local, repo.tmp());
+                    }
+                }
+                placed.put(path, file);
             }
-            entries.put(path, new SnapshotManifest.Entry(file != null ? file.id() : null,
-                    file != null && file.lfs(), CacheFiles.size(local)));
+            move(repo, dir, moves);
+        } catch (IOException e) {
+            throw new ModelSourceException("Failed to place the files of " + repo.repoId + " in " + dir + ": "
+                    + e.getMessage(), e);
         }
+        Map<String, SnapshotManifest.Entry> entries = new LinkedHashMap<>();
+        placed.forEach((path, file) -> entries.put(path, new SnapshotManifest.Entry(file != null ? file.id() : null,
+                file != null && file.lfs(), CacheFiles.size(dir.resolve(path)))));
         SnapshotManifest manifest = repo.readManifest(target);
         if (manifest == null) {
             manifest = SnapshotManifest.empty(target, clock.instant());
@@ -533,35 +559,134 @@ public class HuggingFaceModelSource implements ModelSource {
         manifest.with(entries, subdirectories).write(repo.manifestFile(target));
     }
 
-    /** Places {@code file} at {@code local} from another snapshot or the flat layout, if one holds it. */
-    private boolean reuse(RepoLayout repo, String path, Revision.RemoteFile file, Path local, List<String> others,
-                          Map<String, SnapshotManifest> manifests, Map<String, String> hashes) {
+    /**
+     * A file to reuse: its path in the repo, where it is, the snapshot holding it ({@code null} for the flat
+     * layout), and whether it may be moved rather than copied.
+     */
+    private record Reusable(String path, Path source, String snapshot, boolean movable) {
+    }
+
+    /**
+     * Where another snapshot or the flat layout holds {@code file} with the Hub's id, or {@code null}. A snapshot's
+     * file may be moved when the snapshot could be evicted: no model in this JVM uses it and it is older than the
+     * minimum age, which protects a load in progress in another process. Flat-layout files are always moved.
+     */
+    private Reusable reusable(RepoLayout repo, CacheRegistry.Repo entry, String path, Revision.RemoteFile file,
+                              List<String> others, Map<String, SnapshotManifest> manifests,
+                              Map<String, String> hashes) {
         if (file == null) {
-            return false;
+            return null;
         }
+        Instant now = clock.instant();
+        for (String other : others) {
+            Path candidate = repo.snapshot(other).resolve(path);
+            if (Files.isRegularFile(candidate)) {
+                SnapshotManifest manifest = manifests.computeIfAbsent(other, repo::readManifest);
+                if (file.id().equals(localId(candidate, manifest, path, file.lfs(), hashes))) {
+                    boolean movable = entry.leases(other) == 0
+                            && !now.isBefore(repo.createdAt(other).plus(minimumSnapshotAge));
+                    return new Reusable(path, candidate, other, movable);
+                }
+            }
+        }
+        if (repo.legacy != null) {
+            Path legacy = repo.legacy.resolve(path);
+            if (Files.isRegularFile(legacy) && file.id().equals(localId(legacy, null, path, file.lfs(), hashes))) {
+                logger.debug("Adopting {} of {} from the flat cache layout", path, repo.repoId);
+                return new Reusable(path, legacy, null, true);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Moves {@code moves} into the snapshot {@code dir}, copying where a move fails, and removes what moved from
+     * the manifests of the snapshots it left. Those snapshots are superseded and were never in use, so they are
+     * not served again: only the current snapshot is, and the caller points {@code refs/main} at {@code dir}.
+     */
+    private void move(RepoLayout repo, Path dir, List<Reusable> moves) throws IOException {
+        Map<String, Set<String>> movedOut = new LinkedHashMap<>();
+        for (Reusable reusable : moves) {
+            Path local = dir.resolve(reusable.path());
+            if (CacheFiles.move(reusable.source(), local)) {
+                if (reusable.snapshot() != null) {
+                    movedOut.computeIfAbsent(reusable.snapshot(), k -> new LinkedHashSet<>()).add(reusable.path());
+                } else {
+                    CacheFiles.deleteEmptyDirectories(reusable.source().getParent(), cacheDir);
+                }
+            } else {
+                CacheFiles.copy(reusable.source(), local, repo.tmp());
+                if (reusable.snapshot() == null) {
+                    deleteAdopted(reusable.source());
+                }
+            }
+        }
+        movedOut.forEach((snapshot, paths) -> {
+            SnapshotManifest manifest = repo.readManifest(snapshot);
+            if (manifest != null) {
+                manifest.without(paths).write(repo.manifestFile(snapshot));
+            }
+        });
+    }
+
+    /** Deletes a flat-layout file now held by a snapshot, and the directories it leaves empty; best effort. */
+    private void deleteAdopted(Path legacy) {
         try {
-            for (String other : others) {
-                Path candidate = repo.snapshot(other).resolve(path);
-                if (Files.isRegularFile(candidate)) {
-                    SnapshotManifest manifest = manifests.computeIfAbsent(other, repo::readManifest);
-                    if (file.id().equals(localId(candidate, manifest, path, file.lfs(), hashes))) {
-                        CacheFiles.place(candidate, local, repo.tmp(), false);
-                        return true;
+            Files.deleteIfExists(legacy);
+            CacheFiles.deleteEmptyDirectories(legacy.getParent(), cacheDir);
+        } catch (IOException e) {
+            logger.debug("Cannot delete {}, which prune() retries: {}", legacy, e.toString());
+        }
+    }
+
+    /**
+     * Gives each file {@code request} opens in snapshot {@code revision} a single hard link, as ONNX Runtime
+     * requires of external data: caches written by earlier builds linked files across snapshots and the flat
+     * layout. A link from the flat layout is removed, since the snapshot adopted that file; any other gets the
+     * file a private copy. Skipped where link counts cannot be read, as on Windows, and for a snapshot that a model
+     * in this JVM uses. The caller holds the repo lock.
+     */
+    private void repairLinks(RepoLayout repo, CacheRegistry.Repo entry, String revision, Request request) {
+        Path dir = repo.snapshot(revision);
+        List<String> paths;
+        if (request.files() != null) {
+            paths = request.files();
+        } else if (request.subdirectory() != null) {
+            paths = CacheFiles.listShallow(dir.resolve(request.subdirectory())).stream()
+                    .map(name -> request.subdirectory() + "/" + name).toList();
+        } else {
+            paths = CacheFiles.list(dir);
+        }
+        for (String path : paths) {
+            Path file = dir.resolve(path);
+            if (CacheFiles.linkCount(file) <= 1) {
+                continue;
+            }
+            if (entry.leases(revision) > 0) {
+                if (entry.warnedLinkedInUse.compareAndSet(false, true)) {
+                    logger.warn("{} has hard-linked files in snapshot {}, which a loaded model uses, so they are "
+                            + "left as they are; ONNX Runtime may refuse their external data", repo.repoId, revision);
+                }
+                return;
+            }
+            if (entry.reportedRepair.compareAndSet(false, true)) {
+                logger.info("Replacing the hard-linked files of {} in {}, which ONNX Runtime refuses as external "
+                        + "data", repo.repoId, dir);
+            }
+            try {
+                if (repo.legacy != null) {
+                    Path legacy = repo.legacy.resolve(path);
+                    if (Files.isRegularFile(legacy) && Files.isSameFile(file, legacy)) {
+                        deleteAdopted(legacy);
                     }
                 }
-            }
-            if (repo.legacy != null) {
-                Path legacy = repo.legacy.resolve(path);
-                if (Files.isRegularFile(legacy) && file.id().equals(localId(legacy, null, path, file.lfs(), hashes))) {
-                    CacheFiles.place(legacy, local, repo.tmp(), true);
-                    logger.debug("Adopted {} of {} from the flat cache layout", path, repo.repoId);
-                    return true;
+                if (CacheFiles.linkCount(file) > 1) {
+                    CacheFiles.copy(file, file, repo.tmp());
                 }
+            } catch (IOException e) {
+                logger.warn("Could not replace the hard-linked {} with a copy: {}", file, e.toString());
             }
-        } catch (IOException e) {
-            throw new ModelSourceException("Failed to place " + local + ": " + e.getMessage(), e);
         }
-        return false;
     }
 
     /** The Hub id of a local file: recorded in {@code manifest}, else computed (and remembered in {@code hashes}). */
@@ -662,8 +787,8 @@ public class HuggingFaceModelSource implements ModelSource {
     }
 
     /**
-     * Adopts {@code request}'s files from the flat layout into the {@value ModelRevision#UNKNOWN} snapshot, as
-     * hard links; {@code null} if the flat layout lacks them or the current snapshot has a known commit.
+     * Adopts {@code request}'s files from the flat layout into the {@value ModelRevision#UNKNOWN} snapshot, moving
+     * them; {@code null} if neither holds them or the current snapshot has a known commit.
      */
     private String adoptLegacy(RepoLayout repo, Request request, String current) {
         if (repo.legacy == null || (current != null && !UNKNOWN.equals(current))
@@ -680,16 +805,24 @@ public class HuggingFaceModelSource implements ModelSource {
             files = CacheFiles.list(repo.legacy).stream()
                     .filter(f -> !f.endsWith(".tmp") && !f.endsWith(".inference4j-revision.json")).toList();
         }
-        if (files.isEmpty() || !files.stream().allMatch(f -> Files.isRegularFile(repo.legacy.resolve(f)))) {
+        Path dir = repo.snapshot(UNKNOWN);
+        // A file adopted earlier is in the snapshot, no longer in the flat layout
+        if (files.isEmpty() || !files.stream().allMatch(f -> Files.isRegularFile(dir.resolve(f))
+                || Files.isRegularFile(repo.legacy.resolve(f)))) {
             return null;
         }
-        Path dir = repo.snapshot(UNKNOWN);
         Map<String, SnapshotManifest.Entry> entries = new LinkedHashMap<>();
         try {
             for (String file : files) {
                 Path local = dir.resolve(file);
                 if (!Files.isRegularFile(local)) {
-                    CacheFiles.place(repo.legacy.resolve(file), local, repo.tmp(), true);
+                    Path legacy = repo.legacy.resolve(file);
+                    if (CacheFiles.move(legacy, local)) {
+                        CacheFiles.deleteEmptyDirectories(legacy.getParent(), cacheDir);
+                    } else {
+                        CacheFiles.copy(legacy, local, repo.tmp());
+                        deleteAdopted(legacy);
+                    }
                 }
                 entries.put(file, new SnapshotManifest.Entry(null, false, CacheFiles.size(local)));
             }
