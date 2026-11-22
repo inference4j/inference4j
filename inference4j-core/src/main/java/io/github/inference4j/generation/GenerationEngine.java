@@ -200,6 +200,7 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         TokenStreamer streamer = new TokenStreamer(stopSequences, tokenListener);
         TokenStream tokens = decoder.newStream();
         int generatedTokens = 0;
+        int generatedText = 0;
 
         for (int i = 0; i < maxNewTokens; i++) {
             float[] processed = logitsProcessor.process(result.logits());
@@ -210,6 +211,10 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
             }
 
             String fragment = tokens.next(tokenId);
+            if (generatedText == 0 && !fragment.isEmpty()) {
+                fragment = withoutDecodedLeadingSpace(fragment, tokenId);
+            }
+            generatedText += fragment.length();
             streamer.accept(fragment);
             generatedTokens++;
 
@@ -227,6 +232,19 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
 
         Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
         return new GenerationResult(streamer.getText(), promptTokens, generatedTokens, duration);
+    }
+
+    /**
+     * Drops the leading space of the first text when the decoder drops it too. A stream returns a
+     * SentencePiece token's {@code ▁} as a space, while {@code decode} strips it at the start of a text;
+     * byte-level BPE decoders keep it, and so does this.
+     */
+    private String withoutDecodedLeadingSpace(String fragment, int tokenId) {
+        if (!fragment.startsWith(" ")) {
+            return fragment;
+        }
+        String alone = decoder.decode(new int[]{tokenId});
+        return alone != null && !alone.startsWith(" ") ? fragment.substring(1) : fragment;
     }
 
     /**

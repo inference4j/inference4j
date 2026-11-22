@@ -21,8 +21,12 @@ import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.processing.TokenLimits;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.tokenizer.SentencePieceBpeTokenizer;
+import io.github.inference4j.tokenizer.TokenizerJsonParser;
 import io.github.inference4j.tokenizer.TokenizerProvider;
+import io.github.inference4j.tokenizer.UnigramTokenizer;
 
+import java.nio.file.Path;
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -121,9 +125,27 @@ public class MarianTranslator implements TextGenerator, Translator {
     public static class Builder
             extends AbstractEncoderDecoderBuilder<MarianTranslator, Builder> {
 
+        /**
+         * Reads {@code tokenizer.json} as the model type it names: {@code Unigram}, which reproduces
+         * MarianMT's SentencePiece segmentation, or BPE, which earlier exports used.
+         */
         @Override
         protected TokenizerProvider defaultTokenizerProvider() {
-            return SentencePieceBpeTokenizer.provider();
+            return new TokenizerProvider() {
+                @Override
+                public List<String> requiredFiles() {
+                    return List.of("tokenizer.json");
+                }
+
+                @Override
+                public TokenizerAndDecoder create(Path modelDir, List<String> addedTokens) {
+                    TokenizerProvider provider =
+                            "Unigram".equals(TokenizerJsonParser.modelType(modelDir.resolve("tokenizer.json")))
+                                    ? UnigramTokenizer.provider()
+                                    : SentencePieceBpeTokenizer.provider();
+                    return provider.create(modelDir, addedTokens);
+                }
+            };
         }
 
         @Override

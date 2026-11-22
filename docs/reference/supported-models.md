@@ -140,7 +140,7 @@ A comprehensive view of all supported models, organized by architecture:
 | T5-LM-Large-text2sql-spider | SentencePiece Unigram | `T5SqlGenerator` | Text-to-SQL (high accuracy) |
 | DistilBART CNN 12-6 | BPE | `BartSummarizer` | Summarization |
 | BART Large CNN | BPE | `BartSummarizer` | Summarization |
-| MarianMT (opus-mt-*) | SentencePiece BPE | `MarianTranslator` | Translation (fixed language pair) |
+| MarianMT (opus-mt-*) | SentencePiece Unigram | `MarianTranslator` | Translation (fixed language pair) |
 | CoEdIT (Base / Large) | SentencePiece Unigram | `CoeditGrammarCorrector` | Grammar correction |
 
 ### Vision

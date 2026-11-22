@@ -123,7 +123,7 @@ Each constant provides `displayName()` (e.g., `"Brazilian Portuguese"`) and `iso
 | `.modelId(String)` | `String` | — (required for MarianMT) | HuggingFace model ID (e.g., `inference4j/opus-mt-en-fr`) |
 | `.modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Model resolution strategy |
 | `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | default | ONNX Runtime session config |
-| `.tokenizerProvider(TokenizerProvider)` | `TokenizerProvider` | `SentencePieceBpeTokenizer` | Tokenizer construction strategy |
+| `.tokenizerProvider(TokenizerProvider)` | `TokenizerProvider` | `UnigramTokenizer` or `SentencePieceBpeTokenizer`, from `model.type` in `tokenizer.json` | Tokenizer construction strategy |
 | `.maxNewTokens(int)` | `int` | `256` | Maximum tokens to generate |
 | `.temperature(float)` | `float` | `0.0` | Sampling temperature |
 | `.topK(int)` | `int` | `0` (disabled) | Top-K sampling |
@@ -226,17 +226,21 @@ The pre-exported models under `inference4j/opus-mt-*` work out of the box. If yo
 
 !!! warning "MarianMT models require tokenizer conversion"
 
-    MarianMT models on HuggingFace ship with SentencePiece files (`source.spm`, `target.spm`) instead of `tokenizer.json`. You must build `tokenizer.json` using the model's `vocab.json` for vocabulary IDs and `source.spm` for BPE merges.
+    MarianMT models on HuggingFace ship with SentencePiece files (`source.spm`, `target.spm`) and a `vocab.json`
+    instead of `tokenizer.json`. `MarianTokenizer` splits text with `source.spm`, a SentencePiece **Unigram**
+    model with its own ids, then maps each piece to the model's id through `vocab.json`, the vocabulary shared
+    by source and target. A `tokenizer.json` converted straight from `source.spm` has the wrong ids, and BPE
+    merges taken from it split words differently, so the translations are garbage or degraded.
 
-    This is important because MarianMT merges source and target SentencePiece vocabularies into a shared `vocab.json` with ~65K entries. The raw `SentencePieceExtractor` produces SPM-internal IDs (0–31999) which differ from the model's actual IDs, so you must use `vocab.json` for the vocabulary mapping and only extract BPE merges from the SPM model.
+    Build a Unigram `tokenizer.json` whose ids come from `vocab.json` and whose scores come from `source.spm`.
+    `build_marian_tokenizer` in
+    [onnx-exporter](https://github.com/inference4j/onnx-exporter/blob/main/exporter/models/_marian.py) does this,
+    and its output matches `MarianTokenizer`'s ids:
 
     ```python
-    import json
     from huggingface_hub import hf_hub_download
     from optimum.exporters.onnx import main_export
-    from transformers.convert_slow_tokenizer import SentencePieceExtractor
-    from tokenizers import Tokenizer
-    from tokenizers.models import BPE
+    from exporter.models._marian import build_marian_tokenizer
 
     model_id = "Helsinki-NLP/opus-mt-en-ja"
 
@@ -247,16 +251,15 @@ The pre-exported models under `inference4j/opus-mt-*` work out of the box. If yo
         task="text2text-generation-with-past",
     )
 
-    # 2. Build tokenizer.json from vocab.json + source.spm merges
-    with open("my-model/vocab.json") as f:
-        model_vocab = json.load(f)
-
-    extractor = SentencePieceExtractor("my-model/source.spm")
-    _, merges = extractor.extract(None)
-
-    tokenizer = Tokenizer(BPE(model_vocab, merges, unk_token="<unk>"))
-    tokenizer.save("my-model/tokenizer.json")
+    # 2. Build tokenizer.json from source.spm (segmentation) and vocab.json (ids)
+    build_marian_tokenizer(
+        hf_hub_download(model_id, "vocab.json"),
+        hf_hub_download(model_id, "source.spm"),
+        "my-model/tokenizer.json",
+    )
     ```
+
+    `MarianTranslator` reads `tokenizer.json` as the model type it names: `Unigram`, or `BPE` for older exports.
 
     Only standard `opus-mt-*` models are supported. The newer `opus-mt-tc-big-*` variants require target language prefixes (e.g., `>>por<<`) which `MarianTranslator` does not handle.
 
