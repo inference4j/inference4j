@@ -143,6 +143,7 @@ class EfficientNetClassifierTest {
     void builder_inputNameDefaultsFromSession() {
         InferenceSession session = mock(InferenceSession.class);
         when(session.inputNames()).thenReturn(Set.of("images:0"));
+        when(session.inputShape("images:0")).thenReturn(new long[]{1, 280, 280, 3});
 
         EfficientNetClassifier model = EfficientNetClassifier.builder()
                 .session(session)
@@ -188,6 +189,7 @@ class EfficientNetClassifierTest {
     @Test
     void close_delegatesToSession() {
         InferenceSession session = mock(InferenceSession.class);
+        when(session.inputShape("images:0")).thenReturn(new long[]{1, 280, 280, 3});
 
         EfficientNetClassifier model = EfficientNetClassifier.builder()
                 .session(session)

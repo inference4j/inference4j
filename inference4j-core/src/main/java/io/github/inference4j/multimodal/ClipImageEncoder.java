@@ -20,22 +20,18 @@ import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.preprocessing.image.ImageTransformPipeline;
 import io.github.inference4j.preprocessing.image.Interpolation;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.processing.Preprocessor;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.vision.ImageEmbedder;
+import io.github.inference4j.model.AbstractModelBuilder;
+import io.github.inference4j.model.ModelFiles;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -121,32 +117,15 @@ public class ClipImageEncoder
         return results;
     }
 
-    public static class Builder {
-        private InferenceSession session;
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<ClipImageEncoder, Builder> {
         private Preprocessor<BufferedImage, Tensor> preprocessor;
-        private String inputName;
+
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
 
         Builder session(InferenceSession session) {
-            this.session = session;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
-
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
+            return useSession(VISION_MODEL_FILE, session);
         }
 
         public Builder preprocessor(Preprocessor<BufferedImage, Tensor> preprocessor) {
@@ -154,44 +133,28 @@ public class ClipImageEncoder
             return this;
         }
 
+        @Override
         public ClipImageEncoder build() {
-            if (session == null) {
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                try (ResolvedModel model = source.open(id, List.of(VISION_MODEL_FILE))) {
-                    loadFromDirectory(model);
-                }
-            }
-            if (inputName == null) {
-                inputName = DEFAULT_INPUT_NAME;
-            }
-            if (preprocessor == null) {
-                preprocessor = ImageTransformPipeline.builder()
+            return load(List.of(VISION_MODEL_FILE), files -> create(files, preprocessor));
+        }
+    }
+
+    /**
+     * Creates the encoder from {@code vision_model.onnx} of a CLIP model.
+     *
+     * @param files        the model's files
+     * @param preprocessor the image preprocessor, or {@code null} for CLIP's
+     */
+    static ClipImageEncoder create(ModelFiles files, Preprocessor<BufferedImage, Tensor> preprocessor) {
+        Preprocessor<BufferedImage, Tensor> imagePreprocessor = preprocessor != null
+                ? preprocessor
+                : ImageTransformPipeline.builder()
                         .interpolation(Interpolation.BICUBIC)
                         .resize(224, 224)
                         .centerCrop(224, 224)
                         .mean(CLIP_MEAN)
                         .std(CLIP_STD)
                         .build();
-            }
-            return new ClipImageEncoder(session, inputName, preprocessor);
-        }
-
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
-            }
-
-            Path modelPath = dir.resolve(VISION_MODEL_FILE);
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Vision model file not found: " + modelPath);
-            }
-
-            this.session = sessionConfigurer != null
-                    ? InferenceSession.create(model, VISION_MODEL_FILE, sessionConfigurer)
-                    : InferenceSession.create(model, VISION_MODEL_FILE);
-        }
+        return new ClipImageEncoder(files.session(VISION_MODEL_FILE), DEFAULT_INPUT_NAME, imagePreprocessor);
     }
 }

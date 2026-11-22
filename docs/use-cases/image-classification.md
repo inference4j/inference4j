@@ -68,7 +68,8 @@ try (var classifier = EfficientNetClassifier.builder().build()) {
 | `.modelId(String)` | `String` | `inference4j/resnet50-v1-7` | HuggingFace model ID |
 | `.modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Model resolution strategy |
 | `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | default | ONNX Runtime session config |
-| `.labels(Labels)` | `Labels` | auto-loaded from `labels.txt` | Classification labels |
+| `.labels(Labels)` | `Labels` | `labels.txt` next to the model, else ImageNet | Classification labels |
+| `.preprocessor(Preprocessor)` | `Preprocessor<BufferedImage, Tensor>` | resize to the model input, ImageNet mean/std | Image to input tensor |
 | `.outputOperator(OutputOperator)` | `OutputOperator` | `softmax()` | Output activation function |
 | `.defaultTopK(int)` | `int` | `5` | Default number of top predictions |
 
@@ -79,7 +80,8 @@ try (var classifier = EfficientNetClassifier.builder().build()) {
 | `.modelId(String)` | `String` | `inference4j/efficientnet-lite4` | HuggingFace model ID |
 | `.modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Model resolution strategy |
 | `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | default | ONNX Runtime session config |
-| `.labels(Labels)` | `Labels` | auto-loaded from `labels.txt` | Classification labels |
+| `.labels(Labels)` | `Labels` | `labels.txt` next to the model, else ImageNet | Classification labels |
+| `.preprocessor(Preprocessor)` | `Preprocessor<BufferedImage, Tensor>` | resize to the model input, mean 127/255, std 128/255 | Image to input tensor |
 | `.outputOperator(OutputOperator)` | `OutputOperator` | `identity()` | Output activation (softmax built-in) |
 | `.defaultTopK(int)` | `int` | `5` | Default number of top predictions |
 

@@ -19,14 +19,10 @@ package io.github.inference4j.nlp;
 import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.InferenceContext;
 import io.github.inference4j.PreprocessResult;
-import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.tokenizer.EncodedInput;
@@ -34,9 +30,8 @@ import io.github.inference4j.tokenizer.Tokenizer;
 import io.github.inference4j.tokenizer.WordPieceTokenizer;
 
 import io.github.inference4j.processing.MathOps;
+import io.github.inference4j.model.AbstractModelBuilder;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -386,11 +381,7 @@ public class SentenceTransformerEmbedder
      *         .build();
      * }</pre>
      */
-    public static class Builder {
-        private InferenceSession session;
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<SentenceTransformerEmbedder, Builder> {
         private Tokenizer tokenizer;
         private PoolingStrategy poolingStrategy = PoolingStrategy.MEAN;
         private boolean normalize = false;
@@ -401,42 +392,7 @@ public class SentenceTransformerEmbedder
         private Integer dimensions;
 
         Builder session(InferenceSession session) {
-            this.session = session;
-            return this;
-        }
-
-        /**
-         * Configures the ONNX Runtime session options (e.g., hardware acceleration).
-         *
-         * @param sessionConfigurer the session configuration callback
-         * @return this builder
-         */
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
-
-        /**
-         * Sets a custom model source for resolving model files.
-         * Defaults to {@link HuggingFaceModelSource} if not specified.
-         *
-         * @param modelSource the model source to use
-         * @return this builder
-         */
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        /**
-         * Sets the HuggingFace model ID to download and use.
-         *
-         * @param modelId the model ID (e.g., {@code "inference4j/all-MiniLM-L6-v2"})
-         * @return this builder
-         */
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
+            return useSession("model.onnx", session);
         }
 
         /**
@@ -544,67 +500,35 @@ public class SentenceTransformerEmbedder
          * @throws IllegalStateException if {@code modelId} is not set
          * @throws ModelSourceException if model files cannot be found or loaded
          */
+        @Override
         public SentenceTransformerEmbedder build() {
-            if (session == null) {
-                if (modelId == null) {
-                    throw new IllegalStateException(
-                            "modelId is required (e.g., \"inference4j/all-MiniLM-L6-v2\")");
+            if (modelId == null && !sessionsSupplied()) {
+                throw new IllegalStateException(
+                        "modelId is required (e.g., \"inference4j/all-MiniLM-L6-v2\")");
+            }
+            List<String> required = tokenizer != null ? List.of("model.onnx") : List.of("model.onnx", "vocab.txt");
+            return load(required, files -> {
+                InferenceSession session = files.session("model.onnx");
+                Tokenizer resolvedTokenizer = tokenizer != null
+                        ? tokenizer : WordPieceTokenizer.fromVocabFile(files.file("vocab.txt"));
+                long[] prefixIds = new long[0];
+                if (stride != null) {
+                    if (textPrefix != null) {
+                        long[] encoded = resolvedTokenizer.encode(textPrefix, Integer.MAX_VALUE).inputIds();
+                        prefixIds = Arrays.copyOfRange(encoded, 1, encoded.length - 1);   // without [CLS]/[SEP]
+                    }
+                    int windowSize = maxLength - 2 - prefixIds.length;
+                    if (stride < 0 || stride >= windowSize) {
+                        throw new IllegalArgumentException("stride must be in [0, " + windowSize
+                                + ") for maxLength " + maxLength
+                                + (prefixIds.length > 0 ? " and the text prefix" : "") + ", got " + stride);
+                    }
                 }
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                try (ResolvedModel model = source.open(modelId, List.of("model.onnx", "vocab.txt"))) {
-                    loadFromDirectory(model);
-                }
-            }
-            if (tokenizer == null) {
-                throw new IllegalStateException("Tokenizer is required");
-            }
-            long[] prefixIds = new long[0];
-            if (stride != null) {
-                if (textPrefix != null) {
-                    long[] encoded = tokenizer.encode(textPrefix, Integer.MAX_VALUE).inputIds();
-                    prefixIds = Arrays.copyOfRange(encoded, 1, encoded.length - 1);   // without [CLS]/[SEP]
-                }
-                int windowSize = maxLength - 2 - prefixIds.length;
-                if (stride < 0 || stride >= windowSize) {
-                    throw new IllegalArgumentException("stride must be in [0, " + windowSize + ") for maxLength "
-                            + maxLength + (prefixIds.length > 0 ? " and the text prefix" : "") + ", got " + stride);
-                }
-            }
-            return new SentenceTransformerEmbedder(session, tokenizer, poolingStrategy,
-                    normalize, textPrefix, maxLength,
-                    new TruncationGuard("SentenceTransformerEmbedder", truncation), stride, prefixIds,
-                    dimensions);
-        }
-
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
-            }
-
-            Path modelPath = dir.resolve("model.onnx");
-            Path vocabPath = dir.resolve("vocab.txt");
-
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Model file not found: " + modelPath);
-            }
-            if (!Files.exists(vocabPath)) {
-                throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
-            }
-
-            this.session = sessionConfigurer != null
-                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                    : InferenceSession.create(model, "model.onnx");
-            try {
-                if (this.tokenizer == null) {
-                    this.tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
-                }
-            } catch (Exception e) {
-                this.session.close();
-                this.session = null;
-                throw e;
-            }
+                return new SentenceTransformerEmbedder(session, resolvedTokenizer, poolingStrategy,
+                        normalize, textPrefix, maxLength,
+                        new TruncationGuard("SentenceTransformerEmbedder", truncation), stride, prefixIds,
+                        dimensions);
+            });
         }
     }
 }

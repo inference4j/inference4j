@@ -21,22 +21,16 @@ import io.github.inference4j.InferenceContext;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.Preprocessor;
 import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.TokenStream;
 import io.github.inference4j.tokenizer.TokenizerJsonParser;
 import io.github.inference4j.tokenizer.UnigramTokenizer;
+import io.github.inference4j.model.AbstractModelBuilder;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -215,35 +209,18 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
         return withoutPunctuation.strip().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
 
-    public static class Builder {
-
-        private InferenceSession session;
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<PunctCapSegModel, Builder> {
         private UnigramTokenizer tokenizer;
         private int maxLength = DEFAULT_MAX_LENGTH;
         private TruncationPolicy truncation;
         private Integer stride;
 
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
+
         Builder session(InferenceSession session) {
-            this.session = session;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
-
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
+            return useSession("model.onnx", session);
         }
 
         public Builder tokenizer(UnigramTokenizer tokenizer) {
@@ -279,42 +256,21 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
             return this;
         }
 
+        @Override
         public PunctCapSegModel build() {
             if (stride != null && (stride < 1 || stride >= maxLength - 2)) {
                 throw new IllegalArgumentException(
                         "stride must be in [1, maxLength - 2), got " + stride + " for maxLength " + maxLength);
             }
-            if (session == null) {
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                try (ResolvedModel model = source.open(id, List.of("model.onnx", "tokenizer.json"))) {
-                    loadFromDirectory(model);
-                }
-            }
-            if (tokenizer == null) {
-                throw new IllegalStateException("Tokenizer is required");
-            }
-            return new PunctCapSegModel(session, tokenizer, maxLength,
-                    new TruncationGuard("PunctCapSegModel", truncation), stride);
-        }
-
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            Path modelPath = dir.resolve("model.onnx");
-            Path tokenizerPath = dir.resolve("tokenizer.json");
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Model file not found: " + modelPath);
-            }
-            if (!Files.exists(tokenizerPath)) {
-                throw new ModelSourceException("Tokenizer file not found: " + tokenizerPath);
-            }
-            this.session = sessionConfigurer != null
-                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                    : InferenceSession.create(model, "model.onnx");
-            if (this.tokenizer == null) {
-                this.tokenizer = TokenizerJsonParser.parseUnigram(tokenizerPath).build();
-            }
+            List<String> required = tokenizer != null
+                    ? List.of("model.onnx") : List.of("model.onnx", "tokenizer.json");
+            return load(required, files -> {
+                InferenceSession session = files.session("model.onnx");
+                UnigramTokenizer resolvedTokenizer = tokenizer != null
+                        ? tokenizer : TokenizerJsonParser.parseUnigram(files.file("tokenizer.json")).build();
+                return new PunctCapSegModel(session, resolvedTokenizer, maxLength,
+                        new TruncationGuard("PunctCapSegModel", truncation), stride);
+            });
         }
     }
 }

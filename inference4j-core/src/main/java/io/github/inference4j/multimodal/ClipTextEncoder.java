@@ -18,20 +18,16 @@ package io.github.inference4j.multimodal;
 
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.nlp.TextEmbedder;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.tokenizer.BpeTokenizer;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.Tokenizer;
+import io.github.inference4j.model.AbstractModelBuilder;
+import io.github.inference4j.model.ModelFiles;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -137,32 +133,16 @@ public class ClipTextEncoder implements TextEmbedder {
         session.close();
     }
 
-    public static class Builder {
-        private InferenceSession session;
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<ClipTextEncoder, Builder> {
         private Tokenizer tokenizer;
         private TruncationPolicy truncation;
 
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
+
         Builder session(InferenceSession session) {
-            this.session = session;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
-
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
+            return useSession(TEXT_MODEL_FILE, session);
         }
 
         public Builder tokenizer(Tokenizer tokenizer) {
@@ -179,62 +159,33 @@ public class ClipTextEncoder implements TextEmbedder {
             return this;
         }
 
+        @Override
         public ClipTextEncoder build() {
-            if (session == null) {
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                try (ResolvedModel model = source.open(id, List.of(TEXT_MODEL_FILE, "vocab.json", "merges.txt"))) {
-                    loadFromDirectory(model);
-                }
-            }
-            if (tokenizer == null) {
-                throw new IllegalStateException("Tokenizer is required");
-            }
-            return new ClipTextEncoder(session, tokenizer,
-                    new TruncationGuard("ClipTextEncoder", truncation));
+            List<String> required = tokenizer != null
+                    ? List.of(TEXT_MODEL_FILE) : List.of(TEXT_MODEL_FILE, "vocab.json", "merges.txt");
+            return load(required, files -> create(files, tokenizer, truncation));
         }
+    }
 
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
-            }
-
-            Path modelPath = dir.resolve(TEXT_MODEL_FILE);
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Text model file not found: " + modelPath);
-            }
-
-            this.session = sessionConfigurer != null
-                    ? InferenceSession.create(model, TEXT_MODEL_FILE, sessionConfigurer)
-                    : InferenceSession.create(model, TEXT_MODEL_FILE);
-
-            try {
-                if (this.tokenizer == null) {
-                    Path vocabPath = dir.resolve("vocab.json");
-                    Path mergesPath = dir.resolve("merges.txt");
-                    if (!Files.exists(vocabPath)) {
-                        throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
-                    }
-                    if (!Files.exists(mergesPath)) {
-                        throw new ModelSourceException("Merges file not found: " + mergesPath);
-                    }
-                    this.tokenizer = BpeTokenizer.builder(vocabPath, mergesPath)
-                            .lowercase(true)
-                            .endOfWordMarker("</w>")
-                            .pattern(CLIP_PATTERN)
-                            .bosToken("<|startoftext|>")
-                            .eosToken("<|endoftext|>")
-                            .pad(true)
-                            .defaultMaxLength(77)
-                            .build();
-                }
-            } catch (Exception e) {
-                this.session.close();
-                this.session = null;
-                throw e;
-            }
-        }
+    /**
+     * Creates the encoder from {@code text_model.onnx} of a CLIP model and its BPE vocabulary.
+     *
+     * @param files      the model's files
+     * @param tokenizer  the tokenizer, or {@code null} for the model's {@code vocab.json} and {@code merges.txt}
+     * @param truncation the truncation policy, or {@code null} for the default
+     */
+    static ClipTextEncoder create(ModelFiles files, Tokenizer tokenizer, TruncationPolicy truncation) {
+        InferenceSession session = files.session(TEXT_MODEL_FILE);
+        Tokenizer resolved = tokenizer != null ? tokenizer
+                : BpeTokenizer.builder(files.file("vocab.json"), files.file("merges.txt"))
+                        .lowercase(true)
+                        .endOfWordMarker("</w>")
+                        .pattern(CLIP_PATTERN)
+                        .bosToken("<|startoftext|>")
+                        .eosToken("<|endoftext|>")
+                        .pad(true)
+                        .defaultMaxLength(77)
+                        .build();
+        return new ClipTextEncoder(session, resolved, new TruncationGuard("ClipTextEncoder", truncation));
     }
 }

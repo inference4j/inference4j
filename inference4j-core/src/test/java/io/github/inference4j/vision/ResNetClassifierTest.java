@@ -147,6 +147,7 @@ class ResNetClassifierTest {
     void builder_inputNameDefaultsFromSession() {
         InferenceSession session = mock(InferenceSession.class);
         when(session.inputNames()).thenReturn(Set.of("data"));
+        when(session.inputShape("data")).thenReturn(new long[]{1, 3, 224, 224});
 
         ResNetClassifier model = ResNetClassifier.builder()
                 .session(session)
@@ -191,6 +192,7 @@ class ResNetClassifierTest {
     @Test
     void close_delegatesToSession() {
         InferenceSession session = mock(InferenceSession.class);
+        when(session.inputShape("input")).thenReturn(new long[]{1, 3, 224, 224});
 
         ResNetClassifier model = ResNetClassifier.builder()
                 .session(session)

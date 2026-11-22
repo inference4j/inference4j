@@ -18,26 +18,20 @@ package io.github.inference4j.nlp;
 
 import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.PreprocessResult;
-import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.processing.MathOps;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.processing.OutputOperator;
 import io.github.inference4j.processing.WindowAggregation;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.preprocessing.text.ModelConfig;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.Tokenizer;
 import io.github.inference4j.tokenizer.WordPieceTokenizer;
+import io.github.inference4j.model.AbstractModelBuilder;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -212,11 +206,7 @@ public class DistilBertTextClassifier
         };
     }
 
-    public static class Builder {
-        private InferenceSession session;
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<DistilBertTextClassifier, Builder> {
         private Tokenizer tokenizer;
         private ModelConfig config;
         private OutputOperator outputOperator;
@@ -225,24 +215,12 @@ public class DistilBertTextClassifier
         private Integer stride;
         private WindowAggregation windowAggregation;
 
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
+
         Builder session(InferenceSession session) {
-            this.session = session;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
-
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
+            return useSession("model.onnx", session);
         }
 
         public Builder tokenizer(Tokenizer tokenizer) {
@@ -295,6 +273,7 @@ public class DistilBertTextClassifier
             return this;
         }
 
+        @Override
         public DistilBertTextClassifier build() {
             if (stride != null && (stride < 0 || stride >= maxLength - 2)) {
                 throw new IllegalArgumentException(
@@ -303,65 +282,25 @@ public class DistilBertTextClassifier
             if (windowAggregation != null && stride == null) {
                 throw new IllegalStateException("windowAggregation requires stride(int)");
             }
-            if (session == null) {
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                try (ResolvedModel model = source.open(id, List.of("model.onnx", "vocab.txt", "config.json"))) {
-                    loadFromDirectory(model);
-                }
-            }
+            List<String> required = new ArrayList<>(List.of("model.onnx"));
             if (tokenizer == null) {
-                throw new IllegalStateException("Tokenizer is required");
+                required.add("vocab.txt");
             }
             if (config == null) {
-                throw new IllegalStateException("ModelConfig is required");
+                required.add("config.json");
             }
-            if (outputOperator == null) {
-                outputOperator = config.isMultiLabel()
-                        ? OutputOperator.sigmoid()
-                        : OutputOperator.softmax();
-            }
-            return new DistilBertTextClassifier(session, tokenizer, config, outputOperator, maxLength,
-                    new TruncationGuard("DistilBertTextClassifier", truncation), stride,
-                    windowAggregation != null ? windowAggregation : WindowAggregation.mean());
-        }
-
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
-            }
-
-            Path modelPath = dir.resolve("model.onnx");
-            Path vocabPath = dir.resolve("vocab.txt");
-            Path configPath = dir.resolve("config.json");
-
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Model file not found: " + modelPath);
-            }
-            if (!Files.exists(vocabPath)) {
-                throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
-            }
-            if (!Files.exists(configPath)) {
-                throw new ModelSourceException("Config file not found: " + configPath);
-            }
-
-            this.session = sessionConfigurer != null
-                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                    : InferenceSession.create(model, "model.onnx");
-            try {
-                if (this.tokenizer == null) {
-                    this.tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
-                }
-                if (this.config == null) {
-                    this.config = ModelConfig.fromFile(configPath);
-                }
-            } catch (Exception e) {
-                this.session.close();
-                this.session = null;
-                throw e;
-            }
+            return load(required, files -> {
+                InferenceSession session = files.session("model.onnx");
+                Tokenizer resolvedTokenizer = tokenizer != null
+                        ? tokenizer : WordPieceTokenizer.fromVocabFile(files.file("vocab.txt"));
+                ModelConfig resolvedConfig = config != null
+                        ? config : ModelConfig.fromJson(files.json("config.json"));
+                OutputOperator operator = outputOperator != null ? outputOperator
+                        : resolvedConfig.isMultiLabel() ? OutputOperator.sigmoid() : OutputOperator.softmax();
+                return new DistilBertTextClassifier(session, resolvedTokenizer, resolvedConfig, operator, maxLength,
+                        new TruncationGuard("DistilBertTextClassifier", truncation), stride,
+                        windowAggregation != null ? windowAggregation : WindowAggregation.mean());
+            });
         }
     }
 }
