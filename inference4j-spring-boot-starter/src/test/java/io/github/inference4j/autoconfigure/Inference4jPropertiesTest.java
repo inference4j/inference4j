@@ -50,6 +50,13 @@ class Inference4jPropertiesTest {
     }
 
     @Test
+    void defaultsModelsEndpointEnabled() {
+        Inference4jProperties properties = new Inference4jProperties();
+
+        assertThat(properties.getActuator().getModels().isEnabled()).isTrue();
+    }
+
+    @Test
     void defaultsVisionObjectDetectorIsDfineSmall() {
         Inference4jProperties properties = new Inference4jProperties();
 

@@ -36,6 +36,8 @@ public class Inference4jProperties {
 
 	private GenaiProperties genai = new GenaiProperties();
 
+	private ActuatorProperties actuator = new ActuatorProperties();
+
 	public NlpProperties getNlp() {
 		return nlp;
 	}
@@ -74,6 +76,14 @@ public class Inference4jProperties {
 
 	public void setGenai(GenaiProperties genai) {
 		this.genai = genai;
+	}
+
+	public ActuatorProperties getActuator() {
+		return actuator;
+	}
+
+	public void setActuator(ActuatorProperties actuator) {
+		this.actuator = actuator;
 	}
 
 	public static class NlpProperties {
@@ -181,6 +191,42 @@ public class Inference4jProperties {
 
 	public static class MetricsProperties {
 
+		private boolean enabled = true;
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
+	}
+
+	/**
+	 * Actuator endpoints; used only when Spring Boot Actuator is on the classpath.
+	 */
+	public static class ActuatorProperties {
+
+		private ModelsEndpointProperties models = new ModelsEndpointProperties();
+
+		public ModelsEndpointProperties getModels() {
+			return models;
+		}
+
+		public void setModels(ModelsEndpointProperties models) {
+			this.models = models;
+		}
+
+	}
+
+	/**
+	 * The {@code models} endpoint over the model cache. Exposing it and allowing its write operations is configured
+	 * with the usual {@code management.endpoint.models.*} and {@code management.endpoints.web.exposure.*} properties.
+	 */
+	public static class ModelsEndpointProperties {
+
+		/** Whether to create the {@code models} endpoint bean. */
 		private boolean enabled = true;
 
 		public boolean isEnabled() {

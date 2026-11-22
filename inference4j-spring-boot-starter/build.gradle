@@ -20,6 +20,14 @@ dependencies {
     testImplementation "org.springframework.boot:spring-boot-starter-test:${springBootVersion}"
     testImplementation "org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}"
     testImplementation 'io.micrometer:micrometer-core:1.14.4'
+    // Web tests of the models actuator endpoint, through MockMvc
+    testImplementation "org.springframework.boot:spring-boot-starter-webmvc:${springBootVersion}"
+    testImplementation "org.springframework.boot:spring-boot-webmvc-test:${springBootVersion}"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    // Actuator endpoints bind request parameters by name, so operation methods need their parameter names
+    options.compilerArgs << '-parameters'
 }
 
 tasks.named('test') {
@@ -27,4 +35,6 @@ tasks.named('test') {
     systemProperty 'inference4j.cache.dir', layout.buildDirectory.dir('test-model-cache').get().asFile.absolutePath
     // ...and offline, so the revision check never replaces those stubs with the real models
     systemProperty 'inference4j.offline', 'true'
+    // The root build logs tests through slf4j-simple, so @SpringBootTest must not set up Logback
+    systemProperty 'org.springframework.boot.logging.LoggingSystem', 'none'
 }
