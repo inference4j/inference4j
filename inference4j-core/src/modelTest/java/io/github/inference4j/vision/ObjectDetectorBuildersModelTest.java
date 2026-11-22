@@ -16,6 +16,7 @@
 
 package io.github.inference4j.vision;
 
+import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.preprocessing.image.Labels;
@@ -36,10 +37,11 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Builder options shared by the detectors, on real models: where labels come from and maxDetections. Input-size
- * validation is covered by {@code ObjectDetectorBuildersTest} with a fixed-input model.
+ * Builder options shared by the detectors, on real models: where labels come from, maxDetections and input-size
+ * validation.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ObjectDetectorBuildersModelTest {
@@ -112,6 +114,15 @@ class ObjectDetectorBuildersModelTest {
             assertThat(everything).hasSizeGreaterThan(1);
             assertThat(one.detect(cat)).containsExactly(everything.get(0));
         }
+    }
+
+    @Test
+    void inputSizeOtherThanTheFixedNanoInputFails() {
+        // The published D-FINE nano mirror is simplified to a fixed [1, 3, 640, 640] input
+        assertThatThrownBy(() -> DetrDetector.dfineNano().inputSize(320).build())
+                .isInstanceOf(ModelLoadException.class)
+                .hasMessageContaining("fixed 640 × 640 input")
+                .hasMessageContaining("inputSize(320)");
     }
 
     /** A directory holding a copy of a mirror's model.onnx and nothing else, served for any model id. */

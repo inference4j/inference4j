@@ -248,8 +248,7 @@ interface. Tracked in [#197](https://github.com/inference4j/inference4j/issues/1
 - [ ] **One detector API** — swap contract, shared helpers and builder options
       ([#183](https://github.com/inference4j/inference4j/issues/183), [#184](https://github.com/inference4j/inference4j/issues/184),
       [#185](https://github.com/inference4j/inference4j/issues/185))
-- [ ] **Accurate tier** — D-FINE medium and large, Objects365-pretrained presets
-      ([#186](https://github.com/inference4j/inference4j/issues/186), [#187](https://github.com/inference4j/inference4j/issues/187))
+- [ ] **Accurate tier** — D-FINE medium and large ([#186](https://github.com/inference4j/inference4j/issues/186))
 - [ ] **Detector benchmarks** ([#191](https://github.com/inference4j/inference4j/issues/191))
 
 ### Generative AI via onnxruntime-genai
