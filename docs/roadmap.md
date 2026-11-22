@@ -234,7 +234,7 @@ Tracked in the [0.15.0 milestone](https://github.com/inference4j/inference4j/mil
 ### NLP
 
 - [ ] **Modern reranker** — bge-reranker-v2-m3, multilingual and long-context ([#105](https://github.com/inference4j/inference4j/issues/105))
-- [ ] **Long input for generators** — sentence chunking for translation, map-reduce for summarization ([#74](https://github.com/inference4j/inference4j/issues/74))
+- [x] **Long input for generators** — sentence chunking for translation, map-reduce for summarization ([#74](https://github.com/inference4j/inference4j/issues/74))
 
 ### Vision: permissive object detection
 
