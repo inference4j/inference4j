@@ -166,6 +166,9 @@ the current one: it serves an older version of the model than a model loaded now
 `EvictionResult` with the snapshots removed, those kept because they are in use, and the bytes freed (files still
 linked from a kept snapshot do not count).
 
+In a Spring Boot application, the starter's [`models` actuator endpoint](spring-boot.md#model-cache-endpoint)
+offers these operations over HTTP, and its health indicator reports stale models and available updates.
+
 ### Pruning and snapshots in use
 
 A snapshot is in use while a handle on it is open: a builder holds one while it loads, and each `InferenceSession`

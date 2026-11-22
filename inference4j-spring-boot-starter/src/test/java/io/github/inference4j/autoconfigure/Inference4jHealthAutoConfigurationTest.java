@@ -15,8 +15,22 @@
  */
 package io.github.inference4j.autoconfigure;
 
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
+
 import io.github.inference4j.InferenceTask;
 import io.github.inference4j.generation.GenerativeTask;
+import io.github.inference4j.model.CachedFile;
+import io.github.inference4j.model.CachedModel;
+import io.github.inference4j.model.CachedSnapshot;
+import io.github.inference4j.model.EvictionResult;
+import io.github.inference4j.model.ModelCache;
+import io.github.inference4j.model.UpdateCheck;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -82,6 +96,156 @@ class Inference4jHealthAutoConfigurationTest {
 			HealthIndicator indicator = ctx.getBean(HealthIndicator.class);
 			assertThat(indicator.health().getStatus()).isEqualTo(Status.DOWN);
 		});
+	}
+
+	@Test
+	void healthReportsStaleModelsAndUpdatesWithoutChangingTheStatus() {
+		runner.withUserConfiguration(TaskConfig.class, CacheConfig.class).run(ctx -> {
+			Health health = ctx.getBean(HealthIndicator.class).health();
+			assertThat(health.getStatus()).isEqualTo(Status.UP);
+			assertThat(health.getDetails()).containsEntry("tasks", 1);
+			assertThat(health.getDetails()).containsEntry("staleModels",
+					List.of(Map.of("repo", "org/stale", "loadedRevisions", List.of("old"), "cachedRevision", "new")));
+			assertThat(health.getDetails()).containsEntry("updatesAvailable", List.of("org/outdated"));
+		});
+	}
+
+	@Test
+	void healthWithoutTasksKeepsItsStatusAndAddsCacheDetails() {
+		runner.withUserConfiguration(CacheConfig.class).run(ctx -> {
+			Health health = ctx.getBean(HealthIndicator.class).health();
+			assertThat(health.getStatus()).isEqualTo(Status.UNKNOWN);
+			assertThat(health.getDetails()).containsKeys("reason", "staleModels", "updatesAvailable");
+		});
+	}
+
+	@Test
+	void healthIgnoresACacheThatCannotBeListed() {
+		runner.withUserConfiguration(TaskConfig.class, BrokenCacheConfig.class).run(ctx -> {
+			Health health = ctx.getBean(HealthIndicator.class).health();
+			assertThat(health.getStatus()).isEqualTo(Status.UP);
+			assertThat(health.getDetails()).containsOnlyKeys("tasks");
+		});
+	}
+
+	@Test
+	void healthReusesTheCacheListingWithinTheTtl() {
+		runner.withUserConfiguration(TaskConfig.class, CountingCacheConfig.class).run(ctx -> {
+			HealthIndicator indicator = ctx.getBean(HealthIndicator.class);
+			indicator.health();
+			indicator.health();
+			assertThat(ctx.getBean(CountingCacheConfig.class).listings.get()).isEqualTo(1);
+		});
+	}
+
+	@Test
+	void aZeroTtlListsTheCacheOnEveryHealthCall() {
+		runner.withUserConfiguration(TaskConfig.class, CountingCacheConfig.class)
+			.withPropertyValues("inference4j.health.model-cache-ttl=0s")
+			.run(ctx -> {
+				HealthIndicator indicator = ctx.getBean(HealthIndicator.class);
+				indicator.health();
+				indicator.health();
+				assertThat(ctx.getBean(CountingCacheConfig.class).listings.get()).isEqualTo(2);
+			});
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	static class CountingCacheConfig {
+
+		final AtomicInteger listings = new AtomicInteger();
+
+		@Bean
+		ModelCache modelCache() {
+			return new ListedCache(() -> {
+				listings.incrementAndGet();
+				return List.of();
+			});
+		}
+
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	static class CacheConfig {
+
+		@Bean
+		ModelCache modelCache() {
+			CachedFile v1 = new CachedFile("model.onnx", "id-1", 10);
+			CachedFile v2 = new CachedFile("model.onnx", "id-2", 10);
+			CachedModel stale = new CachedModel("org/stale", "new", null, null, false,
+					List.of(new CachedSnapshot("old", false, 1, List.of(v1), 10),
+							new CachedSnapshot("new", true, 0, List.of(v2), 10)),
+					20);
+			CachedModel outdated = new CachedModel("org/outdated", "abc", Instant.EPOCH, "def", true,
+					List.of(new CachedSnapshot("abc", true, 0, List.of(v1), 10)), 10);
+			CachedModel fresh = new CachedModel("org/fresh", "abc", Instant.EPOCH, "abc", false,
+					List.of(new CachedSnapshot("abc", true, 0, List.of(v1), 10)), 10);
+			return new ListedCache(() -> List.of(fresh, outdated, stale));
+		}
+
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	static class BrokenCacheConfig {
+
+		@Bean
+		ModelCache modelCache() {
+			return new ListedCache(() -> {
+				throw new IllegalStateException("unreadable");
+			});
+		}
+
+	}
+
+	/** A cache whose {@link #list()} answers from a supplier; nothing else is called. */
+	static class ListedCache implements ModelCache {
+
+		private final Supplier<List<CachedModel>> models;
+
+		ListedCache(Supplier<List<CachedModel>> models) {
+			this.models = models;
+		}
+
+		@Override
+		public Path directory() {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public List<CachedModel> list() {
+			return models.get();
+		}
+
+		@Override
+		public Optional<CachedModel> find(String repoId) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public UpdateCheck check(String repoId) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public CachedModel update(String repoId) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public EvictionResult evict(String repoId) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public EvictionResult evict(String repoId, String revision) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public EvictionResult prune() {
+			throw new UnsupportedOperationException();
+		}
+
 	}
 
 	@Configuration(proxyBeanMethods = false)

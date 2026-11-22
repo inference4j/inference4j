@@ -61,6 +61,8 @@ inference4j:
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
+| `inference4j.actuator.models.enabled` | `boolean` | `true` | Create the [`models` actuator endpoint](#model-cache-endpoint) bean when Spring Boot Actuator is on the classpath. It still has to be exposed with `management.endpoints.web.exposure.include` |
+| `inference4j.health.model-cache-ttl` | `Duration` | `10s` | How long the health indicator reuses its listing of the model cache (`staleModels`, `updatesAvailable`), so frequent probes don't read the cache each time. `0s` lists it on every call |
 | `inference4j.metrics.enabled` | `boolean` | `true` | Use a Micrometer-backed `RouterMetrics` when a `MeterRegistry` is present. When `false`, or when Micrometer is absent, `RouterMetrics` falls back to a no-op instead of being removed |
 | `inference4j.nlp.text-classifier.enabled` | `boolean` | `false` | Enable DistilBERT text classifier |
 | `inference4j.nlp.text-classifier.model-id` | `String` | `inference4j/distilbert-base-uncased-finetuned-sst-2-english` | Model ID |
@@ -206,12 +208,32 @@ GET /actuator/health
     "inference4j": {
       "status": "UP",
       "details": {
-        "tasks": 3
+        "tasks": 3,
+        "staleModels": [
+          {
+            "repo": "inference4j/silero-vad",
+            "loadedRevisions": ["3f1c..."],
+            "cachedRevision": "9a7e..."
+          }
+        ],
+        "updatesAvailable": ["inference4j/distilbert-NER"]
       }
     }
   }
 }
 ```
+
+The two model cache details come from the [model cache](model-loading.md#managing-the-cache) on disk, without
+calling the Hub:
+
+| Detail | Description |
+|--------|-------------|
+| `staleModels` | Repos where a model loaded in this JVM reads an older snapshot whose files differ from the cached revision, so it serves an older version than a model loaded now would. `loadedRevisions` are the snapshots still in use. |
+| `updatesAvailable` | Repos whose last Hub check found changed files that are not downloaded yet. |
+
+Neither changes the status: a stale model still serves requests. Restarting the application, or rebuilding the
+model bean, loads the cached revision. The details appear when a `ModelCache` bean exists, which the starter
+defines by default.
 
 The health indicator is enabled by default. Disable it with:
 
@@ -220,6 +242,147 @@ inference4j:
   health:
     enabled: false
 ```
+
+## Model cache endpoint
+
+With Spring Boot Actuator on the classpath, the starter adds a `models` endpoint over the
+[model cache](model-loading.md#managing-the-cache): it lists the cached models, checks them for updates, and can
+update, evict and prune them. Like most actuator endpoints, it is not exposed over HTTP until you include it:
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,models
+```
+
+### Operations
+
+| Request | Access | Description | Status |
+|---------|--------|-------------|--------|
+| `GET /actuator/models` | read | Every cached repo: revision, last check, snapshots, files, leases, size, `stale`, `updating`. Local state only. | 200 |
+| `GET /actuator/models/{org}/{name}` | read | One cached repo. | 200, 404 when not cached |
+| `GET /actuator/models/{org}/{name}?check=true` | read | Also asks the Hub which cached files changed, without downloading. A check younger than a minute is reused. | 200, 404, 409 offline, 502 Hub unreachable |
+| `POST /actuator/models/{org}/{name}` with `{"action":"update"}` | write | Starts an update in the background: downloads the changed files into a new snapshot. | 202, 400 unknown action, 404 |
+| `DELETE /actuator/models/{org}/{name}` | write | Evicts the repo: deletes its snapshots that are not in use. | 200, 404 |
+| `DELETE /actuator/models/{org}/{name}?revision={commit}` | write | Deletes one snapshot, unless it is in use. | 200, 404 |
+| `DELETE /actuator/models` | write | Prunes every repo: deletes superseded snapshots that are not in use, and unfinished downloads. | 200 |
+
+An invalid repo id or revision answers 400. Errors have a JSON body with `status` and `message`. Responses list
+paths inside the repo only, never the cache directory.
+
+```bash
+# every cached model
+curl http://localhost:8080/actuator/models
+
+# one model, asking the Hub whether it changed
+curl 'http://localhost:8080/actuator/models/inference4j/silero-vad?check=true'
+```
+
+```json
+{
+  "repoId": "inference4j/silero-vad",
+  "revision": "9a7e...",
+  "lastChecked": "2026-11-22T10:00:00Z",
+  "remoteRevision": "b21d...",
+  "updateAvailable": true,
+  "stale": false,
+  "updating": false,
+  "snapshots": [
+    {
+      "revision": "9a7e...",
+      "current": true,
+      "leases": 1,
+      "files": [{ "path": "model.onnx", "id": "4c5f...", "sizeBytes": 2313101 }],
+      "sizeBytes": 2313101
+    }
+  ],
+  "sizeBytes": 2313101,
+  "check": {
+    "cachedRevision": "9a7e...",
+    "remoteRevision": "b21d...",
+    "changedFiles": ["model.onnx"],
+    "checkedAt": "2026-11-22T10:00:00Z",
+    "updateAvailable": true
+  }
+}
+```
+
+The write operations, once [enabled](#enabling-writes):
+
+```bash
+# update in the background; GET the model to follow it ("updating", then the new "revision")
+curl -X POST http://localhost:8080/actuator/models/inference4j/silero-vad \
+     -H 'Content-Type: application/json' -d '{"action":"update"}'
+
+# evict a model, or one of its snapshots
+curl -X DELETE http://localhost:8080/actuator/models/inference4j/silero-vad
+curl -X DELETE 'http://localhost:8080/actuator/models/inference4j/silero-vad?revision=9a7e...'
+
+# prune every repo
+curl -X DELETE http://localhost:8080/actuator/models
+```
+
+Updates run one at a time, on a thread the endpoint owns. A request for a repo whose update is already running
+answers 202 with `"status": "already-running"`. A failed update is logged as a warning, and the repo keeps its
+current snapshot. Models already loaded keep reading their snapshot after an update; models loaded afterwards read
+the new one. An eviction keeps the snapshots in use, listed under `inUse` in the response.
+
+### Enabling writes
+
+The endpoint's default access is read-only: `POST` and `DELETE` are not mapped, and answer 405. To allow them:
+
+```yaml
+management:
+  endpoint:
+    models:
+      access: unrestricted
+```
+
+`management.endpoints.access.max-permitted` caps this setting, as for every endpoint.
+
+### Path
+
+The URL follows the actuator base path and can be moved like any endpoint's:
+
+```yaml
+management:
+  endpoints:
+    web:
+      path-mapping:
+        models: model-cache      # /actuator/model-cache
+```
+
+### Disabling the endpoint
+
+Leaving `models` out of the exposure list keeps it off HTTP. To not create the bean at all, for example to define
+your own endpoint with the id `models` over the `ModelCache` bean:
+
+```yaml
+inference4j:
+  actuator:
+    models:
+      enabled: false
+```
+
+`management.endpoint.models.access: none` also removes it.
+
+### Which cache
+
+The endpoint and the health details use the `ModelCache` bean. By default it is the cache of your
+`HuggingFaceModelSource` bean when you define one, and otherwise `ModelCache.defaultCache()`, the cache the
+auto-configured models download into. Define a `ModelCache` bean to use another one.
+
+### Security
+
+- The endpoint is not exposed over HTTP by default.
+- `?check=true` makes an outbound request to the Hub (or the mirror in `HF_ENDPOINT`). It runs only for repos
+  already cached, so a request cannot make the application contact the Hub about an arbitrary repo id.
+- The write operations can fill the disk (`update` downloads files) or force the next model loads to download
+  again (`DELETE`). When you enable them, put the endpoint behind authentication, and keep CSRF protection on for
+  `POST` and `DELETE`, for example with Spring Security's `EndpointRequest.to("models")` matcher.
+- `update` pulls the latest commit of the repo's `main` branch. It does not pin a revision.
 
 ## Example configuration
 
