@@ -203,10 +203,6 @@ Defaults and extra options per detector:
 | `Yolo26Detector` | `inference4j/yolo26n` | `0.5` | `.inputName(String)`: input tensor name, auto-detected |
 | `YoloV8Detector` | `inference4j/yolov8n` | `0.25` | `.inputName(String)`; `.iouThreshold(float)`: NMS IoU threshold, `0.45` |
 
-!!! note "Renamed in 0.15.0"
-    `DetrDetector` was called `RtDetrDetector` before 0.15.0. The old name still works, with the same presets and
-    options, but is deprecated and will be removed in 0.16.0.
-
 ## Result type
 
 `Detection` is a record with:
