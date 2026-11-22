@@ -49,7 +49,7 @@ class InferenceSessionTest {
 
         assertThatThrownBy(() -> InferenceSession.create(badPath))
                 .isInstanceOf(ModelLoadException.class)
-                .satisfies(ex -> assertThat(ex.getMessage()).contains("/nonexistent/model.onnx"));
+                .satisfies(ex -> assertThat(ex.getMessage()).contains(badPath.toString()));
     }
 
     @Test
@@ -69,7 +69,7 @@ class InferenceSessionTest {
 
         assertThatThrownBy(() -> InferenceSession.create(badPath, options))
                 .isInstanceOf(ModelLoadException.class)
-                .satisfies(ex -> assertThat(ex.getMessage()).contains("/nonexistent/model.onnx"));
+                .satisfies(ex -> assertThat(ex.getMessage()).contains(badPath.toString()));
     }
 
     @Test
@@ -89,7 +89,7 @@ class InferenceSessionTest {
 
         assertThatThrownBy(() -> InferenceSession.create(badPath, opts -> { }))
                 .isInstanceOf(ModelLoadException.class)
-                .satisfies(ex -> assertThat(ex.getMessage()).contains("/nonexistent/model.onnx"));
+                .satisfies(ex -> assertThat(ex.getMessage()).contains(badPath.toString()));
     }
 
     @Test

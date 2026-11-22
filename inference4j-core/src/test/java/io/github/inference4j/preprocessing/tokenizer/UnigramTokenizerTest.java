@@ -39,9 +39,9 @@ class UnigramTokenizerTest {
 	private static UnigramTokenizer tokenizer;
 
 	@BeforeAll
-	static void setUp() {
+	static void setUp() throws java.net.URISyntaxException {
 		Path tokenizerJson = Path.of(Objects.requireNonNull(
-				UnigramTokenizerTest.class.getResource("/test-unigram-tokenizer.json")).getPath());
+				UnigramTokenizerTest.class.getResource("/test-unigram-tokenizer.json")).toURI());
 		tokenizer = TokenizerJsonParser.parseUnigram(tokenizerJson).build();
 	}
 
@@ -331,9 +331,13 @@ class UnigramTokenizerTest {
 	}
 
 	private static UnigramTokenizer.Builder tokenizerBuilder() {
-		Path tokenizerJson = Path.of(Objects.requireNonNull(
-				UnigramTokenizerTest.class.getResource("/test-unigram-tokenizer.json")).getPath());
-		return TokenizerJsonParser.parseUnigram(tokenizerJson);
+		try {
+			Path tokenizerJson = Path.of(Objects.requireNonNull(
+					UnigramTokenizerTest.class.getResource("/test-unigram-tokenizer.json")).toURI());
+			return TokenizerJsonParser.parseUnigram(tokenizerJson);
+		} catch (java.net.URISyntaxException e) {
+			throw new IllegalStateException(e);
+		}
 	}
 
 	@Test

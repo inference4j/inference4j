@@ -29,6 +29,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -135,15 +136,22 @@ final class CacheFiles {
 
     /**
      * What identifies a file's content on disk, so that hard links to it count once: its file key (the inode on
-     * Unix), or its path where the file system has none.
+     * Unix). Windows reports no file key; there hard links share their size and timestamps, which a separate
+     * copy does not, since cached files are never modified after they are placed.
      */
     static Object key(Path file) {
         try {
-            Object key = Files.readAttributes(file, BasicFileAttributes.class).fileKey();
-            return key != null ? key : file.toAbsolutePath().normalize();
+            BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class);
+            Object key = attributes.fileKey();
+            return key != null ? key
+                    : new LinkKey(attributes.size(), attributes.creationTime(), attributes.lastModifiedTime());
         } catch (IOException e) {
             return file.toAbsolutePath().normalize();
         }
+    }
+
+    /** Identifies a file by its size and timestamps, where the file system has no file key. */
+    private record LinkKey(long size, FileTime created, FileTime modified) {
     }
 
     static long size(Path file) {

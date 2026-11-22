@@ -36,9 +36,9 @@ class TokenizerJsonParserTest {
     private static Path tokenizerJson;
 
     @BeforeAll
-    static void loadPath() {
+    static void loadPath() throws java.net.URISyntaxException {
         tokenizerJson = Path.of(Objects.requireNonNull(
-                TokenizerJsonParserTest.class.getResource("/test-sp-tokenizer.json")).getPath());
+                TokenizerJsonParserTest.class.getResource("/test-sp-tokenizer.json")).toURI());
     }
 
     @Test
@@ -80,10 +80,10 @@ class TokenizerJsonParserTest {
     }
 
     @Test
-    void parse_arrayMerges_roundTrip() {
+    void parse_arrayMerges_roundTrip() throws java.net.URISyntaxException {
         Path arrayMergesJson = Path.of(Objects.requireNonNull(
                 TokenizerJsonParserTest.class.getResource(
-                        "/test-sp-tokenizer-array-merges.json")).getPath());
+                        "/test-sp-tokenizer-array-merges.json")).toURI());
         SentencePieceBpeTokenizer tokenizer =
                 TokenizerJsonParser.parse(arrayMergesJson).build();
 

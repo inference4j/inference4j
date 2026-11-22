@@ -34,9 +34,9 @@ class WordPieceTokenizerTest {
     private static WordPieceTokenizer casedTokenizer;
 
     @BeforeAll
-    static void setUp() {
+    static void setUp() throws java.net.URISyntaxException {
         Path vocabPath = Path.of(Objects.requireNonNull(
-                WordPieceTokenizerTest.class.getResource("/test-vocab.txt")).getPath());
+                WordPieceTokenizerTest.class.getResource("/test-vocab.txt")).toURI());
         tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
         casedTokenizer = WordPieceTokenizer.fromVocabFile(vocabPath, false);
     }
