@@ -39,24 +39,50 @@ final class ModelInputLimits {
     }
 
     /**
+     * Returns the number of decoder positions of an encoder-decoder model: {@code max_position_embeddings}
+     * or {@code n_positions}, a hard limit for learned or sinusoidal positions (BART, MarianMT). Empty for
+     * relative positions (T5, which declares {@code relative_attention_num_buckets}), which have no hard limit,
+     * and when the config declares none.
+     */
+    static OptionalInt decoderPositions(Path configPath) {
+        JsonNode root = read(configPath);
+        if (root.has("relative_attention_num_buckets")) {
+            return OptionalInt.empty();
+        }
+        return positionField(root);
+    }
+
+    /**
      * Returns {@code max_position_embeddings} (BART, Marian, Qwen, Llama…) or {@code n_positions}
      * (GPT-2, T5), falling back to {@link #T5_TRAINED_LENGTH} for T5 models that declare neither.
      * Empty when the limit is unknown.
      */
     static OptionalInt maxPositions(Path configPath) {
+        JsonNode root = read(configPath);
+        OptionalInt positions = positionField(root);
+        if (positions.isPresent()) {
+            return positions;
+        }
+        JsonNode modelType = root.get("model_type");
+        if (modelType != null && modelType.asText().startsWith("t5")) {
+            return OptionalInt.of(T5_TRAINED_LENGTH);
+        }
+        return OptionalInt.empty();
+    }
+
+    private static OptionalInt positionField(JsonNode root) {
+        for (String field : new String[]{"max_position_embeddings", "n_positions"}) {
+            JsonNode node = root.get(field);
+            if (node != null && node.canConvertToInt() && node.intValue() > 0) {
+                return OptionalInt.of(node.intValue());
+            }
+        }
+        return OptionalInt.empty();
+    }
+
+    private static JsonNode read(Path configPath) {
         try (InputStream is = Files.newInputStream(configPath)) {
-            JsonNode root = new ObjectMapper().readTree(is);
-            for (String field : new String[]{"max_position_embeddings", "n_positions"}) {
-                JsonNode node = root.get(field);
-                if (node != null && node.canConvertToInt() && node.intValue() > 0) {
-                    return OptionalInt.of(node.intValue());
-                }
-            }
-            JsonNode modelType = root.get("model_type");
-            if (modelType != null && modelType.asText().startsWith("t5")) {
-                return OptionalInt.of(T5_TRAINED_LENGTH);
-            }
-            return OptionalInt.empty();
+            return new ObjectMapper().readTree(is);
         } catch (IOException e) {
             throw new ModelLoadException("Failed to read config.json: " + e.getMessage(), e);
         }

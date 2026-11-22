@@ -266,6 +266,7 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
             if (forcedBos != null) {
                 engineBuilder.forcedBosTokenId(forcedBos);
             }
+            ModelInputLimits.decoderPositions(configPath).ifPresent(engineBuilder::maxDecoderPositions);
 
             return createWrapper(engineBuilder.build());
         } catch (Exception e) {

@@ -106,6 +106,21 @@ class MarianTranslatorModelTest {
     }
 
     @Test
+    void maxNewTokensBeyondTheDecoderPositionsStopsAtTheLastPosition() throws Exception {
+        // MarianMT's decoder has 512 positions; generating past them used to fail inside ONNX Runtime (#215)
+        try (var translator = MarianTranslator.builder()
+                .modelId("inference4j/opus-mt-en-es")
+                .maxNewTokens(2000)
+                .build()) {
+            assertThat(translator.translationLimits().maxOutputTokens()).isEqualTo(512);
+
+            GenerationResult result = translator.translate(LONG_TEXT, token -> {});
+
+            assertThat(result.generatedTokens()).isPositive().isLessThanOrEqualTo(512);
+        }
+    }
+
+    @Test
     void failPolicyRejectsInputBeyondModelLimit() throws Exception {
         try (var translator = MarianTranslator.builder()
                 .modelId("inference4j/opus-mt-en-es")

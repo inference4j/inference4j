@@ -124,7 +124,7 @@ Each constant provides `displayName()` (e.g., `"Brazilian Portuguese"`) and `iso
 | `.modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Model resolution strategy |
 | `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | default | ONNX Runtime session config |
 | `.tokenizerProvider(TokenizerProvider)` | `TokenizerProvider` | `UnigramTokenizer` or `SentencePieceBpeTokenizer`, from `model.type` in `tokenizer.json` | Tokenizer construction strategy |
-| `.maxNewTokens(int)` | `int` | `256` | Maximum tokens to generate |
+| `.maxNewTokens(int)` | `int` | `256` | Maximum tokens to generate. Capped at the decoder's positions (512 for MarianMT), with a warning |
 | `.temperature(float)` | `float` | `0.0` | Sampling temperature |
 | `.topK(int)` | `int` | `0` (disabled) | Top-K sampling |
 | `.topP(float)` | `float` | `0.0` (disabled) | Nucleus sampling |
@@ -164,7 +164,7 @@ try (Translator translator = new ChunkedTranslator(MarianTranslator.builder()
   trained on sentences translate them best (see [Evaluation](#evaluation)). Set it with
   `new ChunkedTranslator(translator, maxChunkTokens)`; it never exceeds the model's input limit. When a
   chunk's translation still reaches `maxNewTokens`, a warning is logged: raise `maxNewTokens` or lower the
-  budget. MarianMT's decoder has 512 positions, so keep `maxNewTokens` below 512.
+  budget. MarianMT's decoder has 512 positions, so `maxNewTokens` above 512 is lowered to 512.
 - **Short text** that fits in one chunk is translated in one call, exactly as the wrapped translator would.
 - **Streaming** passes the tokens through chunk by chunk, with the whitespace between chunks; the streamed
   text equals `text()`. `promptTokens()` and `generatedTokens()` are summed over all calls, and

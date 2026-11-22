@@ -54,6 +54,24 @@ class ModelInputLimitsTest {
     }
 
     @Test
+    void decoderPositionsAreTheLearnedPositions() throws IOException {
+        assertThat(ModelInputLimits.decoderPositions(config("{\"model_type\":\"marian\",\"max_position_embeddings\":512}")))
+                .hasValue(512);
+    }
+
+    @Test
+    void relativePositionsHaveNoDecoderLimit() throws IOException {
+        // T5 declares n_positions, but its relative positions have no hard limit
+        assertThat(ModelInputLimits.decoderPositions(config(
+                "{\"model_type\":\"t5\",\"n_positions\":512,\"relative_attention_num_buckets\":32}"))).isEmpty();
+    }
+
+    @Test
+    void unknownDecoderPositionsAreEmpty() throws IOException {
+        assertThat(ModelInputLimits.decoderPositions(config("{\"model_type\":\"mystery\"}"))).isEmpty();
+    }
+
+    @Test
     void unknownLimitIsEmpty() throws IOException {
         assertThat(ModelInputLimits.maxPositions(config("{\"model_type\":\"mystery\"}"))).isEmpty();
     }
