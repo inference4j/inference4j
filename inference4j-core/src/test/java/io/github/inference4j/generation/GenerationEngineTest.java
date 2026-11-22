@@ -405,6 +405,78 @@ class GenerationEngineTest {
         }
     }
 
+    // --- token budget ---
+
+    /** One token per whitespace-separated word; adds no special tokens. */
+    private static Tokenizer wordTokenizer() {
+        return new Tokenizer() {
+            @Override
+            public EncodedInput encode(String text) {
+                return encode(text, Integer.MAX_VALUE);
+            }
+
+            @Override
+            public EncodedInput encode(String text, int maxLength) {
+                String[] words = text.isBlank() ? new String[0] : text.trim().split("\\s+");
+                int kept = Math.min(words.length, maxLength);
+                long[] ids = new long[kept];
+                long[] mask = new long[kept];
+                for (int i = 0; i < kept; i++) {
+                    ids[i] = i + 1;
+                    mask[i] = 1;
+                }
+                return new EncodedInput(ids, mask, new long[kept], null, words.length);
+            }
+        };
+    }
+
+    @Test
+    void countInputTokensAddsTheSpecialTokens() throws Exception {
+        try (var engine = GenerationEngine.builder()
+                .session(mock(GenerativeSession.class))
+                .tokenizer(wordTokenizer())
+                .decoder(mock(TokenDecoder.class))
+                .eosTokenId(7)
+                .appendEosToInput(true)
+                .prependToInput(0)
+                .build()) {
+            assertThat(engine.countInputTokens("a b c")).isEqualTo(5);
+        }
+    }
+
+    @Test
+    void countInputTokensAppliesTheChatTemplate() throws Exception {
+        try (var engine = GenerationEngine.builder()
+                .session(mock(GenerativeSession.class))
+                .tokenizer(wordTokenizer())
+                .decoder(mock(TokenDecoder.class))
+                .eosTokenId(7)
+                .chatTemplate(message -> "user: " + message + " assistant:")
+                .build()) {
+            assertThat(engine.countInputTokens("a b c")).isEqualTo(5);
+        }
+    }
+
+    @Test
+    void countInputTokensMatchesTheTruncationLimit() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        try (var engine = immediateEosEngine(session, wordTokenizer())
+                .maxInputLength(5)
+                .maxNewTokens(3)
+                .appendEosToInput(true)
+                .truncationGuard(new TruncationGuard("TestGenerator", TruncationPolicy.FAIL))
+                .build()) {
+            assertThat(engine.maxInputLength()).isEqualTo(5);
+            assertThat(engine.maxNewTokens()).isEqualTo(3);
+
+            assertThat(engine.countInputTokens("a b c d")).isEqualTo(5);
+            engine.generate("a b c d");
+
+            assertThat(engine.countInputTokens("a b c d e")).isEqualTo(6);
+            assertThatThrownBy(() -> engine.generate("a b c d e")).isInstanceOf(InputTooLongException.class);
+        }
+    }
+
     /**
      * Creates a logits array where the given tokenId has the highest value.
      */

@@ -147,4 +147,35 @@ class FlanT5TextGeneratorTest {
                     assertThat(ex.getMessage()).contains("modelSource");
                 });
     }
+
+    @Test
+    void limitsCountEachTasksPromptPrefix() {
+        GenerationEngine engine = mock(GenerationEngine.class);
+        when(engine.maxInputLength()).thenReturn(512);
+        when(engine.maxNewTokens()).thenReturn(256);
+        when(engine.countInputTokens(anyString())).thenReturn(42);
+        FlanT5TextGenerator flan = new FlanT5TextGenerator(engine);
+        ArgumentCaptor<String> prompts = ArgumentCaptor.forClass(String.class);
+
+        flan.summarizationLimits().countInputTokens("text");
+        flan.translationLimits(Language.EN, Language.DE).countInputTokens("text");
+        flan.correctionLimits().countInputTokens("text");
+        flan.summarize("text", token -> {});
+        flan.translate("text", Language.EN, Language.DE, token -> {});
+        flan.correct("text", token -> {});
+
+        verify(engine, times(3)).generate(prompts.capture(), any());
+        for (String prompt : prompts.getAllValues()) {
+            verify(engine).countInputTokens(prompt);
+        }
+    }
+
+    @Test
+    void translationLimitsWithoutLanguagesAreUnsupported() {
+        FlanT5TextGenerator flan = new FlanT5TextGenerator(mockEngine());
+
+        assertThatThrownBy(flan::translationLimits)
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessageContaining("source and target languages");
+    }
 }

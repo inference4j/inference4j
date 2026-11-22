@@ -94,4 +94,29 @@ class MarianTranslatorTest {
                 .modelId("Helsinki-NLP/opus-mt-en-de");
         assertThat(builder).isNotNull();
     }
+
+    @Test
+    void translationLimitsCountTheTextAsIs() {
+        GenerationEngine engine = mock(GenerationEngine.class);
+        when(engine.maxInputLength()).thenReturn(512);
+        when(engine.maxNewTokens()).thenReturn(256);
+        when(engine.countInputTokens(anyString())).thenReturn(42);
+        MarianTranslator translator = new MarianTranslator(engine);
+
+        var limits = translator.translationLimits();
+
+        assertThat(limits.maxInputTokens()).isEqualTo(512);
+        assertThat(limits.maxOutputTokens()).isEqualTo(256);
+        assertThat(limits.countInputTokens("Hello")).isEqualTo(42);
+        verify(engine).countInputTokens("Hello");
+    }
+
+    @Test
+    void translationLimitsForALanguagePairAreUnsupported() {
+        MarianTranslator translator = new MarianTranslator(mockEngine());
+
+        assertThatThrownBy(() -> translator.translationLimits(Language.EN, Language.DE))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessageContaining("fixed language pair");
+    }
 }

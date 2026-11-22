@@ -18,6 +18,7 @@ package io.github.inference4j.nlp;
 
 import io.github.inference4j.generation.GenerationEngine;
 import io.github.inference4j.generation.GenerationResult;
+import io.github.inference4j.processing.TokenLimits;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.tokenizer.SentencePieceBpeTokenizer;
 import io.github.inference4j.tokenizer.TokenizerProvider;
@@ -99,6 +100,17 @@ public class MarianTranslator implements TextGenerator, Translator {
                                        Consumer<String> tokenListener) {
         throw new UnsupportedOperationException(
                 "MarianMT models have a fixed language pair. Use translate(text) instead.");
+    }
+
+    @Override
+    public TokenLimits translationLimits() {
+        return new EngineTokenLimits(engine, "");
+    }
+
+    @Override
+    public TokenLimits translationLimits(Language source, Language target) {
+        throw new UnsupportedOperationException(
+                "MarianMT models have a fixed language pair. Use translationLimits() instead.");
     }
 
     @Override

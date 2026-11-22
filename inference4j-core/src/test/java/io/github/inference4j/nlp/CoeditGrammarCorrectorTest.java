@@ -90,4 +90,20 @@ class CoeditGrammarCorrectorTest {
                     assertThat(ex.getMessage()).contains("modelSource");
                 });
     }
+
+    @Test
+    void correctionLimitsCountThePromptPrefix() {
+        GenerationEngine engine = mock(GenerationEngine.class);
+        when(engine.maxInputLength()).thenReturn(512);
+        when(engine.maxNewTokens()).thenReturn(256);
+        when(engine.countInputTokens(anyString())).thenReturn(42);
+        CoeditGrammarCorrector corrector = new CoeditGrammarCorrector(engine);
+
+        corrector.correctionLimits().countInputTokens("She go home.");
+
+        ArgumentCaptor<String> prompts = ArgumentCaptor.forClass(String.class);
+        corrector.correct("She go home.", token -> {});
+        verify(engine).generate(prompts.capture(), any());
+        verify(engine).countInputTokens(prompts.getValue());
+    }
 }
