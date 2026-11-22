@@ -45,7 +45,11 @@ final class ModelInputLimits {
      * and when the config declares none.
      */
     static OptionalInt decoderPositions(Path configPath) {
-        JsonNode root = read(configPath);
+        return decoderPositions(read(configPath));
+    }
+
+    /** Like {@link #decoderPositions(Path)}, for a parsed {@code config.json}. */
+    static OptionalInt decoderPositions(JsonNode root) {
         if (root.has("relative_attention_num_buckets")) {
             return OptionalInt.empty();
         }
@@ -58,7 +62,11 @@ final class ModelInputLimits {
      * Empty when the limit is unknown.
      */
     static OptionalInt maxPositions(Path configPath) {
-        JsonNode root = read(configPath);
+        return maxPositions(read(configPath));
+    }
+
+    /** Like {@link #maxPositions(Path)}, for a parsed {@code config.json}. */
+    static OptionalInt maxPositions(JsonNode root) {
         OptionalInt positions = positionField(root);
         if (positions.isPresent()) {
             return positions;

@@ -23,20 +23,17 @@
 package io.github.inference4j.audio;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.NativeTensors;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
+import io.github.inference4j.exception.ModelLoadException;
+import io.github.inference4j.model.ModelFiles;
 
-import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
 
 /**
  * A Moonshine v2 streaming speech-to-text model: six ONNX Runtime sessions and the arithmetic that
@@ -95,39 +92,21 @@ final class MoonshineModel implements AutoCloseable {
     }
 
     /**
-     * Loads the model from a directory holding {@link #FILES}.
-     *
-     * @param dir         the model directory
-     * @param openSession opens one ONNX Runtime session from a graph file, by its name in {@code dir}
+     * Loads the model from {@link #FILES}. The sessions and the frontend weights are registered with {@code files},
+     * so they are closed if loading fails.
      */
-    static MoonshineModel load(Path dir, Function<String, InferenceSession> openSession) {
-        Config config = Config.read(dir.resolve("streaming_config.json"));
-        List<InferenceSession> opened = new ArrayList<>();
-        NativeTensors frontendWeights = null;
-        try {
-            InferenceSession weights = open(dir, "frontend.weights.ort", openSession, opened);
-            frontendWeights = weights.runNative(Map.of(), null);
-            return new MoonshineModel(config,
-                    open(dir, "frontend.model.ort", openSession, opened),
-                    open(dir, "encoder.ort", openSession, opened),
-                    open(dir, "adapter.ort", openSession, opened),
-                    open(dir, "cross_kv.ort", openSession, opened),
-                    open(dir, "decoder_kv.ort", openSession, opened),
-                    weights, frontendWeights);
-        } catch (RuntimeException e) {
-            if (frontendWeights != null) {
-                frontendWeights.close();
-            }
-            opened.forEach(InferenceSession::close);
-            throw e;
-        }
-    }
-
-    private static InferenceSession open(Path dir, String file, Function<String, InferenceSession> openSession,
-                                         List<InferenceSession> opened) {
-        InferenceSession session = openSession.apply(file);
-        opened.add(session);
-        return session;
+    static MoonshineModel load(ModelFiles files) {
+        Config config = Config.from(files.json("streaming_config.json"));
+        InferenceSession weights = files.session("frontend.weights.ort");
+        // Tracked after the weights session, so a failure frees the weights first
+        NativeTensors frontendWeights = files.track(weights.runNative(Map.of(), null));
+        return new MoonshineModel(config,
+                files.session("frontend.model.ort"),
+                files.session("encoder.ort"),
+                files.session("adapter.ort"),
+                files.session("cross_kv.ort"),
+                files.session("decoder_kv.ort"),
+                weights, frontendWeights);
     }
 
     Config config() {
@@ -142,13 +121,7 @@ final class MoonshineModel implements AutoCloseable {
     @Override
     public void close() {
         // The weights were produced by the weights session, so they are freed before it is closed
-        frontendWeights.close();
-        weights.close();
-        frontend.close();
-        encoder.close();
-        adapter.close();
-        crossKv.close();
-        decoder.close();
+        ModelFiles.closeAll(frontendWeights, weights, frontend, encoder, adapter, crossKv, decoder);
     }
 
     /**
@@ -157,23 +130,18 @@ final class MoonshineModel implements AutoCloseable {
     record Config(int encoderDim, int decoderDim, int depth, int heads, int headDim, int vocabSize,
                   int bosId, int eosId, int lookahead, int frontendDim, int c1) {
 
-        static Config read(Path file) {
-            try {
-                JsonNode json = new ObjectMapper().readTree(file.toFile());
-                return new Config(
-                        required(json, "encoder_dim"), required(json, "decoder_dim"), required(json, "depth"),
-                        required(json, "nheads"), required(json, "head_dim"), required(json, "vocab_size"),
-                        required(json, "bos_id"), required(json, "eos_id"), required(json, "total_lookahead"),
-                        required(json, "d_model_frontend"), required(json, "c1"));
-            } catch (IOException e) {
-                throw new ModelSourceException("Failed to read " + file + ": " + e.getMessage(), e);
-            }
+        static Config from(JsonNode json) {
+            return new Config(
+                    required(json, "encoder_dim"), required(json, "decoder_dim"), required(json, "depth"),
+                    required(json, "nheads"), required(json, "head_dim"), required(json, "vocab_size"),
+                    required(json, "bos_id"), required(json, "eos_id"), required(json, "total_lookahead"),
+                    required(json, "d_model_frontend"), required(json, "c1"));
         }
 
         private static int required(JsonNode json, String field) {
             JsonNode value = json.get(field);
             if (value == null || !value.isInt()) {
-                throw new ModelSourceException("streaming_config.json is missing '" + field + "'");
+                throw new ModelLoadException("streaming_config.json is missing '" + field + "'");
             }
             return value.asInt();
         }

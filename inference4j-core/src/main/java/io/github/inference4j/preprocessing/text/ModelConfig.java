@@ -69,6 +69,16 @@ public final class ModelConfig {
     }
 
     /**
+     * Reads configuration from a parsed {@code config.json}.
+     *
+     * @param root the parsed config.json
+     * @return the configuration
+     */
+    public static ModelConfig fromJson(JsonNode root) {
+        return fromJsonNode(root);
+    }
+
+    /**
      * Creates a configuration from pre-built values.
      *
      * @param id2label    mapping from class index to label name

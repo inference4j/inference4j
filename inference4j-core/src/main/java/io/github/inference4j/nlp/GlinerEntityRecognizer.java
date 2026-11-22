@@ -17,24 +17,17 @@
 package io.github.inference4j.nlp;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelLoadException;
-import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
+import io.github.inference4j.model.AbstractModelBuilder;
 import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.tokenizer.SpecialTokens;
 import io.github.inference4j.tokenizer.Tokenizer;
 import io.github.inference4j.tokenizer.TokenizerJsonParser;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -303,29 +296,15 @@ public class GlinerEntityRecognizer implements ZeroShotEntityRecognizer, NamedEn
         return kept;
     }
 
-    public static class Builder {
-        private ModelSource modelSource;
-        private String modelId = SMALL;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<GlinerEntityRecognizer, Builder> {
         private List<String> labels = GENERAL_LABELS;
         private float threshold = 0.5f;
         private boolean multiLabel;
         private TruncationPolicy truncation;
         private Integer stride;
 
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
+        public Builder() {
+            super(SMALL);
         }
 
         /** The entity types {@link #recognize(String)} looks for. Defaults to the preset's labels. */
@@ -371,12 +350,9 @@ public class GlinerEntityRecognizer implements ZeroShotEntityRecognizer, NamedEn
             if (threshold < 0f || threshold >= 1f) {
                 throw new IllegalArgumentException("threshold must be in [0, 1), got " + threshold);
             }
-            ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-            try (ResolvedModel model = source.open(modelId, List.of("model.onnx", "tokenizer.json", "gliner_config.json"))) {
-                Path dir = model.directory();
-                Path modelPath = requireFile(dir, "model.onnx");
-                Path tokenizerPath = requireFile(dir, "tokenizer.json");
-                JsonNode config = readJson(requireFile(dir, "gliner_config.json"));
+            return load(List.of("model.onnx", "tokenizer.json", "gliner_config.json"), files -> {
+                Path tokenizerPath = files.file("tokenizer.json");
+                JsonNode config = files.json("gliner_config.json");
 
                 String spanMode = config.path("span_mode").asText();
                 if (!"markerV0".equals(spanMode)) {
@@ -396,27 +372,9 @@ public class GlinerEntityRecognizer implements ZeroShotEntityRecognizer, NamedEn
 
                 Tokenizer tokenizer = TokenizerJsonParser.parseUnigram(tokenizerPath).build();
                 SpecialTokens special = TokenizerJsonParser.parseSpecialTokens(tokenizerPath);
-                InferenceSession session = sessionConfigurer != null
-                        ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                        : InferenceSession.create(model, "model.onnx");
-                return new GlinerEntityRecognizer(this, session, tokenizer, special, ent, sep, maxWidth, maxWords);
-            }
-        }
-
-        private static JsonNode readJson(Path path) {
-            try {
-                return new ObjectMapper().readTree(path.toFile());
-            } catch (IOException e) {
-                throw new ModelSourceException("Failed to read " + path + ": " + e.getMessage(), e);
-            }
-        }
-
-        private static Path requireFile(Path dir, String name) {
-            Path file = dir.resolve(name);
-            if (!Files.exists(file)) {
-                throw new ModelSourceException("Model file not found: " + file);
-            }
-            return file;
+                return new GlinerEntityRecognizer(this, files.session("model.onnx"), tokenizer, special, ent, sep,
+                        maxWidth, maxWords);
+            });
         }
     }
 }

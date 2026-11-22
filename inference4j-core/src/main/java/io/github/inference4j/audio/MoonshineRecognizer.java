@@ -16,19 +16,13 @@
 
 package io.github.inference4j.audio;
 
-import io.github.inference4j.InferenceSession;
-import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
+import io.github.inference4j.model.AbstractModelBuilder;
 import io.github.inference4j.preprocessing.audio.AudioData;
 import io.github.inference4j.preprocessing.audio.AudioLoader;
 import io.github.inference4j.preprocessing.audio.AudioTransformPipeline;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.tokenizer.SentencePieceBpeTokenizer;
 import io.github.inference4j.tokenizer.TokenDecoder;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -235,48 +229,20 @@ public class MoonshineRecognizer implements SpeechRecognizer {
         }
     }
 
-    public static class Builder {
+    public static class Builder extends AbstractModelBuilder<MoonshineRecognizer, Builder> {
 
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
-
-        /** Where to find the model; defaults to HuggingFace. */
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        /** The model to load; defaults to {@code inference4j/moonshine-streaming-small-en}. */
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
-        }
-
-        /** Customizes the ONNX Runtime options of every graph. */
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
         }
 
         public MoonshineRecognizer build() {
-            ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-            String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
             List<String> files = new ArrayList<>(MoonshineModel.FILES);
             files.add("tokenizer.json");
-            try (ResolvedModel resolved = source.open(id, files)) {
-                Path dir = resolved.directory();
-                for (String file : files) {
-                    if (!Files.exists(dir.resolve(file))) {
-                        throw new ModelSourceException("Model file not found: " + dir.resolve(file));
-                    }
-                }
-                TokenDecoder decoder = SentencePieceBpeTokenizer.provider().create(dir, List.of()).decoder();
-                MoonshineModel model = MoonshineModel.load(dir, file -> sessionConfigurer != null
-                        ? InferenceSession.create(resolved, file, sessionConfigurer)
-                        : InferenceSession.create(resolved, file));
-                return new MoonshineRecognizer(model, decoder);
-            }
+            return load(files, modelFiles -> {
+                TokenDecoder decoder = SentencePieceBpeTokenizer.provider()
+                        .create(modelFiles.directory(), List.of()).decoder();
+                return new MoonshineRecognizer(MoonshineModel.load(modelFiles), decoder);
+            });
         }
     }
 }

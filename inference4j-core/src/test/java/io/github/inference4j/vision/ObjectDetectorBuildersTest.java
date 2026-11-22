@@ -63,14 +63,28 @@ class ObjectDetectorBuildersTest {
         staticModel = id -> dir;
     }
 
+    /** A value for each shared option, to call the setters with. */
+    private static final Map<String, Object> SAMPLE_VALUES = Map.of(
+            "modelId", "acme/detector",
+            "modelSource", (ModelSource) id -> Path.of(id),
+            "sessionOptions", (SessionConfigurer) options -> { },
+            "labels", Labels.coco(),
+            "inputSize", 320,
+            "confidenceThreshold", 0.4f,
+            "maxDetections", 10);
+
     @Test
-    void everyDetectorBuilderHasTheSharedOptions() {
-        for (Class<?> builder : new Class<?>[]{
-                DetrDetector.Builder.class, YoloV8Detector.Builder.class, Yolo26Detector.Builder.class}) {
-            SHARED_OPTIONS.forEach((name, type) -> {
-                Method method = publicMethod(builder, name, type);
-                assertThat(method.getReturnType()).as(builder.getName() + "." + name).isEqualTo(builder);
-            });
+    void everyDetectorBuilderHasTheSharedOptions() throws Exception {
+        for (Object builder : new Object[]{DetrDetector.builder(), YoloV8Detector.builder(), Yolo26Detector.builder(),
+                YoloXDetector.builder(), PicoDetDetector.builder()}) {
+            for (Map.Entry<String, Class<?>> option : SHARED_OPTIONS.entrySet()) {
+                Method method = publicMethod(builder.getClass(), option.getKey(), option.getValue());
+                String name = builder.getClass().getName() + "." + option.getKey();
+                // Setters inherited from a generic base erase to the base type, so chaining is checked on the
+                // returned object rather than on the declared return type
+                assertThat(method.getReturnType()).as(name).isAssignableFrom(builder.getClass());
+                assertThat(method.invoke(builder, SAMPLE_VALUES.get(option.getKey()))).as(name).isSameAs(builder);
+            }
         }
     }
 

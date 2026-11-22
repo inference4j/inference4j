@@ -19,16 +19,10 @@ package io.github.inference4j.vision;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
-import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
+import io.github.inference4j.model.AbstractModelBuilder;
 import io.github.inference4j.preprocessing.image.Labels;
-import io.github.inference4j.session.SessionConfigurer;
 
 import java.awt.image.BufferedImage;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -207,29 +201,15 @@ public class YoloXDetector implements ObjectDetector {
         return DetectionOps.nms(candidates, iouThreshold, false, maxDetections);
     }
 
-    public static class Builder {
-        private ModelSource modelSource;
-        private String modelId = NANO;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<YoloXDetector, Builder> {
         private Labels labels;
         private Integer inputSize;
         private float confidenceThreshold = 0.3f;
         private float iouThreshold = 0.45f;
         private int maxDetections = DetectorModels.DEFAULT_MAX_DETECTIONS;
 
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
+        public Builder() {
+            super(NANO);
         }
 
         /**
@@ -269,28 +249,16 @@ public class YoloXDetector implements ObjectDetector {
         }
 
         public YoloXDetector build() {
-            ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-            try (ResolvedModel model = source.open(modelId, List.of("model.onnx"))) {
-                Path dir = model.directory();
-                Path modelPath = dir.resolve("model.onnx");
-                if (!Files.exists(modelPath)) {
-                    throw new ModelSourceException("Model file not found: " + modelPath);
-                }
-                InferenceSession session = sessionConfigurer != null
-                        ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                        : InferenceSession.create(model, "model.onnx");
-                try {
-                    String inputName = session.inputNames().iterator().next();
-                    int size = DetectorModels.inputSize(inputSize,
-                            DetectorModels.fixedSize(session.inputShape(inputName)), modelId);
-                    Labels resolved = DetectorModels.labels(labels, dir, PRESETS.contains(modelId));
-                    return new YoloXDetector(session, inputName, resolved, size, confidenceThreshold, iouThreshold,
-                            maxDetections);
-                } catch (RuntimeException e) {
-                    session.close();
-                    throw e;
-                }
-            }
+            String id = resolvedModelId();
+            return load(List.of("model.onnx"), files -> {
+                InferenceSession session = files.session("model.onnx");
+                String inputName = session.inputNames().iterator().next();
+                int size = DetectorModels.inputSize(inputSize,
+                        DetectorModels.fixedSize(session.inputShape(inputName)), id);
+                Labels resolved = DetectorModels.labels(labels, files.directory(), PRESETS.contains(id));
+                return new YoloXDetector(session, inputName, resolved, size, confidenceThreshold, iouThreshold,
+                        maxDetections);
+            });
         }
     }
 }

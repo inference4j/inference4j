@@ -17,29 +17,22 @@
 package io.github.inference4j.nlp;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.inference4j.InferenceSession;
 import io.github.inference4j.exception.ModelLoadException;
-import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.generation.ChatTemplate;
 import io.github.inference4j.generation.GenerationEngine;
 import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.generation.OnnxGenerativeSession;
-import io.github.inference4j.model.HuggingFaceModelSource;
+import io.github.inference4j.model.AbstractModelBuilder;
+import io.github.inference4j.model.ModelFiles;
 import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.tokenizer.DecodingBpeTokenizer;
 import io.github.inference4j.tokenizer.SentencePieceBpeTokenizer;
 import io.github.inference4j.tokenizer.TokenDecoder;
 import io.github.inference4j.tokenizer.Tokenizer;
 import io.github.inference4j.tokenizer.TokenizerProvider;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -237,8 +230,8 @@ public class OnnxTextGenerator implements TextGenerator {
     /**
      * Generic builder for custom models.
      *
-     * <p>Requires at minimum a {@link #modelId(String) modelId} (or
-     * {@link #modelSource(ModelSource) modelSource}) pointing to a directory
+     * <p>Requires at minimum a {@link Builder#modelId(String) modelId} (or
+     * {@link Builder#modelSource(ModelSource) modelSource}) pointing to a directory
      * with {@code model.onnx}, {@code vocab.json}, {@code merges.txt}, and
      * {@code config.json}.
      */
@@ -261,11 +254,8 @@ public class OnnxTextGenerator implements TextGenerator {
         engine.close();
     }
 
-    public static class Builder {
+    public static class Builder extends AbstractModelBuilder<OnnxTextGenerator, Builder> {
 
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
         private Tokenizer tokenizer;
         private TokenDecoder decoder;
         private ChatTemplate chatTemplate;
@@ -280,21 +270,6 @@ public class OnnxTextGenerator implements TextGenerator {
         private final List<String> extraFiles = new ArrayList<>();
         private Integer maxInputLength;
         private TruncationPolicy truncation;
-
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
 
         public Builder tokenizer(Tokenizer tokenizer) {
             this.tokenizer = tokenizer;
@@ -384,128 +359,68 @@ public class OnnxTextGenerator implements TextGenerator {
                         "Model source not configured. Set modelId() for HuggingFace models "
                         + "or modelSource() for local models.");
             }
-            ModelSource source = modelSource != null
-                    ? modelSource : HuggingFaceModelSource.defaultInstance();
             String id = modelId != null ? modelId : "";
             TokenizerProvider provider = tokenizerProvider != null
                     ? tokenizerProvider : DecodingBpeTokenizer.provider();
-            List<String> files = new ArrayList<>(List.of("model.onnx", "config.json"));
-            files.addAll(provider.requiredFiles());
-            files.addAll(extraFiles);
-            try (ResolvedModel model = source.open(id, files)) {
-                return loadFromDirectory(model, provider);
-            }
+            List<String> unchecked = new ArrayList<>(provider.requiredFiles());
+            unchecked.addAll(extraFiles);
+            return load(id, List.of("model.onnx", "config.json"), unchecked, files -> assemble(files, provider));
         }
 
-        private OnnxTextGenerator loadFromDirectory(ResolvedModel model, TokenizerProvider provider) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
+        private OnnxTextGenerator assemble(ModelFiles files, TokenizerProvider provider) {
+            OnnxGenerativeSession generativeSession = new OnnxGenerativeSession(files.session("model.onnx"));
+
+            Tokenizer tokenizer = this.tokenizer;
+            TokenDecoder decoder = this.decoder;
+            if (tokenizer == null || decoder == null) {
+                TokenizerProvider.TokenizerAndDecoder td = provider.create(files.directory(), addedTokens);
+                if (tokenizer == null) {
+                    tokenizer = td.tokenizer();
+                }
+                if (decoder == null) {
+                    decoder = td.decoder();
+                }
             }
 
-            Path modelPath = dir.resolve("model.onnx");
-            Path configPath = dir.resolve("config.json");
+            JsonNode config = files.json("config.json");
+            Set<Integer> eos = this.eosTokenIds.isEmpty()
+                    ? EosTokenIds.fromConfig(config)
+                    : this.eosTokenIds;
 
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Model file not found: " + modelPath);
+            GenerationEngine.Builder engineBuilder = GenerationEngine.builder()
+                    .session(generativeSession)
+                    .tokenizer(tokenizer)
+                    .decoder(decoder)
+                    .maxNewTokens(this.maxNewTokens)
+                    .maxInputLength(resolveMaxInputLength(config))
+                    .truncationGuard(new TruncationGuard("OnnxTextGenerator", truncation))
+                    .keepPromptEnd(true)
+                    .temperature(this.temperature)
+                    .topK(this.topK)
+                    .topP(this.topP);
+
+            for (int eosId : eos) {
+                engineBuilder.eosTokenId(eosId);
             }
-            if (!Files.exists(configPath)) {
-                throw new ModelSourceException("Config file not found: " + configPath);
+            if (this.chatTemplate != null) {
+                engineBuilder.chatTemplate(this.chatTemplate);
+            }
+            for (String seq : this.stopSequences) {
+                engineBuilder.stopSequence(seq);
             }
 
-            InferenceSession session = sessionConfigurer != null
-                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                    : InferenceSession.create(model, "model.onnx");
-
-            try {
-                OnnxGenerativeSession generativeSession = new OnnxGenerativeSession(session);
-
-                if (this.tokenizer == null || this.decoder == null) {
-                    TokenizerProvider.TokenizerAndDecoder td =
-                            provider.create(dir, addedTokens);
-                    if (this.tokenizer == null) {
-                        this.tokenizer = td.tokenizer();
-                    }
-                    if (this.decoder == null) {
-                        this.decoder = td.decoder();
-                    }
-                }
-
-                Set<Integer> eos = this.eosTokenIds.isEmpty()
-                        ? readEosTokenIds(configPath)
-                        : this.eosTokenIds;
-
-                GenerationEngine.Builder engineBuilder = GenerationEngine.builder()
-                        .session(generativeSession)
-                        .tokenizer(this.tokenizer)
-                        .decoder(this.decoder)
-                        .maxNewTokens(this.maxNewTokens)
-                        .maxInputLength(resolveMaxInputLength(configPath))
-                        .truncationGuard(new TruncationGuard("OnnxTextGenerator", truncation))
-                        .keepPromptEnd(true)
-                        .temperature(this.temperature)
-                        .topK(this.topK)
-                        .topP(this.topP);
-
-                for (int eosId : eos) {
-                    engineBuilder.eosTokenId(eosId);
-                }
-                if (this.chatTemplate != null) {
-                    engineBuilder.chatTemplate(this.chatTemplate);
-                }
-                for (String seq : this.stopSequences) {
-                    engineBuilder.stopSequence(seq);
-                }
-
-                return new OnnxTextGenerator(engineBuilder.build());
-            } catch (Exception e) {
-                session.close();
-                if (e instanceof RuntimeException re) {
-                    throw re;
-                }
-                throw new ModelLoadException(
-                        "Failed to initialize model: " + e.getMessage(), e);
-            }
+            return new OnnxTextGenerator(engineBuilder.build());
         }
 
-        private int resolveMaxInputLength(Path configPath) {
+        private int resolveMaxInputLength(JsonNode config) {
             if (maxInputLength != null) {
                 return maxInputLength;
             }
-            OptionalInt positions = ModelInputLimits.maxPositions(configPath);
+            OptionalInt positions = ModelInputLimits.maxPositions(config);
             if (positions.isPresent() && positions.getAsInt() > maxNewTokens) {
                 return positions.getAsInt() - maxNewTokens;
             }
             return Integer.MAX_VALUE;
-        }
-
-        private static Set<Integer> readEosTokenIds(Path configPath) {
-            try {
-                ObjectMapper mapper = new ObjectMapper();
-                JsonNode root = mapper.readTree(Files.newInputStream(configPath));
-                JsonNode eosNode = root.get("eos_token_id");
-                if (eosNode != null) {
-                    if (eosNode.isInt()) {
-                        return Set.of(eosNode.intValue());
-                    }
-                    if (eosNode.isArray()) {
-                        Set<Integer> ids = new LinkedHashSet<>();
-                        for (JsonNode element : eosNode) {
-                            if (element.isInt()) {
-                                ids.add(element.intValue());
-                            }
-                        }
-                        if (!ids.isEmpty()) {
-                            return ids;
-                        }
-                    }
-                }
-                throw new ModelLoadException(
-                        "config.json missing eos_token_id — set it explicitly via eosTokenId()");
-            } catch (IOException e) {
-                throw new ModelLoadException(
-                        "Failed to read config.json: " + e.getMessage(), e);
-            }
         }
     }
 }

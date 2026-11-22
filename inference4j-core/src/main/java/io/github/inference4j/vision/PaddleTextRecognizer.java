@@ -20,10 +20,7 @@ import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
-import io.github.inference4j.session.SessionConfigurer;
+import io.github.inference4j.model.AbstractModelBuilder;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -158,54 +155,23 @@ public class PaddleTextRecognizer implements TextRecognizer {
         return probabilities;
     }
 
-    public static class Builder {
-        private ModelSource modelSource;
-        private String modelId = SMALL_MODEL_ID;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<PaddleTextRecognizer, Builder> {
 
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
+        public Builder() {
+            super(SMALL_MODEL_ID);
         }
 
         public PaddleTextRecognizer build() {
-            ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-            try (ResolvedModel model = source.open(modelId, List.of("model.onnx", "inference.yml"))) {
-                Path dir = model.directory();
-                Path modelPath = dir.resolve("model.onnx");
-                Path configPath = dir.resolve("inference.yml");
-                for (Path file : List.of(modelPath, configPath)) {
-                    if (!Files.exists(file)) {
-                        throw new ModelSourceException("Model file not found: " + file);
-                    }
-                }
-                String[] characters = PaddleDictionary.read(configPath);
-                InferenceSession session = sessionConfigurer != null
-                        ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                        : InferenceSession.create(model, "model.onnx");
-                PaddleTextRecognizer recognizer = new PaddleTextRecognizer(session, characters);
-                try {
-                    int classes = recognizer.probabilities(new BufferedImage(MIN_WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB))[0].length;
-                    if (classes != characters.length) {
-                        throw new ModelLoadException("Model predicts " + classes + " classes but inference.yml defines "
-                                + characters.length + " (blank + dictionary + space)");
-                    }
-                } catch (RuntimeException e) {
-                    session.close();
-                    throw e;
+            return load(List.of("model.onnx", "inference.yml"), files -> {
+                String[] characters = PaddleDictionary.read(files.file("inference.yml"));
+                PaddleTextRecognizer recognizer = new PaddleTextRecognizer(files.session("model.onnx"), characters);
+                int classes = recognizer.probabilities(new BufferedImage(MIN_WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB))[0].length;
+                if (classes != characters.length) {
+                    throw new ModelLoadException("Model predicts " + classes + " classes but inference.yml defines "
+                            + characters.length + " (blank + dictionary + space)");
                 }
                 return recognizer;
-            }
+            });
         }
     }
 

@@ -18,14 +18,9 @@ package io.github.inference4j.vision;
 
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
-import io.github.inference4j.session.SessionConfigurer;
+import io.github.inference4j.model.AbstractModelBuilder;
 
 import java.awt.image.BufferedImage;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -159,10 +154,7 @@ public class PaddleTextDetector implements TextDetector {
         return new int[]{resizedWidth, resizedHeight};
     }
 
-    public static class Builder {
-        private ModelSource modelSource;
-        private String modelId = SMALL_MODEL_ID;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<PaddleTextDetector, Builder> {
         private float threshold = 0.3f;
         private float boxThreshold = 0.6f;
         private float unclipRatio = 1.5f;
@@ -170,19 +162,8 @@ public class PaddleTextDetector implements TextDetector {
         private int minSide = 64;
         private int maxSide = 4000;
 
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
+        public Builder() {
+            super(SMALL_MODEL_ID);
         }
 
         /** Probability above which a pixel of the model's map counts as text. Defaults to 0.3. */
@@ -225,19 +206,8 @@ public class PaddleTextDetector implements TextDetector {
             if (minSide < 1 || maxSide < 32) {
                 throw new IllegalArgumentException("minSide must be positive and maxSide at least 32");
             }
-            ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-            try (ResolvedModel model = source.open(modelId, List.of("model.onnx"))) {
-                Path dir = model.directory();
-                Path modelPath = dir.resolve("model.onnx");
-                if (!Files.exists(modelPath)) {
-                    throw new ModelSourceException("Model file not found: " + modelPath);
-                }
-                InferenceSession session = sessionConfigurer != null
-                        ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                        : InferenceSession.create(model, "model.onnx");
-                return new PaddleTextDetector(session,
-                        new DbPostProcessor(threshold, boxThreshold, unclipRatio, maxCandidates), minSide, maxSide);
-            }
+            return load(List.of("model.onnx"), files -> new PaddleTextDetector(files.session("model.onnx"),
+                    new DbPostProcessor(threshold, boxThreshold, unclipRatio, maxCandidates), minSide, maxSide));
         }
     }
 }

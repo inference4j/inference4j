@@ -20,15 +20,13 @@ import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.model.HuggingFaceModelSource;
+import io.github.inference4j.model.AbstractModelBuilder;
+import io.github.inference4j.model.ModelFiles;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.preprocessing.image.Labels;
-import io.github.inference4j.session.SessionConfigurer;
 
 import java.awt.image.BufferedImage;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -172,28 +170,14 @@ public class DetrDetector implements ObjectDetector {
         session.close();
     }
 
-    public static class Builder {
-        ModelSource modelSource;
-        String modelId = DFINE_SMALL;
-        SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<DetrDetector, Builder> {
         Labels labels;
         Integer inputSize;
         float confidenceThreshold = 0.5f;
         int maxDetections = DetectorModels.DEFAULT_MAX_DETECTIONS;
 
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
+        public Builder() {
+            super(DFINE_SMALL);
         }
 
         /**
@@ -227,40 +211,30 @@ public class DetrDetector implements ObjectDetector {
         }
 
         public DetrDetector build() {
-            return new DetrDetector(load());
+            return new DetrDetector(loadModel());
         }
 
-        Loaded load() {
-            ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-            boolean preset = PRESETS.contains(modelId);
-            try (ResolvedModel model = preset ? source.open(modelId, List.of("model.onnx")) : openCustom(source)) {
-                Path dir = model.directory();
-                Path modelPath = dir.resolve("model.onnx");
-                if (!Files.exists(modelPath)) {
-                    throw new ModelSourceException("Model file not found: " + modelPath);
-                }
-                InferenceSession session = sessionConfigurer != null
-                        ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                        : InferenceSession.create(model, "model.onnx");
-                try {
-                    String inputName = session.inputNames().iterator().next();
-                    int size = DetectorModels.inputSize(inputSize,
-                            DetectorModels.fixedSize(session.inputShape(inputName)), modelId);
-                    return new Loaded(session, inputName, DetectorModels.labels(labels, dir, preset), size,
-                            confidenceThreshold, maxDetections);
-                } catch (RuntimeException e) {
-                    session.close();
-                    throw e;
-                }
-            }
+        Loaded loadModel() {
+            String id = resolvedModelId();
+            boolean preset = PRESETS.contains(id);
+            ModelSource source = source();
+            ResolvedModel opened = preset ? source.open(id, List.of("model.onnx")) : openCustom(source, id);
+            return ModelFiles.load(opened, id, sessionConfigurer, List.of("model.onnx"), files -> {
+                InferenceSession session = files.session("model.onnx");
+                String inputName = session.inputNames().iterator().next();
+                int size = DetectorModels.inputSize(inputSize,
+                        DetectorModels.fixedSize(session.inputShape(inputName)), id);
+                return new Loaded(session, inputName, DetectorModels.labels(labels, files.directory(), preset), size,
+                        confidenceThreshold, maxDetections);
+            });
         }
 
         /** A custom model's directory, with its {@code config.json} when the repository has one. */
-        private ResolvedModel openCustom(ModelSource source) {
+        private static ResolvedModel openCustom(ModelSource source, String id) {
             try {
-                return source.open(modelId, List.of("model.onnx", "config.json"));
+                return source.open(id, List.of("model.onnx", "config.json"));
             } catch (ModelSourceException e) {
-                return source.open(modelId, List.of("model.onnx"));
+                return source.open(id, List.of("model.onnx"));
             }
         }
     }
