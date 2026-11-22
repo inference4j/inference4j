@@ -27,16 +27,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.github.inference4j.exception.InferenceException;
+import io.github.inference4j.exception.ModelLoadException;
+import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.generation.GenerativeTask;
 import io.github.inference4j.generation.TokenStreamer;
+import io.github.inference4j.model.HuggingFaceModelSource;
+import io.github.inference4j.model.ModelFiles;
 import io.github.inference4j.model.ModelRevision;
+import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.model.ResolvedModel;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -276,6 +282,73 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
      */
     protected GeneratorParams createParams() throws GenAIException {
         return new GeneratorParams(model);
+    }
+
+    /** The file every genai model directory holds. */
+    private static final String GENAI_CONFIG = "genai_config.json";
+
+    /** The model id passed to a source when the builder has none, as preset sources ignore it. */
+    private static final String DEFAULT_MODEL_ID = "model";
+
+    /**
+     * Builds a task from a loaded genai model.
+     *
+     * @param <T> the task type
+     */
+    @FunctionalInterface
+    protected interface Assembler<T> {
+
+        /**
+         * Builds the task. If this throws, {@code model}, {@code lease} and every resource
+         * {@linkplain ModelFiles#track tracked} on {@code files} are closed.
+         *
+         * @param model the loaded model, which the task takes over
+         * @param lease a hold on the model directory, which the task takes over and releases on
+         *              {@link AbstractGenerativeTask#close()}
+         * @param files the model's files, to {@linkplain ModelFiles#track track} resources made from {@code model}
+         *              (a {@code Tokenizer} or {@code MultiModalProcessor}) so they are closed if building fails
+         * @return the task
+         * @throws GenAIException if a genai resource cannot be created
+         */
+        T assemble(Model model, ResolvedModel lease, ModelFiles files) throws GenAIException;
+    }
+
+    /**
+     * Opens a genai model through {@code source}, loads it and builds a task from it. The directory must hold a
+     * {@code genai_config.json}. If anything fails, the model, the resources tracked by the assembler and the hold
+     * on the directory are closed.
+     *
+     * @param source         where the model comes from; {@code null} for {@link HuggingFaceModelSource}
+     * @param modelId        the model identifier passed to the source; {@code null} passes {@code "model"}, for
+     *                       sources that ignore the id
+     * @param files          the files to request from the source, or {@code null} to request none in particular
+     * @param intraOpThreads the number of threads per session, or 0 for ONNX Runtime's default
+     * @param what           names the model in load failures, such as {@code "genai model"}
+     * @param assembler      builds the task
+     * @param <T>            the task type
+     * @return the task
+     * @throws ModelSourceException if the directory or {@code genai_config.json} cannot be found, or genai cannot
+     *                              load the model
+     * @throws ModelLoadException   if {@code genai_config.json} cannot be read
+     */
+    protected static <T> T load(ModelSource source, String modelId, List<String> files, int intraOpThreads,
+                                String what, Assembler<T> assembler) {
+        ModelSource resolvedSource = source != null ? source : HuggingFaceModelSource.defaultInstance();
+        String sourceId = modelId != null ? modelId : DEFAULT_MODEL_ID;
+        ResolvedModel opened = files != null ? resolvedSource.open(sourceId, files) : resolvedSource.open(sourceId);
+        return ModelFiles.load(opened, modelId, null, List.of(GENAI_CONFIG), modelFiles -> {
+            // Tracked first so it is released last, after the model and what was made from it
+            ResolvedModel lease = modelFiles.track(modelFiles.lease().retain());
+            try {
+                Model model = modelFiles.track(loadModel(modelFiles.directory(), intraOpThreads));
+                return assembler.assemble(model, lease, modelFiles);
+            } catch (GenAIException e) {
+                throw new ModelSourceException("Failed to load " + what + ": " + e.getMessage(), e);
+            } catch (IOException e) {
+                throw new ModelLoadException("Failed to read " + modelFiles.file(GENAI_CONFIG) + ": "
+                        + e.getMessage(), e);
+            }
+        });
     }
 
     /**

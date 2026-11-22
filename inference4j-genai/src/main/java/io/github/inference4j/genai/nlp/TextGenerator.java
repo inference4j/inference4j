@@ -23,7 +23,6 @@ import ai.onnxruntime.genai.Sequences;
 import ai.onnxruntime.genai.Tokenizer;
 import ai.onnxruntime.genai.TokenizerStream;
 import io.github.inference4j.exception.InferenceException;
-import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.genai.AbstractGenerativeTask;
 import io.github.inference4j.generation.ChatMessage;
 import io.github.inference4j.generation.ChatTemplate;
@@ -32,7 +31,6 @@ import io.github.inference4j.generation.GenerativeModel;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.model.ResolvedModel;
 
-import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -353,21 +351,10 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
                             "chatTemplate is required — use model(ModelSources.phi3Mini()) "
                                     + "or provide a chatTemplate alongside modelSource");
                 }
-                ResolvedModel resolved = modelSource.open("model");
-                Model m = null;
-                try {
-                    m = loadModel(resolved.directory(), intraOpThreads);
-                    Tokenizer t = new Tokenizer(m);
-                    return new TextGenerator(m, resolved, t, chatTemplate,
-                            maxLength, temperature, topK, topP, maxNewTokens, repetitionPenalty, stopSequences);
-                } catch (GenAIException | IOException e) {
-                    if (m != null) {
-                        m.close();
-                    }
-                    resolved.close();
-                    throw new ModelSourceException(
-                            "Failed to load genai model: " + e.getMessage(), e);
-                }
+                return load(modelSource, null, null, intraOpThreads, "genai model",
+                        (m, lease, files) -> new TextGenerator(m, lease, files.track(new Tokenizer(m)), chatTemplate,
+                                maxLength, temperature, topK, topP, maxNewTokens, repetitionPenalty,
+                                stopSequences));
             }
             return new TextGenerator(model, tokenizer, chatTemplate,
                     maxLength, temperature, topK, topP, maxNewTokens, repetitionPenalty, stopSequences);

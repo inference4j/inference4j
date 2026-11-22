@@ -26,9 +26,7 @@ import ai.onnxruntime.genai.TokenizerStream;
 import io.github.inference4j.audio.SpeechRecognizer;
 import io.github.inference4j.audio.Transcription;
 import io.github.inference4j.exception.InferenceException;
-import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.genai.AbstractGenerativeTask;
-import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.preprocessing.audio.AudioData;
@@ -342,23 +340,9 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 					throw new IllegalStateException(
 							"modelId is required — e.g., modelId(\"inference4j/whisper-small-genai\")");
 				}
-				ModelSource source = modelSource != null
-						? modelSource : HuggingFaceModelSource.defaultInstance();
-				ResolvedModel resolved = source.open(modelId, MODEL_FILES);
-				Model m = null;
-				try {
-					m = loadModel(resolved.directory(), intraOpThreads);
-					MultiModalProcessor p = new MultiModalProcessor(m);
-					return new WhisperSpeechModel(m, resolved, p, language, task,
-							maxLength, temperature, topK, topP);
-				} catch (GenAIException | IOException e) {
-					if (m != null) {
-						m.close();
-					}
-					resolved.close();
-					throw new ModelSourceException(
-							"Failed to load Whisper model: " + e.getMessage(), e);
-				}
+				return load(modelSource, modelId, MODEL_FILES, intraOpThreads, "Whisper model",
+						(m, lease, files) -> new WhisperSpeechModel(m, lease, files.track(new MultiModalProcessor(m)),
+								language, task, maxLength, temperature, topK, topP));
 			}
 			return new WhisperSpeechModel(model, processor, language, task,
 					maxLength, temperature, topK, topP);

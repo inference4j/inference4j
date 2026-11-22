@@ -24,16 +24,12 @@ import ai.onnxruntime.genai.MultiModalProcessor;
 import ai.onnxruntime.genai.NamedTensors;
 import ai.onnxruntime.genai.TokenizerStream;
 import io.github.inference4j.exception.InferenceException;
-import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.genai.AbstractGenerativeTask;
 import io.github.inference4j.generation.ChatTemplate;
 import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.generation.GenerativeModel;
-import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.model.ResolvedModel;
-
-import java.io.IOException;
 
 /**
  * Vision-language model backed by onnxruntime-genai.
@@ -245,24 +241,9 @@ public class VisionLanguageModel extends AbstractGenerativeTask<VisionInput, Gen
 							"chatTemplate is required — use model(ModelSources.phi3Vision()) "
 									+ "or provide a chatTemplate alongside modelSource/modelId");
 				}
-				ModelSource source = modelSource != null
-						? modelSource : HuggingFaceModelSource.defaultInstance();
-				String id = modelId != null ? modelId : "model";
-				ResolvedModel resolved = source.open(id);
-				Model m = null;
-				try {
-					m = loadModel(resolved.directory(), intraOpThreads);
-					MultiModalProcessor p = new MultiModalProcessor(m);
-					return new VisionLanguageModel(m, resolved, p, chatTemplate,
-							maxLength, temperature, topK, topP);
-				} catch (GenAIException | IOException e) {
-					if (m != null) {
-						m.close();
-					}
-					resolved.close();
-					throw new ModelSourceException(
-							"Failed to load vision model: " + e.getMessage(), e);
-				}
+				return load(modelSource, modelId, null, intraOpThreads, "vision model",
+						(m, lease, files) -> new VisionLanguageModel(m, lease, files.track(new MultiModalProcessor(m)),
+								chatTemplate, maxLength, temperature, topK, topP));
 			}
 			return new VisionLanguageModel(model, processor, chatTemplate,
 					maxLength, temperature, topK, topP);
