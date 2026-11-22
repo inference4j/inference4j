@@ -17,7 +17,7 @@
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
 | `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `DetrDetector`, `YoloXDetector`, `PicoDetDetector`, `DetectionOps`, `CraftTextDetector`, `PaddleTextDetector`, `PaddleTextRecognizer`, `TextRecognizer`, `OcrPipeline`, `DbPostProcessor`, `QuadCrop`, `TextLine`, `RecognizedText`, `Point`, `DepthAnythingEstimator`, `Sam2Segmenter`, `Prompt`, `ImageFeatures`, `ImageEmbedder`, `ImageAnnotator`, `TensorImages`, `Colormap` |
 | `io.github.inference4j.audio` | `MoonshineRecognizer`, `TranscriptionStream`, `TranscriptListener`, `TranscriptLine`, `Wav2Vec2Recognizer`, `PunctuatedSpeechRecognizer`, `SegmentedSpeechRecognizer`, `SileroVadDetector` |
-| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `DebertaZeroShotClassifier`, `ZeroShotTextClassifier`, `DebertaPromptInjectionDetector`, `PromptInjectionDetector`, `InjectionCheck`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `GlinerEntityRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `ChunkedTranslator`, `ChunkedGrammarCorrector`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `ZeroShotEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
+| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `DebertaZeroShotClassifier`, `ZeroShotTextClassifier`, `DebertaPromptInjectionDetector`, `PromptInjectionDetector`, `InjectionCheck`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `GlinerEntityRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `ChunkedTranslator`, `ChunkedGrammarCorrector`, `MapReduceSummarizer`, `ChunkedSummarizer`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `ZeroShotEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
 | `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `EncoderDecoderSession`, `ChatTemplate`, `ChatMessage`, `GenerativeModel`, `TokenStreamer` |
 | `io.github.inference4j.sampling` | `LogitsProcessor`, `LogitsSampler`, `CategoricalSampler`, `GreedySampler` |
@@ -100,6 +100,8 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 ├── PunctCapSegModel                    // infer(String) → List<String>  (class)
 ├── TextGenerator                       // generate(String) → GenerationResult
 ├── Summarizer                          // summarize(String) → String
+│                                       //   MapReduceSummarizer summarizes long text by chunk, then the summaries
+│                                       //   ChunkedSummarizer summarizes long text chunk by chunk
 ├── Translator                          // translate(String) → String
 │                                       //   ChunkedTranslator translates long text in chunks
 ├── GrammarCorrector                    // correct(String) → String
@@ -160,7 +162,7 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | `Transcription` | `text()`, `segments()` | `MoonshineRecognizer`, `Wav2Vec2Recognizer`, `WhisperSpeechModel` |
 | `TranscriptLine` | `id()`, `text()`, `start()`, `end()`, `completed()` | `TranscriptionStream` (via `TranscriptListener`) |
 | `VoiceSegment` | `start()`, `end()`, `duration()`, `confidence()` | `SileroVadDetector` |
-| `GenerationResult` | `text()`, `promptTokens()`, `generatedTokens()`, `duration()` | `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `ChunkedTranslator`, `ChunkedGrammarCorrector`, `TextGenerator`, `VisionLanguageModel` |
+| `GenerationResult` | `text()`, `promptTokens()`, `generatedTokens()`, `duration()` | `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `ChunkedTranslator`, `ChunkedGrammarCorrector`, `MapReduceSummarizer`, `ChunkedSummarizer`, `TextGenerator`, `VisionLanguageModel` |
 | `QueryDocumentPair` | `query()`, `document()` | `MiniLMSearchReranker`, `SearchReranker` |
 | `VisionInput` | `imagePath()`, `prompt()` | `VisionLanguageModel` |
 
