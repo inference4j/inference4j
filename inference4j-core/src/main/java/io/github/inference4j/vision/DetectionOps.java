@@ -58,10 +58,14 @@ public final class DetectionOps {
                     scaledWidth, scaledHeight, targetSize);
         }
 
-        /** The image in the top-left corner of the input, padding on the right and bottom only (YOLOX). */
+        /**
+         * The image in the top-left corner of the input, padding on the right and bottom only, its scaled size
+         * truncated rather than rounded (YOLOX's {@code preproc}).
+         */
         public static Letterbox topLeft(int width, int height, int targetSize) {
-            float scale = Math.min((float) targetSize / width, (float) targetSize / height);
-            return new Letterbox(scale, 0f, 0f, Math.round(width * scale), Math.round(height * scale), targetSize);
+            // In double, as Python computes it: in float, 352 * (416 / 352f) is 415.99997 and truncates to 415
+            double scale = Math.min((double) targetSize / width, (double) targetSize / height);
+            return new Letterbox((float) scale, 0f, 0f, (int) (width * scale), (int) (height * scale), targetSize);
         }
 
         /** Draws the scaled image on a square canvas filled with {@code padding}. */

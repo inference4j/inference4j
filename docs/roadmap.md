@@ -249,9 +249,8 @@ interface. Tracked in [#197](https://github.com/inference4j/inference4j/issues/1
       ([#183](https://github.com/inference4j/inference4j/issues/183), [#184](https://github.com/inference4j/inference4j/issues/184),
       [#185](https://github.com/inference4j/inference4j/issues/185))
 - [ ] **Accurate tier** — D-FINE medium and large ([#186](https://github.com/inference4j/inference4j/issues/186))
-- [ ] **More Apache-2.0 detectors** — RF-DETR as `RfDetrDetector`, YOLOX and PP-PicoDet
-      ([#192](https://github.com/inference4j/inference4j/issues/192), [#193](https://github.com/inference4j/inference4j/issues/193),
-      [#194](https://github.com/inference4j/inference4j/issues/194))
+- [ ] **More Apache-2.0 detectors** — YOLOX and PP-PicoDet
+      ([#193](https://github.com/inference4j/inference4j/issues/193), [#194](https://github.com/inference4j/inference4j/issues/194))
 - [ ] **Detector benchmarks** ([#191](https://github.com/inference4j/inference4j/issues/191))
 
 ### Generative AI via onnxruntime-genai

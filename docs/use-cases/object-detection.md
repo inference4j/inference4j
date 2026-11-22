@@ -21,16 +21,21 @@ try (ObjectDetector detector = DetrDetector.builder().build()) {      // D-FINE 
 | `DetrDetector.dfineMedium()` | D-FINE medium | **Apache-2.0** | 52.3 | 79 MB | — |
 | `DetrDetector.dfineLarge()` | D-FINE large | **Apache-2.0** | 54.0 | 125 MB | — |
 | `DetrDetector.rtDetrV2()` | RT-DETRv2 ResNet-18 | **Apache-2.0** | 48.1 | 81 MB | 108 ms |
+| `YoloXDetector.nano()` | YOLOX-Nano (416 × 416) | **Apache-2.0** | 25.8 | 3.5 MB | — |
+| `YoloXDetector.tiny()` | YOLOX-Tiny (416 × 416) | **Apache-2.0** | 32.8 | 19 MB | — |
+| `YoloXDetector.s()` | YOLOX-S | **Apache-2.0** | 40.5 | 34 MB | — |
 | `Yolo26Detector.builder()` | YOLO26n | AGPL-3.0 | 40.9 | 10 MB | 17 ms |
 | `YoloV8Detector.builder()` | YOLOv8n (also loads YOLO11 exports) | AGPL-3.0 | — | 13 MB | — |
 
 \*Median per image at 640 × 640 on a laptop CPU with four ONNX Runtime threads, measured with inference4j. AP figures
-come from the [D-FINE](https://github.com/Peterande/D-FINE), [RT-DETRv2](https://github.com/lyuwenyu/RT-DETR) and
-[YOLO26](https://docs.ultralytics.com/models/yolo26/) authors (COCO val2017); inference4j has not re-measured them. Latency for D-FINE medium and large is not measured yet.
+come from the [D-FINE](https://github.com/Peterande/D-FINE), [RT-DETRv2](https://github.com/lyuwenyu/RT-DETR),
+[YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) and [YOLO26](https://docs.ultralytics.com/models/yolo26/) authors (COCO val2017); inference4j has not
+re-measured them. Latency for D-FINE medium and large and for YOLOX is not measured yet.
 
 - **Start with D-FINE small**: a good balance of accuracy and speed, and Apache-2.0.
 - **D-FINE medium or large** when accuracy matters more than speed.
 - **D-FINE nano** when speed or size matters most.
+- **YOLOX-Nano** for the smallest download (3.5 MB) and small CPUs, at lower accuracy.
 - **YOLO26n** is the fastest, but its weights are AGPL-3.0; see [Licenses](#licenses).
 
 ## Full example
@@ -71,6 +76,7 @@ downloads:
 |---------|---------|--------|
 | D-FINE nano, small, medium, large | Apache-2.0 | [D-FINE license](https://github.com/Peterande/D-FINE/blob/master/LICENSE) |
 | RT-DETRv2 ResNet-18 | Apache-2.0 | [RT-DETR license](https://github.com/lyuwenyu/RT-DETR/blob/main/LICENSE) |
+| YOLOX-Nano, Tiny, S | Apache-2.0 | [YOLOX license](https://github.com/Megvii-BaseDetection/YOLOX/blob/main/LICENSE) |
 | YOLOv8n, YOLO26n | AGPL-3.0 | [Ultralytics license](https://github.com/ultralytics/ultralytics/blob/main/LICENSE) |
 
 AGPL-3.0 generally obliges a network service or a distributed product that uses the weights to release its own source
@@ -101,6 +107,22 @@ Processing follows HuggingFace `transformers` (`RTDetrImageProcessor`): the imag
 Pillow's bilinear filter, without letterboxing, and scaled to [0, 1]. On six COCO photos, inference4j returns the same
 detections as `transformers` with the PyTorch models: same classes in the same order, scores within 1e-5, boxes within
 0.2 pixels. Labels default to `Labels.coco()`, as for the YOLO detectors, so swapping detectors keeps label names.
+
+### YOLOX (Apache-2.0)
+
+Anchor-free CNN detector from Megvii, with non-maximum suppression. The presets are the authors' COCO models,
+published unchanged from their release; Nano and Tiny take a 416 × 416 input, S takes 640 × 640.
+
+```java
+try (ObjectDetector detector = YoloXDetector.nano().build()) {
+    detector.detect(Path.of("image.jpg"));
+}
+```
+
+Processing follows the official ONNX Runtime demo: the image is scaled to fit the input with OpenCV's bilinear
+resize, placed at the top left and padded with gray, and passed as BGR with values 0–255. Scores are objectness ×
+class score; overlapping boxes are removed whatever their class. On the test images, inference4j returns the
+demo's detections: scores within 0.01, boxes within 1.5 pixels.
 
 ### YOLOv8 / YOLO11 (AGPL-3.0 weights)
 
@@ -144,7 +166,8 @@ All detector builders share these options:
 The first match wins:
 
 1. labels set with `.labels(...)`;
-2. for the presets (`dfineSmall()`, `dfineNano()`, `dfineMedium()`, `dfineLarge()`, `rtDetrV2()`, the YOLO defaults), the 80 COCO classes from
+2. for the presets (`dfineSmall()`, `dfineNano()`, `dfineMedium()`, `dfineLarge()`, `rtDetrV2()`, `YoloXDetector`'s
+   `nano()`, `tiny()` and `s()`, the YOLOv8 and YOLO26 defaults), the 80 COCO classes from
    `Labels.coco()`, so every preset reports the same names;
 3. for a custom model, a `labels.txt` in its directory, one name per line;
 4. the `id2label` map of its `config.json`, as exported by HuggingFace `transformers`;
@@ -155,6 +178,7 @@ Defaults and extra options per detector:
 | Detector | Default `modelId` | Default `confidenceThreshold` | Extra options |
 |----------|-------------------|-------------------------------|---------------|
 | `DetrDetector` | `inference4j/dfine-small-coco`; presets `dfineSmall()`, `dfineNano()`, `dfineMedium()`, `dfineLarge()`, `rtDetrV2()` | `0.5` | none |
+| `YoloXDetector` | `inference4j/yolox-nano`; presets `nano()`, `tiny()`, `s()` | `0.3` | `.iouThreshold(float)`: NMS IoU threshold, `0.45` |
 | `Yolo26Detector` | `inference4j/yolo26n` | `0.5` | `.inputName(String)`: input tensor name, auto-detected |
 | `YoloV8Detector` | `inference4j/yolov8n` | `0.25` | `.inputName(String)`; `.iouThreshold(float)`: NMS IoU threshold, `0.45` |
 
@@ -194,7 +218,7 @@ try (ObjectDetector detector = DetrDetector.builder().build()) {
 }
 ```
 
-The three-argument form also sets the NMS IoU threshold. Only `YoloV8Detector` uses it; the NMS-free detectors
+The three-argument form also sets the NMS IoU threshold. Only `YoloV8Detector` and `YoloXDetector` use it; the NMS-free detectors
 (`DetrDetector`, `Yolo26Detector`) ignore it:
 
 ```java
@@ -234,4 +258,5 @@ So replacing one detector with another changes only the builder line, when varia
 - **YOLOv8 vs YOLO26**: YOLOv8 is widely tested; YOLO26 is NMS-free and newer.
 - All detectors accept `Path` or `BufferedImage` as input.
 - Default labels are COCO (80 classes). Override with `.labels(Labels.of(yourLabels))` for custom-trained models.
-- YOLOv8 uses letterbox preprocessing (preserves aspect ratio, pads with gray). YOLO26 and `DetrDetector` use direct resize.
+- YOLOv8 uses letterbox preprocessing (preserves aspect ratio, pads with gray), YOLOX the same with the image at the
+  top left. YOLO26 and `DetrDetector` use direct resize.

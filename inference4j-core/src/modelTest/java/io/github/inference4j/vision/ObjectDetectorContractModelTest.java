@@ -58,7 +58,10 @@ class ObjectDetectorContractModelTest {
                 detector("D-FINE large", () -> DetrDetector.dfineLarge().sessionOptions(FOUR_THREADS).build()),
                 detector("RT-DETRv2", () -> DetrDetector.rtDetrV2().sessionOptions(FOUR_THREADS).build()),
                 detector("YOLOv8n", () -> YoloV8Detector.builder().sessionOptions(FOUR_THREADS).build()),
-                detector("YOLO26n", () -> Yolo26Detector.builder().sessionOptions(FOUR_THREADS).build()));
+                detector("YOLO26n", () -> Yolo26Detector.builder().sessionOptions(FOUR_THREADS).build()),
+                detector("YOLOX-Nano", () -> YoloXDetector.nano().sessionOptions(FOUR_THREADS).build()),
+                detector("YOLOX-Tiny", () -> YoloXDetector.tiny().sessionOptions(FOUR_THREADS).build()),
+                detector("YOLOX-S", () -> YoloXDetector.s().sessionOptions(FOUR_THREADS).build()));
     }
 
     private static Arguments detector(String name, Supplier<ObjectDetector> factory) {

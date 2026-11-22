@@ -50,6 +50,9 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Object Detection (Apache-2.0) | `DetrDetector.dfineMedium()` | `inference4j/dfine-medium-coco` | ~79 MB | `ObjectDetector` |
 | Object Detection (Apache-2.0) | `DetrDetector.dfineLarge()` | `inference4j/dfine-large-coco` | ~125 MB | `ObjectDetector` |
 | Object Detection (Apache-2.0) | `DetrDetector.rtDetrV2()` | `inference4j/rtdetr-v2-r18vd` | ~81 MB | `ObjectDetector` |
+| Object Detection (Apache-2.0) | `YoloXDetector.nano()` | `inference4j/yolox-nano` | ~3.5 MB | `ObjectDetector` |
+| Object Detection (Apache-2.0) | `YoloXDetector.tiny()` | `inference4j/yolox-tiny` | ~19 MB | `ObjectDetector` |
+| Object Detection (Apache-2.0) | `YoloXDetector.s()` | `inference4j/yolox-s` | ~34 MB | `ObjectDetector` |
 | Object Detection (AGPL-3.0) | `Yolo26Detector` | `inference4j/yolo26n` | ~10 MB | `ObjectDetector` |
 | Object Detection (AGPL-3.0) | `YoloV8Detector` | `inference4j/yolov8n` | ~13 MB | `ObjectDetector` |
 | Text Detection | `CraftTextDetector` | `inference4j/craft-mlt-25k` | ~80 MB | `TextDetector` |
@@ -148,6 +151,7 @@ A comprehensive view of all supported models, organized by architecture:
 | YOLO26n | N/A | `Yolo26Detector` | Object detection (AGPL-3.0) |
 | D-FINE (nano / small / medium / large, COCO) | N/A | `DetrDetector` | Object detection (Apache-2.0) |
 | RT-DETRv2 ResNet-18 | N/A | `DetrDetector` | Object detection (Apache-2.0) |
+| YOLOX (nano / tiny / s) | N/A | `YoloXDetector` | Object detection (Apache-2.0) |
 | CRAFT | N/A | `CraftTextDetector` | Text detection in images |
 | PP-OCRv6 (small / tiny) detection | N/A | `PaddleTextDetector` | Text line detection |
 | PP-OCRv6 (small / tiny) recognition | Character dictionary (`inference.yml`) | `PaddleTextRecognizer` | Text recognition (OCR) |
