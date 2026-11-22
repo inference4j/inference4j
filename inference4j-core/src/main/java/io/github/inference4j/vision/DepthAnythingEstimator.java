@@ -35,6 +35,7 @@ import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.Preprocessor;
 import io.github.inference4j.session.SessionConfigurer;
 
@@ -312,8 +313,9 @@ public class DepthAnythingEstimator extends AbstractInferenceTask<BufferedImage,
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id, List.of("model.onnx"));
-                loadFromDirectory(dir);
+                try (ResolvedModel model = source.open(id, List.of("model.onnx"))) {
+                    loadFromDirectory(model);
+                }
             }
             if (inputName == null) {
                 inputName = session.inputNames().iterator().next();
@@ -321,7 +323,8 @@ public class DepthAnythingEstimator extends AbstractInferenceTask<BufferedImage,
             return new DepthAnythingEstimator(session, inputName, targetSize);
         }
 
-        private void loadFromDirectory(Path dir) {
+        private void loadFromDirectory(ResolvedModel model) {
+            Path dir = model.directory();
             if (!Files.isDirectory(dir)) {
                 throw new ModelSourceException("Model directory not found: " + dir);
             }
@@ -332,8 +335,8 @@ public class DepthAnythingEstimator extends AbstractInferenceTask<BufferedImage,
             }
 
             this.session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
+                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
+                    : InferenceSession.create(model, "model.onnx");
         }
     }
 }

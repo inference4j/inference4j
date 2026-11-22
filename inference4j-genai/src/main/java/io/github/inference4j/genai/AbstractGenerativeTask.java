@@ -30,12 +30,15 @@ import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.generation.GenerativeTask;
 import io.github.inference4j.generation.TokenStreamer;
+import io.github.inference4j.model.ModelRevision;
+import io.github.inference4j.model.ResolvedModel;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -66,11 +69,30 @@ import java.util.function.Supplier;
 public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, O> {
 
     protected final Model model;
+    private final ResolvedModel resolvedModel;
     private final ReentrantLock lock = new ReentrantLock();
     private boolean closed;
 
     protected AbstractGenerativeTask(Model model) {
+        this(model, null);
+    }
+
+    /**
+     * @param model         the loaded genai model
+     * @param resolvedModel the handle on the directory the model was loaded from, which keeps a cached snapshot
+     *                      on disk until {@link #close()}; may be {@code null}
+     */
+    protected AbstractGenerativeTask(Model model, ResolvedModel resolvedModel) {
         this.model = model;
+        this.resolvedModel = resolvedModel;
+    }
+
+    /**
+     * The cached revision the model was loaded from: present when it was loaded through a cache that manages
+     * revisions, such as {@link io.github.inference4j.model.HuggingFaceModelSource}.
+     */
+    public Optional<ModelRevision> modelRevision() {
+        return resolvedModel != null ? resolvedModel.revision() : Optional.empty();
     }
 
     @Override
@@ -317,8 +339,14 @@ public abstract class AbstractGenerativeTask<I, O> implements GenerativeTask<I, 
                 return;
             }
             closed = true;
-            closeResources();
-            model.close();
+            try {
+                closeResources();
+                model.close();
+            } finally {
+                if (resolvedModel != null) {
+                    resolvedModel.close();
+                }
+            }
         } finally {
             lock.unlock();
         }

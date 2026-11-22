@@ -56,6 +56,7 @@ import java.util.List;
  * @see HuggingFaceModelSource
  * @see LocalModelSource
  * @see InferenceSession#create(Path)
+ * @see ResolvedModel
  */
 @FunctionalInterface
 public interface ModelSource {
@@ -101,5 +102,46 @@ public interface ModelSource {
      */
     default Path resolve(String modelId, String subdirectory) {
         return resolve(modelId).resolve(subdirectory);
+    }
+
+    /**
+     * Opens a model directory and holds it while the returned handle is open. Model builders call this rather
+     * than {@link #resolve(String)}, so that a cache never deletes files a model is loading or using.
+     *
+     * <p>The default returns an {@linkplain ResolvedModel#unmanaged(Path) unmanaged} handle on
+     * {@link #resolve(String)}'s directory; {@link HuggingFaceModelSource} returns one that keeps its snapshot.
+     *
+     * @param modelId the model identifier
+     * @return a handle on the model directory, to close once the model is loaded
+     * @throws io.github.inference4j.exception.ModelSourceException if the model cannot be resolved
+     */
+    default ResolvedModel open(String modelId) {
+        return ResolvedModel.unmanaged(resolve(modelId));
+    }
+
+    /**
+     * Like {@link #open(String)}, ensuring {@code requiredFiles} are available, as
+     * {@link #resolve(String, List)} does.
+     *
+     * @param modelId       the model identifier
+     * @param requiredFiles the filenames the task wrapper needs
+     * @return a handle on the model directory, to close once the model is loaded
+     * @throws io.github.inference4j.exception.ModelSourceException if the model cannot be resolved
+     */
+    default ResolvedModel open(String modelId, List<String> requiredFiles) {
+        return ResolvedModel.unmanaged(resolve(modelId, requiredFiles));
+    }
+
+    /**
+     * Like {@link #open(String)}, for a subdirectory of the model repository, as
+     * {@link #resolve(String, String)} does.
+     *
+     * @param modelId      the model identifier
+     * @param subdirectory the subdirectory within the repo
+     * @return a handle on the subdirectory, to close once the model is loaded
+     * @throws io.github.inference4j.exception.ModelSourceException if the model cannot be resolved
+     */
+    default ResolvedModel open(String modelId, String subdirectory) {
+        return ResolvedModel.unmanaged(resolve(modelId, subdirectory));
     }
 }

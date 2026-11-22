@@ -22,6 +22,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -44,7 +45,10 @@ class HuggingFaceModelSourceSubdirectoryTest {
                 "microsoft/Phi-3-mini-4k-instruct-onnx",
                 "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4");
 
-        assertThat(resolved).isEqualTo(subDir);
+        assertThat(resolved).isEqualTo(cacheDir.resolve("hub/models--microsoft--Phi-3-mini-4k-instruct-onnx/snapshots")
+                .resolve(ModelRevision.UNKNOWN).resolve("cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4"));
+        assertThat(resolved.resolve("genai_config.json")).exists();
+        assertThat(resolved.resolve("model.onnx")).exists();
     }
 
     @Test
@@ -54,6 +58,20 @@ class HuggingFaceModelSourceSubdirectoryTest {
         ModelSource local = id -> cacheDir.resolve(id);
         Path result = local.resolve("my-model", "sub/dir");
         assertThat(result).isEqualTo(cacheDir.resolve("my-model").resolve("sub/dir"));
+    }
+
+    @Test
+    void aLambdaSourceOpensUnmanaged() {
+        ModelSource local = id -> cacheDir.resolve(id);
+
+        try (ResolvedModel model = local.open("my-model", "sub/dir")) {
+            assertThat(model.directory()).isEqualTo(cacheDir.resolve("my-model").resolve("sub/dir"));
+            assertThat(model.revision()).isEmpty();
+            assertThat(model.retain()).isSameAs(model);
+        }
+        try (ResolvedModel model = local.open("my-model", List.of("model.onnx"))) {
+            assertThat(model.file("model.onnx")).isEqualTo(cacheDir.resolve("my-model/model.onnx"));
+        }
     }
 
     /** A source that never contacts the Hub, so these cache tests make no network calls. */

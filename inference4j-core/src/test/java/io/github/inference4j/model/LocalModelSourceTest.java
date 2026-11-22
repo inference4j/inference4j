@@ -23,6 +23,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -32,7 +33,7 @@ class LocalModelSourceTest {
     Path tempDir;
 
     @Test
-    void resolve_returnsDirectoryPath() throws IOException {
+    void resolveReturnsDirectoryPath() throws IOException {
         Path modelDir = tempDir.resolve("my-model");
         Files.createDirectory(modelDir);
 
@@ -44,7 +45,7 @@ class LocalModelSourceTest {
     }
 
     @Test
-    void resolve_throwsWhenDirectoryNotFound() {
+    void resolveThrowsWhenDirectoryNotFound() {
         LocalModelSource source = new LocalModelSource(tempDir);
 
         assertThatThrownBy(() -> source.resolve("nonexistent"))
@@ -53,12 +54,23 @@ class LocalModelSourceTest {
     }
 
     @Test
-    void resolve_throwsWhenPathIsFile() throws IOException {
+    void resolveThrowsWhenPathIsFile() throws IOException {
         Files.writeString(tempDir.resolve("not-a-dir"), "content");
 
         LocalModelSource source = new LocalModelSource(tempDir);
 
         assertThatThrownBy(() -> source.resolve("not-a-dir"))
                 .isInstanceOf(ModelSourceException.class);
+    }
+
+    @Test
+    void openReturnsAnUnmanagedHandle() throws IOException {
+        Path modelDir = tempDir.resolve("my-model");
+        Files.createDirectory(modelDir);
+
+        try (ResolvedModel model = new LocalModelSource(tempDir).open("my-model", List.of("model.onnx"))) {
+            assertThat(model.directory()).isEqualTo(modelDir);
+            assertThat(model.revision()).isEmpty();
+        }
     }
 }

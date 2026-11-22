@@ -15,24 +15,17 @@
  */
 package io.github.inference4j.model;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
 import io.github.inference4j.exception.ModelSourceException;
+import io.github.inference4j.model.TestSupport.MutableClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 
@@ -49,26 +42,6 @@ class HuggingFaceModelSourceRevisionTest {
 
     private FakeHub hub;
     private MutableClock clock;
-
-    /** A clock the test moves forward. */
-    static final class MutableClock extends Clock {
-        Instant now = Instant.parse("2026-11-22T10:00:00Z");
-
-        @Override
-        public ZoneOffset getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(java.time.ZoneId zone) {
-            return this;
-        }
-
-        @Override
-        public Instant instant() {
-            return now;
-        }
-    }
 
     @BeforeEach
     void setUp() throws IOException {
@@ -89,22 +62,27 @@ class HuggingFaceModelSourceRevisionTest {
                 .clock(clock).build();
     }
 
-    private Path cached(String file) {
-        return cacheDir.resolve(REPO).resolve(file);
+    private Path snapshot(String revision) {
+        return cacheDir.resolve("hub/models--org--model/snapshots").resolve(revision);
+    }
+
+    private CachedModel cached() {
+        return source().cache().find(REPO).orElseThrow();
     }
 
     @Test
     void aFirstResolveDownloadsAtTheHubRevisionAndRecordsIt() throws IOException {
         Path dir = source().resolve(REPO, FILES);
 
-        assertThat(dir).isEqualTo(cacheDir.resolve(REPO));
-        assertThat(Files.readString(cached("model.onnx"))).isEqualTo("weights v1");
-        assertThat(hub.downloads("model.onnx")).isEqualTo(1);
-        assertThat(hub.downloads("tokenizer.json")).isEqualTo(1);
-        CacheRecord record = CacheRecord.read(dir);
-        assertThat(record.commit()).isEqualTo(hub.commit());
-        assertThat(record.checkedAt()).isEqualTo(clock.now);
-        assertThat(record.files()).containsOnlyKeys("model.onnx", "tokenizer.json");
+        assertThat(dir).isEqualTo(snapshot(hub.commit()));
+        assertThat(Files.readString(dir.resolve("model.onnx"))).isEqualTo("weights v1");
+        assertThat(hub.downloadsAt(hub.commit(), "model.onnx")).isEqualTo(1);
+        assertThat(hub.downloadsAt(hub.commit(), "tokenizer.json")).isEqualTo(1);
+        CachedModel model = cached();
+        assertThat(model.revision()).isEqualTo(hub.commit());
+        assertThat(model.lastChecked()).isEqualTo(clock.now);
+        assertThat(model.snapshots()).singleElement().satisfies(snapshot -> assertThat(snapshot.files())
+                .extracting(CachedFile::path).containsExactly("model.onnx", "tokenizer.json"));
     }
 
     @Test
@@ -123,39 +101,45 @@ class HuggingFaceModelSourceRevisionTest {
         hub.put("tokenizer.json", "tokenizer v2");
         clock.now = clock.now.plus(Duration.ofHours(25));
 
-        source().resolve(REPO, FILES);
+        Path dir = source().resolve(REPO, FILES);
 
-        assertThat(Files.readString(cached("tokenizer.json"))).isEqualTo("tokenizer v2");
-        assertThat(hub.downloads("tokenizer.json")).isEqualTo(1);
+        assertThat(dir).isEqualTo(snapshot(hub.commit()));
+        assertThat(Files.readString(dir.resolve("tokenizer.json"))).isEqualTo("tokenizer v2");
+        assertThat(Files.readString(dir.resolve("model.onnx"))).isEqualTo("weights v1");
+        assertThat(hub.downloadsAt(hub.commit(), "tokenizer.json")).isEqualTo(1);
         assertThat(hub.count("/" + REPO + "/resolve/")).isEqualTo(3);   // two first downloads, one update
-        assertThat(CacheRecord.read(cacheDir.resolve(REPO)).commit()).isEqualTo(hub.commit());
+        assertThat(cached().revision()).isEqualTo(hub.commit());
     }
 
     @Test
     void aNewCommitThatChangesNoCachedFileDownloadsNothing() {
-        source().resolve(REPO, FILES);
+        Path first = source().resolve(REPO, FILES);
         hub.put("README.md", "card v2");
         clock.now = clock.now.plus(Duration.ofDays(2));
 
-        source().resolve(REPO, FILES);
+        Path dir = source().resolve(REPO, FILES);
 
+        assertThat(dir).isEqualTo(first);
         assertThat(hub.revisionChecks()).isEqualTo(2);
         assertThat(hub.count("/" + REPO + "/resolve/")).isEqualTo(2);
-        CacheRecord record = CacheRecord.read(cacheDir.resolve(REPO));
-        assertThat(record.commit()).isEqualTo(hub.commit());
-        assertThat(record.checkedAt()).isEqualTo(clock.now);
+        CachedModel model = cached();
+        assertThat(model.remoteRevision()).isEqualTo(hub.commit());
+        assertThat(model.revision()).isNotEqualTo(hub.commit());
+        assertThat(model.lastChecked()).isEqualTo(clock.now);
+        assertThat(model.updateAvailable()).isFalse();
     }
 
     @Test
-    void aCacheWithoutARecordIsVerifiedByHashing() throws IOException {
+    void aStaleFlatCacheFileIsDownloadedAgain() throws IOException {
         // As left by an earlier version: correct weights (an LFS file), a stale tokenizer
-        Files.createDirectories(cacheDir.resolve(REPO));
-        Files.writeString(cached("model.onnx"), "weights v1");
-        Files.writeString(cached("tokenizer.json"), "tokenizer v0");
+        Path flat = cacheDir.resolve(REPO);
+        Files.createDirectories(flat);
+        Files.writeString(flat.resolve("model.onnx"), "weights v1");
+        Files.writeString(flat.resolve("tokenizer.json"), "tokenizer v0");
 
-        source().resolve(REPO, FILES);
+        Path dir = source().resolve(REPO, FILES);
 
-        assertThat(Files.readString(cached("tokenizer.json"))).isEqualTo("tokenizer v1");
+        assertThat(Files.readString(dir.resolve("tokenizer.json"))).isEqualTo("tokenizer v1");
         assertThat(hub.downloads("tokenizer.json")).isEqualTo(1);
         assertThat(hub.downloads("model.onnx")).isZero();
     }
@@ -167,12 +151,12 @@ class HuggingFaceModelSourceRevisionTest {
         clock.now = clock.now.plus(Duration.ofDays(2));
         HuggingFaceModelSource source = source();
 
-        List<String> warnings = warnings(() -> {
+        List<String> warnings = TestSupport.warnings(HuggingFaceModelSource.class, () -> {
             source.resolve(REPO, FILES);
             source.resolve(REPO, FILES);
         });
 
-        assertThat(Files.readString(cached("tokenizer.json"))).isEqualTo("tokenizer v1");
+        assertThat(Files.readString(source.resolve(REPO, FILES).resolve("tokenizer.json"))).isEqualTo("tokenizer v1");
         assertThat(warnings).containsExactly("Could not check org/model for updates on the Hub; using the cached files");
         assertThat(hub.revisionChecks()).isEqualTo(2);   // the first resolve, then one failed check
     }
@@ -204,13 +188,27 @@ class HuggingFaceModelSourceRevisionTest {
     }
 
     @Test
-    void missingFilesAreStillDownloadedWhenTheRevisionApiFails() throws IOException {
+    void missingFilesAreDownloadedAtTheReportedCommitWhenTheRevisionApiFails() throws IOException {
         hub.revisionStatus = 500;
 
-        source().resolve(REPO, FILES);
+        Path dir = source().resolve(REPO, FILES);
 
-        assertThat(Files.readString(cached("tokenizer.json"))).isEqualTo("tokenizer v1");
-        assertThat(CacheRecord.read(cacheDir.resolve(REPO))).isNull();
+        assertThat(Files.readString(dir.resolve("tokenizer.json"))).isEqualTo("tokenizer v1");
+        assertThat(dir).isEqualTo(snapshot(hub.commit()));
+        assertThat(hub.downloadsAt("main", "model.onnx")).isEqualTo(1);
+        assertThat(hub.downloadsAt(hub.commit(), "tokenizer.json")).isEqualTo(1);
+        assertThat(cached().lastChecked()).isNull();
+    }
+
+    @Test
+    void withoutACommitHeaderTheRevisionIsUnknown() {
+        hub.revisionStatus = 500;
+        hub.commitHeader = false;
+
+        Path dir = source().resolve(REPO, FILES);
+
+        assertThat(dir).isEqualTo(snapshot(ModelRevision.UNKNOWN));
+        assertThat(cached().revision()).isEqualTo(ModelRevision.UNKNOWN);
     }
 
     @Test
@@ -219,17 +217,18 @@ class HuggingFaceModelSourceRevisionTest {
 
         Path dir = source().resolve(REPO, "cpu");
 
-        assertThat(dir).isEqualTo(cacheDir.resolve(REPO).resolve("cpu"));
+        assertThat(dir).isEqualTo(snapshot(hub.commit()).resolve("cpu"));
         assertThat(Files.readString(dir.resolve("model.onnx"))).isEqualTo("cpu weights");
         assertThat(dir.resolve("genai_config.json")).exists();
-        assertThat(cacheDir.resolve(REPO).resolve("gpu")).doesNotExist();
+        assertThat(snapshot(hub.commit()).resolve("gpu")).doesNotExist();
 
         hub.put("cpu/model.onnx", "cpu weights v2");
         clock.now = clock.now.plus(Duration.ofDays(2));
-        source().resolve(REPO, "cpu");
+        Path updated = source().resolve(REPO, "cpu");
 
-        assertThat(Files.readString(dir.resolve("model.onnx"))).isEqualTo("cpu weights v2");
-        assertThat(hub.downloads("cpu/genai_config.json")).isZero();
+        assertThat(updated).isEqualTo(snapshot(hub.commit()).resolve("cpu"));
+        assertThat(Files.readString(updated.resolve("model.onnx"))).isEqualTo("cpu weights v2");
+        assertThat(hub.downloads("cpu/genai_config.json")).isEqualTo(1);
     }
 
     @Test
@@ -238,18 +237,9 @@ class HuggingFaceModelSourceRevisionTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    private static List<String> warnings(Runnable action) {
-        Logger logger = (Logger) LoggerFactory.getLogger(HuggingFaceModelSource.class);
-        ListAppender<ILoggingEvent> appender = new ListAppender<>();
-        appender.start();
-        logger.addAppender(appender);
-        try {
-            action.run();
-        } finally {
-            logger.detachAppender(appender);
-            appender.stop();
-        }
-        return appender.list.stream().filter(e -> e.getLevel() == Level.WARN)
-                .map(ILoggingEvent::getFormattedMessage).toList();
+    @Test
+    void rejectsANegativeMinimumSnapshotAge() {
+        assertThatThrownBy(() -> HuggingFaceModelSource.builder().minimumSnapshotAge(Duration.ofMinutes(-1)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

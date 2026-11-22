@@ -27,6 +27,7 @@ import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.generation.OnnxGenerativeSession;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.session.SessionConfigurer;
@@ -391,11 +392,13 @@ public class OnnxTextGenerator implements TextGenerator {
             List<String> files = new ArrayList<>(List.of("model.onnx", "config.json"));
             files.addAll(provider.requiredFiles());
             files.addAll(extraFiles);
-            Path dir = source.resolve(id, files);
-            return loadFromDirectory(dir, provider);
+            try (ResolvedModel model = source.open(id, files)) {
+                return loadFromDirectory(model, provider);
+            }
         }
 
-        private OnnxTextGenerator loadFromDirectory(Path dir, TokenizerProvider provider) {
+        private OnnxTextGenerator loadFromDirectory(ResolvedModel model, TokenizerProvider provider) {
+            Path dir = model.directory();
             if (!Files.isDirectory(dir)) {
                 throw new ModelSourceException("Model directory not found: " + dir);
             }
@@ -411,8 +414,8 @@ public class OnnxTextGenerator implements TextGenerator {
             }
 
             InferenceSession session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
+                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
+                    : InferenceSession.create(model, "model.onnx");
 
             try {
                 OnnxGenerativeSession generativeSession = new OnnxGenerativeSession(session);

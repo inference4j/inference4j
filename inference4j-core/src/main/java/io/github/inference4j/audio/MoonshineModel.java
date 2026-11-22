@@ -98,9 +98,9 @@ final class MoonshineModel implements AutoCloseable {
      * Loads the model from a directory holding {@link #FILES}.
      *
      * @param dir         the model directory
-     * @param openSession opens one ONNX Runtime session from a graph file
+     * @param openSession opens one ONNX Runtime session from a graph file, by its name in {@code dir}
      */
-    static MoonshineModel load(Path dir, Function<Path, InferenceSession> openSession) {
+    static MoonshineModel load(Path dir, Function<String, InferenceSession> openSession) {
         Config config = Config.read(dir.resolve("streaming_config.json"));
         List<InferenceSession> opened = new ArrayList<>();
         NativeTensors frontendWeights = null;
@@ -123,9 +123,9 @@ final class MoonshineModel implements AutoCloseable {
         }
     }
 
-    private static InferenceSession open(Path dir, String file, Function<Path, InferenceSession> openSession,
+    private static InferenceSession open(Path dir, String file, Function<String, InferenceSession> openSession,
                                          List<InferenceSession> opened) {
-        InferenceSession session = openSession.apply(dir.resolve(file));
+        InferenceSession session = openSession.apply(file);
         opened.add(session);
         return session;
     }

@@ -25,6 +25,7 @@ import io.github.inference4j.generation.EncoderDecoderSession;
 import io.github.inference4j.generation.GenerationEngine;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.session.SessionConfigurer;
@@ -188,11 +189,13 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
         files.addAll(provider.requiredFiles());
         files.addAll(extraFiles);
 
-        Path dir = source.resolve(id, files);
-        return loadFromDirectory(dir, provider);
+        try (ResolvedModel model = source.open(id, files)) {
+            return loadFromDirectory(model, provider);
+        }
     }
 
-    private T loadFromDirectory(Path dir, TokenizerProvider provider) {
+    private T loadFromDirectory(ResolvedModel model, TokenizerProvider provider) {
+        Path dir = model.directory();
         if (!Files.isDirectory(dir)) {
             throw new ModelSourceException("Model directory not found: " + dir);
         }
@@ -221,9 +224,9 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
         InferenceSession decoderWithPastSession = null;
 
         try {
-            encoderSession = createSession(encoderPath);
-            decoderSession = createSession(decoderPath);
-            decoderWithPastSession = createSession(decoderWithPastPath);
+            encoderSession = createSession(model, "encoder_model.onnx");
+            decoderSession = createSession(model, "decoder_model.onnx");
+            decoderWithPastSession = createSession(model, "decoder_with_past_model.onnx");
 
             ModelConfig config = readModelConfig(configPath);
 
@@ -345,10 +348,10 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
         throw new ModelLoadException("config.json missing eos_token_id — set it explicitly via eosTokenId()");
     }
 
-    private InferenceSession createSession(Path modelPath) {
+    private InferenceSession createSession(ResolvedModel model, String file) {
         return sessionConfigurer != null
-                ? InferenceSession.create(modelPath, sessionConfigurer)
-                : InferenceSession.create(modelPath);
+                ? InferenceSession.create(model, file, sessionConfigurer)
+                : InferenceSession.create(model, file);
     }
 
     static void closeQuietly(AutoCloseable closeable) {

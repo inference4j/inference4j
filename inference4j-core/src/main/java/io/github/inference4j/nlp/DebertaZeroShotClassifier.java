@@ -23,6 +23,7 @@ import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.preprocessing.text.ModelConfig;
 import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.WindowAggregation;
@@ -308,21 +309,23 @@ public class DebertaZeroShotClassifier implements ZeroShotTextClassifier {
                 throw new IllegalStateException("windowAggregation requires stride(int)");
             }
             ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-            Path dir = source.resolve(modelId, List.of("model.onnx", "tokenizer.json", "config.json"));
-            Path modelPath = requireFile(dir, "model.onnx");
-            Path tokenizerPath = requireFile(dir, "tokenizer.json");
-            Path configPath = requireFile(dir, "config.json");
+            try (ResolvedModel model = source.open(modelId, List.of("model.onnx", "tokenizer.json", "config.json"))) {
+                Path dir = model.directory();
+                Path modelPath = requireFile(dir, "model.onnx");
+                Path tokenizerPath = requireFile(dir, "tokenizer.json");
+                Path configPath = requireFile(dir, "config.json");
 
-            Tokenizer tokenizer = TokenizerJsonParser.parseUnigram(tokenizerPath).build();
-            SpecialTokens special = TokenizerJsonParser.parseSpecialTokens(tokenizerPath);
-            ModelConfig config = ModelConfig.fromFile(configPath);
-            NliLabels nli = NliLabels.from(config);
+                Tokenizer tokenizer = TokenizerJsonParser.parseUnigram(tokenizerPath).build();
+                SpecialTokens special = TokenizerJsonParser.parseSpecialTokens(tokenizerPath);
+                ModelConfig config = ModelConfig.fromFile(configPath);
+                NliLabels nli = NliLabels.from(config);
 
-            InferenceSession session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
-            return new DebertaZeroShotClassifier(this, session, tokenizer, special, nli.entailment(),
-                    nli.contradiction(), padTokenId(configPath));
+                InferenceSession session = sessionConfigurer != null
+                        ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
+                        : InferenceSession.create(model, "model.onnx");
+                return new DebertaZeroShotClassifier(this, session, tokenizer, special, nli.entailment(),
+                        nli.contradiction(), padTokenId(configPath));
+            }
         }
 
         private static long padTokenId(Path configPath) {

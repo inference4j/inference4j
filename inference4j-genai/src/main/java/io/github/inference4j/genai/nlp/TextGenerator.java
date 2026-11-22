@@ -30,9 +30,9 @@ import io.github.inference4j.generation.ChatTemplate;
 import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.generation.GenerativeModel;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -108,7 +108,14 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
     TextGenerator(Model model, Tokenizer tokenizer, ChatTemplate chatTemplate,
                   int maxLength, double temperature, int topK, double topP,
                   int maxNewTokens, double repetitionPenalty, Set<String> stopSequences) {
-        super(model);
+        this(model, null, tokenizer, chatTemplate, maxLength, temperature, topK, topP, maxNewTokens,
+                repetitionPenalty, stopSequences);
+    }
+
+    TextGenerator(Model model, ResolvedModel resolvedModel, Tokenizer tokenizer, ChatTemplate chatTemplate,
+                  int maxLength, double temperature, int topK, double topP,
+                  int maxNewTokens, double repetitionPenalty, Set<String> stopSequences) {
+        super(model, resolvedModel);
         this.tokenizer = tokenizer;
         this.chatTemplate = chatTemplate;
         this.maxLength = maxLength;
@@ -346,11 +353,18 @@ public class TextGenerator extends AbstractGenerativeTask<String, GenerationResu
                             "chatTemplate is required — use model(ModelSources.phi3Mini()) "
                                     + "or provide a chatTemplate alongside modelSource");
                 }
+                ResolvedModel resolved = modelSource.open("model");
+                Model m = null;
                 try {
-                    Path modelDir = modelSource.resolve("model");
-                    model = loadModel(modelDir, intraOpThreads);
-                    tokenizer = new Tokenizer(model);
+                    m = loadModel(resolved.directory(), intraOpThreads);
+                    Tokenizer t = new Tokenizer(m);
+                    return new TextGenerator(m, resolved, t, chatTemplate,
+                            maxLength, temperature, topK, topP, maxNewTokens, repetitionPenalty, stopSequences);
                 } catch (GenAIException | IOException e) {
+                    if (m != null) {
+                        m.close();
+                    }
+                    resolved.close();
                     throw new ModelSourceException(
                             "Failed to load genai model: " + e.getMessage(), e);
                 }

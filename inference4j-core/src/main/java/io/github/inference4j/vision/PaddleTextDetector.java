@@ -21,6 +21,7 @@ import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.session.SessionConfigurer;
 
 import java.awt.image.BufferedImage;
@@ -225,16 +226,18 @@ public class PaddleTextDetector implements TextDetector {
                 throw new IllegalArgumentException("minSide must be positive and maxSide at least 32");
             }
             ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-            Path dir = source.resolve(modelId, List.of("model.onnx"));
-            Path modelPath = dir.resolve("model.onnx");
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Model file not found: " + modelPath);
+            try (ResolvedModel model = source.open(modelId, List.of("model.onnx"))) {
+                Path dir = model.directory();
+                Path modelPath = dir.resolve("model.onnx");
+                if (!Files.exists(modelPath)) {
+                    throw new ModelSourceException("Model file not found: " + modelPath);
+                }
+                InferenceSession session = sessionConfigurer != null
+                        ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
+                        : InferenceSession.create(model, "model.onnx");
+                return new PaddleTextDetector(session,
+                        new DbPostProcessor(threshold, boxThreshold, unclipRatio, maxCandidates), minSide, maxSide);
             }
-            InferenceSession session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
-            return new PaddleTextDetector(session,
-                    new DbPostProcessor(threshold, boxThreshold, unclipRatio, maxCandidates), minSide, maxSide);
         }
     }
 }

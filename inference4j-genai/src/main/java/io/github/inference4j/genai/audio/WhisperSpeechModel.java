@@ -30,6 +30,7 @@ import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.genai.AbstractGenerativeTask;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.preprocessing.audio.AudioData;
 
 import java.io.IOException;
@@ -100,7 +101,13 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 	WhisperSpeechModel(Model model, MultiModalProcessor processor,
 					   String language, WhisperTask task,
 					   int maxLength, double temperature, int topK, double topP) {
-		super(model);
+		this(model, null, processor, language, task, maxLength, temperature, topK, topP);
+	}
+
+	WhisperSpeechModel(Model model, ResolvedModel resolvedModel, MultiModalProcessor processor,
+					   String language, WhisperTask task,
+					   int maxLength, double temperature, int topK, double topP) {
+		super(model, resolvedModel);
 		this.processor = processor;
 		this.language = language;
 		this.task = task;
@@ -337,16 +344,18 @@ public class WhisperSpeechModel extends AbstractGenerativeTask<Path, Transcripti
 				}
 				ModelSource source = modelSource != null
 						? modelSource : HuggingFaceModelSource.defaultInstance();
-				Path modelDir = source.resolve(modelId, MODEL_FILES);
+				ResolvedModel resolved = source.open(modelId, MODEL_FILES);
 				Model m = null;
 				try {
-					m = loadModel(modelDir, intraOpThreads);
-					model = m;
-					processor = new MultiModalProcessor(m);
+					m = loadModel(resolved.directory(), intraOpThreads);
+					MultiModalProcessor p = new MultiModalProcessor(m);
+					return new WhisperSpeechModel(m, resolved, p, language, task,
+							maxLength, temperature, topK, topP);
 				} catch (GenAIException | IOException e) {
 					if (m != null) {
 						m.close();
 					}
+					resolved.close();
 					throw new ModelSourceException(
 							"Failed to load Whisper model: " + e.getMessage(), e);
 				}

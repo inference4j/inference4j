@@ -33,13 +33,13 @@ class HuggingFaceModelSourceTest {
     Path tempDir;
 
     @Test
-    void constructor_acceptsCustomCacheDir() {
+    void constructorAcceptsCustomCacheDir() {
         HuggingFaceModelSource source = new HuggingFaceModelSource(tempDir);
         assertThat(source).isNotNull();
     }
 
     @Test
-    void resolve_returnsCachedPathWhenAllRequiredFilesExist() throws IOException {
+    void resolveAdoptsTheFlatCacheWhenAllRequiredFilesExist() throws IOException {
         Path repoDir = tempDir.resolve("org/model");
         Files.createDirectories(repoDir);
         Files.writeString(repoDir.resolve("model.onnx"), "fake model");
@@ -48,11 +48,12 @@ class HuggingFaceModelSourceTest {
         HuggingFaceModelSource source = offlineSource(tempDir);
         Path resolved = source.resolve("org/model", List.of("model.onnx", "vocab.txt"));
 
-        assertThat(resolved).isEqualTo(repoDir);
+        assertThat(resolved).isEqualTo(adopted("org/model"));
+        assertThat(Files.readString(resolved.resolve("vocab.txt"))).isEqualTo("fake vocab");
     }
 
     @Test
-    void resolve_returnsCachedPathForSingleFile() throws IOException {
+    void resolveAdoptsTheFlatCacheForSingleFile() throws IOException {
         Path repoDir = tempDir.resolve("org/vision");
         Files.createDirectories(repoDir);
         Files.writeString(repoDir.resolve("vision_model.onnx"), "fake model");
@@ -60,11 +61,12 @@ class HuggingFaceModelSourceTest {
         HuggingFaceModelSource source = offlineSource(tempDir);
         Path resolved = source.resolve("org/vision", List.of("vision_model.onnx"));
 
-        assertThat(resolved).isEqualTo(repoDir);
+        assertThat(resolved).isEqualTo(adopted("org/vision"));
+        assertThat(resolved.resolve("vision_model.onnx")).exists();
     }
 
     @Test
-    void resolve_singleArg_returnsCachedPathWhenDirectoryExists() throws IOException {
+    void resolveWithoutFilesAdoptsTheFlatCacheDirectory() throws IOException {
         Path repoDir = tempDir.resolve("org/model");
         Files.createDirectories(repoDir);
         Files.writeString(repoDir.resolve("model.onnx"), "fake model");
@@ -72,11 +74,12 @@ class HuggingFaceModelSourceTest {
         HuggingFaceModelSource source = offlineSource(tempDir);
         Path resolved = source.resolve("org/model");
 
-        assertThat(resolved).isEqualTo(repoDir);
+        assertThat(resolved).isEqualTo(adopted("org/model"));
+        assertThat(resolved.resolve("model.onnx")).exists();
     }
 
     @Test
-    void resolve_singleArg_throwsWhenDirectoryDoesNotExist() {
+    void resolveWithoutFilesThrowsWhenNothingIsCached() {
         HuggingFaceModelSource source = offlineSource(tempDir);
 
         assertThatThrownBy(() -> source.resolve("org/nonexistent"))
@@ -84,7 +87,7 @@ class HuggingFaceModelSourceTest {
     }
 
     @Test
-    void resolve_skipsDownloadWhenAllFilesPresent() throws IOException {
+    void resolveSkipsDownloadWhenAllFilesPresent() throws IOException {
         Path repoDir = tempDir.resolve("org/cached");
         Files.createDirectories(repoDir);
         Files.writeString(repoDir.resolve("model.onnx"), "fake");
@@ -94,14 +97,34 @@ class HuggingFaceModelSourceTest {
 
         // Should return immediately without any HTTP call
         Path resolved = source.resolve("org/cached", List.of("model.onnx", "labels.txt"));
-        assertThat(resolved).isEqualTo(repoDir);
+        assertThat(resolved).isEqualTo(adopted("org/cached"));
     }
 
     @Test
-    void defaultInstance_returnsSameInstance() {
+    void resolveWithoutFilesReturnsTheCurrentSnapshot() throws IOException {
+        Path repoDir = tempDir.resolve("org/model");
+        Files.createDirectories(repoDir);
+        Files.writeString(repoDir.resolve("model.onnx"), "fake model");
+        HuggingFaceModelSource source = offlineSource(tempDir);
+        Path first = source.resolve("org/model", List.of("model.onnx"));
+
+        try (ResolvedModel model = source.open("org/model")) {
+            assertThat(model.directory()).isEqualTo(first);
+            assertThat(model.revision()).contains(new ModelRevision("org/model", ModelRevision.UNKNOWN));
+        }
+    }
+
+    @Test
+    void defaultInstanceReturnsSameInstance() {
         HuggingFaceModelSource first = HuggingFaceModelSource.defaultInstance();
         HuggingFaceModelSource second = HuggingFaceModelSource.defaultInstance();
         assertThat(second).isSameAs(first);
+    }
+
+    /** Where files of the flat layout are adopted to when offline. */
+    private Path adopted(String repoId) {
+        return tempDir.resolve("hub").resolve("models--" + repoId.replace("/", "--")).resolve("snapshots")
+                .resolve(ModelRevision.UNKNOWN);
     }
 
     /** A source that never contacts the Hub, so these cache tests make no network calls. */

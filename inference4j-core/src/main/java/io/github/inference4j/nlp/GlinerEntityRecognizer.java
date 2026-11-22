@@ -24,6 +24,7 @@ import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
@@ -371,33 +372,35 @@ public class GlinerEntityRecognizer implements ZeroShotEntityRecognizer, NamedEn
                 throw new IllegalArgumentException("threshold must be in [0, 1), got " + threshold);
             }
             ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-            Path dir = source.resolve(modelId, List.of("model.onnx", "tokenizer.json", "gliner_config.json"));
-            Path modelPath = requireFile(dir, "model.onnx");
-            Path tokenizerPath = requireFile(dir, "tokenizer.json");
-            JsonNode config = readJson(requireFile(dir, "gliner_config.json"));
+            try (ResolvedModel model = source.open(modelId, List.of("model.onnx", "tokenizer.json", "gliner_config.json"))) {
+                Path dir = model.directory();
+                Path modelPath = requireFile(dir, "model.onnx");
+                Path tokenizerPath = requireFile(dir, "tokenizer.json");
+                JsonNode config = readJson(requireFile(dir, "gliner_config.json"));
 
-            String spanMode = config.path("span_mode").asText();
-            if (!"markerV0".equals(spanMode)) {
-                throw new ModelLoadException("Unsupported GLiNER span_mode '" + spanMode + "'; only markerV0 is supported");
-            }
-            int maxWidth = config.path("max_width").asInt(12);
-            int maxWords = config.path("max_len").asInt(384);
-            if (stride != null && (stride < 0 || stride >= maxWords)) {
-                throw new IllegalArgumentException("stride must be in [0, " + maxWords + "), got " + stride);
-            }
-            Map<String, Integer> added = TokenizerJsonParser.parseAddedTokens(tokenizerPath);
-            Integer ent = added.get(config.path("ent_token").asText("<<ENT>>"));
-            Integer sep = added.get(config.path("sep_token").asText("<<SEP>>"));
-            if (ent == null || sep == null) {
-                throw new ModelLoadException("tokenizer.json lacks GLiNER's entity or separator token");
-            }
+                String spanMode = config.path("span_mode").asText();
+                if (!"markerV0".equals(spanMode)) {
+                    throw new ModelLoadException("Unsupported GLiNER span_mode '" + spanMode + "'; only markerV0 is supported");
+                }
+                int maxWidth = config.path("max_width").asInt(12);
+                int maxWords = config.path("max_len").asInt(384);
+                if (stride != null && (stride < 0 || stride >= maxWords)) {
+                    throw new IllegalArgumentException("stride must be in [0, " + maxWords + "), got " + stride);
+                }
+                Map<String, Integer> added = TokenizerJsonParser.parseAddedTokens(tokenizerPath);
+                Integer ent = added.get(config.path("ent_token").asText("<<ENT>>"));
+                Integer sep = added.get(config.path("sep_token").asText("<<SEP>>"));
+                if (ent == null || sep == null) {
+                    throw new ModelLoadException("tokenizer.json lacks GLiNER's entity or separator token");
+                }
 
-            Tokenizer tokenizer = TokenizerJsonParser.parseUnigram(tokenizerPath).build();
-            SpecialTokens special = TokenizerJsonParser.parseSpecialTokens(tokenizerPath);
-            InferenceSession session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
-            return new GlinerEntityRecognizer(this, session, tokenizer, special, ent, sep, maxWidth, maxWords);
+                Tokenizer tokenizer = TokenizerJsonParser.parseUnigram(tokenizerPath).build();
+                SpecialTokens special = TokenizerJsonParser.parseSpecialTokens(tokenizerPath);
+                InferenceSession session = sessionConfigurer != null
+                        ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
+                        : InferenceSession.create(model, "model.onnx");
+                return new GlinerEntityRecognizer(this, session, tokenizer, special, ent, sep, maxWidth, maxWords);
+            }
         }
 
         private static JsonNode readJson(Path path) {

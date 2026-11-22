@@ -33,9 +33,9 @@ class SentencePieceBpeTokenizerTest {
     private static SentencePieceBpeTokenizer tokenizer;
 
     @BeforeAll
-    static void setUp() {
+    static void setUp() throws java.net.URISyntaxException {
         Path tokenizerJson = Path.of(Objects.requireNonNull(
-                SentencePieceBpeTokenizerTest.class.getResource("/test-sp-tokenizer.json")).getPath());
+                SentencePieceBpeTokenizerTest.class.getResource("/test-sp-tokenizer.json")).toURI());
         tokenizer = TokenizerJsonParser.parse(tokenizerJson).build();
     }
 

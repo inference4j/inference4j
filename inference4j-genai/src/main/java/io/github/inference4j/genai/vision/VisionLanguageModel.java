@@ -31,9 +31,9 @@ import io.github.inference4j.generation.GenerationResult;
 import io.github.inference4j.generation.GenerativeModel;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 
 import java.io.IOException;
-import java.nio.file.Path;
 
 /**
  * Vision-language model backed by onnxruntime-genai.
@@ -80,7 +80,13 @@ public class VisionLanguageModel extends AbstractGenerativeTask<VisionInput, Gen
 	VisionLanguageModel(Model model, MultiModalProcessor processor,
 						ChatTemplate chatTemplate,
 						int maxLength, double temperature, int topK, double topP) {
-		super(model);
+		this(model, null, processor, chatTemplate, maxLength, temperature, topK, topP);
+	}
+
+	VisionLanguageModel(Model model, ResolvedModel resolvedModel, MultiModalProcessor processor,
+						ChatTemplate chatTemplate,
+						int maxLength, double temperature, int topK, double topP) {
+		super(model, resolvedModel);
 		this.processor = processor;
 		this.chatTemplate = chatTemplate;
 		this.maxLength = maxLength;
@@ -242,16 +248,18 @@ public class VisionLanguageModel extends AbstractGenerativeTask<VisionInput, Gen
 				ModelSource source = modelSource != null
 						? modelSource : HuggingFaceModelSource.defaultInstance();
 				String id = modelId != null ? modelId : "model";
-				Path modelDir = source.resolve(id);
+				ResolvedModel resolved = source.open(id);
 				Model m = null;
 				try {
-					m = loadModel(modelDir, intraOpThreads);
-					model = m;
-					processor = new MultiModalProcessor(m);
+					m = loadModel(resolved.directory(), intraOpThreads);
+					MultiModalProcessor p = new MultiModalProcessor(m);
+					return new VisionLanguageModel(m, resolved, p, chatTemplate,
+							maxLength, temperature, topK, topP);
 				} catch (GenAIException | IOException e) {
 					if (m != null) {
 						m.close();
 					}
+					resolved.close();
 					throw new ModelSourceException(
 							"Failed to load vision model: " + e.getMessage(), e);
 				}

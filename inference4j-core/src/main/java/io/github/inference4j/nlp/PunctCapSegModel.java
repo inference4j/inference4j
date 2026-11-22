@@ -24,6 +24,7 @@ import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.Preprocessor;
 import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
@@ -287,7 +288,9 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                loadFromDirectory(source.resolve(id, List.of("model.onnx", "tokenizer.json")));
+                try (ResolvedModel model = source.open(id, List.of("model.onnx", "tokenizer.json"))) {
+                    loadFromDirectory(model);
+                }
             }
             if (tokenizer == null) {
                 throw new IllegalStateException("Tokenizer is required");
@@ -296,7 +299,8 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
                     new TruncationGuard("PunctCapSegModel", truncation), stride);
         }
 
-        private void loadFromDirectory(Path dir) {
+        private void loadFromDirectory(ResolvedModel model) {
+            Path dir = model.directory();
             Path modelPath = dir.resolve("model.onnx");
             Path tokenizerPath = dir.resolve("tokenizer.json");
             if (!Files.exists(modelPath)) {
@@ -306,8 +310,8 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
                 throw new ModelSourceException("Tokenizer file not found: " + tokenizerPath);
             }
             this.session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
+                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
+                    : InferenceSession.create(model, "model.onnx");
             if (this.tokenizer == null) {
                 this.tokenizer = TokenizerJsonParser.parseUnigram(tokenizerPath).build();
             }

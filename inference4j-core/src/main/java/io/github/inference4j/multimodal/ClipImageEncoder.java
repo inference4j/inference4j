@@ -25,6 +25,7 @@ import io.github.inference4j.preprocessing.image.ImageTransformPipeline;
 import io.github.inference4j.preprocessing.image.Interpolation;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.processing.Preprocessor;
 import io.github.inference4j.session.SessionConfigurer;
@@ -158,8 +159,9 @@ public class ClipImageEncoder
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id, List.of(VISION_MODEL_FILE));
-                loadFromDirectory(dir);
+                try (ResolvedModel model = source.open(id, List.of(VISION_MODEL_FILE))) {
+                    loadFromDirectory(model);
+                }
             }
             if (inputName == null) {
                 inputName = DEFAULT_INPUT_NAME;
@@ -176,7 +178,8 @@ public class ClipImageEncoder
             return new ClipImageEncoder(session, inputName, preprocessor);
         }
 
-        private void loadFromDirectory(Path dir) {
+        private void loadFromDirectory(ResolvedModel model) {
+            Path dir = model.directory();
             if (!Files.isDirectory(dir)) {
                 throw new ModelSourceException("Model directory not found: " + dir);
             }
@@ -187,8 +190,8 @@ public class ClipImageEncoder
             }
 
             this.session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
+                    ? InferenceSession.create(model, VISION_MODEL_FILE, sessionConfigurer)
+                    : InferenceSession.create(model, VISION_MODEL_FILE);
         }
     }
 }

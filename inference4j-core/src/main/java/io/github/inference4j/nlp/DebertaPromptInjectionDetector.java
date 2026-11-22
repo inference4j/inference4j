@@ -22,6 +22,7 @@ import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.preprocessing.text.ModelConfig;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.processing.TokenWindows;
@@ -243,25 +244,27 @@ public class DebertaPromptInjectionDetector implements PromptInjectionDetector, 
             }
             ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
             String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-            Path dir = source.resolve(id, List.of("model.onnx", "tokenizer.json", "config.json"));
-            Path modelPath = requireFile(dir, "model.onnx");
-            Path tokenizerPath = requireFile(dir, "tokenizer.json");
-            Path configPath = requireFile(dir, "config.json");
+            try (ResolvedModel model = source.open(id, List.of("model.onnx", "tokenizer.json", "config.json"))) {
+                Path dir = model.directory();
+                Path modelPath = requireFile(dir, "model.onnx");
+                Path tokenizerPath = requireFile(dir, "tokenizer.json");
+                Path configPath = requireFile(dir, "config.json");
 
-            Tokenizer tokenizer = TokenizerJsonParser.parseUnigram(tokenizerPath).build();
-            long[][] specialIds = specialTokenIds(tokenizerPath);
-            int windowSize = maxLength - specialIds[0].length - specialIds[1].length;
-            if (stride < 0 || stride >= windowSize) {
-                throw new IllegalArgumentException(
-                        "stride must be in [0, " + windowSize + ") for maxLength " + maxLength + ", got " + stride);
+                Tokenizer tokenizer = TokenizerJsonParser.parseUnigram(tokenizerPath).build();
+                long[][] specialIds = specialTokenIds(tokenizerPath);
+                int windowSize = maxLength - specialIds[0].length - specialIds[1].length;
+                if (stride < 0 || stride >= windowSize) {
+                    throw new IllegalArgumentException(
+                            "stride must be in [0, " + windowSize + ") for maxLength " + maxLength + ", got " + stride);
+                }
+                ModelConfig config = ModelConfig.fromFile(configPath);
+                int injectionIndex = labelIndex(config, injectionLabel);
+
+                InferenceSession session = sessionConfigurer != null
+                        ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
+                        : InferenceSession.create(model, "model.onnx");
+                return new DebertaPromptInjectionDetector(this, session, tokenizer, config, specialIds, injectionIndex);
             }
-            ModelConfig config = ModelConfig.fromFile(configPath);
-            int injectionIndex = labelIndex(config, injectionLabel);
-
-            InferenceSession session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
-            return new DebertaPromptInjectionDetector(this, session, tokenizer, config, specialIds, injectionIndex);
         }
 
         private static Path requireFile(Path dir, String name) {

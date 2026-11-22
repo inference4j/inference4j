@@ -37,11 +37,11 @@ class BpeTokenizerTest {
     private static Path mergesPath;
 
     @BeforeAll
-    static void loadPaths() {
+    static void loadPaths() throws java.net.URISyntaxException {
         vocabPath = Path.of(Objects.requireNonNull(
-                BpeTokenizerTest.class.getResource("/test-bpe-vocab.json")).getPath());
+                BpeTokenizerTest.class.getResource("/test-bpe-vocab.json")).toURI());
         mergesPath = Path.of(Objects.requireNonNull(
-                BpeTokenizerTest.class.getResource("/test-bpe-merges.txt")).getPath());
+                BpeTokenizerTest.class.getResource("/test-bpe-merges.txt")).toURI());
     }
 
     @Nested

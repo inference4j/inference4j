@@ -19,6 +19,7 @@ package io.github.inference4j.vision;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.OutputOperator;
 import io.github.inference4j.processing.Preprocessor;
 import io.github.inference4j.Tensor;
@@ -106,14 +107,16 @@ public class EfficientNetClassifier extends AbstractImageClassifier {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id, List.of("model.onnx"));
-                loadFromDirectory(dir);
+                try (ResolvedModel model = source.open(id, List.of("model.onnx"))) {
+                    loadFromDirectory(model);
+                }
             }
             validate();
             return new EfficientNetClassifier(session, preprocessor, labels, inputName, defaultTopK, outputOperator);
         }
 
-        private void loadFromDirectory(Path dir) {
+        private void loadFromDirectory(ResolvedModel model) {
+            Path dir = model.directory();
             if (!Files.isDirectory(dir)) {
                 throw new ModelSourceException("Model directory not found: " + dir);
             }
@@ -124,8 +127,8 @@ public class EfficientNetClassifier extends AbstractImageClassifier {
             }
 
             this.session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
+                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
+                    : InferenceSession.create(model, "model.onnx");
             try {
                 if (this.inputName == null) {
                     this.inputName = session.inputNames().iterator().next();

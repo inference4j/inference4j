@@ -8,7 +8,7 @@
 |---------|----------|
 | `io.github.inference4j` | Core contracts: `InferenceTask`, `Classifier`, `Detector`, `ZeroShotClassifier`, `ZeroShotInput`, `AbstractInferenceTask`, `Tensor`, `TensorType`, `InferenceSession`, `NativeTensors`, `InferenceContext` |
 | `io.github.inference4j.session` | Session config: `SessionConfigurer`, `SessionOptions` |
-| `io.github.inference4j.model` | Model resolution: `ModelSource`, `HuggingFaceModelSource`, `LocalModelSource` |
+| `io.github.inference4j.model` | Model resolution: `ModelSource`, `HuggingFaceModelSource`, `LocalModelSource`, `ResolvedModel`, `ModelRevision`; cache management: `ModelCache`, `CachedModel`, `CachedSnapshot`, `CachedFile`, `UpdateCheck`, `EvictionResult`, `PruneMode` |
 | `io.github.inference4j.processing` | Pre/post-processing: `Preprocessor`, `Postprocessor`, `OutputOperator`, `MathOps`, `TruncationPolicy`, `TruncationGuard`, `TokenWindows`, `WindowAggregation`, `TokenLimits` |
 | `io.github.inference4j.exception` | Custom exceptions: `ModelLoadException`, `InferenceException`, `InputTooLongException` |
 | `io.github.inference4j.tokenizer` | `Tokenizer`, `EncodedInput`, `WordPieceTokenizer`, `BpeTokenizer`, `DecodingBpeTokenizer`, `SentencePieceBpeTokenizer`, `UnigramTokenizer`, `PrecompiledNormalizer`, `SpecialTokens`, `TokenDecoder`, `TokenStream` |
@@ -183,6 +183,27 @@ try (var task = SomeWrapper.builder()
 
 The `.session(InferenceSession)` method exists on all builders but is package-private — the public API uses `modelId` + `modelSource` + `sessionOptions`.
 
+## Model cache
+
+`HuggingFaceModelSource` caches each repo as snapshots, one per Hub commit. See
+[Model loading](../guides/model-loading.md#managing-the-cache).
+
+| Type | Methods / components | Description |
+|------|----------------------|-------------|
+| `ResolvedModel` | `directory()`, `file(name)`, `revision()`, `retain()`, `close()`, `unmanaged(Path)` | An opened model directory; keeps its snapshot on disk until closed. Returned by `ModelSource.open(...)`. |
+| `ModelRevision` | `repoId()`, `commit()` | The repo commit a model was loaded from (`unknown` for files adopted offline from an older cache) |
+| `ModelCache` | `list()`, `find()`, `check()`, `update()`, `evict()`, `prune()`, `directory()`, `defaultCache()` | Inspects and manages a cache; from `HuggingFaceModelSource.cache()` |
+| `CachedModel` | `repoId()`, `revision()`, `lastChecked()`, `remoteRevision()`, `updateAvailable()`, `snapshots()`, `sizeBytes()`, `stale()` | A cached repo |
+| `CachedSnapshot` | `revision()`, `current()`, `leases()`, `files()`, `sizeBytes()` | One snapshot of a repo |
+| `CachedFile` | `path()`, `id()`, `sizeBytes()` | A file in a snapshot |
+| `UpdateCheck` | `repoId()`, `cachedRevision()`, `remoteRevision()`, `changedFiles()`, `checkedAt()`, `updateAvailable()` | What the Hub reported for a cached repo |
+| `EvictionResult` | `removed()`, `inUse()`, `freedBytes()` | What an eviction or prune removed and kept |
+| `PruneMode` | `AUTO`, `MANUAL` | Whether superseded snapshots are deleted after each update |
+
+`InferenceSession.create(ResolvedModel, String fileName[, SessionConfigurer | SessionOptions])` creates a session that
+retains the model until it is closed, and `InferenceSession.modelRevision()` returns the revision it was loaded from.
+The genai tasks expose the same through `AbstractGenerativeTask.modelRevision()`.
+
 ## Thread safety
 
 Models are expensive to build and cheap to call, so build each one once and share it, for example as a Spring singleton
@@ -219,7 +240,7 @@ bean. The split mirrors Hibernate's `SessionFactory` and `Session`:
 | Interface | Signature | Description |
 |-----------|-----------|-------------|
 | `SessionConfigurer` | `void configure(SessionOptions) throws OrtException` | ONNX Runtime session customization |
-| `ModelSource` | `Path resolve(String modelId)` | Model file resolution |
+| `ModelSource` | `Path resolve(String modelId)` (with `open(...)` defaults returning a `ResolvedModel`) | Model file resolution |
 | `Preprocessor<I, O>` | `O process(I input)` | Input transformation |
 | `Postprocessor<I, O>` | `O process(I input)` | Output transformation |
 | `OutputOperator` | `float[] apply(float[] values)` | Activation function (softmax, sigmoid, identity) |

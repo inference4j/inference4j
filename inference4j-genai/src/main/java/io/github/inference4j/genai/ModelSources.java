@@ -20,7 +20,9 @@ import io.github.inference4j.genai.vision.VisionLanguageModel;
 import io.github.inference4j.generation.GenerativeModel;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -191,8 +193,21 @@ public final class ModelSources {
     }
 
     private static ModelSource preconfigured(String repoId, List<String> requiredFiles) {
-        return modelId -> HuggingFaceModelSource.defaultInstance()
-                .resolve(repoId, requiredFiles);
+        return new PresetSource(repoId, requiredFiles);
+    }
+
+    /** A preset's files from the default Hub source, whatever model id is asked for. */
+    private record PresetSource(String repoId, List<String> requiredFiles) implements ModelSource {
+
+        @Override
+        public Path resolve(String modelId) {
+            return HuggingFaceModelSource.defaultInstance().resolve(repoId, requiredFiles);
+        }
+
+        @Override
+        public ResolvedModel open(String modelId) {
+            return HuggingFaceModelSource.defaultInstance().open(repoId, requiredFiles);
+        }
     }
 
 }
