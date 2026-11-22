@@ -87,7 +87,7 @@ Summarizer summarizer = FlanT5TextGenerator.flanT5Base()
 | `.modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Model resolution strategy |
 | `.sessionOptions(SessionConfigurer)` | `SessionConfigurer` | default | ONNX Runtime session config |
 | `.tokenizerProvider(TokenizerProvider)` | `TokenizerProvider` | Preset-dependent | Tokenizer construction strategy |
-| `.maxNewTokens(int)` | `int` | `256` | Maximum tokens to generate |
+| `.maxNewTokens(int)` | `int` | `256` | Maximum tokens to generate. Capped at the decoder's positions (1023 for BART, which forces a first token), with a warning; Flan-T5 has no cap |
 | `.temperature(float)` | `float` | `0.0` | Sampling temperature (higher = more random) |
 | `.topK(int)` | `int` | `0` (disabled) | Top-K sampling |
 | `.topP(float)` | `float` | `0.0` (disabled) | Nucleus sampling |

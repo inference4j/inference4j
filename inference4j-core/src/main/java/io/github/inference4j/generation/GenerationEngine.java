@@ -28,6 +28,8 @@ import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.TokenDecoder;
 import io.github.inference4j.tokenizer.TokenStream;
 import io.github.inference4j.tokenizer.Tokenizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -65,6 +67,8 @@ import java.util.function.Consumer;
  * }</pre>
  */
 public class GenerationEngine implements GenerativeTask<String, GenerationResult> {
+
+    private static final Logger logger = LoggerFactory.getLogger(GenerationEngine.class);
 
     private final GenerativeSession session;
     private final Tokenizer tokenizer;
@@ -218,8 +222,8 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
             streamer.accept(fragment);
             generatedTokens++;
 
-            if (streamer.isStopped()) {
-                break;
+            if (streamer.isStopped() || i == maxNewTokens - 1) {
+                break;      // the last token is never fed back: its logits would go unused
             }
 
             result = session.decode(tokenId);
@@ -369,6 +373,7 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         private Integer inputPrefixTokenId;
         private Integer forcedBosTokenId;
         private int maxInputLength = Integer.MAX_VALUE;
+        private Integer maxDecoderPositions;
         private boolean keepPromptEnd;
         private TruncationGuard truncationGuard;
         private float temperature = 0f;
@@ -446,6 +451,23 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
         }
 
         /**
+         * The number of positions an encoder-decoder model's decoder has: {@code max_position_embeddings} in
+         * {@code config.json} for learned or sinusoidal positions (BART, MarianMT), none for relative positions
+         * (T5). The decoder start token and any {@link #forcedBosTokenId(int) forced first token} take one
+         * position each, and every generated token but the last another. A larger {@link #maxNewTokens(int)}
+         * is lowered to fit, with a warning, since generating past the last position fails inside the model.
+         * Defaults to no limit.
+         */
+        public Builder maxDecoderPositions(int maxDecoderPositions) {
+            if (maxDecoderPositions < 1) {
+                throw new IllegalArgumentException("maxDecoderPositions must be at least 1, got "
+                        + maxDecoderPositions);
+            }
+            this.maxDecoderPositions = maxDecoderPositions;
+            return this;
+        }
+
+        /**
          * How an over-long prompt is truncated. {@code false} (the default) keeps its beginning, which is
          * right for an encoder's input. {@code true} keeps the chat template and the end of the message,
          * which is what a decoder-only model needs: it answers after the template's closing tokens and
@@ -483,6 +505,15 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
             Objects.requireNonNull(decoder, "decoder is required");
             if (eosTokenIds.isEmpty()) {
                 throw new IllegalStateException("At least one eosTokenId is required");
+            }
+            if (maxDecoderPositions != null) {
+                // positions 0.. hold the start token, the forced token, then every generated token but the last
+                int fits = maxDecoderPositions - (forcedBosTokenId != null ? 1 : 0);
+                if (maxNewTokens > fits) {
+                    logger.warn("maxNewTokens {} exceeds the {} tokens the decoder's {} positions allow; "
+                            + "generation stops at {}", maxNewTokens, fits, maxDecoderPositions, fits);
+                    maxNewTokens = fits;
+                }
             }
             return new GenerationEngine(this);
         }

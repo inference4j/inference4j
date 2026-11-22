@@ -209,6 +209,74 @@ class GenerationEngineTest {
         assertThat(streamed).isEqualTo(List.of("Die", " Karte"));
     }
 
+    /** An engine whose model never emits EOS: it always picks token 5, which decodes to "x". */
+    private static GenerationEngine.Builder neverEnding(GenerativeSession session) {
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        TokenDecoder decoder = mock(TokenDecoder.class);
+        TokenStream stream = streamOf(decoder);
+        when(tokenizer.encode(eq("x"), anyInt())).thenReturn(
+                new EncodedInput(new long[]{1}, new long[]{1}, new long[]{0}));
+        when(session.prefill(any())).thenReturn(new ForwardResult(logitsForToken(5, 10)));
+        when(session.decode(anyLong())).thenReturn(new ForwardResult(logitsForToken(5, 10)));
+        when(stream.next(5)).thenReturn("x");
+        return GenerationEngine.builder().session(session).tokenizer(tokenizer).decoder(decoder).eosTokenId(999);
+    }
+
+    @Test
+    void theLastTokenIsNotFedBackToTheModel() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        try (var engine = neverEnding(session).maxNewTokens(3).build()) {
+            assertThat(engine.generate("x").generatedTokens()).isEqualTo(3);
+        }
+        verify(session, times(2)).decode(anyLong());
+    }
+
+    @Test
+    void maxNewTokensIsLoweredToFitTheDecoderPositions() throws Exception {
+        GenerativeSession session = mock(GenerativeSession.class);
+        List<GenerationEngine> engines = new ArrayList<>();
+
+        List<String> warnings = WarningLog.of(GenerationEngine.class,
+                () -> engines.add(neverEnding(session).maxNewTokens(10).maxDecoderPositions(4).build()));
+
+        try (var engine = engines.get(0)) {
+            assertThat(engine.maxNewTokens()).isEqualTo(4);
+            assertThat(warnings).singleElement().asString()
+                    .isEqualTo("maxNewTokens 10 exceeds the 4 tokens the decoder's 4 positions allow; "
+                            + "generation stops at 4");
+            // the start token at position 0, then generated tokens 1-3 at positions 1-3
+            assertThat(engine.generate("x").generatedTokens()).isEqualTo(4);
+        }
+        verify(session, times(3)).decode(anyLong());
+    }
+
+    @Test
+    void aForcedFirstTokenTakesADecoderPosition() throws Exception {
+        try (var engine = neverEnding(mock(GenerativeSession.class))
+                .maxNewTokens(10).forcedBosTokenId(7).maxDecoderPositions(4).build()) {
+            assertThat(engine.maxNewTokens()).isEqualTo(3);
+        }
+    }
+
+    @Test
+    void maxNewTokensThatFitsIsKeptWithoutAWarning() throws Exception {
+        List<GenerationEngine> engines = new ArrayList<>();
+
+        List<String> warnings = WarningLog.of(GenerationEngine.class, () -> engines.add(
+                neverEnding(mock(GenerativeSession.class)).maxNewTokens(4).maxDecoderPositions(4).build()));
+
+        try (var engine = engines.get(0)) {
+            assertThat(engine.maxNewTokens()).isEqualTo(4);
+        }
+        assertThat(warnings).isEmpty();
+    }
+
+    @Test
+    void rejectsDecoderPositionsBelowOne() {
+        assertThatThrownBy(() -> GenerationEngine.builder().maxDecoderPositions(0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test
     void generate_respectsMaxNewTokensLimit() {
         GenerativeSession session = mock(GenerativeSession.class);
