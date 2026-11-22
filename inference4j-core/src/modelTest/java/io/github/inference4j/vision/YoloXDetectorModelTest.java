@@ -94,11 +94,11 @@ class YoloXDetectorModelTest {
     private static void assertSingleCat(Detection d, float confidence, float x1, float y1, float x2, float y2) {
         assertThat(d.label()).isEqualTo("cat");
         assertThat(d.classIndex()).isEqualTo(15);
-        // OpenCV and ImageIO decode the JPEG slightly differently
-        assertThat(d.confidence()).isCloseTo(confidence, offset(0.01f));
-        assertThat(d.box().x1()).isCloseTo(x1, offset(1.5f));
-        assertThat(d.box().y1()).isCloseTo(y1, offset(1.5f));
-        assertThat(d.box().x2()).isCloseTo(x2, offset(1.5f));
-        assertThat(d.box().y2()).isCloseTo(y2, offset(1.5f));
+        // The reference ran OpenCV 5.1, whose bilinear resize moves scores in the third decimal against OpenCV 4.x
+        assertThat(d.confidence()).isCloseTo(confidence, offset(5e-3f));
+        assertThat(d.box().x1()).isCloseTo(x1, offset(1f));
+        assertThat(d.box().y1()).isCloseTo(y1, offset(1f));
+        assertThat(d.box().x2()).isCloseTo(x2, offset(1f));
+        assertThat(d.box().y2()).isCloseTo(y2, offset(1f));
     }
 }
