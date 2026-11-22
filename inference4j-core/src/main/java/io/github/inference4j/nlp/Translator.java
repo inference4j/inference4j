@@ -17,6 +17,7 @@
 package io.github.inference4j.nlp;
 
 import io.github.inference4j.generation.GenerationResult;
+import io.github.inference4j.processing.TokenLimits;
 
 import java.util.function.Consumer;
 
@@ -95,4 +96,26 @@ public interface Translator extends AutoCloseable {
      * @throws UnsupportedOperationException if the model only supports a fixed language pair
      */
     GenerationResult translate(String text, Language source, Language target, Consumer<String> tokenListener);
+
+    /**
+     * The token budget of {@link #translate(String, Consumer)}: the most input one call takes whole.
+     * Long-input strategies such as {@link ChunkedTranslator} use it to cut text into pieces that fit.
+     *
+     * @throws UnsupportedOperationException if this translator does not report its token limits, or
+     *                                       requires explicit languages
+     */
+    default TokenLimits translationLimits() {
+        throw new UnsupportedOperationException(getClass().getSimpleName() + " does not report its token limits");
+    }
+
+    /**
+     * The token budget of {@link #translate(String, Language, Language, Consumer)} for this language pair,
+     * prompt included.
+     *
+     * @throws UnsupportedOperationException if this translator does not report its token limits, or has a
+     *                                       fixed language pair
+     */
+    default TokenLimits translationLimits(Language source, Language target) {
+        throw new UnsupportedOperationException(getClass().getSimpleName() + " does not report its token limits");
+    }
 }

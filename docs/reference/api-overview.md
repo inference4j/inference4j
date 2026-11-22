@@ -9,7 +9,7 @@
 | `io.github.inference4j` | Core contracts: `InferenceTask`, `Classifier`, `Detector`, `ZeroShotClassifier`, `ZeroShotInput`, `AbstractInferenceTask`, `Tensor`, `TensorType`, `InferenceSession`, `NativeTensors`, `InferenceContext` |
 | `io.github.inference4j.session` | Session config: `SessionConfigurer`, `SessionOptions` |
 | `io.github.inference4j.model` | Model resolution: `ModelSource`, `HuggingFaceModelSource`, `LocalModelSource` |
-| `io.github.inference4j.processing` | Pre/post-processing: `Preprocessor`, `Postprocessor`, `OutputOperator`, `MathOps`, `TruncationPolicy`, `TruncationGuard`, `TokenWindows`, `WindowAggregation` |
+| `io.github.inference4j.processing` | Pre/post-processing: `Preprocessor`, `Postprocessor`, `OutputOperator`, `MathOps`, `TruncationPolicy`, `TruncationGuard`, `TokenWindows`, `WindowAggregation`, `TokenLimits` |
 | `io.github.inference4j.exception` | Custom exceptions: `ModelLoadException`, `InferenceException`, `InputTooLongException` |
 | `io.github.inference4j.tokenizer` | `Tokenizer`, `EncodedInput`, `WordPieceTokenizer`, `BpeTokenizer`, `DecodingBpeTokenizer`, `SentencePieceBpeTokenizer`, `UnigramTokenizer`, `PrecompiledNormalizer`, `SpecialTokens`, `TokenDecoder`, `TokenStream` |
 | `io.github.inference4j.preprocessing.text` | `ModelConfig` (HuggingFace config.json parser) |
@@ -17,7 +17,7 @@
 | `io.github.inference4j.preprocessing.audio` | `AudioTransformPipeline`, `AudioTransform`, `AudioData`, `AudioLoader`, `AudioWriter`, `AudioProcessor` |
 | `io.github.inference4j.vision` | `ResNetClassifier`, `EfficientNetClassifier`, `YoloV8Detector`, `Yolo26Detector`, `DetrDetector`, `YoloXDetector`, `PicoDetDetector`, `DetectionOps`, `CraftTextDetector`, `PaddleTextDetector`, `PaddleTextRecognizer`, `TextRecognizer`, `OcrPipeline`, `DbPostProcessor`, `QuadCrop`, `TextLine`, `RecognizedText`, `Point`, `DepthAnythingEstimator`, `Sam2Segmenter`, `Prompt`, `ImageFeatures`, `ImageEmbedder`, `ImageAnnotator`, `TensorImages`, `Colormap` |
 | `io.github.inference4j.audio` | `MoonshineRecognizer`, `TranscriptionStream`, `TranscriptListener`, `TranscriptLine`, `Wav2Vec2Recognizer`, `PunctuatedSpeechRecognizer`, `SegmentedSpeechRecognizer`, `SileroVadDetector` |
-| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `DebertaZeroShotClassifier`, `ZeroShotTextClassifier`, `DebertaPromptInjectionDetector`, `PromptInjectionDetector`, `InjectionCheck`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `GlinerEntityRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `ZeroShotEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
+| `io.github.inference4j.nlp` | `DistilBertTextClassifier`, `DebertaZeroShotClassifier`, `ZeroShotTextClassifier`, `DebertaPromptInjectionDetector`, `PromptInjectionDetector`, `InjectionCheck`, `SentenceTransformerEmbedder`, `MiniLMSearchReranker`, `BertNerRecognizer`, `GlinerEntityRecognizer`, `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `ChunkedTranslator`, `ChunkedGrammarCorrector`, `T5SqlGenerator`, `PunctCapSegModel`, `NamedEntityRecognizer`, `ZeroShotEntityRecognizer`, `NamedEntity`, `TextGenerator`, `Summarizer`, `Translator`, `GrammarCorrector`, `SqlGenerator`, `Language`, `PoolingStrategy`, `QueryDocumentPair` |
 | `io.github.inference4j.multimodal` | `ClipClassifier`, `ClipImageEncoder`, `ClipTextEncoder` |
 | `io.github.inference4j.generation` | `GenerativeTask`, `GenerationEngine`, `GenerationResult`, `GenerativeSession`, `EncoderDecoderSession`, `ChatTemplate`, `ChatMessage`, `GenerativeModel`, `TokenStreamer` |
 | `io.github.inference4j.sampling` | `LogitsProcessor`, `LogitsSampler`, `CategoricalSampler`, `GreedySampler` |
@@ -101,7 +101,9 @@ InferenceTask<I, O>                     // run(I) → O, extends AutoCloseable
 ├── TextGenerator                       // generate(String) → GenerationResult
 ├── Summarizer                          // summarize(String) → String
 ├── Translator                          // translate(String) → String
+│                                       //   ChunkedTranslator translates long text in chunks
 ├── GrammarCorrector                    // correct(String) → String
+│                                       //   ChunkedGrammarCorrector corrects long text sentence by sentence
 └── SqlGenerator                        // generateSql(String, String) → String
 
 PromptInjectionDetector                 // check(String) → InjectionCheck, extends AutoCloseable
@@ -158,7 +160,7 @@ See [Generative AI](../generative-ai/introduction.md) for details.
 | `Transcription` | `text()`, `segments()` | `MoonshineRecognizer`, `Wav2Vec2Recognizer`, `WhisperSpeechModel` |
 | `TranscriptLine` | `id()`, `text()`, `start()`, `end()`, `completed()` | `TranscriptionStream` (via `TranscriptListener`) |
 | `VoiceSegment` | `start()`, `end()`, `duration()`, `confidence()` | `SileroVadDetector` |
-| `GenerationResult` | `text()`, `promptTokens()`, `generatedTokens()`, `duration()` | `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `TextGenerator`, `VisionLanguageModel` |
+| `GenerationResult` | `text()`, `promptTokens()`, `generatedTokens()`, `duration()` | `OnnxTextGenerator`, `FlanT5TextGenerator`, `BartSummarizer`, `MarianTranslator`, `CoeditGrammarCorrector`, `ChunkedTranslator`, `ChunkedGrammarCorrector`, `TextGenerator`, `VisionLanguageModel` |
 | `QueryDocumentPair` | `query()`, `document()` | `MiniLMSearchReranker`, `SearchReranker` |
 | `VisionInput` | `imagePath()`, `prompt()` | `VisionLanguageModel` |
 

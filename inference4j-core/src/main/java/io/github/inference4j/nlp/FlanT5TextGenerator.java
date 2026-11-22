@@ -18,6 +18,7 @@ package io.github.inference4j.nlp;
 
 import io.github.inference4j.generation.GenerationEngine;
 import io.github.inference4j.generation.GenerationResult;
+import io.github.inference4j.processing.TokenLimits;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.tokenizer.TokenizerProvider;
 import io.github.inference4j.tokenizer.UnigramTokenizer;
@@ -54,6 +55,9 @@ import java.util.function.Consumer;
  */
 public class FlanT5TextGenerator implements TextGenerator, Summarizer, Translator,
         GrammarCorrector {
+
+    private static final String SUMMARIZE_PREFIX = "summarize: ";
+    private static final String CORRECT_PREFIX = "correct grammar: ";
 
     private final GenerationEngine engine;
 
@@ -120,7 +124,12 @@ public class FlanT5TextGenerator implements TextGenerator, Summarizer, Translato
 
     @Override
     public GenerationResult summarize(String text, Consumer<String> tokenListener) {
-        return engine.generate("summarize: " + text, tokenListener);
+        return engine.generate(SUMMARIZE_PREFIX + text, tokenListener);
+    }
+
+    @Override
+    public TokenLimits summarizationLimits() {
+        return new EngineTokenLimits(engine, SUMMARIZE_PREFIX);
     }
 
     // --- Translator ---
@@ -135,16 +144,35 @@ public class FlanT5TextGenerator implements TextGenerator, Summarizer, Translato
     @Override
     public GenerationResult translate(String text, Language source, Language target,
                                        Consumer<String> tokenListener) {
-        return engine.generate(
-                "translate " + source.displayName() + " to " + target.displayName() + ": " + text,
-                tokenListener);
+        return engine.generate(translatePrefix(source, target) + text, tokenListener);
+    }
+
+    @Override
+    public TokenLimits translationLimits() {
+        throw new UnsupportedOperationException(
+                "Flan-T5 requires source and target languages. "
+                + "Use translationLimits(source, target) instead.");
+    }
+
+    @Override
+    public TokenLimits translationLimits(Language source, Language target) {
+        return new EngineTokenLimits(engine, translatePrefix(source, target));
+    }
+
+    private static String translatePrefix(Language source, Language target) {
+        return "translate " + source.displayName() + " to " + target.displayName() + ": ";
     }
 
     // --- GrammarCorrector ---
 
     @Override
     public GenerationResult correct(String text, Consumer<String> tokenListener) {
-        return engine.generate("correct grammar: " + text, tokenListener);
+        return engine.generate(CORRECT_PREFIX + text, tokenListener);
+    }
+
+    @Override
+    public TokenLimits correctionLimits() {
+        return new EngineTokenLimits(engine, CORRECT_PREFIX);
     }
 
     @Override

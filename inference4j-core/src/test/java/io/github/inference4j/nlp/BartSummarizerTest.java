@@ -88,4 +88,20 @@ class BartSummarizerTest {
                     assertThat(ex.getMessage()).contains("modelSource");
                 });
     }
+
+    @Test
+    void summarizationLimitsCountTheTextAsIs() {
+        GenerationEngine engine = mock(GenerationEngine.class);
+        when(engine.maxInputLength()).thenReturn(512);
+        when(engine.maxNewTokens()).thenReturn(256);
+        when(engine.countInputTokens(anyString())).thenReturn(42);
+        BartSummarizer summarizer = new BartSummarizer(engine);
+
+        var limits = summarizer.summarizationLimits();
+
+        assertThat(limits.maxInputTokens()).isEqualTo(512);
+        assertThat(limits.maxOutputTokens()).isEqualTo(256);
+        assertThat(limits.countInputTokens("An article.")).isEqualTo(42);
+        verify(engine).countInputTokens("An article.");
+    }
 }

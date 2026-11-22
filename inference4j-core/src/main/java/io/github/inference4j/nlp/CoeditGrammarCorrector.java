@@ -18,6 +18,7 @@ package io.github.inference4j.nlp;
 
 import io.github.inference4j.generation.GenerationEngine;
 import io.github.inference4j.generation.GenerationResult;
+import io.github.inference4j.processing.TokenLimits;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.tokenizer.TokenizerProvider;
 import io.github.inference4j.tokenizer.UnigramTokenizer;
@@ -111,6 +112,11 @@ public class CoeditGrammarCorrector implements TextGenerator, GrammarCorrector {
     @Override
     public GenerationResult correct(String text, Consumer<String> tokenListener) {
         return engine.generate(GRAMMAR_PREFIX + text, tokenListener);
+    }
+
+    @Override
+    public TokenLimits correctionLimits() {
+        return new EngineTokenLimits(engine, GRAMMAR_PREFIX);
     }
 
     @Override

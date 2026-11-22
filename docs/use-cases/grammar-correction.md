@@ -99,9 +99,34 @@ GrammarCorrector corrector = FlanT5TextGenerator.flanT5Base()
 
 | Model | Default limit | When exceeded | Long-input strategies |
 |-------|---------------|---------------|-----------------------|
-| CoEdIT / Flan-T5 | 512 tokens (the length T5 was trained on) | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
+| CoEdIT / Flan-T5 | 512 tokens (the length T5 was trained on) | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | [`ChunkedGrammarCorrector`](#long-documents) |
 
 The limit comes from the model's `config.json` and can be changed with `.maxInputLength(int)`.
+
+## Long documents
+
+CoEdIT is prompted and trained sentence by sentence ("Fix grammatical errors in this sentence"). Wrap a
+corrector in `ChunkedGrammarCorrector` to correct longer text one sentence at a time:
+
+```java
+try (GrammarCorrector corrector = new ChunkedGrammarCorrector(
+        CoeditGrammarCorrector.coeditBase().build())) {
+    String corrected = corrector.correct(longDocument);
+}
+```
+
+- Each sentence is a separate call; sentences are found with the JDK's `BreakIterator`. Whitespace,
+  paragraphs and line breaks are kept.
+- Text of a single sentence is corrected in one call, exactly as the wrapped corrector would.
+- A sentence longer than the token budget is split between words. The budget defaults to a quarter of
+  the corrector's `maxNewTokens` (64 with the default of 256) and can be set with
+  `new ChunkedGrammarCorrector(corrector, maxChunkTokens)`.
+- Streaming passes the tokens through sentence by sentence, with the whitespace between sentences; token
+  counts are summed over all calls.
+
+`ChunkedGrammarCorrector` works with any `GrammarCorrector` that reports its token budget through
+`correctionLimits()`; `CoeditGrammarCorrector` and `FlanT5TextGenerator` do. It is thread-safe, and
+closing it closes the wrapped corrector.
 
 ## Result type
 

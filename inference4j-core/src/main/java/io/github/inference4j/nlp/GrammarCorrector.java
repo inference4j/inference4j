@@ -17,6 +17,7 @@
 package io.github.inference4j.nlp;
 
 import io.github.inference4j.generation.GenerationResult;
+import io.github.inference4j.processing.TokenLimits;
 
 import java.util.function.Consumer;
 
@@ -51,4 +52,15 @@ public interface GrammarCorrector extends AutoCloseable {
      * @return the complete generation result
      */
     GenerationResult correct(String text, Consumer<String> tokenListener);
+
+    /**
+     * The token budget of {@link #correct(String, Consumer)}: the most input one call takes whole,
+     * prompt included. Long-input strategies such as {@link ChunkedGrammarCorrector} use it to cut text
+     * into pieces that fit.
+     *
+     * @throws UnsupportedOperationException if this corrector does not report its token limits
+     */
+    default TokenLimits correctionLimits() {
+        throw new UnsupportedOperationException(getClass().getSimpleName() + " does not report its token limits");
+    }
 }

@@ -17,6 +17,7 @@
 package io.github.inference4j.nlp;
 
 import io.github.inference4j.generation.GenerationResult;
+import io.github.inference4j.processing.TokenLimits;
 
 import java.util.function.Consumer;
 
@@ -54,4 +55,14 @@ public interface Summarizer extends AutoCloseable {
      * @return the complete generation result including timing and token counts
      */
     GenerationResult summarize(String text, Consumer<String> tokenListener);
+
+    /**
+     * The token budget of {@link #summarize(String, Consumer)}: the most input one call takes whole,
+     * prompt included. Long-input strategies use it to cut text into pieces that fit.
+     *
+     * @throws UnsupportedOperationException if this summarizer does not report its token limits
+     */
+    default TokenLimits summarizationLimits() {
+        throw new UnsupportedOperationException(getClass().getSimpleName() + " does not report its token limits");
+    }
 }

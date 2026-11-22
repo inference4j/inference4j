@@ -165,7 +165,7 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
 
         String prompt = chatTemplate != null ? chatTemplate.format(input) : input;
         // Leave room for the tokens added around the prompt below
-        int addedTokens = (appendEosToInput ? 1 : 0) + (inputPrefixTokenId != null ? 1 : 0);
+        int addedTokens = addedTokens();
         int tokenLimit = maxInputLength != Integer.MAX_VALUE
                 ? maxInputLength - addedTokens : maxInputLength;
         EncodedInput encoded = tokenizer.encode(prompt, tokenLimit);
@@ -227,6 +227,34 @@ public class GenerationEngine implements GenerativeTask<String, GenerationResult
 
         Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
         return new GenerationResult(streamer.getText(), promptTokens, generatedTokens, duration);
+    }
+
+    /**
+     * The most tokens one generation accepts as input, special tokens included;
+     * {@link Integer#MAX_VALUE} when the limit is unknown. Longer input is handled by the truncation policy.
+     */
+    public int maxInputLength() {
+        return maxInputLength;
+    }
+
+    /** The most tokens one generation produces. */
+    public int maxNewTokens() {
+        return maxNewTokens;
+    }
+
+    /**
+     * The number of tokens {@code input} becomes once the chat template, if any, is applied and the special
+     * tokens are added: the count compared with {@link #maxInputLength()}. Never truncates, and does not
+     * wait for a generation in progress.
+     */
+    public int countInputTokens(String input) {
+        String prompt = chatTemplate != null ? chatTemplate.format(input) : input;
+        return tokenizer.encode(prompt, Integer.MAX_VALUE).originalLength() + addedTokens();
+    }
+
+    /** Tokens added around the encoded prompt: EOS for encoder-decoder models, and a fixed first token. */
+    private int addedTokens() {
+        return (appendEosToInput ? 1 : 0) + (inputPrefixTokenId != null ? 1 : 0);
     }
 
     /**

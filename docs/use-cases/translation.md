@@ -138,10 +138,64 @@ Each constant provides `displayName()` (e.g., `"Brazilian Portuguese"`) and `iso
 
 | Model | Default limit | When exceeded | Long-input strategies |
 |-------|---------------|---------------|-----------------------|
-| MarianMT | 512 tokens | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
-| Flan-T5 | 512 tokens (the length T5 was trained on) | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | None yet |
+| MarianMT | 512 tokens | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | [`ChunkedTranslator`](#long-documents) |
+| Flan-T5 | 512 tokens (the length T5 was trained on) | Truncated with a warning (default), or rejected with `.truncation(TruncationPolicy.FAIL)` | [`ChunkedTranslator`](#long-documents) |
 
 The limit comes from the model's `config.json` and can be changed with `.maxInputLength(int)`.
+
+## Long documents
+
+Wrap a translator in `ChunkedTranslator` to translate text of any length. It cuts the text into chunks
+the model takes whole, translates each, and joins the translations:
+
+```java
+try (Translator translator = new ChunkedTranslator(MarianTranslator.builder()
+        .modelId("inference4j/opus-mt-en-de")
+        .build())) {
+    String german = translator.translate(longDocument);
+}
+```
+
+- **What a chunk holds.** Whole sentences, packed up to the token budget. A chunk never spans a line
+  break, so paragraphs, blank lines and indentation come out as they went in. A sentence too long on its
+  own is split between words. Sentences are found with the JDK's `BreakIterator`.
+- **Token budget.** By default a chunk holds at most a quarter of the translator's `maxNewTokens` in input
+  tokens (64 with the default of 256), prompt included. Short chunks fit the output limit, and models
+  trained on sentences translate them best (see [Evaluation](#evaluation)). Set it with
+  `new ChunkedTranslator(translator, maxChunkTokens)`; it never exceeds the model's input limit. When a
+  chunk's translation still reaches `maxNewTokens`, a warning is logged: raise `maxNewTokens` or lower the
+  budget. MarianMT's decoder has 512 positions, so keep `maxNewTokens` below 512.
+- **Short text** that fits in one chunk is translated in one call, exactly as the wrapped translator would.
+- **Streaming** passes the tokens through chunk by chunk, with the whitespace between chunks; the streamed
+  text equals `text()`. `promptTokens()` and `generatedTokens()` are summed over all calls, and
+  `duration()` covers the whole document.
+- **Limits.** Each chunk is translated without the others, so context across chunks (pronouns, gender,
+  consistent terms) can be lost at chunk boundaries.
+
+`ChunkedTranslator` works with any `Translator` that reports its token budget through
+`translationLimits()`; `MarianTranslator` and `FlanT5TextGenerator` do. It is thread-safe, and closing it
+closes the wrapped translator.
+
+### Evaluation
+
+16 documents of 24 consecutive sentences each (450–550 words), with a paragraph break every four
+sentences, scored with chrF (character n-gram F-score, 0–100) against the full reference translation:
+
+| Configuration | opus-mt-en-es | flan-t5-base (en→de) |
+|---|---|---|
+| Plain: whole document, truncated at 512 tokens | 12.8 | 4.3 |
+| `ChunkedTranslator`, 64-token chunks | 63.7 | 51.1 |
+| `ChunkedTranslator`, 128-token chunks | 64.8 | 39.2 |
+| `ChunkedTranslator`, 256-token chunks | 62.9 | 35.5 |
+| One call per sentence | 65.5 | 56.4 |
+
+Truncation is not the only loss: on the first 480 tokens of each document, which fit in one call, plain
+translation scored 27.1 and 10.0, while 64-token chunks scored 60.7 and 50.1. Both models were trained on
+short segments and drop or repeat content in long ones. Chunk runs used `maxNewTokens(500)`.
+
+Data: opus-mt-en-es on News Commentary en-es, which is part of the OPUS data opus-mt was trained on, so
+its absolute scores are inflated; flan-t5-base on WMT newstest2018 en→de. Compare rows, not columns. The
+evaluation is `LongDocumentTranslationEvaluation` in the model tests.
 
 ## Result type
 

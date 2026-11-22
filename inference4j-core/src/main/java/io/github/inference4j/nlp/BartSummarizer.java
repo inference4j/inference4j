@@ -18,6 +18,7 @@ package io.github.inference4j.nlp;
 
 import io.github.inference4j.generation.GenerationEngine;
 import io.github.inference4j.generation.GenerationResult;
+import io.github.inference4j.processing.TokenLimits;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.tokenizer.DecodingBpeTokenizer;
 import io.github.inference4j.tokenizer.TokenizerProvider;
@@ -114,6 +115,11 @@ public class BartSummarizer implements TextGenerator, Summarizer {
     @Override
     public GenerationResult summarize(String text, Consumer<String> tokenListener) {
         return engine.generate(text, tokenListener);
+    }
+
+    @Override
+    public TokenLimits summarizationLimits() {
+        return new EngineTokenLimits(engine, "");
     }
 
     @Override
