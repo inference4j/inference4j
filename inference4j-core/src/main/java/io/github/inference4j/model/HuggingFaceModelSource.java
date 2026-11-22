@@ -32,19 +32,38 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * A {@link ModelSource} that downloads model files from HuggingFace Hub and caches
- * them locally.
+ * them locally, keeping the cache up to date with the Hub.
  *
  * <p>On first use, model files are downloaded from
- * {@code https://huggingface.co/{repoId}/resolve/main/{filename}} and stored in a
- * local cache directory. Subsequent calls return the cached path immediately without
- * any network requests.
+ * {@code https://huggingface.co/{repoId}/resolve/{revision}/{filename}} and stored in a
+ * local cache directory, with a {@code .inference4j-revision.json} file recording the
+ * repo's commit and each file's id.
+ *
+ * <p><b>Updates.</b> At most once per {@linkplain Builder#checkInterval(Duration) check interval}
+ * (a day by default), resolving a cached repo asks the Hub for its current revision: one small
+ * API call. Files whose id changed are downloaded again; unchanged files are kept, so a README
+ * edit never re-downloads a model. A cache written before these checks existed is verified by
+ * hashing the local files once. When the Hub cannot be reached, the cached files are used and a
+ * warning is logged.
+ *
+ * <p><b>Offline.</b> With {@code INFERENCE4J_OFFLINE=true}, {@code -Dinference4j.offline=true},
+ * {@code HF_HUB_OFFLINE=1} or {@link Builder#offline(boolean)}, the Hub is never contacted:
+ * cached files are used as they are, and missing files fail to resolve.
  *
  * <p>Cache directory resolution priority:
  * <ol>
@@ -53,6 +72,8 @@ import java.util.concurrent.locks.ReentrantLock;
  *   <li>Environment variable {@code INFERENCE4J_CACHE_DIR}</li>
  *   <li>Default: {@code ~/.cache/inference4j/}</li>
  * </ol>
+ * The Hub endpoint is {@code https://huggingface.co} unless {@code -Dinference4j.hf.endpoint} or
+ * {@code HF_ENDPOINT} names a mirror.
  *
  * <p>Example usage:
  * <pre>{@code
@@ -60,39 +81,71 @@ import java.util.concurrent.locks.ReentrantLock;
  * ModelSource hf = HuggingFaceModelSource.defaultInstance();
  * Path dir = hf.resolve("inference4j/silero-vad");
  *
- * // Custom cache directory
- * ModelSource hf = new HuggingFaceModelSource(Path.of("/tmp/models"));
+ * // Custom cache directory, checked for updates every hour
+ * ModelSource hf = HuggingFaceModelSource.builder()
+ *         .cacheDir(Path.of("/tmp/models"))
+ *         .checkInterval(Duration.ofHours(1))
+ *         .build();
  * }</pre>
+ *
+ * <p>Thread-safe. Several processes may share a cache directory: files and the revision record
+ * are replaced atomically.
  */
 public class HuggingFaceModelSource implements ModelSource {
 
     private static final Logger logger = LoggerFactory.getLogger(HuggingFaceModelSource.class);
 
-    private static final String HF_BASE_URL = "https://huggingface.co";
+    private static final String DEFAULT_ENDPOINT = "https://huggingface.co";
+    private static final Duration DEFAULT_CHECK_INTERVAL = Duration.ofDays(1);
+    private static final Duration API_TIMEOUT = Duration.ofSeconds(5);
 
     private static volatile HuggingFaceModelSource instance;
 
     private final Path cacheDir;
+    private final String endpoint;
+    private final boolean offline;
+    private final Duration checkInterval;
+    private final Clock clock;
     private final HttpClient httpClient;
     private final ConcurrentHashMap<String, ReentrantLock> repoLocks = new ConcurrentHashMap<>();
+    private final Set<String> warnedUnreachable = ConcurrentHashMap.newKeySet();
+    /** When a check last failed per repo, so an unreachable Hub is not asked again until the interval passes. */
+    private final ConcurrentHashMap<String, Instant> failedChecks = new ConcurrentHashMap<>();
 
     /**
-     * Creates a new source with the default cache directory.
+     * Creates a new source with the default cache directory, endpoint, check interval and
+     * offline setting.
      */
     public HuggingFaceModelSource() {
-        this(resolveDefaultCacheDir());
+        this(builder());
     }
 
     /**
-     * Creates a new source with a custom cache directory.
+     * Creates a new source with a custom cache directory, and the default endpoint, check
+     * interval and offline setting.
      *
      * @param cacheDir the directory where downloaded models will be cached
      */
     public HuggingFaceModelSource(Path cacheDir) {
-        this.cacheDir = cacheDir;
+        this(builder().cacheDir(cacheDir));
+    }
+
+    private HuggingFaceModelSource(Builder builder) {
+        this.cacheDir = builder.cacheDir != null ? builder.cacheDir : resolveDefaultCacheDir();
+        String base = builder.endpoint != null ? builder.endpoint.toString() : defaultEndpoint();
+        this.endpoint = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+        this.offline = builder.offline != null ? builder.offline : defaultOffline();
+        this.checkInterval = builder.checkInterval != null ? builder.checkInterval : defaultCheckInterval();
+        this.clock = builder.clock;
         this.httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(API_TIMEOUT)
                 .build();
+    }
+
+    /** Returns a builder for a source with custom settings. */
+    public static Builder builder() {
+        return new Builder();
     }
 
     /**
@@ -110,7 +163,8 @@ public class HuggingFaceModelSource implements ModelSource {
     }
 
     /**
-     * Resolves a model by repo ID without a file list.
+     * Resolves a model by repo ID without a file list. Returns the cached directory as is, without
+     * checking for updates.
      *
      * <p>This overload exists for backward compatibility with custom {@link ModelSource}
      * lambdas. Callers that know which files they need should prefer
@@ -134,47 +188,20 @@ public class HuggingFaceModelSource implements ModelSource {
     @Override
     public Path resolve(String repoId, List<String> requiredFiles) {
         Path repoDir = cacheDir.resolve(repoId);
-
-        // Cache hit: all required files already exist
-        if (allFilesPresent(repoDir, requiredFiles)) {
-            logger.debug("Cache hit for {}", repoId);
-            return repoDir;
+        Map<String, Path> files = new LinkedHashMap<>();
+        for (String file : requiredFiles) {
+            files.put(file, repoDir.resolve(file));
         }
-
-        // Acquire per-repo lock to prevent concurrent duplicate downloads
-        ReentrantLock lock = repoLocks.computeIfAbsent(repoId, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            // Double-check after acquiring lock
-            if (allFilesPresent(repoDir, requiredFiles)) {
-                logger.debug("Cache hit for {} (after lock)", repoId);
-                return repoDir;
-            }
-
-            Files.createDirectories(repoDir);
-            logger.info("Downloading model files for {} to {}", repoId, repoDir);
-
-            List<String> missing = missingFiles(repoDir, requiredFiles);
-            for (String filename : missing) {
-                downloadFile(repoId, filename, repoDir);
-            }
-
-            logger.info("Model download complete for {}", repoId);
-            return repoDir;
-        } catch (IOException e) {
-            throw new ModelDownloadException(
-                    "Failed to create cache directory: " + repoDir, e);
-        } finally {
-            lock.unlock();
-        }
+        withRepoLock(repoId, () -> sync(repoId, repoDir, files));
+        return repoDir;
     }
 
     /**
-     * Resolves a model subdirectory, downloading all files in it if not cached.
+     * Resolves a model subdirectory, downloading all files in it if not cached and keeping them up
+     * to date like {@link #resolve(String, List)}.
      *
      * <p>Genai models on HuggingFace are organized in subdirectories within the
-     * repository. This method lists the files in the subdirectory via the HuggingFace
-     * API and downloads any that are missing from the local cache.
+     * repository. The files to fetch are those the Hub lists under the subdirectory.
      *
      * @param repoId       the HuggingFace repository ID
      * @param subdirectory the subdirectory path within the repo
@@ -182,76 +209,188 @@ public class HuggingFaceModelSource implements ModelSource {
      */
     @Override
     public Path resolve(String repoId, String subdirectory) {
-        Path subDir = cacheDir.resolve(repoId).resolve(subdirectory);
-
-        // Cache hit: directory exists and is non-empty
-        if (Files.isDirectory(subDir) && isNonEmpty(subDir)) {
-            logger.debug("Cache hit for {}/{}", repoId, subdirectory);
-            return subDir;
-        }
-
-        ReentrantLock lock = repoLocks.computeIfAbsent(
-                repoId + "/" + subdirectory, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            // Double-check after lock
-            if (Files.isDirectory(subDir) && isNonEmpty(subDir)) {
-                logger.debug("Cache hit for {}/{} (after lock)", repoId, subdirectory);
-                return subDir;
+        Path repoDir = cacheDir.resolve(repoId);
+        Path subDir = repoDir.resolve(subdirectory);
+        withRepoLock(repoId, () -> {
+            CacheRecord record = CacheRecord.read(repoDir);
+            boolean cached = Files.isDirectory(subDir) && isNonEmpty(subDir);
+            if (cached && !checkDue(repoId, record)) {
+                logger.debug("Cache hit for {}/{}", repoId, subdirectory);
+                return;
             }
-
-            Files.createDirectories(subDir);
-            logger.info("Downloading genai model {}/{} to {}", repoId, subdirectory, subDir);
-
-            List<String> files = listRemoteFiles(repoId, subdirectory);
-            for (String filename : files) {
-                if (!Files.exists(subDir.resolve(filename))) {
-                    downloadFile(repoId, subdirectory + "/" + filename,
-                            subDir, filename);
+            if (offline) {
+                if (cached) {
+                    return;
+                }
+                throw offlineMiss(repoId + "/" + subdirectory);
+            }
+            Revision revision = fetchRevision(repoId);
+            if (revision == null) {
+                if (cached) {
+                    warnUnreachable(repoId);
+                    return;
+                }
+                throw new ModelDownloadException("Cannot list the files of " + repoId + "/" + subdirectory
+                        + ": the Hub could not be reached", 0);
+            }
+            String prefix = subdirectory.endsWith("/") ? subdirectory : subdirectory + "/";
+            Map<String, Path> files = new LinkedHashMap<>();
+            for (String remotePath : revision.files().keySet()) {
+                if (remotePath.startsWith(prefix) && remotePath.indexOf('/', prefix.length()) < 0) {
+                    files.put(remotePath, subDir.resolve(remotePath.substring(prefix.length())));
                 }
             }
+            if (files.isEmpty()) {
+                throw new ModelSourceException("No files found under " + repoId + "/" + subdirectory);
+            }
+            update(repoId, repoDir, files, record, revision);
+        });
+        return subDir;
+    }
 
-            logger.info("Model download complete for {}/{}", repoId, subdirectory);
-            return subDir;
+    /** Brings {@code files} (remote path to local file) up to date, checking the Hub when due. */
+    private void sync(String repoId, Path repoDir, Map<String, Path> files) {
+        CacheRecord record = CacheRecord.read(repoDir);
+        boolean cached = files.values().stream().allMatch(Files::exists);
+        if (cached && !checkDue(repoId, record)) {
+            logger.debug("Cache hit for {}", repoId);
+            return;
+        }
+        if (offline) {
+            if (cached) {
+                return;
+            }
+            throw offlineMiss(repoId);
+        }
+        Revision revision = fetchRevision(repoId);
+        if (revision == null) {
+            if (cached) {
+                warnUnreachable(repoId);
+                return;
+            }
+            // The API may fail where downloads work: fetch what is missing, unverified
+            createDirectories(repoDir);
+            logger.info("Downloading model files for {} to {}", repoId, repoDir);
+            files.forEach((remotePath, local) -> {
+                if (!Files.exists(local)) {
+                    downloadFile(repoId, "main", remotePath, local);
+                }
+            });
+            return;
+        }
+        update(repoId, repoDir, files, record, revision);
+    }
+
+    /** Downloads every missing or changed file at the Hub's revision, then records it. */
+    private void update(String repoId, Path repoDir, Map<String, Path> files, CacheRecord record, Revision revision) {
+        Map<String, String> ids = new LinkedHashMap<>(record != null ? record.files() : Map.of());
+        List<String> changed = new ArrayList<>();
+        List<String> missing = new ArrayList<>();
+        for (Map.Entry<String, Path> file : files.entrySet()) {
+            String remotePath = file.getKey();
+            Path local = file.getValue();
+            Revision.RemoteFile remote = revision.files().get(remotePath);
+            if (!Files.exists(local)) {
+                missing.add(remotePath);
+            } else if (remote != null) {
+                String localId = ids.get(remotePath);
+                if (localId == null) {
+                    localId = remote.lfs() ? FileHashes.sha256(local) : FileHashes.gitBlobId(local);
+                }
+                if (remote.id().equals(localId)) {
+                    ids.put(remotePath, localId);
+                } else {
+                    changed.add(remotePath);
+                }
+            }
+        }
+        if (!changed.isEmpty()) {
+            logger.info("{} changed on the Hub (revision {}); updating {}", repoId, revision.commit(), changed);
+        }
+        if (!missing.isEmpty()) {
+            createDirectories(repoDir);
+            logger.info("Downloading model files for {} to {}", repoId, repoDir);
+        }
+        for (String remotePath : concat(missing, changed)) {
+            Path local = files.get(remotePath);
+            createDirectories(local.getParent());
+            downloadFile(repoId, revision.commit(), remotePath, local);
+            Revision.RemoteFile remote = revision.files().get(remotePath);
+            if (remote != null) {
+                ids.put(remotePath, remote.id());
+            }
+        }
+        createDirectories(repoDir);
+        new CacheRecord(revision.commit(), clock.instant(), ids).write(repoDir);
+    }
+
+    private boolean checkDue(String repoId, CacheRecord record) {
+        Instant now = clock.instant();
+        Instant failed = failedChecks.get(repoId);
+        if (failed != null && now.isBefore(failed.plus(checkInterval))) {
+            return false;
+        }
+        return record == null || !now.isBefore(record.checkedAt().plus(checkInterval));
+    }
+
+    /** The repo's current commit and file ids, or {@code null} when the Hub cannot answer. */
+    private Revision fetchRevision(String repoId) {
+        URI uri = URI.create(endpoint + "/api/models/" + repoId + "/revision/main?blobs=true");
+        HttpRequest request = HttpRequest.newBuilder(uri).timeout(API_TIMEOUT).GET().build();
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                logger.debug("Revision check of {} failed: HTTP {}", repoId, response.statusCode());
+                return null;
+            }
+            return Revision.parse(response.body());
         } catch (IOException e) {
-            throw new ModelDownloadException(
-                    "Failed to create cache directory: " + subDir, e);
+            logger.debug("Revision check of {} failed: {}", repoId, e.toString());
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+    }
+
+    private void warnUnreachable(String repoId) {
+        failedChecks.put(repoId, clock.instant());
+        if (warnedUnreachable.add(repoId)) {
+            logger.warn("Could not check {} for updates on the Hub; using the cached files", repoId);
+        }
+    }
+
+    private static ModelSourceException offlineMiss(String what) {
+        return new ModelSourceException("Offline mode is on and " + what + " is not fully cached");
+    }
+
+    private void withRepoLock(String repoId, Runnable action) {
+        ReentrantLock lock = repoLocks.computeIfAbsent(repoId, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            action.run();
         } finally {
             lock.unlock();
         }
     }
 
-    private static boolean allFilesPresent(Path dir, List<String> files) {
-        if (!Files.isDirectory(dir)) {
-            return false;
+    private static void createDirectories(Path dir) {
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new ModelDownloadException("Failed to create cache directory: " + dir, e);
         }
-        for (String file : files) {
-            if (!Files.exists(dir.resolve(file))) {
-                return false;
-            }
-        }
-        return true;
     }
 
-    private static List<String> missingFiles(Path dir, List<String> files) {
-        List<String> missing = new ArrayList<>();
-        for (String file : files) {
-            if (!Files.exists(dir.resolve(file))) {
-                missing.add(file);
-            }
-        }
-        return missing;
+    private static List<String> concat(List<String> a, List<String> b) {
+        List<String> all = new ArrayList<>(a);
+        all.addAll(b);
+        return all;
     }
 
-    private void downloadFile(String repoId, String filename, Path targetDir) {
-        downloadFile(repoId, filename, targetDir, filename);
-    }
-
-    private void downloadFile(String repoId, String remotePath,
-                              Path targetDir, String targetFilename) {
-        URI uri = URI.create(HF_BASE_URL + "/" + repoId + "/resolve/main/" + remotePath);
-        Path targetFile = targetDir.resolve(targetFilename);
-        Path tmpFile = targetDir.resolve(targetFilename + ".tmp");
+    private void downloadFile(String repoId, String revision, String remotePath, Path targetFile) {
+        URI uri = URI.create(endpoint + "/" + repoId + "/resolve/" + revision + "/" + remotePath);
+        Path tmpFile = targetFile.resolveSibling(targetFile.getFileName() + ".tmp");
 
         HttpRequest request = HttpRequest.newBuilder(uri).GET().build();
 
@@ -273,7 +412,7 @@ public class HuggingFaceModelSource implements ModelSource {
 
             Files.move(tmpFile, targetFile, StandardCopyOption.ATOMIC_MOVE,
                     StandardCopyOption.REPLACE_EXISTING);
-            logger.debug("Downloaded {}", targetFilename);
+            logger.debug("Downloaded {}", remotePath);
 
         } catch (ModelDownloadException e) {
             throw e;
@@ -305,65 +444,6 @@ public class HuggingFaceModelSource implements ModelSource {
         }
     }
 
-    private List<String> listRemoteFiles(String repoId, String subdirectory) {
-        URI uri = URI.create(HF_BASE_URL + "/api/models/" + repoId
-                + "/tree/main/" + subdirectory);
-        HttpRequest request = HttpRequest.newBuilder(uri).GET().build();
-
-        try {
-            HttpResponse<String> response = httpClient.send(request,
-                    HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new ModelDownloadException(
-                        "Failed to list files at " + uri + " (HTTP " + response.statusCode() + ")",
-                        response.statusCode());
-            }
-            return parseFileList(response.body());
-        } catch (ModelDownloadException e) {
-            throw e;
-        } catch (IOException | InterruptedException e) {
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-            throw new ModelDownloadException(
-                    "Failed to list files at " + uri + ": " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Parses the HuggingFace tree API JSON response to extract filenames.
-     * The response is an array of objects, each with a "path" and "type" field.
-     * We only want entries where type is "file".
-     */
-    List<String> parseFileList(String json) {
-        List<String> files = new ArrayList<>();
-        int idx = 0;
-        while ((idx = json.indexOf("\"type\"", idx)) != -1) {
-            int typeStart = json.indexOf('"', json.indexOf(':', idx) + 1) + 1;
-            int typeEnd = json.indexOf('"', typeStart);
-            String type = json.substring(typeStart, typeEnd);
-            idx = typeEnd;
-
-            if (!"file".equals(type)) {
-                continue;
-            }
-
-            // Find the "path" field near this entry — search backward since
-            // in HF API response, "path" comes before "type" in each object
-            int pathIdx = json.lastIndexOf("\"path\"", idx);
-            if (pathIdx != -1) {
-                int pathStart = json.indexOf('"', json.indexOf(':', pathIdx) + 1) + 1;
-                int pathEnd = json.indexOf('"', pathStart);
-                String fullPath = json.substring(pathStart, pathEnd);
-                // Extract just the filename (strip the subdirectory prefix)
-                int lastSlash = fullPath.lastIndexOf('/');
-                String filename = lastSlash >= 0 ? fullPath.substring(lastSlash + 1) : fullPath;
-                files.add(filename);
-            }
-        }
-        return files;
-    }
-
     private static Path resolveDefaultCacheDir() {
         String sysProp = System.getProperty("inference4j.cache.dir");
         if (sysProp != null && !sysProp.isBlank()) {
@@ -376,5 +456,98 @@ public class HuggingFaceModelSource implements ModelSource {
         }
 
         return Path.of(System.getProperty("user.home"), ".cache", "inference4j");
+    }
+
+    private static String defaultEndpoint() {
+        String value = setting("inference4j.hf.endpoint", "HF_ENDPOINT");
+        return value != null ? value : DEFAULT_ENDPOINT;
+    }
+
+    private static boolean defaultOffline() {
+        String value = setting("inference4j.offline", "INFERENCE4J_OFFLINE");
+        if (value != null) {
+            return Boolean.parseBoolean(value);
+        }
+        String hf = System.getenv("HF_HUB_OFFLINE");
+        return hf != null && (hf.equals("1") || hf.equalsIgnoreCase("true"));
+    }
+
+    private static Duration defaultCheckInterval() {
+        String value = setting("inference4j.cache.check-interval", "INFERENCE4J_CACHE_CHECK_INTERVAL");
+        if (value == null) {
+            return DEFAULT_CHECK_INTERVAL;
+        }
+        try {
+            return requireNotNegative(Duration.parse(value));
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("Invalid cache check interval '" + value
+                    + "': use an ISO-8601 duration such as PT1H or P1D", e);
+        }
+    }
+
+    private static Duration requireNotNegative(Duration interval) {
+        if (interval.isNegative()) {
+            throw new IllegalArgumentException("The cache check interval must not be negative, got " + interval);
+        }
+        return interval;
+    }
+
+    private static String setting(String property, String environmentVariable) {
+        String value = System.getProperty(property);
+        if (value == null || value.isBlank()) {
+            value = System.getenv(environmentVariable);
+        }
+        return value == null || value.isBlank() ? null : value.strip();
+    }
+
+    /** Settings for a {@link HuggingFaceModelSource}; each defaults as described on the class. */
+    public static final class Builder {
+        private Path cacheDir;
+        private URI endpoint;
+        private Boolean offline;
+        private Duration checkInterval;
+        private Clock clock = Clock.systemUTC();
+
+        private Builder() {
+        }
+
+        /** The cache directory. */
+        public Builder cacheDir(Path cacheDir) {
+            this.cacheDir = Objects.requireNonNull(cacheDir, "cacheDir");
+            return this;
+        }
+
+        /** The Hub endpoint, such as a mirror. Defaults to {@code https://huggingface.co}. */
+        public Builder endpoint(URI endpoint) {
+            this.endpoint = Objects.requireNonNull(endpoint, "endpoint");
+            return this;
+        }
+
+        /** When {@code true}, never contacts the Hub: cached files are used as they are. */
+        public Builder offline(boolean offline) {
+            this.offline = offline;
+            return this;
+        }
+
+        /**
+         * How long a cached repo is trusted before the Hub is asked for updates again. Defaults to a
+         * day; {@link Duration#ZERO} checks on every resolve.
+         *
+         * @throws IllegalArgumentException if {@code checkInterval} is negative
+         */
+        public Builder checkInterval(Duration checkInterval) {
+            this.checkInterval = requireNotNegative(Objects.requireNonNull(checkInterval, "checkInterval"));
+            return this;
+        }
+
+        /** The clock that times the check interval. Defaults to the system clock. */
+        public Builder clock(Clock clock) {
+            this.clock = Objects.requireNonNull(clock, "clock");
+            return this;
+        }
+
+        public HuggingFaceModelSource build() {
+            return new HuggingFaceModelSource(this);
+        }
     }
 }
