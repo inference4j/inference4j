@@ -24,6 +24,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -35,6 +36,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assumptions.assumeThat;
@@ -93,6 +95,26 @@ class HuggingFaceModelSourceSnapshotTest {
         Files.writeString(flat.resolve("tokenizer.json"), tokenizer);
     }
 
+    /** Every file under {@code dir} has a single hard link, as ONNX Runtime requires of external data. */
+    private static void assertSingleLinks(Path dir) throws IOException {
+        List<Path> files;
+        try (Stream<Path> walk = Files.walk(dir)) {
+            files = walk.filter(Files::isRegularFile).toList();
+        }
+        assertThat(files).isNotEmpty();
+        for (Path file : files) {
+            assertThat(links(file)).as(file.toString()).isEqualTo(1);
+        }
+    }
+
+    private static int links(Path file) throws IOException {
+        return (Integer) Files.getAttribute(file, "unix:nlink");
+    }
+
+    private static void assumeLinkCounts() {
+        assumeThat(FileSystems.getDefault().supportedFileAttributeViews()).contains("unix");
+    }
+
     private int leases(HuggingFaceModelSource source, String revision) {
         return source.cache().find(REPO).orElseThrow().snapshots().stream()
                 .filter(s -> s.revision().equals(revision)).findFirst().orElseThrow().leases();
@@ -117,7 +139,7 @@ class HuggingFaceModelSourceSnapshotTest {
     }
 
     @Test
-    void unchangedFilesAreLinkedNotDownloaded() throws IOException {
+    void unchangedFilesAreReusedNotDownloaded() throws IOException {
         HuggingFaceModelSource source = builder().pruneMode(PruneMode.MANUAL).build();
         Path first = source.resolve(REPO, FILES);
         hub.put("model.onnx", "weights v2");
@@ -126,8 +148,82 @@ class HuggingFaceModelSourceSnapshotTest {
         Path second = source.resolve(REPO, FILES);
 
         assertThat(hub.downloads("tokenizer.json")).isEqualTo(1);
-        assertThat(Files.isSameFile(first.resolve("tokenizer.json"), second.resolve("tokenizer.json"))).isTrue();
+        assertThat(Files.readString(second.resolve("tokenizer.json"))).isEqualTo("tokenizer v1");
         assertThat(Files.readString(first.resolve("model.onnx"))).isEqualTo("weights v1");
+    }
+
+    @Test
+    void anUpdateMovesUnchangedFilesOutOfAnUnusedSnapshot() throws IOException {
+        assumeLinkCounts();
+        HuggingFaceModelSource source = source();
+        String first = hub.commit();
+        source.resolve(REPO, FILES);
+        hub.put("model.onnx", "weights v2");
+        clock.now = clock.now.plus(Duration.ofDays(2));
+
+        try (ResolvedModel updated = source.open(REPO, FILES)) {
+            assertThat(Files.readString(updated.file("tokenizer.json"))).isEqualTo("tokenizer v1");
+            assertThat(Files.readString(updated.file("model.onnx"))).isEqualTo("weights v2");
+            assertSingleLinks(updated.directory());
+        }
+        assertThat(hub.downloads("tokenizer.json")).isEqualTo(1);
+        assertThat(snapshot(first)).doesNotExist();   // auto-pruned
+        assertThat(source.cache().find(REPO).orElseThrow().snapshots()).extracting(CachedSnapshot::revision)
+                .containsExactly(hub.commit());
+    }
+
+    @Test
+    void aSnapshotLeftByMovedFilesIsNeverServedAgain() throws IOException {
+        HuggingFaceModelSource source = builder().pruneMode(PruneMode.MANUAL).build();
+        String first = hub.commit();
+        source.resolve(REPO, FILES);
+        hub.put("model.onnx", "weights v2");
+        clock.now = clock.now.plus(Duration.ofDays(2));
+        source.resolve(REPO, FILES);
+
+        CachedSnapshot old = source.cache().find(REPO).orElseThrow().snapshots().stream()
+                .filter(s -> s.revision().equals(first)).findFirst().orElseThrow();
+        assertThat(old.current()).isFalse();
+        assertThat(old.files()).extracting(CachedFile::path).containsExactly("model.onnx");
+        assertThat(snapshot(first).resolve("tokenizer.json")).doesNotExist();
+        try (ResolvedModel model = offlineSource().open(REPO, FILES)) {
+            assertThat(model.revision()).contains(new ModelRevision(REPO, hub.commit()));
+        }
+        assertThat(source.cache().prune().removed()).containsExactly(new ModelRevision(REPO, first));
+    }
+
+    @Test
+    void anUpdateCopiesUnchangedFilesOfASnapshotInUse() throws IOException {
+        assumeLinkCounts();
+        HuggingFaceModelSource source = source();
+        try (ResolvedModel loaded = source.open(REPO, FILES)) {
+            hub.put("model.onnx", "weights v2");
+            clock.now = clock.now.plus(Duration.ofDays(2));
+
+            try (ResolvedModel updated = source.open(REPO, FILES)) {
+                assertThat(Files.readString(updated.file("tokenizer.json"))).isEqualTo("tokenizer v1");
+                assertSingleLinks(updated.directory());
+            }
+            assertThat(Files.readString(loaded.file("tokenizer.json"))).isEqualTo("tokenizer v1");
+            assertThat(Files.readString(loaded.file("model.onnx"))).isEqualTo("weights v1");
+            assertSingleLinks(loaded.directory());
+        }
+        assertThat(hub.downloads("tokenizer.json")).isEqualTo(1);
+    }
+
+    @Test
+    void anUpdateCopiesUnchangedFilesOfAYoungSnapshot() throws IOException {
+        HuggingFaceModelSource source = builder().checkInterval(Duration.ZERO).build();
+        Path first = source.resolve(REPO, FILES);
+        hub.put("model.onnx", "weights v2");
+        clock.now = clock.now.plus(Duration.ofMinutes(1));
+
+        Path second = source.resolve(REPO, FILES);
+
+        assertThat(second).isNotEqualTo(first);
+        assertThat(Files.readString(second.resolve("tokenizer.json"))).isEqualTo("tokenizer v1");
+        assertThat(Files.readString(first.resolve("tokenizer.json"))).isEqualTo("tokenizer v1");   // kept whole
+        assertThat(hub.downloads("tokenizer.json")).isEqualTo(1);
     }
 
     @Test
@@ -157,7 +253,8 @@ class HuggingFaceModelSourceSnapshotTest {
 
         assertThat(dir).isEqualTo(snapshot(hub.commit()));
         assertThat(Files.readString(dir.resolve("extra.json"))).isEqualTo("added later");
-        assertThat(Files.isSameFile(first.resolve("model.onnx"), dir.resolve("model.onnx"))).isTrue();
+        assertThat(Files.readString(dir.resolve("model.onnx"))).isEqualTo("weights v1");
+        assertThat(first).isNotEqualTo(dir);
         assertThat(hub.downloads("model.onnx")).isEqualTo(1);
     }
 
@@ -216,9 +313,41 @@ class HuggingFaceModelSourceSnapshotTest {
 
         assertThat(dir).isEqualTo(snapshot(hub.commit()));
         assertThat(hub.count("/" + REPO + "/resolve/")).isZero();
-        assertThat(Files.isSameFile(dir.resolve("model.onnx"), cacheDir.resolve(REPO).resolve("model.onnx")))
-                .isTrue();
-        assertThat(cacheDir.resolve(REPO).resolve("tokenizer.json")).exists();
+        assertThat(Files.readString(dir.resolve("model.onnx"))).isEqualTo("weights v1");
+        assertThat(cacheDir.resolve(REPO).resolve("model.onnx")).doesNotExist();   // moved, not linked
+        assertThat(cacheDir.resolve("org")).doesNotExist();
+    }
+
+    @Test
+    void aFlatCacheAdoptedOnlineHasSingleLinks() throws IOException {
+        assumeLinkCounts();
+        seedFlatCache("weights v1", "tokenizer v1");
+
+        assertSingleLinks(source().resolve(REPO, FILES));
+    }
+
+    @Test
+    void aFlatCacheAdoptedOfflineHasSingleLinks() throws IOException {
+        assumeLinkCounts();
+        seedFlatCache("weights v1", "tokenizer v1");
+
+        try (ResolvedModel model = offlineSource().open(REPO, FILES)) {
+            assertSingleLinks(model.directory());
+        }
+        assertThat(cacheDir.resolve(REPO)).doesNotExist();
+    }
+
+    @Test
+    void filesAdoptedOfflineOneRequestAtATimeAreAllAdopted() throws IOException {
+        seedFlatCache("weights v1", "tokenizer v1");
+        HuggingFaceModelSource source = offlineSource();
+        source.resolve(REPO, List.of("model.onnx"));
+
+        Path dir = source.resolve(REPO, FILES);
+
+        assertThat(dir).isEqualTo(snapshot(ModelRevision.UNKNOWN));
+        assertThat(Files.readString(dir.resolve("tokenizer.json"))).isEqualTo("tokenizer v1");
+        assertThat(Files.readString(dir.resolve("model.onnx"))).isEqualTo("weights v1");
     }
 
     @Test
@@ -263,6 +392,66 @@ class HuggingFaceModelSourceSnapshotTest {
             assertThat(warnings).singleElement().asString().contains("is not writable");
         } finally {
             cacheDir.toFile().setWritable(true);
+        }
+    }
+
+    // Hard links left by earlier builds
+
+    @Test
+    void openingRepairsAFileLinkedFromTheFlatLayout() throws IOException {
+        assumeLinkCounts();
+        seedFlatCache("weights v1", "tokenizer v1");
+        HuggingFaceModelSource source = offlineSource();
+        Path dir = source.resolve(REPO, FILES);
+        Path flat = cacheDir.resolve(REPO).resolve("model.onnx");
+        Files.createDirectories(flat.getParent());
+        Files.createLink(flat, dir.resolve("model.onnx"));
+        assertThat(links(dir.resolve("model.onnx"))).isEqualTo(2);
+
+        try (ResolvedModel model = source.open(REPO, FILES)) {
+            assertThat(links(model.file("model.onnx"))).isEqualTo(1);
+            assertThat(Files.readString(model.file("model.onnx"))).isEqualTo("weights v1");
+            assertSingleLinks(model.directory());
+        }
+        assertThat(flat).doesNotExist();   // the adopted flat copy is dropped, not duplicated
+    }
+
+    @Test
+    void openingRepairsAFileWithAnotherHardLink() throws IOException {
+        assumeLinkCounts();
+        seedFlatCache("weights v1", "tokenizer v1");
+        HuggingFaceModelSource source = offlineSource();
+        Path dir = source.resolve(REPO, FILES);
+        Path elsewhere = cacheDir.resolve("elsewhere.onnx");
+        Files.createLink(elsewhere, dir.resolve("model.onnx"));
+
+        try (ResolvedModel model = source.open(REPO, FILES)) {
+            assertThat(links(model.file("model.onnx"))).isEqualTo(1);
+            assertThat(Files.readString(model.file("model.onnx"))).isEqualTo("weights v1");
+        }
+        assertThat(links(elsewhere)).isEqualTo(1);
+        assertThat(Files.readString(elsewhere)).isEqualTo("weights v1");
+    }
+
+    @Test
+    void aLinkedFileOfASnapshotInUseIsLeftAlone() throws IOException {
+        assumeLinkCounts();
+        seedFlatCache("weights v1", "tokenizer v1");
+        HuggingFaceModelSource source = offlineSource();
+        try (ResolvedModel loaded = source.open(REPO, FILES)) {
+            Files.createLink(cacheDir.resolve("elsewhere.onnx"), loaded.file("model.onnx"));
+
+            List<String> warnings = TestSupport.warnings(HuggingFaceModelSource.class, () -> {
+                try (ResolvedModel again = source.open(REPO, FILES)) {
+                    assertThat(again.directory()).isEqualTo(loaded.directory());
+                }
+            });
+
+            assertThat(warnings).singleElement().asString().contains("hard-linked");
+            assertThat(links(loaded.file("model.onnx"))).isEqualTo(2);
+        }
+        try (ResolvedModel model = source.open(REPO, FILES)) {
+            assertThat(links(model.file("model.onnx"))).isEqualTo(1);
         }
     }
 

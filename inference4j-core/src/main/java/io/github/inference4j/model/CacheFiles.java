@@ -25,11 +25,11 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -62,33 +62,49 @@ final class CacheFiles {
     }
 
     /**
-     * Places a complete copy of {@code source} at {@code target}: a hard link when the file system allows one,
-     * otherwise (when {@code mayMove}) a move, otherwise a copy written to {@code tmpDir} and moved into place.
-     * {@code target} appears complete or not at all.
+     * Moves {@code source} to {@code target} atomically; whether it did. Fails where they are on different file
+     * stores, or where an open handle pins the file, as on Windows.
      */
-    static void place(Path source, Path target, Path tmpDir, boolean mayMove) throws IOException {
-        Files.createDirectories(target.getParent());
+    static boolean move(Path source, Path target) {
         try {
-            Files.createLink(target, source);
-            return;
-        } catch (UnsupportedOperationException | IOException e) {
-            logger.debug("Cannot link {} to {}: {}", target, source, e.toString());
+            Files.createDirectories(target.getParent());
+            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+            return true;
+        } catch (IOException | UnsupportedOperationException e) {
+            logger.debug("Cannot move {} to {}: {}", source, target, e.toString());
+            return false;
         }
-        if (mayMove) {
-            try {
-                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
-                return;
-            } catch (IOException e) {
-                logger.debug("Cannot move {} to {}: {}", source, target, e.toString());
-            }
-        }
+    }
+
+    /**
+     * Copies {@code source} to {@code target} through a file in {@code tmpDir}, moved into place atomically: the
+     * copy is a separate file, never a link, and {@code target} appears complete or not at all. Replaces
+     * {@code target} if it exists, so {@code source} may be {@code target} itself, to give it a private copy.
+     */
+    static void copy(Path source, Path target, Path tmpDir) throws IOException {
+        Files.createDirectories(target.getParent());
         Files.createDirectories(tmpDir);
         Path tmp = tmpDir.resolve(UUID.randomUUID() + ".part");
         try {
             Files.copy(source, tmp, StandardCopyOption.REPLACE_EXISTING);
-            Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
+            Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } finally {
             Files.deleteIfExists(tmp);
+        }
+    }
+
+    /**
+     * How many hard links {@code file} has, or {@code -1} where the file system cannot tell, as on Windows, whose
+     * NIO attribute views ({@code basic}, {@code dos}, {@code acl}, {@code owner}, {@code user}) have no link count.
+     */
+    static int linkCount(Path file) {
+        if (!file.getFileSystem().supportedFileAttributeViews().contains("unix")) {
+            return -1;
+        }
+        try {
+            return ((Number) Files.getAttribute(file, "unix:nlink", LinkOption.NOFOLLOW_LINKS)).intValue();
+        } catch (IOException | UnsupportedOperationException | IllegalArgumentException | ClassCastException e) {
+            return -1;
         }
     }
 
@@ -135,23 +151,16 @@ final class CacheFiles {
     }
 
     /**
-     * What identifies a file's content on disk, so that hard links to it count once: its file key (the inode on
-     * Unix). Windows reports no file key; there hard links share their size and timestamps, which a separate
-     * copy does not, since cached files are never modified after they are placed.
+     * What identifies a file's content on disk: its file key (the inode on Unix), so that a file still hard-linked
+     * from an older cache counts once; elsewhere, its path.
      */
     static Object key(Path file) {
         try {
-            BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class);
-            Object key = attributes.fileKey();
-            return key != null ? key
-                    : new LinkKey(attributes.size(), attributes.creationTime(), attributes.lastModifiedTime());
+            Object key = Files.readAttributes(file, BasicFileAttributes.class).fileKey();
+            return key != null ? key : file.toAbsolutePath().normalize();
         } catch (IOException e) {
             return file.toAbsolutePath().normalize();
         }
-    }
-
-    /** Identifies a file by its size and timestamps, where the file system has no file key. */
-    private record LinkKey(long size, FileTime created, FileTime modified) {
     }
 
     static long size(Path file) {

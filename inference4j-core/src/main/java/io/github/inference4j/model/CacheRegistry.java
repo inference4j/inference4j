@@ -87,6 +87,10 @@ final class CacheRegistry {
         /** When a check last failed, so an unreachable Hub is not asked again until the interval passes. */
         volatile Instant failedCheck;
         final AtomicBoolean warnedUnreachable = new AtomicBoolean();
+        /** Whether hard-linked files of the repo were replaced by private copies, which is logged once. */
+        final AtomicBoolean reportedRepair = new AtomicBoolean();
+        /** Whether hard-linked files were left alone because their snapshot was in use, which is logged once. */
+        final AtomicBoolean warnedLinkedInUse = new AtomicBoolean();
         private final Map<String, Integer> leases = new HashMap<>();
 
         private Repo(String repoId) {

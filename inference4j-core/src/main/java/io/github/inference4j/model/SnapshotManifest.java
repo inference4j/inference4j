@@ -68,6 +68,13 @@ record SnapshotManifest(String commit, Instant createdAt, Map<String, Entry> fil
         return new SnapshotManifest(commit, createdAt, allFiles, allSubdirectories);
     }
 
+    /** This manifest without {@code removed}, the files moved out of its snapshot. */
+    SnapshotManifest without(Set<String> removed) {
+        Map<String, Entry> kept = new LinkedHashMap<>(files);
+        kept.keySet().removeAll(removed);
+        return new SnapshotManifest(commit, createdAt, kept, subdirectories);
+    }
+
     /** The recorded id of {@code path} if it was recorded with the same kind of id; {@code null} otherwise. */
     String id(String path, boolean lfs) {
         Entry entry = files.get(path);

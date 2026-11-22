@@ -187,13 +187,13 @@ class ModelCacheTest {
         EvictionResult result = source.cache().prune();
 
         assertThat(result.removed()).containsExactly(new ModelRevision(REPO, first));
-        assertThat(result.freedBytes()).isEqualTo("weights v1".length());   // the tokenizer is still linked
+        assertThat(result.freedBytes()).isEqualTo("weights v1".length());   // the tokenizer moved to the new one
         assertThat(source.cache().find(REPO).orElseThrow().snapshots()).extracting(CachedSnapshot::revision)
                 .containsExactly(hub.commit());
     }
 
     @Test
-    void pruneDeletesAdoptedFlatFiles() throws IOException {
+    void pruneAfterAdoptionFreesNothing() throws IOException {
         Path flat = cacheDir.resolve(REPO);
         Files.createDirectories(flat);
         Files.writeString(flat.resolve("model.onnx"), "weights v1");
@@ -203,7 +203,7 @@ class ModelCacheTest {
 
         EvictionResult result = source.cache().prune();
 
-        assertThat(result.freedBytes()).isZero();   // the snapshot still links the same files
+        assertThat(result.freedBytes()).isZero();   // adoption moved the flat files into the snapshot
         assertThat(cacheDir.resolve("org")).doesNotExist();
         assertThat(Files.readString(dir.resolve("model.onnx"))).isEqualTo("weights v1");
     }
