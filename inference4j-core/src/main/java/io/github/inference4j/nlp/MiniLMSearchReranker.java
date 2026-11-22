@@ -21,6 +21,7 @@ import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
@@ -246,8 +247,9 @@ public class MiniLMSearchReranker
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id, List.of("model.onnx", "vocab.txt"));
-                loadFromDirectory(dir);
+                try (ResolvedModel model = source.open(id, List.of("model.onnx", "vocab.txt"))) {
+                    loadFromDirectory(model);
+                }
             }
             if (tokenizer == null) {
                 throw new IllegalStateException("Tokenizer is required");
@@ -256,7 +258,8 @@ public class MiniLMSearchReranker
                     new TruncationGuard("MiniLMSearchReranker", truncation), stride);
         }
 
-        private void loadFromDirectory(Path dir) {
+        private void loadFromDirectory(ResolvedModel model) {
+            Path dir = model.directory();
             if (!Files.isDirectory(dir)) {
                 throw new ModelSourceException("Model directory not found: " + dir);
             }
@@ -272,8 +275,8 @@ public class MiniLMSearchReranker
             }
 
             this.session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
+                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
+                    : InferenceSession.create(model, "model.onnx");
             try {
                 if (this.tokenizer == null) {
                     this.tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);

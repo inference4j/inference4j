@@ -21,6 +21,7 @@ import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.nlp.TextEmbedder;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.processing.TruncationGuard;
@@ -183,8 +184,9 @@ public class ClipTextEncoder implements TextEmbedder {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id, List.of(TEXT_MODEL_FILE, "vocab.json", "merges.txt"));
-                loadFromDirectory(dir);
+                try (ResolvedModel model = source.open(id, List.of(TEXT_MODEL_FILE, "vocab.json", "merges.txt"))) {
+                    loadFromDirectory(model);
+                }
             }
             if (tokenizer == null) {
                 throw new IllegalStateException("Tokenizer is required");
@@ -193,7 +195,8 @@ public class ClipTextEncoder implements TextEmbedder {
                     new TruncationGuard("ClipTextEncoder", truncation));
         }
 
-        private void loadFromDirectory(Path dir) {
+        private void loadFromDirectory(ResolvedModel model) {
+            Path dir = model.directory();
             if (!Files.isDirectory(dir)) {
                 throw new ModelSourceException("Model directory not found: " + dir);
             }
@@ -204,8 +207,8 @@ public class ClipTextEncoder implements TextEmbedder {
             }
 
             this.session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
+                    ? InferenceSession.create(model, TEXT_MODEL_FILE, sessionConfigurer)
+                    : InferenceSession.create(model, TEXT_MODEL_FILE);
 
             try {
                 if (this.tokenizer == null) {

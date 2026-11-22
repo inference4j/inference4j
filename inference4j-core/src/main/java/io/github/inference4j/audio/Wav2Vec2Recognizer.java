@@ -23,6 +23,7 @@ import io.github.inference4j.InferenceSession;
 import io.github.inference4j.preprocessing.audio.AudioData;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
@@ -215,8 +216,9 @@ public class Wav2Vec2Recognizer
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id, List.of("model.onnx", "vocab.json"));
-                loadFromDirectory(dir);
+                try (ResolvedModel model = source.open(id, List.of("model.onnx", "vocab.json"))) {
+                    loadFromDirectory(model);
+                }
             }
             if (vocabulary == null) {
                 throw new IllegalStateException("Vocabulary is required");
@@ -232,7 +234,8 @@ public class Wav2Vec2Recognizer
                     pipeline, blankIndex, wordDelimiter);
         }
 
-        private void loadFromDirectory(Path dir) {
+        private void loadFromDirectory(ResolvedModel model) {
+            Path dir = model.directory();
             if (!Files.isDirectory(dir)) {
                 throw new ModelSourceException("Model directory not found: " + dir);
             }
@@ -248,8 +251,8 @@ public class Wav2Vec2Recognizer
             }
 
             this.session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
+                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
+                    : InferenceSession.create(model, "model.onnx");
             try {
                 if (this.vocabulary == null) {
                     this.vocabulary = io.github.inference4j.preprocessing.audio.Vocabulary.fromFile(vocabPath);

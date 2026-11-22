@@ -28,6 +28,8 @@ import ai.onnxruntime.TensorInfo;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.exception.TensorConversionException;
+import io.github.inference4j.model.ModelRevision;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.session.SessionOptions;
 
@@ -41,6 +43,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -78,6 +81,8 @@ public class InferenceSession implements AutoCloseable {
     private final ReentrantReadWriteLock closeLock = new ReentrantReadWriteLock();
     private volatile boolean closed;
     private volatile ModelMetadata metadata;
+    /** Keeps the model's cached files on disk while the session is open; {@code null} when loaded from a path. */
+    private volatile ResolvedModel model;
 
     private InferenceSession(OrtEnvironment environment, OrtSession session) {
         this.environment = environment;
@@ -145,6 +150,77 @@ public class InferenceSession implements AutoCloseable {
             throw new ModelLoadException(
                     "Failed to load model from " + modelPath + ": " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Creates a session from a file of a resolved model, with default options. The session
+     * {@linkplain ResolvedModel#retain() retains} the model until it is closed, so a cache keeps the model's
+     * files (such as external weights read while the session runs) even after {@code model} is closed.
+     *
+     * @param model    the resolved model directory
+     * @param fileName the {@code .onnx} file, relative to the model directory
+     * @return a new session ready for inference
+     * @throws io.github.inference4j.exception.ModelLoadException if the model cannot be loaded
+     * @throws IllegalStateException if {@code model} was closed
+     */
+    public static InferenceSession create(ResolvedModel model, String fileName) {
+        return create(model, fileName, SessionOptions.defaults());
+    }
+
+    /**
+     * Creates a session from a file of a resolved model, with a configurer for custom options, retaining the
+     * model like {@link #create(ResolvedModel, String)}.
+     *
+     * @param model      the resolved model directory
+     * @param fileName   the {@code .onnx} file, relative to the model directory
+     * @param configurer callback to customize session options
+     * @return a new session ready for inference
+     * @throws io.github.inference4j.exception.ModelLoadException if the model cannot be loaded
+     * @throws IllegalStateException if {@code model} was closed
+     */
+    public static InferenceSession create(ResolvedModel model, String fileName, SessionConfigurer configurer) {
+        ResolvedModel retained = model.retain();
+        try {
+            InferenceSession session = create(retained.file(fileName), configurer);
+            session.model = retained;
+            return session;
+        } catch (RuntimeException e) {
+            retained.close();
+            throw e;
+        }
+    }
+
+    /**
+     * Creates a session from a file of a resolved model, with custom options, retaining the model like
+     * {@link #create(ResolvedModel, String)}.
+     *
+     * @param model    the resolved model directory
+     * @param fileName the {@code .onnx} file, relative to the model directory
+     * @param options  session configuration (thread counts, optimization level)
+     * @return a new session ready for inference
+     * @throws io.github.inference4j.exception.ModelLoadException if the model cannot be loaded
+     * @throws IllegalStateException if {@code model} was closed
+     */
+    public static InferenceSession create(ResolvedModel model, String fileName, SessionOptions options) {
+        ResolvedModel retained = model.retain();
+        try {
+            InferenceSession session = create(retained.file(fileName), options);
+            session.model = retained;
+            return session;
+        } catch (RuntimeException e) {
+            retained.close();
+            throw e;
+        }
+    }
+
+    /**
+     * The cached revision the model was loaded from: present when the session was created from a
+     * {@link ResolvedModel} that a cache manages, such as one from
+     * {@link io.github.inference4j.model.HuggingFaceModelSource}.
+     */
+    public Optional<ModelRevision> modelRevision() {
+        ResolvedModel loaded = model;
+        return loaded != null ? loaded.revision() : Optional.empty();
     }
 
     /**
@@ -508,8 +584,8 @@ public class InferenceSession implements AutoCloseable {
 
     /**
      * Closes the session and frees its native memory. Waits for runs already in progress to finish;
-     * later calls to {@link #run} or {@link #runNative} throw {@link IllegalStateException}. Closing
-     * twice does nothing.
+     * later calls to {@link #run} or {@link #runNative} throw {@link IllegalStateException}. Releases the
+     * {@link ResolvedModel} the session was created from, if any. Closing twice does nothing.
      */
     @Override
     public void close() {
@@ -525,6 +601,10 @@ public class InferenceSession implements AutoCloseable {
                 // Silently ignore close errors
             }
             bufferPool.clear();
+            ResolvedModel loaded = model;
+            if (loaded != null) {
+                loaded.close();
+            }
         } finally {
             closeLock.writeLock().unlock();
         }

@@ -21,6 +21,7 @@ import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
@@ -324,8 +325,10 @@ public class Yolo26Detector
                     logger.warn("Yolo26Detector is using the default weights '{}', which are licensed "
                             + "under AGPL-3.0 (Ultralytics). DetrDetector is an Apache-2.0 alternative.", id);
                 }
-                dir = source.resolve(id, List.of("model.onnx"));
-                loadFromDirectory(dir);
+                try (ResolvedModel model = source.open(id, List.of("model.onnx"))) {
+                    dir = model.directory();
+                    loadFromDirectory(model);
+                }
             }
             try {
                 if (inputName == null) {
@@ -343,7 +346,8 @@ public class Yolo26Detector
             }
         }
 
-        private void loadFromDirectory(Path dir) {
+        private void loadFromDirectory(ResolvedModel model) {
+            Path dir = model.directory();
             if (!Files.isDirectory(dir)) {
                 throw new ModelSourceException("Model directory not found: " + dir);
             }
@@ -354,8 +358,8 @@ public class Yolo26Detector
             }
 
             this.session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
+                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
+                    : InferenceSession.create(model, "model.onnx");
         }
     }
 }

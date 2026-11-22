@@ -11,8 +11,10 @@ Models are downloaded from HuggingFace and cached locally. The cache directory i
 | 3 | Environment variable | `INFERENCE4J_CACHE_DIR=/path/to/cache` |
 | 4 | Default | `~/.cache/inference4j/` |
 
-Cached models are checked against the Hub at most once a day, and files that changed there are downloaded
-again; see [Model loading](../guides/model-loading.md#updates).
+Each repo is cached as snapshots under `{cacheDir}/hub/`, one per Hub commit. Cached models are checked against
+the Hub at most once a day, and files that changed there are downloaded into a new snapshot; see
+[Model loading](../guides/model-loading.md#updates). Superseded snapshots are pruned after each update unless a
+loaded model uses them; see [Pruning and snapshots in use](../guides/model-loading.md#pruning-and-snapshots-in-use).
 
 ## JVM flags
 
@@ -34,6 +36,7 @@ Or, on the module path:
 |----------|-------------|---------|
 | `inference4j.cache.dir` | Model cache directory | `~/.cache/inference4j/` |
 | `inference4j.cache.check-interval` | How often cached models are checked for updates (ISO-8601 duration) | `P1D` |
+| `inference4j.cache.prune` | `auto` deletes superseded snapshots after each update unless in use; `manual` keeps them until `ModelCache.prune()` | `auto` |
 | `inference4j.offline` | Never contact the Hub; use cached files as they are | `false` |
 | `inference4j.hf.endpoint` | Hugging Face Hub endpoint, such as a mirror | `https://huggingface.co` |
 
@@ -43,6 +46,7 @@ Or, on the module path:
 |----------|-------------|---------|
 | `INFERENCE4J_CACHE_DIR` | Model cache directory | `~/.cache/inference4j/` |
 | `INFERENCE4J_CACHE_CHECK_INTERVAL` | How often cached models are checked for updates (ISO-8601 duration) | `P1D` |
+| `INFERENCE4J_CACHE_PRUNE` | `auto` or `manual`, like `inference4j.cache.prune` | `auto` |
 | `INFERENCE4J_OFFLINE` | Never contact the Hub; use cached files as they are | `false` |
 | `HF_HUB_OFFLINE` | Same as `INFERENCE4J_OFFLINE` when set to `1` (the Hugging Face convention) | unset |
 | `HF_ENDPOINT` | Hugging Face Hub endpoint, such as a mirror | `https://huggingface.co` |

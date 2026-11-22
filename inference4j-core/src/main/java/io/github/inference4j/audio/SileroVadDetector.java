@@ -19,6 +19,7 @@ package io.github.inference4j.audio;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.preprocessing.audio.AudioData;
 import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
@@ -419,8 +420,9 @@ public class SileroVadDetector implements VoiceActivityDetector {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                Path dir = source.resolve(id, List.of("model.onnx"));
-                loadFromDirectory(dir);
+                try (ResolvedModel model = source.open(id, List.of("model.onnx"))) {
+                    loadFromDirectory(model);
+                }
             }
             int contextSize = (sampleRate == 16000) ? 64 : 32;
             io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline = io.github.inference4j.preprocessing.audio.AudioTransformPipeline.builder()
@@ -430,22 +432,20 @@ public class SileroVadDetector implements VoiceActivityDetector {
                     contextSize, threshold, minSpeechDuration, minSilenceDuration, speechPadding, pipeline);
         }
 
-        private void loadFromDirectory(Path dir) {
+        private void loadFromDirectory(ResolvedModel model) {
+            Path dir = model.directory();
             if (!Files.isDirectory(dir)) {
                 throw new ModelSourceException("Model directory not found: " + dir);
             }
 
-            Path modelPath = dir.resolve("model.onnx");
-            if (!Files.exists(modelPath)) {
-                modelPath = dir.resolve("silero_vad.onnx");
-            }
-            if (!Files.exists(modelPath)) {
+            String modelFile = Files.exists(dir.resolve("model.onnx")) ? "model.onnx" : "silero_vad.onnx";
+            if (!Files.exists(dir.resolve(modelFile))) {
                 throw new ModelSourceException("Model file not found in: " + dir);
             }
 
             this.session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
+                    ? InferenceSession.create(model, modelFile, sessionConfigurer)
+                    : InferenceSession.create(model, modelFile);
         }
     }
 }

@@ -153,7 +153,8 @@ class Inference4jVisionAutoConfigurationTest {
 				"inference4j.vision.object-detector.model-id=" + modelId)
 			.run(ctx -> assertThatThrownBy(() -> ctx.getBean(ObjectDetector.class))
 				.hasStackTraceContaining(ModelLoadException.class.getName() + ": Failed to load model from")
-				.hasStackTraceContaining(Path.of(modelId, "model.onnx").toString())
+				// The flat-layout stub, adopted into the repo's snapshot directory
+				.hasStackTraceContaining("models--" + modelId.replace("/", "--"))
 				.hasStackTraceContaining(builder));
 	}
 

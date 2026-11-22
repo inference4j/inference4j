@@ -22,6 +22,7 @@ import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.session.SessionConfigurer;
 
 import java.awt.image.BufferedImage;
@@ -179,30 +180,32 @@ public class PaddleTextRecognizer implements TextRecognizer {
 
         public PaddleTextRecognizer build() {
             ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-            Path dir = source.resolve(modelId, List.of("model.onnx", "inference.yml"));
-            Path modelPath = dir.resolve("model.onnx");
-            Path configPath = dir.resolve("inference.yml");
-            for (Path file : List.of(modelPath, configPath)) {
-                if (!Files.exists(file)) {
-                    throw new ModelSourceException("Model file not found: " + file);
+            try (ResolvedModel model = source.open(modelId, List.of("model.onnx", "inference.yml"))) {
+                Path dir = model.directory();
+                Path modelPath = dir.resolve("model.onnx");
+                Path configPath = dir.resolve("inference.yml");
+                for (Path file : List.of(modelPath, configPath)) {
+                    if (!Files.exists(file)) {
+                        throw new ModelSourceException("Model file not found: " + file);
+                    }
                 }
-            }
-            String[] characters = PaddleDictionary.read(configPath);
-            InferenceSession session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
-            PaddleTextRecognizer recognizer = new PaddleTextRecognizer(session, characters);
-            try {
-                int classes = recognizer.probabilities(new BufferedImage(MIN_WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB))[0].length;
-                if (classes != characters.length) {
-                    throw new ModelLoadException("Model predicts " + classes + " classes but inference.yml defines "
-                            + characters.length + " (blank + dictionary + space)");
+                String[] characters = PaddleDictionary.read(configPath);
+                InferenceSession session = sessionConfigurer != null
+                        ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
+                        : InferenceSession.create(model, "model.onnx");
+                PaddleTextRecognizer recognizer = new PaddleTextRecognizer(session, characters);
+                try {
+                    int classes = recognizer.probabilities(new BufferedImage(MIN_WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB))[0].length;
+                    if (classes != characters.length) {
+                        throw new ModelLoadException("Model predicts " + classes + " classes but inference.yml defines "
+                                + characters.length + " (blank + dictionary + space)");
+                    }
+                } catch (RuntimeException e) {
+                    session.close();
+                    throw e;
                 }
-            } catch (RuntimeException e) {
-                session.close();
-                throw e;
+                return recognizer;
             }
-            return recognizer;
         }
     }
 

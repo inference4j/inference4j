@@ -20,6 +20,7 @@ import io.github.inference4j.InferenceSession;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.preprocessing.audio.AudioData;
 import io.github.inference4j.preprocessing.audio.AudioLoader;
 import io.github.inference4j.preprocessing.audio.AudioTransformPipeline;
@@ -263,17 +264,19 @@ public class MoonshineRecognizer implements SpeechRecognizer {
             String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
             List<String> files = new ArrayList<>(MoonshineModel.FILES);
             files.add("tokenizer.json");
-            Path dir = source.resolve(id, files);
-            for (String file : files) {
-                if (!Files.exists(dir.resolve(file))) {
-                    throw new ModelSourceException("Model file not found: " + dir.resolve(file));
+            try (ResolvedModel resolved = source.open(id, files)) {
+                Path dir = resolved.directory();
+                for (String file : files) {
+                    if (!Files.exists(dir.resolve(file))) {
+                        throw new ModelSourceException("Model file not found: " + dir.resolve(file));
+                    }
                 }
+                TokenDecoder decoder = SentencePieceBpeTokenizer.provider().create(dir, List.of()).decoder();
+                MoonshineModel model = MoonshineModel.load(dir, file -> sessionConfigurer != null
+                        ? InferenceSession.create(resolved, file, sessionConfigurer)
+                        : InferenceSession.create(resolved, file));
+                return new MoonshineRecognizer(model, decoder);
             }
-            TokenDecoder decoder = SentencePieceBpeTokenizer.provider().create(dir, List.of()).decoder();
-            MoonshineModel model = MoonshineModel.load(dir, path -> sessionConfigurer != null
-                    ? InferenceSession.create(path, sessionConfigurer)
-                    : InferenceSession.create(path));
-            return new MoonshineRecognizer(model, decoder);
         }
     }
 }

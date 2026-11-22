@@ -22,6 +22,7 @@ import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.preprocessing.image.Labels;
 import io.github.inference4j.session.SessionConfigurer;
 
@@ -232,32 +233,34 @@ public class DetrDetector implements ObjectDetector {
         Loaded load() {
             ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
             boolean preset = PRESETS.contains(modelId);
-            Path dir = preset ? source.resolve(modelId, List.of("model.onnx")) : resolveCustom(source);
-            Path modelPath = dir.resolve("model.onnx");
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Model file not found: " + modelPath);
-            }
-            InferenceSession session = sessionConfigurer != null
-                    ? InferenceSession.create(modelPath, sessionConfigurer)
-                    : InferenceSession.create(modelPath);
-            try {
-                String inputName = session.inputNames().iterator().next();
-                int size = DetectorModels.inputSize(inputSize,
-                        DetectorModels.fixedSize(session.inputShape(inputName)), modelId);
-                return new Loaded(session, inputName, DetectorModels.labels(labels, dir, preset), size,
-                        confidenceThreshold, maxDetections);
-            } catch (RuntimeException e) {
-                session.close();
-                throw e;
+            try (ResolvedModel model = preset ? source.open(modelId, List.of("model.onnx")) : openCustom(source)) {
+                Path dir = model.directory();
+                Path modelPath = dir.resolve("model.onnx");
+                if (!Files.exists(modelPath)) {
+                    throw new ModelSourceException("Model file not found: " + modelPath);
+                }
+                InferenceSession session = sessionConfigurer != null
+                        ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
+                        : InferenceSession.create(model, "model.onnx");
+                try {
+                    String inputName = session.inputNames().iterator().next();
+                    int size = DetectorModels.inputSize(inputSize,
+                            DetectorModels.fixedSize(session.inputShape(inputName)), modelId);
+                    return new Loaded(session, inputName, DetectorModels.labels(labels, dir, preset), size,
+                            confidenceThreshold, maxDetections);
+                } catch (RuntimeException e) {
+                    session.close();
+                    throw e;
+                }
             }
         }
 
         /** A custom model's directory, with its {@code config.json} when the repository has one. */
-        private Path resolveCustom(ModelSource source) {
+        private ResolvedModel openCustom(ModelSource source) {
             try {
-                return source.resolve(modelId, List.of("model.onnx", "config.json"));
+                return source.open(modelId, List.of("model.onnx", "config.json"));
             } catch (ModelSourceException e) {
-                return source.resolve(modelId, List.of("model.onnx"));
+                return source.open(modelId, List.of("model.onnx"));
             }
         }
     }

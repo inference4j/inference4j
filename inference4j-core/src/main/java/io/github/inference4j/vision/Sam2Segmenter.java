@@ -34,6 +34,7 @@ import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.session.SessionConfigurer;
 
 /**
@@ -369,31 +370,34 @@ public class Sam2Segmenter implements PromptableSegmenter {
                 ModelSource source = modelSource != null
                         ? modelSource : HuggingFaceModelSource.defaultInstance();
                 String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                loadFromDirectory(source.resolve(id, MODEL_FILES));
+                try (ResolvedModel model = source.open(id, MODEL_FILES)) {
+                    loadFromDirectory(model);
+                }
             }
             return new Sam2Segmenter(encoderSession, decoderSession);
         }
 
-        private void loadFromDirectory(Path dir) {
+        private void loadFromDirectory(ResolvedModel model) {
+            Path dir = model.directory();
             if (!Files.isDirectory(dir)) {
                 throw new ModelSourceException("Model directory not found: " + dir);
             }
-            Path encoderPath = requireFile(dir, ENCODER_FILE);
-            Path decoderPath = requireFile(dir, DECODER_FILE);
+            requireFile(dir, ENCODER_FILE);
+            requireFile(dir, DECODER_FILE);
 
-            this.encoderSession = open(encoderPath);
+            this.encoderSession = open(model, ENCODER_FILE);
             try {
-                this.decoderSession = open(decoderPath);
+                this.decoderSession = open(model, DECODER_FILE);
             } catch (RuntimeException e) {
                 encoderSession.close();
                 throw e;
             }
         }
 
-        private InferenceSession open(Path path) {
+        private InferenceSession open(ResolvedModel model, String file) {
             return sessionConfigurer != null
-                    ? InferenceSession.create(path, sessionConfigurer)
-                    : InferenceSession.create(path);
+                    ? InferenceSession.create(model, file, sessionConfigurer)
+                    : InferenceSession.create(model, file);
         }
 
         private static Path requireFile(Path dir, String name) {
