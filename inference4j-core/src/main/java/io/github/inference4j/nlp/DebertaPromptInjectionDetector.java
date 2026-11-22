@@ -19,20 +19,15 @@ package io.github.inference4j.nlp;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelLoadException;
-import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
+import io.github.inference4j.model.AbstractModelBuilder;
 import io.github.inference4j.preprocessing.text.ModelConfig;
 import io.github.inference4j.processing.MathOps;
 import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.WindowAggregation;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.tokenizer.SpecialTokens;
 import io.github.inference4j.tokenizer.Tokenizer;
 import io.github.inference4j.tokenizer.TokenizerJsonParser;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -168,29 +163,15 @@ public class DebertaPromptInjectionDetector implements PromptInjectionDetector, 
         return MathOps.softmax(logits);
     }
 
-    public static class Builder {
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<DebertaPromptInjectionDetector, Builder> {
         private String injectionLabel = DEFAULT_INJECTION_LABEL;
         private float threshold = DEFAULT_THRESHOLD;
         private int maxLength = DEFAULT_MAX_LENGTH;
         private int stride = DEFAULT_STRIDE;
         private WindowAggregation windowAggregation = WindowAggregation.max();
 
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
         }
 
         /**
@@ -242,14 +223,8 @@ public class DebertaPromptInjectionDetector implements PromptInjectionDetector, 
             if (maxLength < 3) {
                 throw new IllegalArgumentException("maxLength must be at least 3, got " + maxLength);
             }
-            ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-            String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-            try (ResolvedModel model = source.open(id, List.of("model.onnx", "tokenizer.json", "config.json"))) {
-                Path dir = model.directory();
-                Path modelPath = requireFile(dir, "model.onnx");
-                Path tokenizerPath = requireFile(dir, "tokenizer.json");
-                Path configPath = requireFile(dir, "config.json");
-
+            return load(List.of("model.onnx", "tokenizer.json", "config.json"), files -> {
+                Path tokenizerPath = files.file("tokenizer.json");
                 Tokenizer tokenizer = TokenizerJsonParser.parseUnigram(tokenizerPath).build();
                 long[][] specialIds = specialTokenIds(tokenizerPath);
                 int windowSize = maxLength - specialIds[0].length - specialIds[1].length;
@@ -257,22 +232,11 @@ public class DebertaPromptInjectionDetector implements PromptInjectionDetector, 
                     throw new IllegalArgumentException(
                             "stride must be in [0, " + windowSize + ") for maxLength " + maxLength + ", got " + stride);
                 }
-                ModelConfig config = ModelConfig.fromFile(configPath);
+                ModelConfig config = ModelConfig.fromJson(files.json("config.json"));
                 int injectionIndex = labelIndex(config, injectionLabel);
-
-                InferenceSession session = sessionConfigurer != null
-                        ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                        : InferenceSession.create(model, "model.onnx");
-                return new DebertaPromptInjectionDetector(this, session, tokenizer, config, specialIds, injectionIndex);
-            }
-        }
-
-        private static Path requireFile(Path dir, String name) {
-            Path file = dir.resolve(name);
-            if (!Files.exists(file)) {
-                throw new ModelSourceException("Model file not found: " + file);
-            }
-            return file;
+                return new DebertaPromptInjectionDetector(this, files.session("model.onnx"), tokenizer, config,
+                        specialIds, injectionIndex);
+            });
         }
 
         private static int labelIndex(ModelConfig config, String label) {

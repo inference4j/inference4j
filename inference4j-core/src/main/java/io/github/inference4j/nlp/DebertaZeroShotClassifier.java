@@ -17,23 +17,16 @@
 package io.github.inference4j.nlp;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
+import io.github.inference4j.model.AbstractModelBuilder;
 import io.github.inference4j.preprocessing.text.ModelConfig;
 import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.WindowAggregation;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.tokenizer.SpecialTokens;
 import io.github.inference4j.tokenizer.Tokenizer;
 import io.github.inference4j.tokenizer.TokenizerJsonParser;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -230,29 +223,15 @@ public class DebertaZeroShotClassifier implements ZeroShotTextClassifier {
         return scores;
     }
 
-    public static class Builder {
-        private ModelSource modelSource;
-        private String modelId = BASE;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<DebertaZeroShotClassifier, Builder> {
         private String template = DEFAULT_TEMPLATE;
         private boolean multiLabel;
         private int maxLength = DEFAULT_MAX_LENGTH;
         private Integer stride;
         private WindowAggregation windowAggregation;
 
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
+        public Builder() {
+            super(BASE);
         }
 
         /**
@@ -308,41 +287,16 @@ public class DebertaZeroShotClassifier implements ZeroShotTextClassifier {
             if (windowAggregation != null && stride == null) {
                 throw new IllegalStateException("windowAggregation requires stride(int)");
             }
-            ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-            try (ResolvedModel model = source.open(modelId, List.of("model.onnx", "tokenizer.json", "config.json"))) {
-                Path dir = model.directory();
-                Path modelPath = requireFile(dir, "model.onnx");
-                Path tokenizerPath = requireFile(dir, "tokenizer.json");
-                Path configPath = requireFile(dir, "config.json");
-
+            return load(List.of("model.onnx", "tokenizer.json", "config.json"), files -> {
+                Path tokenizerPath = files.file("tokenizer.json");
                 Tokenizer tokenizer = TokenizerJsonParser.parseUnigram(tokenizerPath).build();
                 SpecialTokens special = TokenizerJsonParser.parseSpecialTokens(tokenizerPath);
-                ModelConfig config = ModelConfig.fromFile(configPath);
-                NliLabels nli = NliLabels.from(config);
-
-                InferenceSession session = sessionConfigurer != null
-                        ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                        : InferenceSession.create(model, "model.onnx");
-                return new DebertaZeroShotClassifier(this, session, tokenizer, special, nli.entailment(),
-                        nli.contradiction(), padTokenId(configPath));
-            }
-        }
-
-        private static long padTokenId(Path configPath) {
-            try {
-                JsonNode pad = new ObjectMapper().readTree(configPath.toFile()).path("pad_token_id");
-                return pad.isNumber() ? pad.asLong() : 0;
-            } catch (IOException e) {
-                throw new ModelSourceException("Failed to read config.json: " + e.getMessage(), e);
-            }
-        }
-
-        private static Path requireFile(Path dir, String name) {
-            Path file = dir.resolve(name);
-            if (!Files.exists(file)) {
-                throw new ModelSourceException("Model file not found: " + file);
-            }
-            return file;
+                JsonNode configJson = files.json("config.json");
+                NliLabels nli = NliLabels.from(ModelConfig.fromJson(configJson));
+                JsonNode pad = configJson.path("pad_token_id");
+                return new DebertaZeroShotClassifier(this, files.session("model.onnx"), tokenizer, special,
+                        nli.entailment(), nli.contradiction(), pad.isNumber() ? pad.asLong() : 0);
+            });
         }
     }
 }

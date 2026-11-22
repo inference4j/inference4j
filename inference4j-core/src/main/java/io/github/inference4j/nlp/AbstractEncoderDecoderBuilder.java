@@ -17,26 +17,18 @@
 package io.github.inference4j.nlp;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.exception.ModelLoadException;
-import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.generation.EncoderDecoderSession;
 import io.github.inference4j.generation.GenerationEngine;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
+import io.github.inference4j.model.AbstractModelBuilder;
+import io.github.inference4j.model.ModelFiles;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.tokenizer.TokenDecoder;
 import io.github.inference4j.tokenizer.Tokenizer;
 import io.github.inference4j.tokenizer.TokenizerProvider;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -53,11 +45,9 @@ import java.util.Set;
  * @param <T> the wrapper type being built
  * @param <B> the concrete builder type (for fluent chaining)
  */
-abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoderBuilder<T, B>> {
+abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoderBuilder<T, B>>
+        extends AbstractModelBuilder<T, B> {
 
-    ModelSource modelSource;
-    String modelId;
-    SessionConfigurer sessionConfigurer;
     TokenizerProvider tokenizerProvider;
     int maxNewTokens = 256;
     float temperature = 0f;
@@ -70,11 +60,6 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
     TruncationPolicy truncation;
     Integer forcedBosTokenId;
 
-    @SuppressWarnings("unchecked")
-    private B self() {
-        return (B) this;
-    }
-
     protected abstract TokenizerProvider defaultTokenizerProvider();
 
     protected abstract T createWrapper(GenerationEngine engine);
@@ -85,21 +70,6 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
      */
     protected boolean prependBosToInput() {
         return false;
-    }
-
-    public B modelSource(ModelSource modelSource) {
-        this.modelSource = modelSource;
-        return self();
-    }
-
-    public B modelId(String modelId) {
-        this.modelId = modelId;
-        return self();
-    }
-
-    public B sessionOptions(SessionConfigurer sessionConfigurer) {
-        this.sessionConfigurer = sessionConfigurer;
-        return self();
     }
 
     public B tokenizerProvider(TokenizerProvider tokenizerProvider) {
@@ -175,135 +145,71 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
                     "Model source not configured. Set modelId() for HuggingFace models "
                     + "or modelSource() for local models.");
         }
-        ModelSource source = modelSource != null
-                ? modelSource : HuggingFaceModelSource.defaultInstance();
         String id = modelId != null ? modelId : "";
         TokenizerProvider provider = tokenizerProvider != null
                 ? tokenizerProvider : defaultTokenizerProvider();
 
-        List<String> files = new ArrayList<>(List.of(
-                "encoder_model.onnx",
-                "decoder_model.onnx",
-                "decoder_with_past_model.onnx",
-                "config.json"));
-        files.addAll(provider.requiredFiles());
-        files.addAll(extraFiles);
-
-        try (ResolvedModel model = source.open(id, files)) {
-            return loadFromDirectory(model, provider);
-        }
+        List<String> unchecked = new ArrayList<>(provider.requiredFiles());
+        unchecked.addAll(extraFiles);
+        return load(id, List.of("encoder_model.onnx", "decoder_model.onnx", "decoder_with_past_model.onnx",
+                "config.json"), unchecked, files -> assemble(files, provider));
     }
 
-    private T loadFromDirectory(ResolvedModel model, TokenizerProvider provider) {
-        Path dir = model.directory();
-        if (!Files.isDirectory(dir)) {
-            throw new ModelSourceException("Model directory not found: " + dir);
+    private T assemble(ModelFiles files, TokenizerProvider provider) {
+        InferenceSession encoderSession = files.session("encoder_model.onnx");
+        InferenceSession decoderSession = files.session("decoder_model.onnx");
+        InferenceSession decoderWithPastSession = files.session("decoder_with_past_model.onnx");
+
+        JsonNode config = files.json("config.json");
+        int decoderStartTokenId = extractDecoderStartTokenId(config);
+        // Read even when eosTokenId() is set: a config.json without eos_token_id is rejected either way
+        Set<Integer> configEos = EosTokenIds.fromConfig(config);
+
+        EncoderDecoderSession generativeSession = new EncoderDecoderSession(
+                encoderSession, decoderSession, decoderWithPastSession, decoderStartTokenId);
+
+        TokenizerProvider.TokenizerAndDecoder td = provider.create(files.directory(), addedTokens);
+        Tokenizer tokenizer = td.tokenizer();
+        TokenDecoder decoder = td.decoder();
+
+        Set<Integer> eos = this.eosTokenIds.isEmpty() ? configEos : this.eosTokenIds;
+
+        GenerationEngine.Builder engineBuilder = GenerationEngine.builder()
+                .session(generativeSession)
+                .tokenizer(tokenizer)
+                .decoder(decoder)
+                .appendEosToInput(true)
+                .maxInputLength(maxInputLength != null
+                        ? maxInputLength
+                        : ModelInputLimits.maxPositions(config).orElse(Integer.MAX_VALUE))
+                .truncationGuard(new TruncationGuard(taskName(), truncation))
+                .maxNewTokens(this.maxNewTokens)
+                .temperature(this.temperature)
+                .topK(this.topK)
+                .topP(this.topP);
+
+        for (int eosId : eos) {
+            engineBuilder.eosTokenId(eosId);
         }
-
-        Path encoderPath = dir.resolve("encoder_model.onnx");
-        Path decoderPath = dir.resolve("decoder_model.onnx");
-        Path decoderWithPastPath = dir.resolve("decoder_with_past_model.onnx");
-        Path configPath = dir.resolve("config.json");
-
-        if (!Files.exists(encoderPath)) {
-            throw new ModelSourceException("Encoder model not found: " + encoderPath);
-        }
-        if (!Files.exists(decoderPath)) {
-            throw new ModelSourceException("Decoder model not found: " + decoderPath);
-        }
-        if (!Files.exists(decoderWithPastPath)) {
-            throw new ModelSourceException(
-                    "Decoder-with-past model not found: " + decoderWithPastPath);
-        }
-        if (!Files.exists(configPath)) {
-            throw new ModelSourceException("Config file not found: " + configPath);
-        }
-
-        InferenceSession encoderSession = null;
-        InferenceSession decoderSession = null;
-        InferenceSession decoderWithPastSession = null;
-
-        try {
-            encoderSession = createSession(model, "encoder_model.onnx");
-            decoderSession = createSession(model, "decoder_model.onnx");
-            decoderWithPastSession = createSession(model, "decoder_with_past_model.onnx");
-
-            ModelConfig config = readModelConfig(configPath);
-
-            EncoderDecoderSession generativeSession = new EncoderDecoderSession(
-                    encoderSession, decoderSession, decoderWithPastSession,
-                    config.decoderStartTokenId());
-
-            TokenizerProvider.TokenizerAndDecoder td = provider.create(dir, addedTokens);
-            Tokenizer tokenizer = td.tokenizer();
-            TokenDecoder decoder = td.decoder();
-
-            Set<Integer> eos = this.eosTokenIds.isEmpty()
-                    ? config.eosTokenIds()
-                    : this.eosTokenIds;
-
-            GenerationEngine.Builder engineBuilder = GenerationEngine.builder()
-                    .session(generativeSession)
-                    .tokenizer(tokenizer)
-                    .decoder(decoder)
-                    .appendEosToInput(true)
-                    .maxInputLength(maxInputLength != null
-                            ? maxInputLength
-                            : ModelInputLimits.maxPositions(configPath).orElse(Integer.MAX_VALUE))
-                    .truncationGuard(new TruncationGuard(taskName(), truncation))
-                    .maxNewTokens(this.maxNewTokens)
-                    .temperature(this.temperature)
-                    .topK(this.topK)
-                    .topP(this.topP);
-
-            for (int eosId : eos) {
-                engineBuilder.eosTokenId(eosId);
+        if (prependBosToInput()) {
+            Integer bos = optionalInt(config, "bos_token_id");
+            if (bos == null) {
+                throw new ModelLoadException("config.json missing bos_token_id, needed to start the input");
             }
-            if (prependBosToInput()) {
-                if (config.bosTokenId() == null) {
-                    throw new ModelLoadException("config.json missing bos_token_id, needed to start the input");
-                }
-                engineBuilder.prependToInput(config.bosTokenId());
-            }
-            Integer forcedBos = forcedBosTokenId != null ? forcedBosTokenId : config.forcedBosTokenId();
-            if (forcedBos != null) {
-                engineBuilder.forcedBosTokenId(forcedBos);
-            }
-            ModelInputLimits.decoderPositions(configPath).ifPresent(engineBuilder::maxDecoderPositions);
-
-            return createWrapper(engineBuilder.build());
-        } catch (Exception e) {
-            closeQuietly(encoderSession);
-            closeQuietly(decoderSession);
-            closeQuietly(decoderWithPastSession);
-            if (e instanceof RuntimeException re) {
-                throw re;
-            }
-            throw new ModelLoadException("Failed to initialize model: " + e.getMessage(), e);
+            engineBuilder.prependToInput(bos);
         }
+        Integer forcedBos = forcedBosTokenId != null ? forcedBosTokenId : optionalInt(config, "forced_bos_token_id");
+        if (forcedBos != null) {
+            engineBuilder.forcedBosTokenId(forcedBos);
+        }
+        ModelInputLimits.decoderPositions(config).ifPresent(engineBuilder::maxDecoderPositions);
+
+        return createWrapper(engineBuilder.build());
     }
 
     private String taskName() {
         Class<?> wrapper = getClass().getEnclosingClass();
         return wrapper != null ? wrapper.getSimpleName() : getClass().getSimpleName();
-    }
-
-    private record ModelConfig(int decoderStartTokenId, Set<Integer> eosTokenIds,
-                               Integer bosTokenId, Integer forcedBosTokenId) {}
-
-    private static ModelConfig readModelConfig(Path configPath) {
-        try (InputStream is = Files.newInputStream(configPath)) {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode root = mapper.readTree(is);
-
-            int decoderStartTokenId = extractDecoderStartTokenId(root);
-            Set<Integer> eosTokenIds = extractEosTokenIds(root);
-
-            return new ModelConfig(decoderStartTokenId, eosTokenIds,
-                    optionalInt(root, "bos_token_id"), optionalInt(root, "forced_bos_token_id"));
-        } catch (IOException e) {
-            throw new ModelLoadException("Failed to read config.json: " + e.getMessage(), e);
-        }
     }
 
     private static Integer optionalInt(JsonNode root, String field) {
@@ -325,41 +231,5 @@ abstract class AbstractEncoderDecoderBuilder<T, B extends AbstractEncoderDecoder
         throw new ModelLoadException(
                 "config.json missing decoder_start_token_id — "
                 + "set it explicitly or ensure config.json contains this field");
-    }
-
-    private static Set<Integer> extractEosTokenIds(JsonNode root) {
-        JsonNode eosNode = root.get("eos_token_id");
-        if (eosNode != null) {
-            if (eosNode.isInt()) {
-                return Set.of(eosNode.intValue());
-            }
-            if (eosNode.isArray()) {
-                Set<Integer> ids = new LinkedHashSet<>();
-                for (JsonNode element : eosNode) {
-                    if (element.isInt()) {
-                        ids.add(element.intValue());
-                    }
-                }
-                if (!ids.isEmpty()) {
-                    return ids;
-                }
-            }
-        }
-        throw new ModelLoadException("config.json missing eos_token_id — set it explicitly via eosTokenId()");
-    }
-
-    private InferenceSession createSession(ResolvedModel model, String file) {
-        return sessionConfigurer != null
-                ? InferenceSession.create(model, file, sessionConfigurer)
-                : InferenceSession.create(model, file);
-    }
-
-    static void closeQuietly(AutoCloseable closeable) {
-        if (closeable != null) {
-            try {
-                closeable.close();
-            } catch (Exception ignored) {
-            }
-        }
     }
 }

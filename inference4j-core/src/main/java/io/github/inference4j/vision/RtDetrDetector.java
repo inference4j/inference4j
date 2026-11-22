@@ -107,7 +107,7 @@ public class RtDetrDetector extends DetrDetector {
 
         @Override
         public RtDetrDetector build() {
-            return new RtDetrDetector(load());
+            return new RtDetrDetector(loadModel());
         }
     }
 }

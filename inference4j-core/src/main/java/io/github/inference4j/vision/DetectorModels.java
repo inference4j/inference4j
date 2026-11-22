@@ -16,10 +16,13 @@
 
 package io.github.inference4j.vision;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.preprocessing.image.Labels;
 import io.github.inference4j.preprocessing.text.ModelConfig;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -57,7 +60,7 @@ final class DetectorModels {
         }
         Path configFile = dir.resolve("config.json");
         if (Files.exists(configFile)) {
-            ModelConfig config = ModelConfig.fromFile(configFile);
+            ModelConfig config = ModelConfig.fromJson(readJson(configFile));
             if (config.numLabels() > 0) {
                 List<String> names = new ArrayList<>(config.numLabels());
                 for (int i = 0; i < config.numLabels(); i++) {
@@ -67,6 +70,14 @@ final class DetectorModels {
             }
         }
         return Labels.coco();
+    }
+
+    private static JsonNode readJson(Path file) {
+        try {
+            return new ObjectMapper().readTree(file.toFile());
+        } catch (IOException e) {
+            throw new ModelLoadException("Failed to read " + file + ": " + e.getMessage(), e);
+        }
     }
 
     /**
