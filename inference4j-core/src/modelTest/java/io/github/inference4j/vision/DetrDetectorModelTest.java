@@ -114,18 +114,6 @@ class DetrDetectorModelTest {
         }
     }
 
-    @Test
-    @SuppressWarnings("removal")
-    void theDeprecatedRtDetrDetectorNameBuildsTheSameDetector() {
-        try (RtDetrDetector detector = RtDetrDetector.dfineNano().confidenceThreshold(0.5f).build()) {
-            assertThat(detector).isInstanceOf(DetrDetector.class);
-            assertThat(detector.detect(cat)).singleElement().satisfies(d -> {
-                assertThat(d.label()).isEqualTo("cat");
-                assertThat(d.confidence()).isCloseTo(0.9536f, offset(1e-3f));
-            });
-        }
-    }
-
     private static void assertBox(BoundingBox box, float x1, float y1, float x2, float y2) {
         assertThat(box.x1()).isCloseTo(x1, offset(1f));
         assertThat(box.y1()).isCloseTo(y1, offset(1f));
