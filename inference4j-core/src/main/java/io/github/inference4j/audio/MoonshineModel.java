@@ -78,17 +78,19 @@ final class MoonshineModel implements AutoCloseable {
     private final InferenceSession adapter;
     private final InferenceSession crossKv;
     private final InferenceSession decoder;
+    private final InferenceSession weights;
     private final NativeTensors frontendWeights;
 
     private MoonshineModel(Config config, InferenceSession frontend, InferenceSession encoder,
                            InferenceSession adapter, InferenceSession crossKv, InferenceSession decoder,
-                           NativeTensors frontendWeights) {
+                           InferenceSession weights, NativeTensors frontendWeights) {
         this.config = config;
         this.frontend = frontend;
         this.encoder = encoder;
         this.adapter = adapter;
         this.crossKv = crossKv;
         this.decoder = decoder;
+        this.weights = weights;
         this.frontendWeights = frontendWeights;
     }
 
@@ -101,17 +103,21 @@ final class MoonshineModel implements AutoCloseable {
     static MoonshineModel load(Path dir, Function<Path, InferenceSession> openSession) {
         Config config = Config.read(dir.resolve("streaming_config.json"));
         List<InferenceSession> opened = new ArrayList<>();
+        NativeTensors frontendWeights = null;
         try {
             InferenceSession weights = open(dir, "frontend.weights.ort", openSession, opened);
-            NativeTensors frontendWeights = weights.runNative(Map.of(), null);
+            frontendWeights = weights.runNative(Map.of(), null);
             return new MoonshineModel(config,
                     open(dir, "frontend.model.ort", openSession, opened),
                     open(dir, "encoder.ort", openSession, opened),
                     open(dir, "adapter.ort", openSession, opened),
                     open(dir, "cross_kv.ort", openSession, opened),
                     open(dir, "decoder_kv.ort", openSession, opened),
-                    frontendWeights);
+                    weights, frontendWeights);
         } catch (RuntimeException e) {
+            if (frontendWeights != null) {
+                frontendWeights.close();
+            }
             opened.forEach(InferenceSession::close);
             throw e;
         }
@@ -135,7 +141,9 @@ final class MoonshineModel implements AutoCloseable {
 
     @Override
     public void close() {
+        // The weights were produced by the weights session, so they are freed before it is closed
         frontendWeights.close();
+        weights.close();
         frontend.close();
         encoder.close();
         adapter.close();

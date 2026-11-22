@@ -16,40 +16,47 @@
 
 package io.github.inference4j.audio;
 
-import io.github.inference4j.exception.InferenceException;
-
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * Serializes use of one {@link MoonshineModel} by a recognizer and its streams, and closes the model only
- * when no call is using it.
+ * Lets a recognizer and its streams use one {@link MoonshineModel} at the same time, and closes the model
+ * only when no call is using it.
+ *
+ * <p>Model work holds the read lock, so calls run in parallel; {@link #close(Runnable)} takes the write
+ * lock, so it waits for them. No user code, such as a transcript listener, runs while the lock is held.
  */
 final class MoonshineGuard {
 
-    private final ReentrantLock lock = new ReentrantLock();
+    private final ReentrantReadWriteLock closeLock = new ReentrantReadWriteLock();
     private volatile boolean closed;
 
     /**
-     * Waits for the model, then holds it until {@link #release()}.
+     * Holds the model open until {@link #release()}.
      *
      * @throws IllegalStateException if the recognizer was closed
-     * @throws InferenceException    if the thread is interrupted while waiting
      */
     void acquire() {
-        try {
-            lock.lockInterruptibly();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new InferenceException("Interrupted while waiting for another transcription to finish", e);
-        }
-        if (closed) {
-            lock.unlock();
+        if (!acquireIfOpen()) {
             throw new IllegalStateException("The speech recognizer was closed");
         }
     }
 
+    /**
+     * Holds the model open until {@link #release()}, unless the recognizer was closed.
+     *
+     * @return whether the model is held; when {@code false}, do not call {@link #release()}
+     */
+    boolean acquireIfOpen() {
+        closeLock.readLock().lock();
+        if (closed) {
+            closeLock.readLock().unlock();
+            return false;
+        }
+        return true;
+    }
+
     void release() {
-        lock.unlock();
+        closeLock.readLock().unlock();
     }
 
     boolean isClosed() {
@@ -57,15 +64,11 @@ final class MoonshineGuard {
     }
 
     /**
-     * Waits for the call in progress, if any, then runs {@code closer} once.
-     *
-     * @throws IllegalStateException if called from a transcript listener, while this thread holds the model
+     * Waits for the calls in progress, then runs {@code closer} once. Later calls to {@link #acquire()}
+     * throw.
      */
     void close(Runnable closer) {
-        if (lock.isHeldByCurrentThread()) {
-            throw new IllegalStateException("The speech recognizer cannot be closed from a transcript listener");
-        }
-        lock.lock();
+        closeLock.writeLock().lock();
         try {
             if (closed) {
                 return;
@@ -73,7 +76,7 @@ final class MoonshineGuard {
             closed = true;
             closer.run();
         } finally {
-            lock.unlock();
+            closeLock.writeLock().unlock();
         }
     }
 }
