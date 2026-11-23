@@ -391,10 +391,6 @@ public class SentenceTransformerEmbedder
         private Integer stride;
         private Integer dimensions;
 
-        Builder session(InferenceSession session) {
-            return useSession("model.onnx", session);
-        }
-
         /**
          * Sets a custom tokenizer. If not specified, a {@link WordPieceTokenizer} is
          * automatically loaded from the model directory's {@code vocab.txt}.
@@ -502,7 +498,7 @@ public class SentenceTransformerEmbedder
          */
         @Override
         public SentenceTransformerEmbedder build() {
-            if (modelId == null && !sessionsSupplied()) {
+            if (modelId == null) {
                 throw new IllegalStateException(
                         "modelId is required (e.g., \"inference4j/all-MiniLM-L6-v2\")");
             }

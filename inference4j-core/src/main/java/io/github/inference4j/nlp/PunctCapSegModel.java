@@ -219,10 +219,6 @@ public class PunctCapSegModel extends AbstractInferenceTask<String, List<String>
             super(DEFAULT_MODEL_ID);
         }
 
-        Builder session(InferenceSession session) {
-            return useSession("model.onnx", session);
-        }
-
         public Builder tokenizer(UnigramTokenizer tokenizer) {
             this.tokenizer = tokenizer;
             return this;

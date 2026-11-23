@@ -15,13 +15,9 @@
  */
 package io.github.inference4j.model;
 
-import io.github.inference4j.InferenceSession;
 import io.github.inference4j.session.SessionConfigurer;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 
 /**
  * Base class of model builders: the options every builder shares ({@link #modelId(String) modelId},
@@ -44,7 +40,6 @@ public abstract class AbstractModelBuilder<T, B extends AbstractModelBuilder<T, 
     protected SessionConfigurer sessionConfigurer;
 
     private final String defaultModelId;
-    private final Map<String, InferenceSession> suppliedSessions = new LinkedHashMap<>();
 
     /** A builder with no default model: one must be set. */
     protected AbstractModelBuilder() {
@@ -80,31 +75,6 @@ public abstract class AbstractModelBuilder<T, B extends AbstractModelBuilder<T, 
 
     /** Loads the model. */
     public abstract T build();
-
-    /**
-     * Uses an already created session for a model file instead of opening the model. Once any session is supplied,
-     * {@code build()} opens nothing: {@link ModelFiles#session(String)} returns the supplied sessions, the
-     * directory is {@code null} and no file exists, so the builder relies on its own options for everything else.
-     *
-     * <p><strong>Transitional:</strong> backs the package-private {@code session(InferenceSession)} test hooks of
-     * the builders, and goes away with them.
-     *
-     * @param fileName the model file the session stands for, such as {@code "model.onnx"}
-     * @param session  the session; the built model owns it
-     * @return this builder
-     */
-    protected B useSession(String fileName, InferenceSession session) {
-        suppliedSessions.put(Objects.requireNonNull(fileName, "fileName"), Objects.requireNonNull(session, "session"));
-        return self();
-    }
-
-    /**
-     * Whether sessions were supplied with {@link #useSession(String, InferenceSession)}, in which case
-     * {@code build()} opens no model. <strong>Transitional</strong>, like {@code useSession}.
-     */
-    protected final boolean sessionsSupplied() {
-        return !suppliedSessions.isEmpty();
-    }
 
     /** This builder, as its concrete type. */
     @SuppressWarnings("unchecked")
@@ -158,9 +128,6 @@ public abstract class AbstractModelBuilder<T, B extends AbstractModelBuilder<T, 
      */
     protected T load(String modelId, List<String> required, List<String> unchecked,
                      ModelFiles.Assembler<T> assembler) {
-        if (!suppliedSessions.isEmpty()) {
-            return ModelFiles.forSessions(modelId, suppliedSessions, assembler);
-        }
         return ModelFiles.load(source(), modelId, sessionConfigurer, required, unchecked, assembler);
     }
 }

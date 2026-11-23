@@ -16,83 +16,78 @@
 
 package io.github.inference4j.multimodal;
 
-import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.processing.Preprocessor;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 class ClipImageEncoderTest {
 
+    // The fixture model averages each channel, so a 1 x 3 x 1 x 1 input is its own raw embedding.
+
+    /** Feeds the model the raw embedding [3, 4, 0], whatever the image. */
+    private static final Preprocessor<BufferedImage, Tensor> THREE_FOUR_ZERO =
+            image -> Tensor.fromFloats(new float[]{3f, 4f, 0f}, new long[]{1, 3, 1, 1});
+
+    @TempDir
+    Path dir;
+
     @Test
     void encode_returnsL2NormalizedEmbedding() {
-        InferenceSession session = mock(InferenceSession.class);
-        @SuppressWarnings("unchecked")
-        Preprocessor<BufferedImage, Tensor> preprocessor = mock(Preprocessor.class);
+        try (ClipImageEncoder encoder = encoder()) {
+            float[] embedding = encoder.encode(new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB));
 
-        Tensor inputTensor = Tensor.fromFloats(new float[]{0.5f}, new long[]{1});
-        when(preprocessor.process(any(BufferedImage.class))).thenReturn(inputTensor);
+            // Raw output: [3, 4, 0] -> L2 norm = 5, normalized = [0.6, 0.8, 0]
+            assertThat(embedding).containsExactly(new float[]{0.6f, 0.8f, 0f}, within(1e-5f));
 
-        // Raw output: [3, 4] -> L2 norm = 5, normalized = [0.6, 0.8]
-        Tensor outputTensor = Tensor.fromFloats(new float[]{3.0f, 4.0f}, new long[]{1, 2});
-        when(session.run(any())).thenReturn(Map.of("image_embeds", outputTensor));
-
-        ClipImageEncoder encoder = ClipImageEncoder.builder()
-                .session(session)
-                .preprocessor(preprocessor)
-                .build();
-
-        BufferedImage image = new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB);
-        float[] embedding = encoder.encode(image);
-
-        assertThat(embedding).hasSize(2);
-        assertThat(embedding[0]).isCloseTo(0.6f, within(1e-5f));
-        assertThat(embedding[1]).isCloseTo(0.8f, within(1e-5f));
-
-        // Verify L2 norm ≈ 1.0
-        float norm = 0f;
-        for (float v : embedding) {
-            norm += v * v;
+            float norm = 0f;
+            for (float v : embedding) {
+                norm += v * v;
+            }
+            assertThat((float) Math.sqrt(norm)).isCloseTo(1.0f, within(1e-5f));
         }
-        assertThat((float) Math.sqrt(norm)).isCloseTo(1.0f, within(1e-5f));
     }
 
     @Test
     void encodeBatch_returnsOneEmbeddingPerImage() {
-        InferenceSession session = mock(InferenceSession.class);
-        @SuppressWarnings("unchecked")
-        Preprocessor<BufferedImage, Tensor> preprocessor = mock(Preprocessor.class);
+        try (ClipImageEncoder encoder = encoder()) {
+            List<BufferedImage> images = List.of(
+                    new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB),
+                    new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB));
+            List<float[]> results = encoder.encodeBatch(images);
 
-        Tensor inputTensor = Tensor.fromFloats(new float[]{0.5f}, new long[]{1});
-        when(preprocessor.process(any(BufferedImage.class))).thenReturn(inputTensor);
-
-        Tensor outputTensor = Tensor.fromFloats(new float[]{1.0f, 0.0f}, new long[]{1, 2});
-        when(session.run(any())).thenReturn(Map.of("image_embeds", outputTensor));
-
-        ClipImageEncoder encoder = ClipImageEncoder.builder()
-                .session(session)
-                .preprocessor(preprocessor)
-                .build();
-
-        List<BufferedImage> images = List.of(
-                new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB),
-                new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB));
-        List<float[]> results = encoder.encodeBatch(images);
-
-        assertThat(results).hasSize(2);
-        for (float[] emb : results) {
-            assertThat(emb).hasSize(2);
+            assertThat(results).hasSize(2);
+            for (float[] emb : results) {
+                assertThat(emb).hasSize(3);
+            }
         }
+    }
+
+    @Test
+    void closedEncoderRejectsEncode() {
+        ClipImageEncoder encoder = encoder();
+
+        encoder.close();
+
+        assertThatThrownBy(() -> encoder.encode(new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB)))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    private ClipImageEncoder encoder() {
+        TestModels.install(dir, "clip-vision", "vision_model.onnx");
+        return ClipImageEncoder.builder()
+                .modelSource(TestModels.source(dir))
+                .preprocessor(THREE_FOUR_ZERO)
+                .build();
     }
 
     @Test
@@ -103,22 +98,6 @@ class ClipImageEncoderTest {
                         .modelSource(badSource)
                         .build())
                 .isInstanceOf(ModelSourceException.class);
-    }
-
-    @Test
-    void close_delegatesToSession() {
-        InferenceSession session = mock(InferenceSession.class);
-        @SuppressWarnings("unchecked")
-        Preprocessor<BufferedImage, Tensor> preprocessor = mock(Preprocessor.class);
-
-        ClipImageEncoder encoder = ClipImageEncoder.builder()
-                .session(session)
-                .preprocessor(preprocessor)
-                .build();
-
-        encoder.close();
-
-        verify(session).close();
     }
 
     @Test

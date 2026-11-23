@@ -163,10 +163,6 @@ public class Wav2Vec2Recognizer
             super(DEFAULT_MODEL_ID);
         }
 
-        Builder session(InferenceSession session) {
-            return useSession("model.onnx", session);
-        }
-
         public Builder vocabulary(io.github.inference4j.preprocessing.audio.Vocabulary vocabulary) {
             this.vocabulary = vocabulary;
             return this;

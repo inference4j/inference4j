@@ -22,16 +22,14 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
+import org.junit.jupiter.api.io.TempDir;
 
-import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.ModelSource;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 class Sam2SegmenterTest {
 
@@ -129,15 +127,20 @@ class Sam2SegmenterTest {
     }
 
     // --- End-to-End ---
+    // The fixture decoder proposes three 2x2 masks (all background, all foreground, right column) scored
+    // 0.2, 0.9 and 0.5, plus the sum of the box coordinates in model space divided by 10240.
+
+    @TempDir
+    Path dir;
 
     @Test
     void segmentReturnsHighestScoringMaskAtImageSize() {
-        try (Sam2Segmenter sam = segmenterReturning(new float[]{0.2f, 0.9f, 0.5f})) {
+        try (Sam2Segmenter sam = segmenter()) {
             BufferedImage image = new BufferedImage(40, 30, BufferedImage.TYPE_INT_RGB);
 
             SegmentationMask mask = sam.segment(sam.encode(image), Prompt.point(10, 10));
 
-            assertThat(mask.score()).isEqualTo(0.9f);
+            assertThat(mask.score()).isCloseTo(0.9f, within(1e-6f));
             assertThat(mask.width()).isEqualTo(40);
             assertThat(mask.height()).isEqualTo(30);
             assertThat(mask.area()).isEqualTo(40 * 30);
@@ -146,39 +149,33 @@ class Sam2SegmenterTest {
 
     @Test
     void segmentCandidatesAreSortedByScore() {
-        try (Sam2Segmenter sam = segmenterReturning(new float[]{0.2f, 0.9f, 0.5f})) {
+        try (Sam2Segmenter sam = segmenter()) {
             ImageFeatures features = sam.encode(new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB));
 
             List<SegmentationMask> masks = sam.segmentCandidates(features, Prompt.point(1, 1));
 
-            assertThat(masks).extracting(SegmentationMask::score).containsExactly(0.9f, 0.5f, 0.2f);
+            assertThat(masks).extracting(SegmentationMask::score)
+                    .containsExactly(0.9f, 0.5f, 0.2f);
         }
     }
 
     @Test
     void segmentPassesEmbeddingsAndPromptToDecoder() {
-        InferenceSession encoder = mockEncoder();
-        InferenceSession decoder = mockDecoder(new float[]{0.1f, 0.2f, 0.3f});
-        try (Sam2Segmenter sam = Sam2Segmenter.builder()
-                .encoderSession(encoder)
-                .decoderSession(decoder)
-                .build()) {
+        // Box (0, 0, 4, 4) on an 8x8 image is (0, 0, 512, 512) in model space: 1024 / 10240 = 0.1 per score
+        try (Sam2Segmenter sam = segmenter()) {
             ImageFeatures features = sam.encode(new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB));
-            sam.segment(features, Prompt.box(0, 0, 4, 4));
-        }
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(decoder).run(captor.capture());
-        assertThat(captor.getValue()).containsKeys(
-                "image_embeddings.0", "image_embeddings.1", "image_embeddings.2",
-                "input_points", "input_labels", "input_boxes");
-        assertThat(captor.getValue().get("input_boxes").toFloats()).containsExactly(0f, 0f, 512f, 512f);
+            List<SegmentationMask> masks = sam.segmentCandidates(features, Prompt.box(0, 0, 4, 4));
+
+            float[] scores = {masks.get(0).score(), masks.get(1).score(), masks.get(2).score()};
+            assertThat(scores).containsExactly(new float[]{1.0f, 0.6f, 0.3f}, within(1e-5f));
+            assertThat(masks.get(0).area()).isEqualTo(8 * 8);
+        }
     }
 
     @Test
     void encodeKeepsImageSize() {
-        try (Sam2Segmenter sam = segmenterReturning(new float[]{0.1f, 0.2f, 0.3f})) {
+        try (Sam2Segmenter sam = segmenter()) {
             ImageFeatures features = sam.encode(new BufferedImage(640, 480, BufferedImage.TYPE_INT_RGB));
 
             assertThat(features.width()).isEqualTo(640);
@@ -187,14 +184,16 @@ class Sam2SegmenterTest {
     }
 
     @Test
-    void closeClosesBothSessions() {
-        InferenceSession encoder = mockEncoder();
-        InferenceSession decoder = mockDecoder(new float[]{0.1f, 0.2f, 0.3f});
+    void closedSegmenterRejectsEncodeAndSegment() {
+        Sam2Segmenter sam = segmenter();
+        ImageFeatures features = sam.encode(new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB));
 
-        Sam2Segmenter.builder().encoderSession(encoder).decoderSession(decoder).build().close();
+        sam.close();
 
-        verify(encoder).close();
-        verify(decoder).close();
+        assertThatThrownBy(() -> sam.encode(new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> sam.segment(features, Prompt.point(1, 1)))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -207,33 +206,9 @@ class Sam2SegmenterTest {
 
     // --- Helpers ---
 
-    /** A segmenter whose decoder proposes three 2x2 masks: only the second is all foreground. */
-    private static Sam2Segmenter segmenterReturning(float[] scores) {
-        return Sam2Segmenter.builder()
-                .encoderSession(mockEncoder())
-                .decoderSession(mockDecoder(scores))
-                .build();
-    }
-
-    private static InferenceSession mockEncoder() {
-        InferenceSession encoder = mock(InferenceSession.class);
-        Tensor tiny = Tensor.fromFloats(new float[]{0f}, new long[]{1, 1, 1, 1});
-        when(encoder.run(any())).thenReturn(Map.of(
-                "image_embeddings.0", tiny,
-                "image_embeddings.1", tiny,
-                "image_embeddings.2", tiny));
-        return encoder;
-    }
-
-    private static InferenceSession mockDecoder(float[] scores) {
-        InferenceSession decoder = mock(InferenceSession.class);
-        float[] masks = {
-                -1f, -1f, -1f, -1f,
-                1f, 1f, 1f, 1f,
-                -1f, 1f, -1f, 1f};
-        when(decoder.run(any())).thenReturn(Map.of(
-                "iou_scores", Tensor.fromFloats(scores, new long[]{1, 1, 3}),
-                "pred_masks", Tensor.fromFloats(masks, new long[]{1, 1, 3, 2, 2})));
-        return decoder;
+    private Sam2Segmenter segmenter() {
+        TestModels.install(dir, "sam2-encoder", "vision_encoder.onnx");
+        TestModels.install(dir, "sam2-decoder", "prompt_encoder_mask_decoder.onnx");
+        return Sam2Segmenter.builder().modelSource(TestModels.source(dir)).build();
     }
 }

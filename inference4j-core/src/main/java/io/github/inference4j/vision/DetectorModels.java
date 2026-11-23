@@ -45,14 +45,14 @@ final class DetectorModels {
      * model directory; {@code id2label} from its {@code config.json}; COCO.
      *
      * @param explicit labels set on the builder, or {@code null}
-     * @param dir      the model directory, or {@code null} when the session was supplied directly
+     * @param dir      the model directory
      * @param preset   whether the model is one of the wrapper's presets, which use COCO names
      */
     static Labels labels(Labels explicit, Path dir, boolean preset) {
         if (explicit != null) {
             return explicit;
         }
-        if (preset || dir == null) {
+        if (preset) {
             return Labels.coco();
         }
         Path labelsFile = dir.resolve("labels.txt");

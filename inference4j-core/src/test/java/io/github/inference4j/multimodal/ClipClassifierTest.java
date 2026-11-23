@@ -16,22 +16,18 @@
 
 package io.github.inference4j.multimodal;
 
-import io.github.inference4j.InferenceSession;
-import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
+import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.processing.MathOps;
-import io.github.inference4j.processing.Preprocessor;
-import io.github.inference4j.tokenizer.EncodedInput;
-import io.github.inference4j.tokenizer.Tokenizer;
 import io.github.inference4j.vision.Classification;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.awt.image.BufferedImage;
+import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 class ClipClassifierTest {
 
@@ -116,110 +112,66 @@ class ClipClassifierTest {
         }
     }
 
+    // End to end through the model files: the fixture vision model averages each normalized channel, the
+    // fixture text model counts the tokens r</w>, g</w> and b</w>, so a red image is closest to "r".
+
+    @TempDir
+    Path dir;
+
     @Test
-    @SuppressWarnings("unchecked")
     void classify_usesEncodersAndReturnsClassifications() {
-        InferenceSession visionSession = mock(InferenceSession.class);
-        InferenceSession textSession = mock(InferenceSession.class);
-        Preprocessor<BufferedImage, Tensor> preprocessor = mock(Preprocessor.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
+        try (ClipClassifier classifier = classifier()) {
+            List<Classification> red = classifier.classify(filled(0xFF0000), List.of("r", "g", "b"));
+            List<Classification> green = classifier.classify(filled(0x00FF00), List.of("r", "g", "b"));
 
-        // Vision: mock preprocessor and session
-        Tensor inputTensor = Tensor.fromFloats(new float[]{0.5f}, new long[]{1});
-        when(preprocessor.process(any(BufferedImage.class))).thenReturn(inputTensor);
-
-        // Vision session returns embedding pointing toward "cat"
-        Tensor imageOutput = Tensor.fromFloats(new float[]{1.0f, 0.0f}, new long[]{1, 2});
-        when(visionSession.run(any())).thenReturn(Map.of("image_embeds", imageOutput));
-
-        // Text: mock tokenizer
-        when(tokenizer.encode(anyString())).thenReturn(
-                new EncodedInput(new long[]{1, 2}, new long[]{1, 1}, new long[]{0, 0}));
-
-        // Text session returns different embeddings for each label
-        Tensor catEmb = Tensor.fromFloats(new float[]{1.0f, 0.0f}, new long[]{1, 2});
-        Tensor dogEmb = Tensor.fromFloats(new float[]{0.0f, 1.0f}, new long[]{1, 2});
-        when(textSession.run(any()))
-                .thenReturn(Map.of("text_embeds", catEmb))
-                .thenReturn(Map.of("text_embeds", dogEmb));
-
-        ClipImageEncoder imageEncoder = ClipImageEncoder.builder()
-                .session(visionSession)
-                .preprocessor(preprocessor)
-                .build();
-
-        ClipTextEncoder textEncoder = ClipTextEncoder.builder()
-                .session(textSession)
-                .tokenizer(tokenizer)
-                .build();
-
-        ClipClassifier classifier = ClipClassifier.builder()
-                .imageEncoder(imageEncoder)
-                .textEncoder(textEncoder)
-                .build();
-
-        BufferedImage image = new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB);
-        List<Classification> results = classifier.classify(image, List.of("cat", "dog"));
-
-        assertThat(results).hasSize(2);
-        assertThat(results.get(0).label()).isEqualTo("cat");
+            assertThat(red).hasSize(3);
+            assertThat(red.get(0).label()).isEqualTo("r");
+            assertThat(red.get(0).index()).isZero();
+            assertThat(green.get(0).label()).isEqualTo("g");
+        }
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void classify_withEmptyCandidateLabels_returnsEmpty() {
-        InferenceSession visionSession = mock(InferenceSession.class);
-        InferenceSession textSession = mock(InferenceSession.class);
-        Preprocessor<BufferedImage, Tensor> preprocessor = mock(Preprocessor.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
-
-        ClipImageEncoder imageEncoder = ClipImageEncoder.builder()
-                .session(visionSession)
-                .preprocessor(preprocessor)
-                .build();
-
-        ClipTextEncoder textEncoder = ClipTextEncoder.builder()
-                .session(textSession)
-                .tokenizer(tokenizer)
-                .build();
-
-        ClipClassifier classifier = ClipClassifier.builder()
-                .imageEncoder(imageEncoder)
-                .textEncoder(textEncoder)
-                .build();
-
-        BufferedImage image = new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB);
-        List<Classification> results = classifier.classify(image, List.of());
-
-        assertThat(results).isEmpty();
+        try (ClipClassifier classifier = classifier()) {
+            assertThat(classifier.classify(filled(0xFF0000), List.of())).isEmpty();
+        }
     }
 
     @Test
-    void close_delegatesToBothEncoders() {
-        InferenceSession visionSession = mock(InferenceSession.class);
-        InferenceSession textSession = mock(InferenceSession.class);
-        @SuppressWarnings("unchecked")
-        Preprocessor<BufferedImage, Tensor> preprocessor = mock(Preprocessor.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
-
-        ClipImageEncoder imageEncoder = ClipImageEncoder.builder()
-                .session(visionSession)
-                .preprocessor(preprocessor)
-                .build();
-
-        ClipTextEncoder textEncoder = ClipTextEncoder.builder()
-                .session(textSession)
-                .tokenizer(tokenizer)
-                .build();
-
-        ClipClassifier classifier = ClipClassifier.builder()
-                .imageEncoder(imageEncoder)
-                .textEncoder(textEncoder)
-                .build();
+    void closedClassifierRejectsClassify() {
+        ClipClassifier classifier = classifier();
 
         classifier.close();
 
-        verify(visionSession).close();
-        verify(textSession).close();
+        assertThatThrownBy(() -> classifier.classify(filled(0xFF0000), List.of("r", "g")))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void everyModelFileIsRequired() {
+        TestModels.install(dir, "clip-vision", "vision_model.onnx");
+        TestModels.install(dir, "clip-text", "text_model.onnx");
+
+        assertThatThrownBy(() -> ClipClassifier.builder().modelSource(TestModels.source(dir)).build())
+                .isInstanceOf(ModelSourceException.class)
+                .hasMessageContaining("vocab.json");
+    }
+
+    private ClipClassifier classifier() {
+        TestModels.install(dir, "clip-vision", "vision_model.onnx");
+        TestModels.install(dir, "clip-text", "text_model.onnx");
+        TestModels.clipVocabulary(dir);
+        return ClipClassifier.builder().modelSource(TestModels.source(dir)).build();
+    }
+
+    private static BufferedImage filled(int rgb) {
+        BufferedImage image = new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                image.setRGB(x, y, rgb);
+            }
+        }
+        return image;
     }
 }

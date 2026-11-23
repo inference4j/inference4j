@@ -16,17 +16,17 @@
 
 package io.github.inference4j.multimodal;
 
-import io.github.inference4j.InferenceSession;
-import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.Tokenizer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -34,88 +34,63 @@ import static org.mockito.Mockito.*;
 
 class ClipTextEncoderTest {
 
+    // The fixture model counts the unmasked tokens with ids 0, 1 and 2 into a 3-value raw embedding.
+
+    @TempDir
+    Path dir;
+
     @Test
     void encode_returnsL2NormalizedEmbedding() {
-        InferenceSession session = mock(InferenceSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
-
         when(tokenizer.encode(anyString())).thenReturn(
-                new EncodedInput(new long[]{1, 2, 3}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
+                new EncodedInput(new long[]{0, 0, 0, 1, 1, 1, 1}, ones(7), new long[7]));
 
-        // Raw output: [3, 4] -> L2 norm = 5, normalized = [0.6, 0.8]
-        Tensor outputTensor = Tensor.fromFloats(new float[]{3.0f, 4.0f}, new long[]{1, 2});
-        when(session.run(any())).thenReturn(Map.of("text_embeds", outputTensor));
+        try (ClipTextEncoder encoder = encoder(tokenizer)) {
+            float[] embedding = encoder.encode("a photo of a cat");
 
-        io.github.inference4j.multimodal.ClipTextEncoder encoder = ClipTextEncoder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build();
-
-        float[] embedding = encoder.encode("a photo of a cat");
-
-        assertThat(embedding).hasSize(2);
-        assertThat(embedding[0]).isCloseTo(0.6f, within(1e-5f));
-        assertThat(embedding[1]).isCloseTo(0.8f, within(1e-5f));
+            // Raw output: [3, 4, 0] -> L2 norm = 5, normalized = [0.6, 0.8, 0]
+            assertThat(embedding).containsExactly(new float[]{0.6f, 0.8f, 0f}, within(1e-5f));
+        }
     }
 
     @Test
     void encode_passesInputIdsAndAttentionMask() {
-        InferenceSession session = mock(InferenceSession.class);
+        // Unmasked, the ids would count to [1, 2, 0]; with the last token masked they count to [1, 1, 0]
         Tokenizer tokenizer = mock(Tokenizer.class);
-
-        long[] inputIds = {49406, 320, 49407};
-        long[] attentionMask = {1, 1, 1};
         when(tokenizer.encode("hello")).thenReturn(
-                new EncodedInput(inputIds, attentionMask, new long[]{0, 0, 0}));
+                new EncodedInput(new long[]{0, 1, 1}, new long[]{1, 1, 0}, new long[]{0, 0, 0}));
 
-        Tensor outputTensor = Tensor.fromFloats(new float[]{1.0f, 0.0f}, new long[]{1, 2});
-        when(session.run(any())).thenReturn(Map.of("text_embeds", outputTensor));
-
-        ClipTextEncoder encoder = ClipTextEncoder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build();
-
-        encoder.encode("hello");
-
-        verify(session).run(argThat(inputs -> {
-            assertThat(inputs).containsKey("input_ids");
-            assertThat(inputs).containsKey("attention_mask");
-            assertThat(inputs.get("input_ids").toLongs()).isEqualTo(inputIds);
-            assertThat(inputs.get("attention_mask").toLongs()).isEqualTo(attentionMask);
-            return true;
-        }));
+        try (ClipTextEncoder encoder = encoder(tokenizer)) {
+            float half = (float) Math.sqrt(0.5);
+            assertThat(encoder.encode("hello")).containsExactly(new float[]{half, half, 0f}, within(1e-5f));
+        }
     }
 
     @Test
     void encodeBatch_returnsOneEmbeddingPerText() {
-        InferenceSession session = mock(InferenceSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode("cat")).thenReturn(new EncodedInput(new long[]{0, 4}, ones(2), new long[2]));
+        when(tokenizer.encode("dog")).thenReturn(new EncodedInput(new long[]{1, 4}, ones(2), new long[2]));
+        when(tokenizer.encode("bird")).thenReturn(new EncodedInput(new long[]{2, 4}, ones(2), new long[2]));
 
-        when(tokenizer.encode(anyString())).thenReturn(
-                new EncodedInput(new long[]{1, 2}, new long[]{1, 1}, new long[]{0, 0}));
+        try (ClipTextEncoder encoder = encoder(tokenizer)) {
+            List<float[]> results = encoder.encodeBatch(List.of("cat", "dog", "bird"));
 
-        Tensor outputTensor = Tensor.fromFloats(new float[]{1.0f, 0.0f}, new long[]{1, 2});
-        when(session.run(any())).thenReturn(Map.of("text_embeds", outputTensor));
-
-        ClipTextEncoder encoder = ClipTextEncoder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build();
-
-        List<float[]> results = encoder.encodeBatch(List.of("cat", "dog", "bird"));
-        assertThat(results).hasSize(3);
+            assertThat(results).containsExactly(
+                    new float[]{1f, 0f, 0f}, new float[]{0f, 1f, 0f}, new float[]{0f, 0f, 1f});
+        }
     }
 
     @Test
     void builder_missingTokenizer_throws() {
-        InferenceSession session = mock(InferenceSession.class);
+        TestModels.install(dir, "clip-text", "text_model.onnx");
 
         assertThatThrownBy(() ->
                 ClipTextEncoder.builder()
-                        .session(session)
+                        .modelSource(TestModels.source(dir))
                         .build())
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ModelSourceException.class)
+                .hasMessageContaining("vocab.json");
     }
 
     @Test
@@ -129,17 +104,27 @@ class ClipTextEncoderTest {
     }
 
     @Test
-    void close_delegatesToSession() {
-        InferenceSession session = mock(InferenceSession.class);
+    void closedEncoderRejectsEncode() {
         Tokenizer tokenizer = mock(Tokenizer.class);
-
-        ClipTextEncoder encoder = ClipTextEncoder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build();
+        when(tokenizer.encode(anyString())).thenReturn(new EncodedInput(new long[]{0}, ones(1), new long[1]));
+        ClipTextEncoder encoder = encoder(tokenizer);
 
         encoder.close();
 
-        verify(session).close();
+        assertThatThrownBy(() -> encoder.encode("hello")).isInstanceOf(IllegalStateException.class);
+    }
+
+    private ClipTextEncoder encoder(Tokenizer tokenizer) {
+        TestModels.install(dir, "clip-text", "text_model.onnx");
+        return ClipTextEncoder.builder()
+                .modelSource(TestModels.source(dir))
+                .tokenizer(tokenizer)
+                .build();
+    }
+
+    private static long[] ones(int n) {
+        long[] ones = new long[n];
+        Arrays.fill(ones, 1L);
+        return ones;
     }
 }

@@ -20,18 +20,16 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 
-import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.ModelSource;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 class DepthAnythingEstimatorTest {
 
@@ -164,19 +162,14 @@ class DepthAnythingEstimatorTest {
     }
 
     // --- End-to-End Tests ---
+    // The fixture model returns the sum of the three normalized channels at each pixel as its depth.
+
+    @TempDir
+    Path dir;
 
     @Test
     void estimate_returnsDepthMapInOriginalImageDimensions() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.run(any())).thenReturn(Map.of(
-                "predicted_depth", Tensor.fromFloats(
-                        new float[]{1f, 2f, 3f, 4f}, new long[]{1, 2, 2})));
-
-        try (DepthAnythingEstimator estimator = DepthAnythingEstimator.builder()
-                .session(session)
-                .inputName("pixel_values")
-                .build()) {
-
+        try (DepthAnythingEstimator estimator = estimator()) {
             BufferedImage image = new BufferedImage(64, 32, BufferedImage.TYPE_INT_RGB);
             DepthMap depth = estimator.estimate(image);
 
@@ -189,41 +182,49 @@ class DepthAnythingEstimatorTest {
 
     @Test
     void estimate_exposesValueRange() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.run(any())).thenReturn(Map.of(
-                "predicted_depth", Tensor.fromFloats(
-                        new float[]{0f, 5f, 10f, 15f}, new long[]{1, 2, 2})));
+        // Left half black, right half white: ImageNet-normalized channel sums of -5.958 and +7.318
+        BufferedImage image = new BufferedImage(28, 28, BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < 28; y++) {
+            for (int x = 14; x < 28; x++) {
+                image.setRGB(x, y, 0xFFFFFF);
+            }
+        }
 
-        try (DepthAnythingEstimator estimator = DepthAnythingEstimator.builder()
-                .session(session)
-                .inputName("pixel_values")
-                .build()) {
+        try (DepthAnythingEstimator estimator = estimator()) {
+            DepthMap depth = estimator.estimate(image);
 
-            DepthMap depth = estimator.estimate(new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB));
-
-            assertThat(depth.min()).isCloseTo(0f, within(1e-4f));
-            assertThat(depth.max()).isCloseTo(15f, within(1e-4f));
+            assertThat(depth.min()).isCloseTo(-5.958f, within(1e-2f));
+            assertThat(depth.max()).isCloseTo(7.318f, within(1e-2f));
         }
     }
 
     @Test
     void estimate_producesRenderableImage() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.run(any())).thenReturn(Map.of(
-                "predicted_depth", Tensor.fromFloats(
-                        new float[]{0f, 1f, 2f, 3f}, new long[]{1, 2, 2})));
-
-        try (DepthAnythingEstimator estimator = DepthAnythingEstimator.builder()
-                .session(session)
-                .inputName("pixel_values")
-                .build()) {
-
+        try (DepthAnythingEstimator estimator = estimator()) {
             DepthMap depth = estimator.estimate(new BufferedImage(16, 16, BufferedImage.TYPE_INT_RGB));
             BufferedImage rendered = depth.toImage(Colormap.TURBO);
 
             assertThat(rendered.getWidth()).isEqualTo(16);
             assertThat(rendered.getHeight()).isEqualTo(16);
         }
+    }
+
+    @Test
+    void closedEstimatorRejectsEstimate() {
+        DepthAnythingEstimator estimator = estimator();
+
+        estimator.close();
+
+        assertThatThrownBy(() -> estimator.estimate(new BufferedImage(16, 16, BufferedImage.TYPE_INT_RGB)))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    /** No input name is set, so the builder takes the model's first input. */
+    private DepthAnythingEstimator estimator() {
+        return DepthAnythingEstimator.builder()
+                .modelSource(TestModels.model(dir, "depth-channel-sum"))
+                .targetSize(28)
+                .build();
     }
 
     // --- Builder Tests ---
@@ -237,32 +238,5 @@ class DepthAnythingEstimatorTest {
                         .modelSource(badSource)
                         .build())
                 .isInstanceOf(ModelSourceException.class);
-    }
-
-    @Test
-    void builder_inputNameDefaultsFromSession() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.inputNames()).thenReturn(Set.of("pixel_values"));
-
-        DepthAnythingEstimator model = DepthAnythingEstimator.builder()
-                .session(session)
-                .build();
-
-        assertThat(model).isNotNull();
-        verify(session).inputNames();
-    }
-
-    @Test
-    void close_delegatesToSession() {
-        InferenceSession session = mock(InferenceSession.class);
-
-        DepthAnythingEstimator model = DepthAnythingEstimator.builder()
-                .session(session)
-                .inputName("pixel_values")
-                .build();
-
-        model.close();
-
-        verify(session).close();
     }
 }

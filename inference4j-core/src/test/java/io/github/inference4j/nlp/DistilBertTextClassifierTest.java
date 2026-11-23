@@ -16,24 +16,23 @@
 
 package io.github.inference4j.nlp;
 
-import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.processing.OutputOperator;
 import io.github.inference4j.processing.WindowAggregation;
-import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.preprocessing.text.ModelConfig;
 import io.github.inference4j.tokenizer.Tokenizer;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
-
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.assertj.core.api.Assertions.within;
@@ -41,6 +40,9 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class DistilBertTextClassifierTest {
+
+    @TempDir
+    Path dir;
 
     private static final ModelConfig SENTIMENT_CONFIG = ModelConfig.of(
             Map.of(0, "NEGATIVE", 1, "POSITIVE"),
@@ -177,193 +179,122 @@ class DistilBertTextClassifierTest {
 
     @Test
     void builder_missingTokenizer_throws() {
-        InferenceSession session = mock(InferenceSession.class);
+        ModelSource source = TestModels.model(dir, "tokens-echo");
         assertThatThrownBy(() ->
                 DistilBertTextClassifier.builder()
-                        .session(session)
+                        .modelSource(source)
                         .config(SENTIMENT_CONFIG)
                         .build())
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ModelSourceException.class)
+                .hasMessageContaining("vocab.txt");
     }
 
     @Test
     void builder_missingConfig_throws() {
-        InferenceSession session = mock(InferenceSession.class);
+        ModelSource source = TestModels.model(dir, "tokens-echo");
         Tokenizer tokenizer = mock(Tokenizer.class);
         assertThatThrownBy(() ->
                 DistilBertTextClassifier.builder()
-                        .session(session)
+                        .modelSource(source)
                         .tokenizer(tokenizer)
                         .build())
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ModelSourceException.class)
+                .hasMessageContaining("config.json");
     }
+
+    // The fixture models return one logit per token: its id (+ 1000 x its token type when the model takes
+    // token_type_ids), so a two-token input gives the two sentiment logits.
 
     @Test
     void builder_maxLength_passedToTokenizer() {
-        InferenceSession session = mock(InferenceSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
-
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
         when(tokenizer.encode(anyString(), anyInt())).thenReturn(
                 new EncodedInput(new long[]{101, 102}, new long[]{1, 1}, new long[]{0, 0}));
-        when(session.run(any())).thenReturn(
-                Map.of("logits", Tensor.fromFloats(new float[]{1.0f, -1.0f}, new long[]{1, 2})));
 
-        DistilBertTextClassifier model = DistilBertTextClassifier.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .config(SENTIMENT_CONFIG)
-                .maxLength(128)
-                .build();
-
-        model.classify("test");
+        try (DistilBertTextClassifier model = sentiment("tokens-echo", tokenizer).maxLength(128).build()) {
+            model.classify("test");
+        }
 
         verify(tokenizer).encode("test", 128);
     }
 
     @Test
     void builder_customOutputOperator_applied() {
-        InferenceSession session = mock(InferenceSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
-
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
         when(tokenizer.encode(anyString(), anyInt())).thenReturn(
-                new EncodedInput(new long[]{101, 102}, new long[]{1, 1}, new long[]{0, 0}));
-        when(session.run(any())).thenReturn(
-                Map.of("logits", Tensor.fromFloats(new float[]{3.0f, -3.0f}, new long[]{1, 2})));
+                new EncodedInput(new long[]{3, 0}, new long[]{1, 1}, new long[]{0, 0}));
 
-        DistilBertTextClassifier model = DistilBertTextClassifier.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .config(SENTIMENT_CONFIG)
+        try (DistilBertTextClassifier model = sentiment("tokens-echo", tokenizer)
                 .outputOperator(OutputOperator.sigmoid())
-                .build();
+                .build()) {
+            List<TextClassification> results = model.classify("test");
 
-        List<TextClassification> results = model.classify("test");
-
-        // Sigmoid: each class is independent (doesn't sum to 1)
-        assertThat(results).hasSize(2);
-        assertThat(results.get(0).confidence()).isGreaterThan(0.9f);
-    }
-
-    @Test
-    void builder_modelIdAndModelSource_accepted() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
-
-        DistilBertTextClassifier model = DistilBertTextClassifier.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .config(SENTIMENT_CONFIG)
-                .modelId("custom/model")
-                .modelSource(id -> Path.of("/tmp"))
-                .build();
-
-        assertThat(model).isNotNull();
-    }
-
-    @Test
-    void builder_sessionOptions_accepted() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
-
-        DistilBertTextClassifier model = DistilBertTextClassifier.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .config(SENTIMENT_CONFIG)
-                .sessionOptions(opts -> { })
-                .build();
-
-        assertThat(model).isNotNull();
+            // Sigmoid: each class is independent (doesn't sum to 1)
+            assertThat(results).hasSize(2);
+            assertThat(results.get(0).confidence()).isCloseTo(0.9526f, within(1e-4f));
+            assertThat(results.get(1).confidence()).isCloseTo(0.5f, within(1e-6f));
+        }
     }
 
     // --- Inference flow ---
 
     @Test
     void classify_withTokenTypeIds_includesInInputs() {
-        InferenceSession session = mock(InferenceSession.class);
+        // A model without token_type_ids would reject them, and one with them requires them
         Tokenizer tokenizer = mock(Tokenizer.class);
-
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask", "token_type_ids"));
         when(tokenizer.encode(anyString(), anyInt())).thenReturn(
-                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
-        when(session.run(any())).thenReturn(
-                Map.of("logits", Tensor.fromFloats(new float[]{-2.0f, 3.0f}, new long[]{1, 2})));
+                new EncodedInput(new long[]{1, 6}, new long[]{1, 1}, new long[]{0, 0}));
 
-        DistilBertTextClassifier model = DistilBertTextClassifier.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .config(SENTIMENT_CONFIG)
-                .build();
+        try (DistilBertTextClassifier model = sentiment("tokens-echo-types", tokenizer).build()) {
+            List<TextClassification> results = model.classify("great movie");
 
-        List<TextClassification> results = model.classify("great movie");
-
-        assertThat(results).hasSize(2);
-        assertThat(results.get(0).label()).isEqualTo("POSITIVE");
-        assertThat(results.get(0).confidence()).isGreaterThan(0.99f);
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(session).run(captor.capture());
-        assertThat(captor.getValue()).containsKey("token_type_ids");
+            assertThat(results).hasSize(2);
+            assertThat(results.get(0).label()).isEqualTo("POSITIVE");
+            assertThat(results.get(0).confidence()).isGreaterThan(0.99f);
+        }
     }
 
     @Test
     void classify_withoutTokenTypeIds_excludesFromInputs() {
-        InferenceSession session = mock(InferenceSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
-
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
         when(tokenizer.encode(anyString(), anyInt())).thenReturn(
-                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
-        when(session.run(any())).thenReturn(
-                Map.of("logits", Tensor.fromFloats(new float[]{-2.0f, 3.0f}, new long[]{1, 2})));
+                new EncodedInput(new long[]{1, 6}, new long[]{1, 1}, new long[]{0, 0}));
 
-        DistilBertTextClassifier model = DistilBertTextClassifier.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .config(SENTIMENT_CONFIG)
-                .build();
-
-        model.classify("great movie");
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(session).run(captor.capture());
-        assertThat(captor.getValue()).doesNotContainKey("token_type_ids");
+        try (DistilBertTextClassifier model = sentiment("tokens-echo", tokenizer).build()) {
+            assertThat(model.classify("great movie").get(0).label()).isEqualTo("POSITIVE");
+        }
     }
 
-    // --- Close delegation ---
+    // --- Close ---
 
     @Test
-    void close_delegatesToSession() {
-        InferenceSession session = mock(InferenceSession.class);
+    void closedClassifierRejectsClassify() {
         Tokenizer tokenizer = mock(Tokenizer.class);
-
-        DistilBertTextClassifier model = DistilBertTextClassifier.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .config(SENTIMENT_CONFIG)
-                .build();
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{1, 6}, new long[]{1, 1}, new long[]{0, 0}));
+        DistilBertTextClassifier model = sentiment("tokens-echo", tokenizer).build();
 
         model.close();
 
-        verify(session).close();
+        assertThatThrownBy(() -> model.classify("great movie")).isInstanceOf(IllegalStateException.class);
+    }
+
+    private DistilBertTextClassifier.Builder sentiment(String fixture, Tokenizer tokenizer) {
+        return DistilBertTextClassifier.builder()
+                .modelSource(TestModels.model(dir, fixture))
+                .tokenizer(tokenizer)
+                .config(SENTIMENT_CONFIG);
     }
 
     // --- long input in windows (stride) ---
     // maxLength 6 leaves 4 content tokens per window; 10 content tokens with stride 2 give
-    // windows starting at 0, 2, 4 and 6. Identity output keeps the "probabilities" readable.
+    // windows starting at 0, 2, 4 and 6. The fixture model returns each window's token ids as its six logits,
+    // one per label L0..L5, and the identity output keeps them as the "probabilities".
 
     private static final long[] LONG_IDS = {101, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 102};
 
-    private InferenceSession windowSession() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
-        when(session.run(any())).thenReturn(
-                logits(0.2f, 0.8f), logits(0.6f, 0.4f), logits(0.1f, 0.9f), logits(0.3f, 0.7f));
-        return session;
-    }
+    private static final ModelConfig WINDOW_CONFIG = ModelConfig.of(labelMap(TestModels.labels(6)),
+            "single_label_classification");
 
     private Tokenizer longTokenizer() {
         Tokenizer tokenizer = mock(Tokenizer.class);
@@ -371,92 +302,90 @@ class DistilBertTextClassifierTest {
         return tokenizer;
     }
 
-    private DistilBertTextClassifier.Builder windowed(InferenceSession session, Tokenizer tokenizer) {
+    private DistilBertTextClassifier.Builder windowed(Tokenizer tokenizer) {
         return DistilBertTextClassifier.builder()
-                .session(session)
+                .modelSource(TestModels.model(dir, "tokens-echo"))
                 .tokenizer(tokenizer)
-                .config(SENTIMENT_CONFIG)
+                .config(WINDOW_CONFIG)
                 .outputOperator(OutputOperator.identity())
                 .maxLength(6)
                 .stride(2);
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void strideClassifiesEveryWindowOfALongText() {
-        InferenceSession session = windowSession();
+        List<float[]> windows = new ArrayList<>();
+        WindowAggregation recording = windowScores -> {
+            windows.addAll(windowScores);
+            return windowScores.get(0);
+        };
 
-        windowed(session, longTokenizer()).build().classify("long text");
+        try (DistilBertTextClassifier model = windowed(longTokenizer()).windowAggregation(recording).build()) {
+            model.classify("long text");
+        }
 
-        ArgumentCaptor<Map<String, Tensor>> inputs = ArgumentCaptor.forClass(Map.class);
-        verify(session, times(4)).run(inputs.capture());
-        List<long[]> windows = new ArrayList<>();
-        inputs.getAllValues().forEach(in -> windows.add(in.get("input_ids").toLongs()));
         assertThat(windows).containsExactly(
-                new long[]{101, 1, 2, 3, 4, 102},
-                new long[]{101, 3, 4, 5, 6, 102},
-                new long[]{101, 5, 6, 7, 8, 102},
-                new long[]{101, 7, 8, 9, 10, 102});
+                new float[]{101, 1, 2, 3, 4, 102},
+                new float[]{101, 3, 4, 5, 6, 102},
+                new float[]{101, 5, 6, 7, 8, 102},
+                new float[]{101, 7, 8, 9, 10, 102});
     }
 
     @Test
     void strideAveragesWindowScoresByDefault() {
-        List<TextClassification> results = windowed(windowSession(), longTokenizer()).build().classify("long text");
+        try (DistilBertTextClassifier model = windowed(longTokenizer()).build()) {
+            List<TextClassification> results = model.classify("long text", 6);
 
-        assertThat(results).extracting(TextClassification::label).containsExactly("POSITIVE", "NEGATIVE");
-        assertThat(results.get(0).confidence()).isCloseTo(0.7f, within(1e-6f));
-        assertThat(results.get(1).confidence()).isCloseTo(0.3f, within(1e-6f));
+            assertThat(results).extracting(TextClassification::label)
+                    .containsExactly("L5", "L0", "L4", "L3", "L2", "L1");
+            assertThat(confidences(results)).containsExactly(new float[]{102, 101, 7, 6, 5, 4}, within(1e-4f));
+        }
     }
 
     @Test
     void maxAggregationKeepsTheStrongestWindowPerLabel() {
-        List<TextClassification> results = windowed(windowSession(), longTokenizer())
+        try (DistilBertTextClassifier model = windowed(longTokenizer())
                 .windowAggregation(WindowAggregation.max())
-                .build()
-                .classify("long text");
+                .build()) {
+            List<TextClassification> results = model.classify("long text", 6);
 
-        assertThat(results.get(0).confidence()).isCloseTo(0.9f, within(1e-6f));   // POSITIVE, window 3
-        assertThat(results.get(1).confidence()).isCloseTo(0.6f, within(1e-6f));   // NEGATIVE, window 2
+            assertThat(results).extracting(TextClassification::label)
+                    .containsExactly("L5", "L0", "L4", "L3", "L2", "L1");
+            assertThat(confidences(results)).containsExactly(new float[]{102, 101, 10, 9, 8, 7}, within(1e-4f));
+        }
     }
 
     @Test
-    void customAggregationReceivesEveryWindowInOrder() {
-        List<float[]> received = new ArrayList<>();
-        WindowAggregation firstWindow = windowScores -> {
-            received.addAll(windowScores);
-            return windowScores.get(0);
-        };
+    void customAggregationDecidesTheScores() {
+        WindowAggregation secondWindow = windowScores -> windowScores.get(1);
 
-        List<TextClassification> results = windowed(windowSession(), longTokenizer())
-                .windowAggregation(firstWindow)
-                .build()
-                .classify("long text", 1);
+        try (DistilBertTextClassifier model = windowed(longTokenizer()).windowAggregation(secondWindow).build()) {
+            List<TextClassification> results = model.classify("long text", 6);
 
-        assertThat(received).containsExactly(
-                new float[]{0.2f, 0.8f}, new float[]{0.6f, 0.4f}, new float[]{0.1f, 0.9f}, new float[]{0.3f, 0.7f});
-        assertThat(results).singleElement().satisfies(r -> {
-            assertThat(r.label()).isEqualTo("POSITIVE");
-            assertThat(r.confidence()).isCloseTo(0.8f, within(1e-6f));
-        });
+            assertThat(confidences(results)).containsExactly(new float[]{102, 101, 6, 5, 4, 3}, within(1e-4f));
+        }
     }
 
     @Test
     void strideLeavesInputThatFitsToASinglePass() {
-        InferenceSession session = windowSession();
+        WindowAggregation unexpected = windowScores -> {
+            throw new AssertionError("input that fits must not be split into windows");
+        };
+        long[] ids = {101, 1, 2, 3, 4, 102};
         Tokenizer tokenizer = mock(Tokenizer.class);
-        when(tokenizer.encode("short", Integer.MAX_VALUE)).thenReturn(encoded(new long[]{101, 1, 2, 102}));
-        when(tokenizer.encode("short", 6)).thenReturn(encoded(new long[]{101, 1, 2, 102}));
+        when(tokenizer.encode("short", Integer.MAX_VALUE)).thenReturn(encoded(ids));
+        when(tokenizer.encode("short", 6)).thenReturn(encoded(ids));
 
-        List<TextClassification> results = windowed(session, tokenizer).build().classify("short");
+        try (DistilBertTextClassifier model = windowed(tokenizer).windowAggregation(unexpected).build()) {
+            List<TextClassification> results = model.classify("short", 6);
 
-        verify(session, times(1)).run(any());
-        assertThat(results.get(0).confidence()).isCloseTo(0.8f, within(1e-6f));
+            assertThat(confidences(results)).containsExactly(new float[]{102, 101, 4, 3, 2, 1}, within(1e-4f));
+        }
     }
 
     @Test
     void windowAggregationWithoutStrideIsRejected() {
         assertThatThrownBy(() -> DistilBertTextClassifier.builder()
-                .session(mock(InferenceSession.class))
                 .tokenizer(mock(Tokenizer.class))
                 .config(SENTIMENT_CONFIG)
                 .windowAggregation(WindowAggregation.max())
@@ -467,18 +396,30 @@ class DistilBertTextClassifierTest {
 
     @Test
     void strideMustLeaveRoomInTheWindow() {
-        assertThatThrownBy(() -> windowed(mock(InferenceSession.class), mock(Tokenizer.class)).stride(4).build())
+        assertThatThrownBy(() -> windowed(mock(Tokenizer.class)).stride(4).build())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("[0, 4)");
     }
 
-    private static Map<String, Tensor> logits(float... values) {
-        return Map.of("logits", Tensor.fromFloats(values, new long[]{1, values.length}));
+    private static float[] confidences(List<TextClassification> results) {
+        float[] confidences = new float[results.size()];
+        for (int i = 0; i < confidences.length; i++) {
+            confidences[i] = results.get(i).confidence();
+        }
+        return confidences;
+    }
+
+    private static Map<Integer, String> labelMap(String[] labels) {
+        Map<Integer, String> map = new HashMap<>();
+        for (int i = 0; i < labels.length; i++) {
+            map.put(i, labels[i]);
+        }
+        return map;
     }
 
     private static EncodedInput encoded(long[] ids) {
         long[] ones = new long[ids.length];
-        java.util.Arrays.fill(ones, 1L);
+        Arrays.fill(ones, 1L);
         return new EncodedInput(ids, ones, new long[ids.length]);
     }
 }

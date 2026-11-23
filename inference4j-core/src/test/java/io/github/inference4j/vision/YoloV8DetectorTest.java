@@ -16,22 +16,18 @@
 
 package io.github.inference4j.vision;
 
-import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.preprocessing.image.Labels;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 class YoloV8DetectorTest {
 
@@ -238,61 +234,37 @@ class YoloV8DetectorTest {
                 .isInstanceOf(ModelSourceException.class);
     }
 
-    @Test
-    void builder_inputNameDefaultsFromSession() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.inputNames()).thenReturn(Set.of("images"));
-
-        YoloV8Detector model = YoloV8Detector.builder()
-                .session(session)
-                .build();
-
-        assertThat(model).isNotNull();
-        verify(session).inputNames();
-    }
-
     // --- Inference flow ---
 
     @Test
-    void detect_bufferedImage_returnsCorrectResults() {
-        InferenceSession session = mock(InferenceSession.class);
+    void detectFindsThePersonTheModelReports(@TempDir Path dir) {
+        // One candidate at cx 16, cy 16, 20 x 20 on the model's fixed 32 x 32 input, class 0 at 0.9
+        try (YoloV8Detector model = YoloV8Detector.builder()
+                .modelId("acme/tiny")
+                .modelSource(TestModels.model(dir, "yolov8-one-person"))
+                .build()) {
+            List<Detection> results = model.detect(new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB));
 
-        // Single candidate: person at center of 32x32 input space
-        float[] output = createOutput(
-                new float[]{16, 16, 20, 20, 0.9f, 0.1f, 0.0f, 0.0f, 0.0f}
-        );
-        when(session.run(any())).thenReturn(
-                Map.of("output", Tensor.fromFloats(output, shape(1))));
-
-        YoloV8Detector model = YoloV8Detector.builder()
-                .session(session)
-                .labels(TEST_LABELS)
-                .inputName("images")
-                .inputSize(32)
-                .build();
-
-        BufferedImage image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB);
-        List<Detection> results = model.detect(image);
-
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).label()).isEqualTo("person");
-        assertThat(results.get(0).confidence()).isCloseTo(0.9f, within(1e-5f));
+            assertThat(results).singleElement().satisfies(detection -> {
+                assertThat(detection.label()).isEqualTo("person");
+                assertThat(detection.classIndex()).isZero();
+                assertThat(detection.confidence()).isCloseTo(0.9f, within(1e-5f));
+                assertThat(detection.box()).isEqualTo(new BoundingBox(6, 6, 26, 26));
+            });
+        }
     }
 
-    // --- Close delegation ---
-
     @Test
-    void close_delegatesToSession() {
-        InferenceSession session = mock(InferenceSession.class);
-
+    void closedDetectorRejectsDetect(@TempDir Path dir) {
         YoloV8Detector model = YoloV8Detector.builder()
-                .session(session)
-                .inputName("images")
+                .modelId("acme/tiny")
+                .modelSource(TestModels.model(dir, "yolov8-one-person"))
                 .build();
 
         model.close();
 
-        verify(session).close();
+        assertThatThrownBy(() -> model.detect(new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB)))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     // --- License warning ---

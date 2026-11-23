@@ -352,10 +352,6 @@ public class SileroVadDetector implements VoiceActivityDetector {
             super(DEFAULT_MODEL_ID);
         }
 
-        Builder session(InferenceSession session) {
-            return useSession("model.onnx", session);
-        }
-
         public Builder sampleRate(int sampleRate) {
             this.sampleRate = sampleRate;
             return this;

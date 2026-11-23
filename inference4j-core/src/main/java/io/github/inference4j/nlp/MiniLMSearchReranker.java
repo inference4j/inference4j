@@ -181,10 +181,6 @@ public class MiniLMSearchReranker
             super(DEFAULT_MODEL_ID);
         }
 
-        Builder session(InferenceSession session) {
-            return useSession("model.onnx", session);
-        }
-
         public Builder tokenizer(Tokenizer tokenizer) {
             this.tokenizer = tokenizer;
             return this;

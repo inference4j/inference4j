@@ -181,8 +181,6 @@ try (var task = SomeWrapper.builder()
 }
 ```
 
-The `.session(InferenceSession)` method exists on all builders but is package-private — the public API uses `modelId` + `modelSource` + `sessionOptions`.
-
 ## Model cache
 
 `HuggingFaceModelSource` caches each repo as snapshots, one per Hub commit. See

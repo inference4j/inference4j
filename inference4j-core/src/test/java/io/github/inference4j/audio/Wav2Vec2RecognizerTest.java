@@ -16,20 +16,17 @@
 
 package io.github.inference4j.audio;
 
-import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
 import io.github.inference4j.exception.ModelSourceException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 class Wav2Vec2RecognizerTest {
 
@@ -125,66 +122,52 @@ class Wav2Vec2RecognizerTest {
     }
 
     @Test
-    void builder_missingVocabulary_throws() {
-        InferenceSession session = mock(InferenceSession.class);
-        assertThatThrownBy(() ->
-                Wav2Vec2Recognizer.builder()
-                        .session(session)
-                        .build())
-                .isInstanceOf(IllegalStateException.class);
-    }
+    void builder_missingVocabulary_throws(@TempDir Path dir) {
+        ModelSource source = TestModels.model(dir, "wav2vec2-abc");
 
-    @Test
-    void builder_inputNameDefaultsFromSession() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.inputNames()).thenReturn(Set.of("input_values"));
-
-        Wav2Vec2Recognizer model = Wav2Vec2Recognizer.builder()
-                .session(session)
-                .vocabulary(VOCAB)
-                .build();
-
-        assertThat(model).isNotNull();
-        verify(session).inputNames();
+        assertThatThrownBy(() -> Wav2Vec2Recognizer.builder().modelSource(source).build())
+                .isInstanceOf(ModelSourceException.class)
+                .hasMessageContaining("vocab.json");
     }
 
     // --- Inference flow ---
+    // The fixture model returns logits whose argmax per step is a, blank, b, blank, c.
 
     @Test
-    void transcribe_audioData_returnsTranscription() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.inputNames()).thenReturn(Set.of("input"));
-
-        // CTC output: timesteps produce tokens [a, _, b, _, c] → "abc"
-        float[] logits = buildLogits(1, 0, 2, 0, 3);
-        when(session.run(any())).thenReturn(
-                Map.of("logits", Tensor.fromFloats(logits, new long[]{1, 5, VOCAB_SIZE})));
-
-        Wav2Vec2Recognizer model = Wav2Vec2Recognizer.builder()
-                .session(session)
+    void transcribe_audioData_returnsTranscription(@TempDir Path dir) {
+        try (Wav2Vec2Recognizer model = Wav2Vec2Recognizer.builder()
+                .modelSource(TestModels.model(dir, "wav2vec2-abc"))
                 .vocabulary(VOCAB)
-                .build();
+                .build()) {
+            Transcription result = model.transcribe(new float[]{0.1f, 0.2f, 0.3f}, 16000);
 
-        Transcription result = model.transcribe(new float[]{0.1f, 0.2f, 0.3f}, 16000);
-
-        assertThat(result.text()).isEqualTo("abc");
+            assertThat(result.text()).isEqualTo("abc");
+        }
     }
 
-    // --- Close delegation ---
+    @Test
+    void vocabularyIsReadFromVocabJson(@TempDir Path dir) {
+        ModelSource source = TestModels.model(dir, "wav2vec2-abc");
+        TestModels.wav2Vec2Vocabulary(dir);
+
+        try (Wav2Vec2Recognizer model = Wav2Vec2Recognizer.builder().modelSource(source).build()) {
+            assertThat(model.transcribe(new float[]{0.1f, 0.2f, 0.3f}, 16000).text()).isEqualTo("abc");
+        }
+    }
+
+    // --- Close ---
 
     @Test
-    void close_delegatesToSession() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.inputNames()).thenReturn(Set.of("input"));
-
+    void closedRecognizerRejectsTranscribe(@TempDir Path dir) {
         Wav2Vec2Recognizer model = Wav2Vec2Recognizer.builder()
-                .session(session)
+                .modelSource(TestModels.model(dir, "wav2vec2-abc"))
                 .vocabulary(VOCAB)
                 .build();
 
         model.close();
 
-        verify(session).close();
+        assertThatThrownBy(() -> model.transcribe(new float[]{0.1f, 0.2f, 0.3f}, 16000))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     /**

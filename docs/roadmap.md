@@ -74,7 +74,7 @@
 - [x] `Preprocessor`/`Postprocessor` functional interfaces
 - [x] `InferenceContext` — cross-stage data carrier
 - [x] Task-oriented architecture — `InferenceTask` → `Classifier`/`Detector` → domain interfaces
-- [x] Builder API — `.session()` package-private, public API uses `modelId` + `modelSource` + `sessionOptions(SessionConfigurer)`
+- [x] Builder API — `modelId` + `modelSource` + `sessionOptions(SessionConfigurer)`
 - [x] Spring Boot starter — auto-configuration, health indicators
 - [x] Documentation site (MkDocs Material)
 - [x] CRAFT text detection wrapper — `TextDetector` interface, `TextRegion`, `CraftTextDetector`
