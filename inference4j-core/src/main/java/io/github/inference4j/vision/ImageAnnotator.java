@@ -18,13 +18,15 @@ package io.github.inference4j.vision;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.Line2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Draws bounding box annotations on images.
+ * Draws bounding boxes and pose skeletons on images.
  *
  * <p>Works with any detection result type that provides a {@link BoundingBox} —
  * extract boxes with {@code detections.stream().map(Detection::box).toList()} or
@@ -37,12 +39,15 @@ import java.util.List;
  * ImageAnnotator.save(annotated, Path.of("output.jpg"));
  * }</pre>
  *
+ * <p>Poses from a {@link PoseDetector} are drawn as a skeleton with {@link #annotatePoses(BufferedImage, List)}.
+ *
  * @see BoundingBox
  */
 public final class ImageAnnotator {
 
     private static final Color DEFAULT_COLOR = Color.GREEN;
     private static final float DEFAULT_STROKE_WIDTH = 2f;
+    private static final float DEFAULT_MIN_KEYPOINT_CONFIDENCE = 0.3f;
 
     private ImageAnnotator() {
     }
@@ -82,6 +87,67 @@ public final class ImageAnnotator {
             int w = Math.round(box.width());
             int h = Math.round(box.height());
             g.drawRect(x, y, w, h);
+        }
+
+        g.dispose();
+        return copy;
+    }
+
+    /**
+     * Draws the skeleton of each pose on a copy of the image: a line for each {@link CocoJoint#edges() COCO bone}
+     * and a dot for each joint, skipping joints with a confidence below 0.3 and the bones that touch them.
+     *
+     * @param image the source image (not modified)
+     * @param poses poses to draw, usually from a {@link PoseDetector}
+     * @return a new image with the skeletons drawn
+     */
+    public static BufferedImage annotatePoses(BufferedImage image, List<Pose> poses) {
+        return annotatePoses(image, poses, CocoJoint.edges(), DEFAULT_MIN_KEYPOINT_CONFIDENCE, DEFAULT_COLOR,
+                DEFAULT_STROKE_WIDTH);
+    }
+
+    /**
+     * Draws the skeleton of each pose on a copy of the image with custom styling.
+     *
+     * @param image                 the source image (not modified)
+     * @param poses                 poses to draw
+     * @param edges                 bones to draw as lines, such as {@link CocoJoint#edges()}; a bone whose joints
+     *                              a pose does not have is skipped
+     * @param minKeypointConfidence joints scoring below this are not drawn, nor are the bones that touch them
+     * @param color                 line and dot color
+     * @param strokeWidth           line thickness in pixels; dots are a little wider
+     * @return a new image with the skeletons drawn
+     */
+    public static BufferedImage annotatePoses(BufferedImage image, List<Pose> poses, List<Joint.Edge> edges,
+                                              float minKeypointConfidence, Color color, float strokeWidth) {
+        int type = image.getType() == BufferedImage.TYPE_CUSTOM
+                ? (image.getColorModel().hasAlpha() ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB)
+                : image.getType();
+        BufferedImage copy = new BufferedImage(image.getWidth(), image.getHeight(), type);
+        Graphics2D g = copy.createGraphics();
+        g.drawImage(image, 0, 0, null);
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setColor(color);
+        g.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        float radius = Math.max(2f, strokeWidth * 1.5f);
+
+        for (Pose pose : poses) {
+            for (Joint.Edge edge : edges) {
+                if (!pose.has(edge.from()) || !pose.has(edge.to())) {
+                    continue;
+                }
+                Keypoint from = pose.keypoint(edge.from());
+                Keypoint to = pose.keypoint(edge.to());
+                if (from.confidence() >= minKeypointConfidence && to.confidence() >= minKeypointConfidence) {
+                    g.draw(new Line2D.Float(from.x(), from.y(), to.x(), to.y()));
+                }
+            }
+            for (Keypoint keypoint : pose.keypoints()) {
+                if (keypoint.confidence() >= minKeypointConfidence) {
+                    g.fill(new Ellipse2D.Float(keypoint.x() - radius, keypoint.y() - radius, 2 * radius,
+                            2 * radius));
+                }
+            }
         }
 
         g.dispose();

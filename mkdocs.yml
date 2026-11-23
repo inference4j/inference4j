@@ -61,6 +61,7 @@ nav:
     - Semantic Search: use-cases/semantic-search.md
     - Image Classification: use-cases/image-classification.md
     - Object Detection: use-cases/object-detection.md
+    - Pose Detection: use-cases/pose-detection.md
     - Speech-to-Text: use-cases/speech-to-text.md
     - Punctuation & Casing: use-cases/punctuation-and-casing.md
     - Voice Activity Detection: use-cases/voice-activity-detection.md
