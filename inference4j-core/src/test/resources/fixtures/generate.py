@@ -202,6 +202,24 @@ def yolo26_one_person():
                              "pred_boxes": np.array([0.5, 0.5, 0.25, 0.25]).reshape(1, 1, 4)})
 
 
+def rtmo_people():
+    """Five RTMO rows on a 32 x 32 input: dets [1, 5, 5] (x1, y1, x2, y2, score) and keypoints [1, 5, 17, 3].
+
+    Row 0 (0.7) overlaps row 1 (0.9) and is removed by NMS; row 2 (0.8) is a second person; row 3 (0.2) falls below
+    the default threshold; row 4 is the export's padding row (score 0, keypoint scores 0, junk coordinates). Keypoint
+    k of rows 0 to 3 is at (3 + r + 0.5 k, 3 + k), scored 0.9 for even k and 0.1 for odd k.
+    """
+    dets = np.array([[2, 2, 14, 30, 0.7], [2, 2, 14, 28, 0.9], [18, 4, 30, 28, 0.8], [0, 0, 4, 4, 0.2],
+                     [7, 7, 9, 9, 0]])
+    keypoints = np.full((5, 17, 3), 7.0)
+    for r in range(5):
+        for k in range(17):
+            keypoints[r, k] = [3 + r + 0.5 * k, 3 + k, 0.9 if k % 2 == 0 else 0.1] if r < 4 else [7, 7, 0]
+    return constant_outputs("rtmo_people",
+                            helper.make_tensor_value_info("input", FLOAT, [1, 3, 32, 32]),
+                            {"dets": dets.reshape(1, 5, 5), "keypoints": keypoints.reshape(1, 5, 17, 3)})
+
+
 def wav2vec2_abc():
     """CTC logits over 5 steps and a 5-token vocabulary whose argmax per step is 1, 0, 2, 0, 3."""
     logits = np.full((1, 5, 5), -10.0)
@@ -296,6 +314,7 @@ FIXTURES = {
     "sam2-decoder": sam2_decoder,
     "yolov8-one-person": yolov8_one_person,
     "yolo26-one-person": yolo26_one_person,
+    "rtmo-people": rtmo_people,
     "wav2vec2-abc": wav2vec2_abc,
     "silero-vad": silero_vad,
     "clip-vision": clip_vision,

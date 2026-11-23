@@ -202,6 +202,26 @@ class FixtureModelsTest {
     }
 
     @Test
+    void rtmoPeopleReturnsFourCandidatesAndAPaddingRow() {
+        try (InferenceSession session = open("rtmo-people")) {
+            assertThat(session.inputNames()).containsExactly("input");
+            assertThat(session.inputShape("input")).containsExactly(1, 3, 32, 32);
+
+            Map<String, Tensor> outputs = session.run(Map.of("input", zeros(1, 3, 32, 32)));
+
+            assertThat(outputs.get("dets").shape()).containsExactly(1, 5, 5);
+            assertThat(Arrays.copyOfRange(outputs.get("dets").toFloats(), 5, 10))
+                    .containsExactly(2f, 2f, 14f, 28f, 0.9f);
+            assertThat(outputs.get("keypoints").shape()).containsExactly(1, 5, 17, 3);
+            float[] keypoints = outputs.get("keypoints").toFloats();
+            int rowTwoJointThree = (2 * 17 + 3) * 3;
+            assertThat(Arrays.copyOfRange(keypoints, rowTwoJointThree, rowTwoJointThree + 3))
+                    .containsExactly(6.5f, 6f, 0.1f);
+            assertThat(outputs.get("dets").toFloats()[24]).isZero();
+        }
+    }
+
+    @Test
     void wav2Vec2AbcReturnsFiveSteps() {
         try (InferenceSession session = open("wav2vec2-abc")) {
             assertThat(session.inputNames()).containsExactly("input_values");

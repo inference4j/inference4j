@@ -57,6 +57,9 @@ All supported models are hosted under the [`inference4j`](https://huggingface.co
 | Object Detection (Apache-2.0) | `PicoDetDetector.m()` | `inference4j/picodet-m` | ~13 MB | `ObjectDetector` |
 | Object Detection (AGPL-3.0) | `Yolo26Detector` | `inference4j/yolo26n` | ~10 MB | `ObjectDetector` |
 | Object Detection (AGPL-3.0) | `YoloV8Detector` | `inference4j/yolov8n` | ~13 MB | `ObjectDetector` |
+| Pose Detection (Apache-2.0, COCO data) | `RtmoPoseDetector.s()` | `inference4j/rtmo-s-coco` | ~40 MB | `PoseDetector` |
+| Pose Detection (Apache-2.0, COCO data) | `RtmoPoseDetector.m()` | `inference4j/rtmo-m-coco` | ~89 MB | `PoseDetector` |
+| Pose Detection (Apache-2.0, COCO data) | `RtmoPoseDetector.l()` | `inference4j/rtmo-l-coco` | ~176 MB | `PoseDetector` |
 | Text Detection | `CraftTextDetector` | `inference4j/craft-mlt-25k` | ~80 MB | `TextDetector` |
 | Text Detection (lines) | `PaddleTextDetector.small()` | `inference4j/pp-ocrv6-small-det` | ~10 MB | `TextDetector` |
 | Text Detection (lines) | `PaddleTextDetector.tiny()` | `inference4j/pp-ocrv6-tiny-det` | ~2 MB | `TextDetector` |
@@ -155,6 +158,7 @@ A comprehensive view of all supported models, organized by architecture:
 | RT-DETRv2 ResNet-18 | N/A | `DetrDetector` | Object detection (Apache-2.0) |
 | YOLOX (nano / tiny / s) | N/A | `YoloXDetector` | Object detection (Apache-2.0) |
 | PP-PicoDet (S / M) | N/A | `PicoDetDetector` | Object detection (Apache-2.0) |
+| RTMO (s / m / l, COCO) | N/A | `RtmoPoseDetector` | Multi-person pose detection, 17 COCO keypoints (Apache-2.0) |
 | CRAFT | N/A | `CraftTextDetector` | Text detection in images |
 | PP-OCRv6 (small / tiny) detection | N/A | `PaddleTextDetector` | Text line detection |
 | PP-OCRv6 (small / tiny) recognition | Character dictionary (`inference.yml`) | `PaddleTextRecognizer` | Text recognition (OCR) |
