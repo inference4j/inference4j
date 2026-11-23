@@ -178,6 +178,11 @@ Every `PoseDetector` follows the same contract:
 - every pose has every joint of the model's format, in its order; only the person confidence filters;
 - `Path` and `BufferedImage` inputs give the same poses for the same image.
 
+## Spring Boot
+
+The starter registers a `PoseDetector` bean when `inference4j.vision.pose-detector.enabled=true`; `model-id`
+and `confidence-threshold` are optional. See the [Spring Boot guide](../guides/spring-boot.md#pose-detection).
+
 ## Tips
 
 - **Type variables as `PoseDetector`** to keep the model swappable.

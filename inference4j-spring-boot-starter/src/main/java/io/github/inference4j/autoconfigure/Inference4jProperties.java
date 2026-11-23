@@ -149,6 +149,8 @@ public class Inference4jProperties {
 
 		private TaskProperties textDetector = new TaskProperties("inference4j/craft-mlt-25k");
 
+		private PoseDetectorProperties poseDetector = new PoseDetectorProperties();
+
 		public TaskProperties getImageClassifier() {
 			return imageClassifier;
 		}
@@ -171,6 +173,38 @@ public class Inference4jProperties {
 
 		public void setTextDetector(TaskProperties textDetector) {
 			this.textDetector = textDetector;
+		}
+
+		public PoseDetectorProperties getPoseDetector() {
+			return poseDetector;
+		}
+
+		public void setPoseDetector(PoseDetectorProperties poseDetector) {
+			this.poseDetector = poseDetector;
+		}
+
+	}
+
+	/**
+	 * The human pose detector: an {@code RtmoPoseDetector}, RTMO-s trained on COCO only by default.
+	 */
+	public static class PoseDetectorProperties extends TaskProperties {
+
+		/**
+		 * The lowest person score a pose is returned for; unset keeps the builder's default (0.5).
+		 */
+		private Float confidenceThreshold;
+
+		public PoseDetectorProperties() {
+			super("inference4j/rtmo-s-coco");
+		}
+
+		public Float getConfidenceThreshold() {
+			return confidenceThreshold;
+		}
+
+		public void setConfidenceThreshold(Float confidenceThreshold) {
+			this.confidenceThreshold = confidenceThreshold;
 		}
 
 	}

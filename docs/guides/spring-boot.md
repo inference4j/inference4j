@@ -80,6 +80,9 @@ inference4j:
 | `inference4j.vision.object-detector.enabled` | `boolean` | `false` | Enable the object detector |
 | `inference4j.vision.object-detector.architecture` | `String` | `detr` | Wrapper that builds the bean: `detr` (`DetrDetector`), `yolov8` (`YoloV8Detector`) or `yolo26` (`Yolo26Detector`). See [Object detection](#object-detection) |
 | `inference4j.vision.object-detector.model-id` | `String` | the architecture's default | Model ID. Unset, it is `inference4j/dfine-small-coco` for `detr`, `inference4j/yolov8n` for `yolov8` and `inference4j/yolo26n` for `yolo26` |
+| `inference4j.vision.pose-detector.enabled` | `boolean` | `false` | Enable the [pose detector](#pose-detection) (`RtmoPoseDetector`) |
+| `inference4j.vision.pose-detector.model-id` | `String` | `inference4j/rtmo-s-coco` | Model ID: `inference4j/rtmo-m-coco`, `inference4j/rtmo-l-coco`, or your own RTMO weights |
+| `inference4j.vision.pose-detector.confidence-threshold` | `float` | `0.5` | Lowest person score a pose is returned for |
 | `inference4j.vision.text-detector.enabled` | `boolean` | `false` | Enable CRAFT text detector |
 | `inference4j.vision.text-detector.model-id` | `String` | `inference4j/craft-mlt-25k` | Model ID |
 | `inference4j.audio.speech-recognizer.enabled` | `boolean` | `false` | Enable Wav2Vec2 speech recognizer |
@@ -143,6 +146,38 @@ checkpoint needs `architecture: yolov8`.
     Before 0.15.0 the bean was always `YoloV8Detector` with `inference4j/yolov8n` and a confidence
     threshold of 0.25. Applications that set a YOLO `model-id` must now also set `architecture`,
     or the model is loaded by `DetrDetector`.
+
+### Pose detection
+
+`inference4j.vision.pose-detector.enabled=true` registers a `PoseDetector` built with `RtmoPoseDetector` and
+RTMO-s trained on COCO only (`inference4j/rtmo-s-coco`). Pick a larger model with `model-id`:
+
+```yaml
+inference4j:
+  vision:
+    pose-detector:
+      enabled: true
+      model-id: inference4j/rtmo-m-coco
+      confidence-threshold: 0.6
+```
+
+```java
+@RestController
+public class PoseController {
+    private final PoseDetector detector;
+
+    public PoseController(PoseDetector detector) {
+        this.detector = detector;
+    }
+
+    @PostMapping("/poses")
+    public List<Pose> poses(@RequestParam MultipartFile image) throws IOException {
+        return detector.detect(ImageIO.read(image.getInputStream()));
+    }
+}
+```
+
+See [Pose detection](../use-cases/pose-detection.md).
 
 ### Generative models
 

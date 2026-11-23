@@ -30,6 +30,9 @@ import io.github.inference4j.vision.Detection;
 import io.github.inference4j.vision.DetrDetector;
 import io.github.inference4j.vision.ImageClassifier;
 import io.github.inference4j.vision.ObjectDetector;
+import io.github.inference4j.vision.Pose;
+import io.github.inference4j.vision.PoseDetector;
+import io.github.inference4j.vision.RtmoPoseDetector;
 import io.github.inference4j.vision.TextDetector;
 import io.github.inference4j.vision.TextRegion;
 import io.github.inference4j.vision.Yolo26Detector;
@@ -64,7 +67,12 @@ class Inference4jVisionAutoConfigurationTest {
 				Files.copy(stub, dir.resolve("model.onnx"), StandardCopyOption.REPLACE_EXISTING);
 			}
 		}
-		for (String modelId : List.of("acme/custom-detr", "acme/custom-yolov8", "acme/custom-yolo26")) {
+		Path pose = Files.createDirectories(cache.resolve("inference4j/rtmo-s-coco"));
+		try (InputStream stub = Inference4jVisionAutoConfigurationTest.class.getResourceAsStream("/pose-stub.onnx")) {
+			Files.copy(stub, pose.resolve("model.onnx"), StandardCopyOption.REPLACE_EXISTING);
+		}
+		for (String modelId : List.of("acme/custom-detr", "acme/custom-yolov8", "acme/custom-yolo26",
+				"acme/custom-rtmo")) {
 			Path dir = Files.createDirectories(cache.resolve(modelId));
 			Files.writeString(dir.resolve("model.onnx"), "not an onnx model", StandardCharsets.UTF_8);
 		}
@@ -76,6 +84,7 @@ class Inference4jVisionAutoConfigurationTest {
 			assertThat(ctx).doesNotHaveBean(ImageClassifier.class);
 			assertThat(ctx).doesNotHaveBean(ObjectDetector.class);
 			assertThat(ctx).doesNotHaveBean(TextDetector.class);
+			assertThat(ctx).doesNotHaveBean(PoseDetector.class);
 		});
 	}
 
@@ -156,6 +165,67 @@ class Inference4jVisionAutoConfigurationTest {
 				// The flat-layout stub, adopted into the repo's snapshot directory
 				.hasStackTraceContaining("models--" + modelId.replace("/", "--"))
 				.hasStackTraceContaining(builder));
+	}
+
+	@Test
+	void defaultPoseDetectorIsRtmoS() {
+		runner.withPropertyValues("inference4j.vision.pose-detector.enabled=true")
+			.run(ctx -> assertThat(ctx.getBean(PoseDetector.class)).isInstanceOf(RtmoPoseDetector.class));
+	}
+
+	@Test
+	void poseDetectorAppliesTheConfiguredThreshold() {
+		// The stub scores its people 0.9 and 0.8 above the default threshold of 0.5
+		BufferedImage image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB);
+		runner.withPropertyValues("inference4j.vision.pose-detector.enabled=true")
+			.run(ctx -> assertThat(ctx.getBean(PoseDetector.class).detect(image)).hasSize(2));
+		runner.withPropertyValues("inference4j.vision.pose-detector.enabled=true",
+				"inference4j.vision.pose-detector.confidence-threshold=0.85")
+			.run(ctx -> assertThat(ctx.getBean(PoseDetector.class).detect(image)).hasSize(1));
+	}
+
+	@Test
+	void poseDetectorLoadsTheConfiguredModelId() {
+		runner.withPropertyValues("inference4j.vision.pose-detector.enabled=true",
+				"inference4j.vision.pose-detector.model-id=acme/custom-rtmo")
+			.run(ctx -> assertThatThrownBy(() -> ctx.getBean(PoseDetector.class))
+				.hasStackTraceContaining(ModelLoadException.class.getName() + ": Failed to load model from")
+				.hasStackTraceContaining("models--acme--custom-rtmo")
+				.hasStackTraceContaining("RtmoPoseDetector$Builder"));
+	}
+
+	@Test
+	void poseDetectorBeanIsLazy() {
+		runner.withPropertyValues("inference4j.vision.pose-detector.enabled=true")
+			.run(ctx -> {
+				assertThat(ctx).hasNotFailed();
+				assertThat(ctx.getBeanFactory().getBeanDefinition("poseDetector").isLazyInit()).isTrue();
+			});
+	}
+
+	@Test
+	void userBeanOverridesAutoConfiguredPoseDetector() {
+		PoseDetector custom = new PoseDetector() {
+			@Override
+			public List<Pose> detect(BufferedImage image) {
+				return List.of();
+			}
+
+			@Override
+			public List<Pose> detect(BufferedImage image, float confidenceThreshold) {
+				return List.of();
+			}
+
+			@Override
+			public void close() {
+			}
+		};
+		runner.withPropertyValues("inference4j.vision.pose-detector.enabled=true")
+			.withBean(PoseDetector.class, () -> custom)
+			.run(ctx -> {
+				assertThat(ctx).hasSingleBean(PoseDetector.class);
+				assertThat(ctx).getBean(PoseDetector.class).isSameAs(custom);
+			});
 	}
 
 	@Test
