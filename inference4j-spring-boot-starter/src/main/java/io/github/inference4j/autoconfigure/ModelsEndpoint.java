@@ -15,32 +15,22 @@
  */
 package io.github.inference4j.autoconfigure;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
 
-import io.github.inference4j.exception.ModelDownloadException;
-import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.model.CachedModel;
+import io.github.inference4j.dashboard.CacheError;
+import io.github.inference4j.dashboard.ModelCacheService;
+import io.github.inference4j.dashboard.ModelCheck;
+import io.github.inference4j.dashboard.ModelView;
+import io.github.inference4j.dashboard.UpdateStatus;
 import io.github.inference4j.model.CachedSnapshot;
 import io.github.inference4j.model.EvictionResult;
-import io.github.inference4j.model.ModelCache;
 import io.github.inference4j.model.ModelRevision;
-import io.github.inference4j.model.UpdateCheck;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import org.springframework.beans.factory.DisposableBean;
 import org.springframework.boot.actuate.endpoint.Access;
 import org.springframework.boot.actuate.endpoint.OperationResponseBody;
 import org.springframework.boot.actuate.endpoint.annotation.DeleteOperation;
@@ -64,44 +54,25 @@ import org.springframework.boot.actuate.endpoint.web.annotation.WebEndpoint;
  *   <li>{@code DELETE /actuator/models}: prunes superseded snapshots of every repo.</li>
  * </ul>
  *
- * <p>Read-only by default: the write and delete operations are mapped only with
+ * <p>The operations run on a {@link ModelCacheService}, shared with the dashboard. Read-only by default: the write and delete operations are mapped only with
  * {@code management.endpoint.models.access=unrestricted}. Responses never contain absolute paths.
  */
 @WebEndpoint(id = "models", defaultAccess = Access.READ_ONLY)
-public class ModelsEndpoint implements DisposableBean {
-
-	private static final Logger logger = LoggerFactory.getLogger(ModelsEndpoint.class);
-
-	/** How long a check's answer is reused, so repeated requests do not call the Hub each time. */
-	private static final Duration CHECK_REUSE = Duration.ofMinutes(1);
+public class ModelsEndpoint {
 
 	private static final String UPDATE = "update";
 
-	private final ModelCache cache;
+	private final ModelCacheService service;
 
-	private final ExecutorService updates;
-
-	private final Map<String, UpdateCheck> checks = new ConcurrentHashMap<>();
-
-	private final Set<String> pendingUpdates = ConcurrentHashMap.newKeySet();
-
-	/**
-	 * Creates the endpoint over {@code cache}. Updates run one at a time on a thread the endpoint owns, stopped
-	 * when the endpoint is destroyed.
-	 */
-	public ModelsEndpoint(ModelCache cache) {
-		this.cache = Objects.requireNonNull(cache, "cache");
-		this.updates = Executors.newSingleThreadExecutor(runnable -> {
-			Thread thread = new Thread(runnable, "inference4j-model-updates");
-			thread.setDaemon(true);
-			return thread;
-		});
+	/** Creates the endpoint over {@code service}, which runs the updates and owns their thread. */
+	public ModelsEndpoint(ModelCacheService service) {
+		this.service = Objects.requireNonNull(service, "service");
 	}
 
 	/** Every cached repo, read from local state only. */
 	@ReadOperation
 	public ModelsDescriptor models() {
-		return new ModelsDescriptor(cache.list().stream().map(model -> describe(model, null)).toList());
+		return new ModelsDescriptor(service.models().stream().map(ModelDescriptor::of).toList());
 	}
 
 	/**
@@ -112,21 +83,12 @@ public class ModelsEndpoint implements DisposableBean {
 			@Nullable Boolean check) {
 		String repoId = String.join("/", repo);
 		try {
-			Optional<CachedModel> found = cache.find(repoId);
-			if (found.isEmpty()) {
-				return notCached(repoId);
-			}
-			CachedModel model = found.get();
-			if (!Boolean.TRUE.equals(check)) {
-				return new WebEndpointResponse<>(describe(model, null));
-			}
-			UpdateCheck result = check(model);
-			// The check records its answer, so read the repo again
-			model = cache.find(repoId).orElse(model);
-			return new WebEndpointResponse<>(describe(model, result));
+			Optional<ModelView> found = Boolean.TRUE.equals(check) ? service.check(repoId) : service.model(repoId);
+			return found.<WebEndpointResponse<Object>>map(m -> new WebEndpointResponse<>(ModelDescriptor.of(m)))
+				.orElseGet(() -> notCached(repoId));
 		}
 		catch (RuntimeException ex) {
-			return failure(repoId, "check", ex);
+			return failure(ex);
 		}
 	}
 
@@ -142,25 +104,15 @@ public class ModelsEndpoint implements DisposableBean {
 					"Unknown action '" + action + "': expected '" + UPDATE + "'");
 		}
 		try {
-			Optional<CachedModel> found = cache.find(repoId);
-			if (found.isEmpty()) {
+			Optional<UpdateStatus> status = service.startUpdate(repoId);
+			if (status.isEmpty()) {
 				return notCached(repoId);
 			}
-			String id = found.get().repoId();
-			if (!pendingUpdates.add(id)) {
-				return new WebEndpointResponse<>(new ActionDescriptor(id, UPDATE, "already-running"), 202);
-			}
-			try {
-				updates.execute(() -> update(id));
-			}
-			catch (RejectedExecutionException ex) {
-				pendingUpdates.remove(id);
-				return error(WebEndpointResponse.STATUS_SERVICE_UNAVAILABLE, "The endpoint is shutting down");
-			}
-			return new WebEndpointResponse<>(new ActionDescriptor(id, UPDATE, "accepted"), 202);
+			String id = service.model(repoId).map(ModelView::repoId).orElse(repoId);
+			return new WebEndpointResponse<>(new ActionDescriptor(id, UPDATE, statusName(status.get())), 202);
 		}
 		catch (RuntimeException ex) {
-			return failure(repoId, UPDATE, ex);
+			return failure(ex);
 		}
 	}
 
@@ -170,24 +122,21 @@ public class ModelsEndpoint implements DisposableBean {
 			@Nullable String revision) {
 		String repoId = String.join("/", repo);
 		try {
-			Optional<CachedModel> found = cache.find(repoId);
-			if (found.isEmpty()) {
+			if (revision == null) {
+				return service.evict(repoId)
+					.<WebEndpointResponse<Object>>map(r -> new WebEndpointResponse<>(EvictionDescriptor.of(r)))
+					.orElseGet(() -> notCached(repoId));
+			}
+			if (service.model(repoId).isEmpty()) {
 				return notCached(repoId);
 			}
-			if (revision == null) {
-				return new WebEndpointResponse<>(EvictionDescriptor.of(cache.evict(repoId)));
-			}
-			boolean cached = found.get().snapshots().stream().anyMatch(s -> s.revision().equals(revision));
-			// Rejects an invalid revision (400); a revision not cached removes nothing (404)
-			EvictionResult result = cache.evict(repoId, revision);
-			if (!cached) {
-				return error(WebEndpointResponse.STATUS_NOT_FOUND,
-						repoId + " has no cached snapshot at revision " + revision);
-			}
-			return new WebEndpointResponse<>(EvictionDescriptor.of(result));
+			return service.evict(repoId, revision)
+				.<WebEndpointResponse<Object>>map(r -> new WebEndpointResponse<>(EvictionDescriptor.of(r)))
+				.orElseGet(() -> error(WebEndpointResponse.STATUS_NOT_FOUND,
+						repoId + " has no cached snapshot at revision " + revision));
 		}
 		catch (RuntimeException ex) {
-			return failure(repoId, "evict", ex);
+			return failure(ex);
 		}
 	}
 
@@ -195,79 +144,25 @@ public class ModelsEndpoint implements DisposableBean {
 	@DeleteOperation
 	public WebEndpointResponse<Object> prune() {
 		try {
-			return new WebEndpointResponse<>(EvictionDescriptor.of(cache.prune()));
+			return new WebEndpointResponse<>(EvictionDescriptor.of(service.prune()));
 		}
 		catch (RuntimeException ex) {
-			return failure(null, "prune", ex);
+			return failure(ex);
 		}
 	}
 
-	@Override
-	public void destroy() throws InterruptedException {
-		updates.shutdown();
-		if (!updates.awaitTermination(5, TimeUnit.SECONDS)) {
-			updates.shutdownNow();
-		}
-	}
-
-	private UpdateCheck check(CachedModel model) {
-		UpdateCheck last = checks.get(model.repoId());
-		if (last != null && Objects.equals(last.cachedRevision(), model.revision())
-				&& last.checkedAt().isAfter(Instant.now().minus(CHECK_REUSE))) {
-			return last;
-		}
-		UpdateCheck result = cache.check(model.repoId());
-		checks.put(model.repoId(), result);
-		return result;
-	}
-
-	private void update(String repoId) {
-		try {
-			CachedModel model = cache.update(repoId);
-			logger.info("Updated {} to revision {}", repoId, model.revision());
-		}
-		catch (RuntimeException ex) {
-			logger.warn("Update of {} failed: {}", repoId, safeMessage(ex));
-		}
-		finally {
-			checks.remove(repoId);
-			pendingUpdates.remove(repoId);
-		}
-	}
-
-	private ModelDescriptor describe(CachedModel model, @Nullable UpdateCheck check) {
-		return new ModelDescriptor(model.repoId(), model.revision(), model.lastChecked(), model.remoteRevision(),
-				model.updateAvailable(), model.stale(), pendingUpdates.contains(model.repoId()), model.snapshots(),
-				model.sizeBytes(), check != null ? CheckDescriptor.of(check) : null);
+	/** The JSON name of an update status: {@code accepted} or {@code already-running}. */
+	static String statusName(UpdateStatus status) {
+		return status.name().toLowerCase(Locale.ROOT).replace('_', '-');
 	}
 
 	private static WebEndpointResponse<Object> notCached(String repoId) {
 		return error(WebEndpointResponse.STATUS_NOT_FOUND, repoId + " is not cached");
 	}
 
-	/**
-	 * Maps a failure to a status: 400 for an invalid repo id or revision, 502 when the Hub fails, 409 when the
-	 * source cannot do it in its current state (offline, or the repo evicted meanwhile).
-	 */
-	private WebEndpointResponse<Object> failure(@Nullable String repoId, String operation, RuntimeException ex) {
-		if (ex instanceof IllegalArgumentException) {
-			return error(WebEndpointResponse.STATUS_BAD_REQUEST, safeMessage(ex));
-		}
-		if (ex instanceof ModelDownloadException) {
-			logger.warn("Cannot {} {}: {}", operation, repoId, safeMessage(ex));
-			return error(502, safeMessage(ex));
-		}
-		if (ex instanceof ModelSourceException) {
-			return error(409, safeMessage(ex));
-		}
-		throw ex;
-	}
-
-	/** The exception's message, with the cache directory left out. */
-	private String safeMessage(RuntimeException ex) {
-		String message = Objects.requireNonNullElse(ex.getMessage(), ex.getClass().getSimpleName());
-		String directory = cache.directory().toString();
-		return directory.isEmpty() ? message : message.replace(directory, "<cache>");
+	private WebEndpointResponse<Object> failure(RuntimeException ex) {
+		CacheError error = service.error(ex);
+		return error(error.status(), error.message());
 	}
 
 	private static WebEndpointResponse<Object> error(int status, String message) {
@@ -278,23 +173,16 @@ public class ModelsEndpoint implements DisposableBean {
 	public record ModelsDescriptor(List<ModelDescriptor> models) implements OperationResponseBody {
 	}
 
-	/**
-	 * A cached repo: {@link CachedModel}'s components, plus whether it is {@linkplain CachedModel#stale() stale},
-	 * whether an update started here is still running, and the Hub check when one was asked for.
-	 */
+	/** A cached repo: {@link ModelView}'s components. */
 	public record ModelDescriptor(String repoId, @Nullable String revision, @Nullable Instant lastChecked,
 			@Nullable String remoteRevision, boolean updateAvailable, boolean stale, boolean updating,
-			List<CachedSnapshot> snapshots, long sizeBytes, @Nullable CheckDescriptor check)
+			List<CachedSnapshot> snapshots, long sizeBytes, @Nullable ModelCheck check)
 			implements OperationResponseBody {
-	}
 
-	/** {@link UpdateCheck}'s components, plus whether an update would download anything. */
-	public record CheckDescriptor(String cachedRevision, String remoteRevision, List<String> changedFiles,
-			Instant checkedAt, boolean updateAvailable) {
-
-		static CheckDescriptor of(UpdateCheck check) {
-			return new CheckDescriptor(check.cachedRevision(), check.remoteRevision(), check.changedFiles(),
-					check.checkedAt(), check.updateAvailable());
+		static ModelDescriptor of(ModelView model) {
+			return new ModelDescriptor(model.repoId(), model.revision(), model.lastChecked(), model.remoteRevision(),
+					model.updateAvailable(), model.stale(), model.updating(), model.snapshots(), model.sizeBytes(),
+					model.check());
 		}
 
 	}

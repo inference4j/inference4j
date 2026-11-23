@@ -6,3 +6,4 @@ io.github.inference4j.autoconfigure.Inference4jGenaiAutoConfiguration
 io.github.inference4j.autoconfigure.Inference4jAudioAutoConfiguration
 io.github.inference4j.autoconfigure.Inference4jHealthAutoConfiguration
 io.github.inference4j.autoconfigure.Inference4jModelCacheAutoConfiguration
+io.github.inference4j.autoconfigure.Inference4jDashboardAutoConfiguration

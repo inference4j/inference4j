@@ -62,6 +62,9 @@ inference4j:
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `inference4j.actuator.models.enabled` | `boolean` | `true` | Create the [`models` actuator endpoint](#model-cache-endpoint) bean when Spring Boot Actuator is on the classpath. It still has to be exposed with `management.endpoints.web.exposure.include` |
+| `inference4j.dashboard.enabled` | `boolean` | `false` | Serve the [dashboard](#dashboard) in a Spring MVC web application |
+| `inference4j.dashboard.path` | `String` | `/inference4j` | The path the dashboard is served at; its JSON API is under `<path>/api` |
+| `inference4j.dashboard.read-only` | `boolean` | `true` | When `false`, the dashboard can update, evict and prune cached models |
 | `inference4j.health.model-cache-ttl` | `Duration` | `10s` | How long the health indicator reuses its listing of the model cache (`staleModels`, `updatesAvailable`), so frequent probes don't read the cache each time. `0s` lists it on every call |
 | `inference4j.metrics.enabled` | `boolean` | `true` | Use a Micrometer-backed `RouterMetrics` when a `MeterRegistry` is present. When `false`, or when Micrometer is absent, `RouterMetrics` falls back to a no-op instead of being removed |
 | `inference4j.nlp.text-classifier.enabled` | `boolean` | `false` | Enable DistilBERT text classifier |
@@ -383,6 +386,46 @@ auto-configured models download into. Define a `ModelCache` bean to use another 
   again (`DELETE`). When you enable them, put the endpoint behind authentication, and keep CSRF protection on for
   `POST` and `DELETE`, for example with Spring Security's `EndpointRequest.to("models")` matcher.
 - `update` pulls the latest commit of the repo's `main` branch. It does not pin a revision.
+
+## Dashboard
+
+The starter can serve a local dashboard, a web page over the [model cache](model-loading.md#managing-the-cache).
+It shows the cache's size and the disk usage of its volume, the largest models, and every cached repo with its
+snapshots and files. When writes are enabled, it can also check repos for updates, update, evict and prune them.
+
+The dashboard needs a Spring MVC web application (`spring-boot-starter-webmvc`) and is off by default:
+
+```yaml
+inference4j:
+  dashboard:
+    enabled: true
+    read-only: false     # allow update, evict and prune; checking for updates is always allowed
+```
+
+It is served at `http://localhost:8080/inference4j/`, and the URL is logged at startup. Its page, styles and
+scripts ship in `inference4j-core`; there are no requests to a CDN, so it also works offline. It uses the same
+`ModelCacheService` bean as the [model cache endpoint](#model-cache-endpoint), so updates started from either one
+show as `updating` in both.
+
+The page reads a small JSON API, which other tools can call too:
+
+| Request | Description | Status |
+|---------|-------------|--------|
+| `GET /inference4j/api/info` | `{"readOnly": true}` | 200 |
+| `GET /inference4j/api/cache` | The cache summary: models, snapshots, sizes, and the volume's `disk.totalBytes` and `disk.usableBytes` | 200 |
+| `GET /inference4j/api/cache/models` | Every cached repo | 200 |
+| `GET /inference4j/api/cache/model?repo={org}/{name}[&check=true]` | One cached repo; with `check`, after asking the Hub | 200, 400, 404, 409 offline, 502 Hub unreachable |
+| `POST /inference4j/api/cache/update?repo={org}/{name}` | Starts an update in the background | 202, 403 read-only, 404 |
+| `DELETE /inference4j/api/cache/model?repo={org}/{name}[&revision={commit}]` | Evicts the repo, or one snapshot | 200, 403, 404 |
+| `POST /inference4j/api/cache/prune` | Prunes superseded snapshots not in use | 200, 403 |
+
+### Dashboard security
+
+- The dashboard has no authentication of its own. It is meant for local development; in a deployed application,
+  leave it off or put its path behind your Spring Security configuration.
+- Like the endpoint's `?check=true`, a check runs only for repos already cached.
+- With Spring Security's cookie CSRF repository (`CookieCsrfTokenRepository`), the page sends the `XSRF-TOKEN`
+  cookie back as the `X-XSRF-TOKEN` header on `POST` and `DELETE`.
 
 ## Example configuration
 

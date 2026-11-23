@@ -9,6 +9,7 @@
 | `io.github.inference4j` | Core contracts: `InferenceTask`, `Classifier`, `Detector`, `ZeroShotClassifier`, `ZeroShotInput`, `AbstractInferenceTask`, `Tensor`, `TensorType`, `InferenceSession`, `NativeTensors`, `InferenceContext` |
 | `io.github.inference4j.session` | Session config: `SessionConfigurer`, `SessionOptions` |
 | `io.github.inference4j.model` | Model resolution: `ModelSource`, `HuggingFaceModelSource`, `LocalModelSource`, `ResolvedModel`, `ModelRevision`; cache management: `ModelCache`, `CachedModel`, `CachedSnapshot`, `CachedFile`, `UpdateCheck`, `EvictionResult`, `PruneMode` |
+| `io.github.inference4j.dashboard` | Framework-independent dashboard support: `ModelCacheService`, `CacheSummary`, `DiskUsage`, `ModelView`, `ModelCheck`, `UpdateStatus`, `CacheError`; the dashboard's static page under `io/github/inference4j/dashboard/static/` |
 | `io.github.inference4j.processing` | Pre/post-processing: `Preprocessor`, `Postprocessor`, `OutputOperator`, `MathOps`, `TruncationPolicy`, `TruncationGuard`, `TokenWindows`, `WindowAggregation`, `TokenLimits` |
 | `io.github.inference4j.exception` | Custom exceptions: `ModelLoadException`, `InferenceException`, `InputTooLongException` |
 | `io.github.inference4j.tokenizer` | `Tokenizer`, `EncodedInput`, `WordPieceTokenizer`, `BpeTokenizer`, `DecodingBpeTokenizer`, `SentencePieceBpeTokenizer`, `UnigramTokenizer`, `PrecompiledNormalizer`, `SpecialTokens`, `TokenDecoder`, `TokenStream` |
@@ -61,7 +62,7 @@ a `compileOnly` dependency of the module. See the [LangChain4j guide](../guides/
 
 | Package | Contents |
 |---------|----------|
-| `io.github.inference4j.autoconfigure` | Auto-configuration, health indicators, `Inference4jProperties` |
+| `io.github.inference4j.autoconfigure` | Auto-configuration, health indicators, the `models` actuator endpoint, the dashboard routes, `Inference4jProperties` |
 
 ## Interface hierarchy
 
@@ -197,6 +198,22 @@ try (var task = SomeWrapper.builder()
 | `UpdateCheck` | `repoId()`, `cachedRevision()`, `remoteRevision()`, `changedFiles()`, `checkedAt()`, `updateAvailable()` | What the Hub reported for a cached repo |
 | `EvictionResult` | `removed()`, `inUse()`, `freedBytes()` | What an eviction or prune removed and kept |
 | `PruneMode` | `AUTO`, `MANUAL` | Whether superseded snapshots are deleted after each update |
+
+### Model cache service
+
+`ModelCacheService` wraps a `ModelCache` with what a web tier needs, independent of any web framework. The Spring
+Boot actuator endpoint and dashboard run on it, and other framework integrations can expose the same operations.
+It is thread-safe and owns the thread that runs updates; `close()` stops it.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `summary()` | `CacheSummary` | Totals over the cached repos (models, snapshots, snapshots in use, updates available, stale, updating, size, superseded size), and the `DiskUsage` of the cache's volume |
+| `models()` / `model(repoId)` | `List<ModelView>` / `Optional<ModelView>` | Cached repos from local state; a `ModelView` adds `stale`, `updating` and an optional `ModelCheck` to `CachedModel` |
+| `check(repoId)` | `Optional<ModelView>` | Asks the Hub whether the repo changed; a check younger than a minute is reused |
+| `startUpdate(repoId)` | `Optional<UpdateStatus>` | Starts an update in the background, one at a time: `ACCEPTED` or `ALREADY_RUNNING` |
+| `evict(repoId[, revision])` | `Optional<EvictionResult>` | Evicts the repo, or one snapshot; empty when not cached |
+| `prune()` | `EvictionResult` | Deletes superseded snapshots not in use |
+| `error(RuntimeException)` | `CacheError` | The HTTP status (400, 409, 502, 503) and message for a failure, without the cache directory |
 
 `InferenceSession.create(ResolvedModel, String fileName[, SessionConfigurer | SessionOptions])` creates a session that
 retains the model until it is closed, and `InferenceSession.modelRevision()` returns the revision it was loaded from.

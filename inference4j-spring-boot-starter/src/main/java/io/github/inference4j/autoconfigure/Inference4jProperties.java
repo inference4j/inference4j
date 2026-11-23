@@ -38,6 +38,8 @@ public class Inference4jProperties {
 
 	private ActuatorProperties actuator = new ActuatorProperties();
 
+	private DashboardProperties dashboard = new DashboardProperties();
+
 	public NlpProperties getNlp() {
 		return nlp;
 	}
@@ -84,6 +86,14 @@ public class Inference4jProperties {
 
 	public void setActuator(ActuatorProperties actuator) {
 		this.actuator = actuator;
+	}
+
+	public DashboardProperties getDashboard() {
+		return dashboard;
+	}
+
+	public void setDashboard(DashboardProperties dashboard) {
+		this.dashboard = dashboard;
 	}
 
 	public static class NlpProperties {
@@ -235,6 +245,46 @@ public class Inference4jProperties {
 
 		public void setEnabled(boolean enabled) {
 			this.enabled = enabled;
+		}
+
+	}
+
+	/**
+	 * The local dashboard, a web page over the model cache; used only in a Spring MVC web application.
+	 */
+	public static class DashboardProperties {
+
+		/** Whether to serve the dashboard. */
+		private boolean enabled = false;
+
+		/** The path the dashboard is served at; its JSON API is under {@code <path>/api}. */
+		private String path = "/inference4j";
+
+		/** Whether the dashboard only reads; when {@code false}, it can update, evict and prune cached models. */
+		private boolean readOnly = true;
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
+		public String getPath() {
+			return path;
+		}
+
+		public void setPath(String path) {
+			this.path = path;
+		}
+
+		public boolean isReadOnly() {
+			return readOnly;
+		}
+
+		public void setReadOnly(boolean readOnly) {
+			this.readOnly = readOnly;
 		}
 
 	}
