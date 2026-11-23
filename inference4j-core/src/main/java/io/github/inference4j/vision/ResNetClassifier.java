@@ -16,19 +16,8 @@
 
 package io.github.inference4j.vision;
 
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.InferenceSession;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.OutputOperator;
-import io.github.inference4j.processing.Preprocessor;
-import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.preprocessing.image.Labels;
 
-import java.awt.image.BufferedImage;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -81,11 +70,8 @@ public class ResNetClassifier extends AbstractImageClassifier {
 
     private static final String DEFAULT_MODEL_ID = "inference4j/resnet50-v1-7";
 
-    private ResNetClassifier(InferenceSession session,
-                             Preprocessor<BufferedImage, Tensor> imagePreprocessor,
-                             Labels labels, String inputName, int defaultTopK,
-                             OutputOperator outputOperator) {
-        super(session, imagePreprocessor, labels, inputName, defaultTopK, outputOperator);
+    private ResNetClassifier(Parts parts) {
+        super(parts);
     }
 
     public static Builder builder() {
@@ -95,58 +81,16 @@ public class ResNetClassifier extends AbstractImageClassifier {
     private static final float[] IMAGENET_MEAN = {0.485f, 0.456f, 0.406f};
     private static final float[] IMAGENET_STD = {0.229f, 0.224f, 0.225f};
 
-    public static class Builder extends AbstractBuilder<Builder> {
+    public static class Builder extends AbstractBuilder<ResNetClassifier, Builder> {
+
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
 
         @Override
-        protected Builder self() {
-            return this;
-        }
-
         public ResNetClassifier build() {
-            if (session == null) {
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                try (ResolvedModel model = source.open(id, List.of("model.onnx"))) {
-                    loadFromDirectory(model);
-                }
-            }
-            validate();
-            return new ResNetClassifier(session, preprocessor, labels, inputName, defaultTopK, outputOperator);
-        }
-
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
-            }
-
-            Path modelPath = dir.resolve("model.onnx");
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Model file not found: " + modelPath);
-            }
-
-            this.session = sessionConfigurer != null
-                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                    : InferenceSession.create(model, "model.onnx");
-            try {
-                if (this.inputName == null) {
-                    this.inputName = session.inputNames().iterator().next();
-                }
-
-                Path labelsPath = dir.resolve("labels.txt");
-                if (Files.exists(labelsPath)) {
-                    this.labels = Labels.fromFile(labelsPath);
-                }
-
-                this.preprocessor = detectPipeline(session, this.inputName,
-                        IMAGENET_MEAN, IMAGENET_STD);
-                this.outputOperator = OutputOperator.softmax();
-            } catch (Exception e) {
-                this.session.close();
-                this.session = null;
-                throw e;
-            }
+            return load(List.of("model.onnx"), files ->
+                    new ResNetClassifier(parts(files, IMAGENET_MEAN, IMAGENET_STD, OutputOperator.softmax())));
         }
     }
 }

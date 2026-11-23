@@ -28,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -80,14 +81,17 @@ public final class ModelFiles implements AutoCloseable {
     private final ResolvedModel model;
     private final String modelId;
     private final SessionConfigurer sessionConfigurer;
+    private final Map<String, InferenceSession> suppliedSessions;
     private final List<AutoCloseable> resources = new ArrayList<>();
     private boolean assembled;
     private boolean closed;
 
-    private ModelFiles(ResolvedModel model, String modelId, SessionConfigurer sessionConfigurer) {
+    private ModelFiles(ResolvedModel model, String modelId, SessionConfigurer sessionConfigurer,
+                       Map<String, InferenceSession> suppliedSessions) {
         this.model = model;
         this.modelId = modelId;
         this.sessionConfigurer = sessionConfigurer;
+        this.suppliedSessions = suppliedSessions;
     }
 
     /**
@@ -147,7 +151,30 @@ public final class ModelFiles implements AutoCloseable {
                              List<String> required, Assembler<T> assembler) {
         Objects.requireNonNull(model, "model");
         Objects.requireNonNull(assembler, "assembler");
-        try (ModelFiles files = new ModelFiles(model, modelId, sessionConfigurer)) {
+        return assemble(new ModelFiles(model, modelId, sessionConfigurer, Map.of()), required, assembler);
+    }
+
+    /**
+     * Builds a model from sessions created elsewhere instead of from a model directory. Transitional support for
+     * the package-private {@code session(InferenceSession)} test hooks of the builders, to be removed with them.
+     *
+     * <p>Nothing is opened: {@link #session(String)} returns the supplied session for a file name, the
+     * {@linkplain #directory() directory} is {@code null}, no {@linkplain #optional optional} file exists, reading
+     * a file fails with an {@link IllegalStateException}, and nothing is closed if building fails.
+     *
+     * @param modelId   the model identifier, for messages
+     * @param sessions  the sessions, by the model file name they stand for
+     * @param assembler builds the model
+     * @param <T>       the model type
+     * @return the model
+     */
+    static <T> T forSessions(String modelId, Map<String, InferenceSession> sessions, Assembler<T> assembler) {
+        Objects.requireNonNull(assembler, "assembler");
+        return assemble(new ModelFiles(null, modelId, null, Map.copyOf(sessions)), List.of(), assembler);
+    }
+
+    private static <T> T assemble(ModelFiles opened, List<String> required, Assembler<T> assembler) {
+        try (ModelFiles files = opened) {
             files.check(required);
             T result = assembler.assemble(files);
             files.assembled = true;
@@ -164,18 +191,29 @@ public final class ModelFiles implements AutoCloseable {
         return modelId;
     }
 
-    /** The model directory. */
+    /** The model directory, or {@code null} when the sessions were supplied directly (no directory). */
     public Path directory() {
-        return model.directory();
+        return model != null ? model.directory() : null;
     }
 
-    /** A file in the model directory, by its path relative to it; it may not exist. */
+    /**
+     * A file in the model directory, by its path relative to it; it may not exist.
+     *
+     * @throws IllegalStateException when the sessions were supplied directly (no directory)
+     */
     public Path file(String name) {
+        if (model == null) {
+            throw new IllegalStateException("No model directory to read " + name + " from" + forModel()
+                    + ": only sessions were supplied, so the builder must be given what the file provides");
+        }
         return model.file(name);
     }
 
-    /** A file in the model directory, if it exists. */
+    /** A file in the model directory, if it exists; always empty when the sessions were supplied directly. */
     public Optional<Path> optional(String name) {
+        if (model == null) {
+            return Optional.empty();
+        }
         Path file = file(name);
         return Files.exists(file) ? Optional.of(file) : Optional.empty();
     }
@@ -202,6 +240,13 @@ public final class ModelFiles implements AutoCloseable {
      * @throws ModelSourceException if the file does not exist
      */
     public InferenceSession session(String name) {
+        if (model == null) {
+            InferenceSession supplied = suppliedSessions.get(name);
+            if (supplied == null) {
+                throw new IllegalStateException("No session was supplied for " + name + forModel());
+            }
+            return supplied;
+        }
         require(name);
         InferenceSession session = sessionConfigurer != null
                 ? InferenceSession.create(model, name, sessionConfigurer)
@@ -223,8 +268,13 @@ public final class ModelFiles implements AutoCloseable {
     /**
      * The opened model directory. It is released when loading ends; {@linkplain ResolvedModel#retain() retain} it
      * to keep the files beyond that. Do not close it.
+     *
+     * @throws IllegalStateException when the sessions were supplied directly (no directory)
      */
     public ResolvedModel lease() {
+        if (model == null) {
+            throw new IllegalStateException("No model directory: only sessions were supplied");
+        }
         return model;
     }
 
@@ -244,7 +294,9 @@ public final class ModelFiles implements AutoCloseable {
                 toClose.add(resources.get(i));
             }
         }
-        toClose.add(model);
+        if (model != null) {
+            toClose.add(model);
+        }
         closeAll(toClose.toArray(new AutoCloseable[0]));
     }
 
@@ -280,6 +332,9 @@ public final class ModelFiles implements AutoCloseable {
     }
 
     private void check(List<String> required) {
+        if (model == null) {
+            return;
+        }
         Path directory = directory();
         if (!Files.isDirectory(directory)) {
             throw new ModelSourceException("Model directory not found: " + directory + forModel());

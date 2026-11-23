@@ -18,22 +18,17 @@ package io.github.inference4j.vision;
 
 import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.PreprocessResult;
-import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.processing.MathOps;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.preprocessing.image.Labels;
+import io.github.inference4j.model.AbstractModelBuilder;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -264,11 +259,7 @@ public class YoloV8Detector
 
     // --- Utilities ---
 
-    public static class Builder {
-        private InferenceSession session;
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<YoloV8Detector, Builder> {
         private Labels labels;
         private String inputName;
         private Integer inputSize;
@@ -276,24 +267,12 @@ public class YoloV8Detector
         private float confidenceThreshold = 0.25f;
         private float iouThreshold = 0.45f;
 
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
+
         Builder session(InferenceSession session) {
-            this.session = session;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
-
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
+            return useSession("model.onnx", session);
         }
 
         /**
@@ -335,51 +314,22 @@ public class YoloV8Detector
             return this;
         }
 
+        @Override
         public YoloV8Detector build() {
-            String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-            Path dir = null;
-            if (session == null) {
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                if (DEFAULT_MODEL_ID.equals(id)) {
-                    logger.warn("YoloV8Detector is using the default weights '{}', which are licensed "
-                            + "under AGPL-3.0 (Ultralytics). DetrDetector is an Apache-2.0 alternative.", id);
-                }
-                try (ResolvedModel model = source.open(id, List.of("model.onnx"))) {
-                    dir = model.directory();
-                    loadFromDirectory(model);
-                }
+            String id = resolvedModelId();
+            boolean preset = DEFAULT_MODEL_ID.equals(id);
+            if (preset) {
+                DetectorModels.warnAgpl(logger, "YoloV8Detector", id);
             }
-            try {
-                if (inputName == null) {
-                    inputName = session.inputNames().iterator().next();
-                }
-                int fixedSize = dir != null ? DetectorModels.fixedSize(session.inputShape(inputName)) : -1;
+            return load(List.of("model.onnx"), files -> {
+                InferenceSession session = files.session("model.onnx");
+                String input = inputName != null ? inputName : session.inputNames().iterator().next();
+                int fixedSize = files.directory() != null ? DetectorModels.fixedSize(session.inputShape(input)) : -1;
                 int size = DetectorModels.inputSize(inputSize, fixedSize, id);
-                Labels resolved = DetectorModels.labels(labels, dir, DEFAULT_MODEL_ID.equals(id));
-                return new YoloV8Detector(session, resolved, inputName, size, confidenceThreshold, iouThreshold, maxDetections);
-            } catch (RuntimeException e) {
-                if (dir != null) {
-                    session.close();
-                }
-                throw e;
-            }
-        }
-
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
-            }
-
-            Path modelPath = dir.resolve("model.onnx");
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Model file not found: " + modelPath);
-            }
-
-            this.session = sessionConfigurer != null
-                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                    : InferenceSession.create(model, "model.onnx");
+                Labels resolved = DetectorModels.labels(labels, files.directory(), preset);
+                return new YoloV8Detector(session, resolved, input, size, confidenceThreshold, iouThreshold,
+                        maxDetections);
+            });
         }
     }
 }

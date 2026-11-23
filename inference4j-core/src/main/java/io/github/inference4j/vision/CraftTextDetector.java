@@ -18,16 +18,11 @@ package io.github.inference4j.vision;
 
 import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.PreprocessResult;
-import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
+import io.github.inference4j.model.AbstractModelBuilder;
 
 import java.awt.image.BufferedImage;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -212,11 +207,7 @@ public class CraftTextDetector
     /**
      * Builder for custom CRAFT configuration.
      */
-    public static class Builder {
-        private InferenceSession session;
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<CraftTextDetector, Builder> {
         private String inputName;
         private int targetSize = 1280;
         private float magRatio = 1.5f;
@@ -225,24 +216,12 @@ public class CraftTextDetector
         private float lowTextThreshold = 0.4f;
         private int minComponentArea = 10;
 
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
+
         Builder session(InferenceSession session) {
-            this.session = session;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
-
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
+            return useSession("model.onnx", session);
         }
 
         public Builder inputName(String inputName) {
@@ -286,35 +265,13 @@ public class CraftTextDetector
             return this;
         }
 
+        @Override
         public CraftTextDetector build() {
-            if (session == null) {
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                try (ResolvedModel model = source.open(id, List.of("model.onnx"))) {
-                    loadFromDirectory(model);
-                }
-            }
-            if (inputName == null) {
-                inputName = session.inputNames().iterator().next();
-            }
-            return new CraftTextDetector(session, inputName, this);
-        }
-
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
-            }
-
-            Path modelPath = dir.resolve("model.onnx");
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Model file not found: " + modelPath);
-            }
-
-            this.session = sessionConfigurer != null
-                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                    : InferenceSession.create(model, "model.onnx");
+            return load(List.of("model.onnx"), files -> {
+                InferenceSession session = files.session("model.onnx");
+                String input = inputName != null ? inputName : session.inputNames().iterator().next();
+                return new CraftTextDetector(session, input, this);
+            });
         }
     }
 }

@@ -20,11 +20,11 @@ import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.processing.MathOps;
-import io.github.inference4j.model.ModelSource;
+import io.github.inference4j.model.AbstractModelBuilder;
+import io.github.inference4j.model.ModelFiles;
 import io.github.inference4j.processing.OutputOperator;
 import io.github.inference4j.processing.Postprocessor;
 import io.github.inference4j.processing.Preprocessor;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
 import io.github.inference4j.preprocessing.image.ImageLayout;
@@ -150,78 +150,106 @@ public abstract class AbstractImageClassifier
     }
 
     /**
+     * The parts an image classifier is built from.
+     *
+     * @param session           the session, which the classifier owns
+     * @param imagePreprocessor turns an image into the model input
+     * @param labels            class names, by class index
+     * @param inputName         the model input the image goes to
+     * @param defaultTopK       how many classes {@link #classify(BufferedImage)} returns
+     * @param outputOperator    turns the model output into probabilities
+     */
+    protected record Parts(InferenceSession session, Preprocessor<BufferedImage, Tensor> imagePreprocessor,
+                           Labels labels, String inputName, int defaultTopK, OutputOperator outputOperator) {
+    }
+
+    /**
+     * Creates a classifier from its parts.
+     *
+     * @param parts the parts, usually from {@link AbstractBuilder#parts}
+     */
+    protected AbstractImageClassifier(Parts parts) {
+        this(parts.session(), parts.imagePreprocessor(), parts.labels(), parts.inputName(), parts.defaultTopK(),
+                parts.outputOperator());
+    }
+
+    /**
      * Base builder for image classifiers.
      *
+     * @param <T> the classifier type
      * @param <B> the concrete builder type (for self-returning setters)
      */
-    protected abstract static class AbstractBuilder<B extends AbstractBuilder<B>> {
-        protected InferenceSession session;
-        protected ModelSource modelSource;
-        protected String modelId;
-        protected SessionConfigurer sessionConfigurer;
-        protected Preprocessor<BufferedImage, Tensor> preprocessor = ImageTransformPipeline.imagenet(224);
-        protected Labels labels = Labels.imagenet();
+    protected abstract static class AbstractBuilder<T extends AbstractImageClassifier, B extends AbstractBuilder<T, B>>
+            extends AbstractModelBuilder<T, B> {
+        protected Preprocessor<BufferedImage, Tensor> preprocessor;
+        protected Labels labels;
         protected String inputName;
         protected int defaultTopK = 5;
-        protected OutputOperator outputOperator = OutputOperator.softmax();
+        protected OutputOperator outputOperator;
 
-        @SuppressWarnings("unchecked")
-        protected B self() {
-            return (B) this;
+        /**
+         * @param defaultModelId the model used when {@link #modelId(String)} is not set
+         */
+        protected AbstractBuilder(String defaultModelId) {
+            super(defaultModelId);
         }
 
         B session(InferenceSession session) {
-            this.session = session;
-            return self();
+            return useSession("model.onnx", session);
         }
 
-        public B sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return self();
-        }
-
-        public B modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return self();
-        }
-
-        public B modelId(String modelId) {
-            this.modelId = modelId;
-            return self();
-        }
-
+        /**
+         * Turns an image into the model input. Defaults to resizing to the model's input size and normalizing with
+         * the wrapper's mean and standard deviation, in the model's layout.
+         */
         public B preprocessor(Preprocessor<BufferedImage, Tensor> preprocessor) {
             this.preprocessor = preprocessor;
             return self();
         }
 
+        /** Class names, by class index. Defaults to a {@code labels.txt} next to the model, or ImageNet. */
         public B labels(Labels labels) {
             this.labels = labels;
             return self();
         }
 
+        /** The model input the image goes to. Defaults to the model's first input. */
         public B inputName(String inputName) {
             this.inputName = inputName;
             return self();
         }
 
+        /** How many classes {@code classify(image)} returns. Defaults to 5. */
         public B defaultTopK(int defaultTopK) {
             this.defaultTopK = defaultTopK;
             return self();
         }
 
+        /** Turns the model output into probabilities. The default depends on the wrapper. */
         public B outputOperator(OutputOperator outputOperator) {
             this.outputOperator = outputOperator;
             return self();
         }
 
-        protected void validate() {
-            if (session == null) {
-                throw new IllegalStateException("InferenceSession is required");
-            }
-            if (inputName == null) {
-                inputName = session.inputNames().iterator().next();
-            }
+        /**
+         * The classifier's parts: {@code model.onnx} and the options set on this builder, with defaults for those
+         * not set.
+         *
+         * @param files                 the model's files
+         * @param mean                  per-channel mean of the default preprocessor
+         * @param std                   per-channel standard deviation of the default preprocessor
+         * @param defaultOutputOperator the output operator when none is set
+         * @return the parts
+         */
+        protected Parts parts(ModelFiles files, float[] mean, float[] std, OutputOperator defaultOutputOperator) {
+            InferenceSession session = files.session("model.onnx");
+            String input = inputName != null ? inputName : session.inputNames().iterator().next();
+            Preprocessor<BufferedImage, Tensor> imagePreprocessor = preprocessor != null
+                    ? preprocessor : detectPipeline(session, input, mean, std);
+            Labels resolvedLabels = labels != null
+                    ? labels : files.optional("labels.txt").map(Labels::fromFile).orElseGet(Labels::imagenet);
+            OutputOperator operator = outputOperator != null ? outputOperator : defaultOutputOperator;
+            return new Parts(session, imagePreprocessor, resolvedLabels, input, defaultTopK, operator);
         }
     }
 }

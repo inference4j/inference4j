@@ -20,7 +20,6 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -32,12 +31,8 @@ import io.github.inference4j.InferenceSession;
 import io.github.inference4j.PreprocessResult;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
-import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.Preprocessor;
-import io.github.inference4j.session.SessionConfigurer;
+import io.github.inference4j.model.AbstractModelBuilder;
 
 /**
  * Monocular depth estimation with Depth Anything V2.
@@ -261,32 +256,16 @@ public class DepthAnythingEstimator extends AbstractInferenceTask<BufferedImage,
         }
     }
 
-    public static class Builder {
-        private InferenceSession session;
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<DepthAnythingEstimator, Builder> {
         private String inputName;
         private int targetSize = DEFAULT_TARGET_SIZE;
 
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
+
         Builder session(InferenceSession session) {
-            this.session = session;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
-
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
+            return useSession("model.onnx", session);
         }
 
         public Builder inputName(String inputName) {
@@ -308,35 +287,13 @@ public class DepthAnythingEstimator extends AbstractInferenceTask<BufferedImage,
             return this;
         }
 
+        @Override
         public DepthAnythingEstimator build() {
-            if (session == null) {
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                try (ResolvedModel model = source.open(id, List.of("model.onnx"))) {
-                    loadFromDirectory(model);
-                }
-            }
-            if (inputName == null) {
-                inputName = session.inputNames().iterator().next();
-            }
-            return new DepthAnythingEstimator(session, inputName, targetSize);
-        }
-
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
-            }
-
-            Path modelPath = dir.resolve("model.onnx");
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Model file not found: " + modelPath);
-            }
-
-            this.session = sessionConfigurer != null
-                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                    : InferenceSession.create(model, "model.onnx");
+            return load(List.of("model.onnx"), files -> {
+                InferenceSession session = files.session("model.onnx");
+                String input = inputName != null ? inputName : session.inputNames().iterator().next();
+                return new DepthAnythingEstimator(session, input, targetSize);
+            });
         }
     }
 }

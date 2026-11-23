@@ -18,17 +18,14 @@ package io.github.inference4j.audio;
 
 import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.PreprocessResult;
-import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.preprocessing.audio.AudioData;
 import io.github.inference4j.processing.MathOps;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
+import io.github.inference4j.model.AbstractModelBuilder;
+import io.github.inference4j.preprocessing.audio.AudioTransformPipeline;
+import io.github.inference4j.preprocessing.audio.Vocabulary;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -155,35 +152,19 @@ public class Wav2Vec2Recognizer
         return new Transcription(sb.toString().strip());
     }
 
-    public static class Builder {
-        private InferenceSession session;
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<Wav2Vec2Recognizer, Builder> {
         private io.github.inference4j.preprocessing.audio.Vocabulary vocabulary;
         private String inputName;
         private int sampleRate = DEFAULT_SAMPLE_RATE;
         private int blankIndex = DEFAULT_BLANK_INDEX;
         private String wordDelimiter = DEFAULT_WORD_DELIMITER;
 
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
+
         Builder session(InferenceSession session) {
-            this.session = session;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
-
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
+            return useSession("model.onnx", session);
         }
 
         public Builder vocabulary(io.github.inference4j.preprocessing.audio.Vocabulary vocabulary) {
@@ -211,57 +192,21 @@ public class Wav2Vec2Recognizer
             return this;
         }
 
+        @Override
         public Wav2Vec2Recognizer build() {
-            if (session == null) {
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                try (ResolvedModel model = source.open(id, List.of("model.onnx", "vocab.json"))) {
-                    loadFromDirectory(model);
-                }
-            }
-            if (vocabulary == null) {
-                throw new IllegalStateException("Vocabulary is required");
-            }
-            if (inputName == null) {
-                inputName = session.inputNames().iterator().next();
-            }
-            io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline = io.github.inference4j.preprocessing.audio.AudioTransformPipeline.builder()
+            AudioTransformPipeline pipeline = AudioTransformPipeline.builder()
                     .resample(sampleRate)
                     .normalize()
                     .build();
-            return new Wav2Vec2Recognizer(session, vocabulary, inputName,
-                    pipeline, blankIndex, wordDelimiter);
-        }
-
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
-            }
-
-            Path modelPath = dir.resolve("model.onnx");
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Model file not found: " + modelPath);
-            }
-
-            Path vocabPath = dir.resolve("vocab.json");
-            if (!Files.exists(vocabPath)) {
-                throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
-            }
-
-            this.session = sessionConfigurer != null
-                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                    : InferenceSession.create(model, "model.onnx");
-            try {
-                if (this.vocabulary == null) {
-                    this.vocabulary = io.github.inference4j.preprocessing.audio.Vocabulary.fromFile(vocabPath);
-                }
-            } catch (Exception e) {
-                this.session.close();
-                this.session = null;
-                throw e;
-            }
+            List<String> required = vocabulary != null ? List.of("model.onnx") : List.of("model.onnx", "vocab.json");
+            return load(required, files -> {
+                InferenceSession session = files.session("model.onnx");
+                Vocabulary resolvedVocabulary = vocabulary != null
+                        ? vocabulary : Vocabulary.fromFile(files.file("vocab.json"));
+                String input = inputName != null ? inputName : session.inputNames().iterator().next();
+                return new Wav2Vec2Recognizer(session, resolvedVocabulary, input, pipeline, blankIndex,
+                        wordDelimiter);
+            });
         }
     }
 }

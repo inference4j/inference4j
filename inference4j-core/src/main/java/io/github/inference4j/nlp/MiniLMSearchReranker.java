@@ -18,23 +18,17 @@ package io.github.inference4j.nlp;
 
 import io.github.inference4j.AbstractInferenceTask;
 import io.github.inference4j.PreprocessResult;
-import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.TokenWindows;
 import io.github.inference4j.processing.TruncationGuard;
 import io.github.inference4j.processing.TruncationPolicy;
 import io.github.inference4j.processing.Preprocessor;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.Tokenizer;
 import io.github.inference4j.tokenizer.WordPieceTokenizer;
+import io.github.inference4j.model.AbstractModelBuilder;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -177,34 +171,18 @@ public class MiniLMSearchReranker
         };
     }
 
-    public static class Builder {
-        private InferenceSession session;
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<MiniLMSearchReranker, Builder> {
         private Tokenizer tokenizer;
         private int maxLength = DEFAULT_MAX_LENGTH;
         private TruncationPolicy truncation;
         private Integer stride;
 
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
+
         Builder session(InferenceSession session) {
-            this.session = session;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
-
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
+            return useSession("model.onnx", session);
         }
 
         public Builder tokenizer(Tokenizer tokenizer) {
@@ -242,50 +220,16 @@ public class MiniLMSearchReranker
             return this;
         }
 
+        @Override
         public MiniLMSearchReranker build() {
-            if (session == null) {
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                try (ResolvedModel model = source.open(id, List.of("model.onnx", "vocab.txt"))) {
-                    loadFromDirectory(model);
-                }
-            }
-            if (tokenizer == null) {
-                throw new IllegalStateException("Tokenizer is required");
-            }
-            return new MiniLMSearchReranker(session, tokenizer, maxLength,
-                    new TruncationGuard("MiniLMSearchReranker", truncation), stride);
-        }
-
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
-            }
-
-            Path modelPath = dir.resolve("model.onnx");
-            Path vocabPath = dir.resolve("vocab.txt");
-
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Model file not found: " + modelPath);
-            }
-            if (!Files.exists(vocabPath)) {
-                throw new ModelSourceException("Vocabulary file not found: " + vocabPath);
-            }
-
-            this.session = sessionConfigurer != null
-                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                    : InferenceSession.create(model, "model.onnx");
-            try {
-                if (this.tokenizer == null) {
-                    this.tokenizer = WordPieceTokenizer.fromVocabFile(vocabPath);
-                }
-            } catch (Exception e) {
-                this.session.close();
-                this.session = null;
-                throw e;
-            }
+            List<String> required = tokenizer != null ? List.of("model.onnx") : List.of("model.onnx", "vocab.txt");
+            return load(required, files -> {
+                InferenceSession session = files.session("model.onnx");
+                Tokenizer resolvedTokenizer = tokenizer != null
+                        ? tokenizer : WordPieceTokenizer.fromVocabFile(files.file("vocab.txt"));
+                return new MiniLMSearchReranker(session, resolvedTokenizer, maxLength,
+                        new TruncationGuard("MiniLMSearchReranker", truncation), stride);
+            });
         }
     }
 }

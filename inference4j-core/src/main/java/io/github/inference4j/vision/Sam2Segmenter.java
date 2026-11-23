@@ -18,7 +18,6 @@ package io.github.inference4j.vision;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -31,10 +30,7 @@ import javax.imageio.ImageIO;
 import io.github.inference4j.InferenceSession;
 import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.InferenceException;
-import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
+import io.github.inference4j.model.AbstractModelBuilder;
 import io.github.inference4j.session.SessionConfigurer;
 
 /**
@@ -84,9 +80,6 @@ public class Sam2Segmenter implements PromptableSegmenter {
     private static final String DEFAULT_MODEL_ID = "inference4j/sam2.1-hiera-tiny";
     private static final String ENCODER_FILE = "vision_encoder.onnx";
     private static final String DECODER_FILE = "prompt_encoder_mask_decoder.onnx";
-    private static final List<String> MODEL_FILES = List.of(
-            ENCODER_FILE, ENCODER_FILE + "_data",
-            DECODER_FILE, DECODER_FILE + "_data");
 
     /** SAM 2 works on a fixed square input; images are stretched to it, not letterboxed. */
     static final int INPUT_SIZE = 1024;
@@ -320,21 +313,18 @@ public class Sam2Segmenter implements PromptableSegmenter {
         }
     }
 
-    public static class Builder {
-        private InferenceSession encoderSession;
-        private InferenceSession decoderSession;
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<Sam2Segmenter, Builder> {
+
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
 
         Builder encoderSession(InferenceSession session) {
-            this.encoderSession = session;
-            return this;
+            return useSession(ENCODER_FILE, session);
         }
 
         Builder decoderSession(InferenceSession session) {
-            this.decoderSession = session;
-            return this;
+            return useSession(DECODER_FILE, session);
         }
 
         /**
@@ -343,14 +333,9 @@ public class Sam2Segmenter implements PromptableSegmenter {
          * @param sessionConfigurer applied to the encoder and the decoder session
          * @return this builder
          */
+        @Override
         public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
-
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
+            return super.sessionOptions(sessionConfigurer);
         }
 
         /**
@@ -360,52 +345,16 @@ public class Sam2Segmenter implements PromptableSegmenter {
          * @param modelId the model identifier; defaults to {@code inference4j/sam2.1-hiera-tiny}
          * @return this builder
          */
+        @Override
         public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
+            return super.modelId(modelId);
         }
 
+        @Override
         public Sam2Segmenter build() {
-            if (encoderSession == null || decoderSession == null) {
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                try (ResolvedModel model = source.open(id, MODEL_FILES)) {
-                    loadFromDirectory(model);
-                }
-            }
-            return new Sam2Segmenter(encoderSession, decoderSession);
-        }
-
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
-            }
-            requireFile(dir, ENCODER_FILE);
-            requireFile(dir, DECODER_FILE);
-
-            this.encoderSession = open(model, ENCODER_FILE);
-            try {
-                this.decoderSession = open(model, DECODER_FILE);
-            } catch (RuntimeException e) {
-                encoderSession.close();
-                throw e;
-            }
-        }
-
-        private InferenceSession open(ResolvedModel model, String file) {
-            return sessionConfigurer != null
-                    ? InferenceSession.create(model, file, sessionConfigurer)
-                    : InferenceSession.create(model, file);
-        }
-
-        private static Path requireFile(Path dir, String name) {
-            Path path = dir.resolve(name);
-            if (!Files.exists(path)) {
-                throw new ModelSourceException("Model file not found: " + path);
-            }
-            return path;
+            return load(resolvedModelId(), List.of(ENCODER_FILE, DECODER_FILE),
+                    List.of(ENCODER_FILE + "_data", DECODER_FILE + "_data"),
+                    files -> new Sam2Segmenter(files.session(ENCODER_FILE), files.session(DECODER_FILE)));
         }
     }
 }

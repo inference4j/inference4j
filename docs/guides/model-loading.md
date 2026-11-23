@@ -222,7 +222,6 @@ The cache directory is resolved in this order:
 - `vocab.json` — JSON vocabulary (audio models)
 - `config.json` — HuggingFace model config
 - `labels.txt` — class labels (vision models)
-- `silero_vad.onnx` — alternate model filename (Silero VAD)
 
 ## Lambda shorthand
 
@@ -248,7 +247,7 @@ try (var classifier = ResNetClassifier.builder()
 | Object detection | `model.onnx`, `labels.txt` |
 | Text detection | `model.onnx` |
 | Speech-to-text | `model.onnx`, `vocab.json` |
-| Voice activity detection | `silero_vad.onnx` |
+| Voice activity detection | `model.onnx` |
 
 ## Using a custom HuggingFace model
 

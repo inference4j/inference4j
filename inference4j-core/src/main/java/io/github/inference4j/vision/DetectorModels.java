@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.inference4j.exception.ModelLoadException;
 import io.github.inference4j.preprocessing.image.Labels;
 import io.github.inference4j.preprocessing.text.ModelConfig;
+import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -112,6 +113,18 @@ final class DetectorModels {
         long height = channelsFirst ? shape[2] : shape[1];
         long width = channelsFirst ? shape[3] : shape[2];
         return height > 0 && height == width ? (int) height : -1;
+    }
+
+    /**
+     * Warns that a wrapper loads its default Ultralytics weights, which are licensed under AGPL-3.0.
+     *
+     * @param logger  the wrapper's logger
+     * @param wrapper the wrapper's simple name
+     * @param modelId the default model
+     */
+    static void warnAgpl(Logger logger, String wrapper, String modelId) {
+        logger.warn("{} is using the default weights '{}', which are licensed under AGPL-3.0 (Ultralytics). "
+                + "DetrDetector is an Apache-2.0 alternative.", wrapper, modelId);
     }
 
     static int maxDetections(int value) {

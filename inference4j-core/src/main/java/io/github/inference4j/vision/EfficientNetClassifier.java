@@ -16,19 +16,8 @@
 
 package io.github.inference4j.vision;
 
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.InferenceSession;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.OutputOperator;
-import io.github.inference4j.processing.Preprocessor;
-import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
-import io.github.inference4j.preprocessing.image.Labels;
 
-import java.awt.image.BufferedImage;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -81,11 +70,8 @@ public class EfficientNetClassifier extends AbstractImageClassifier {
 
     private static final String DEFAULT_MODEL_ID = "inference4j/efficientnet-lite4";
 
-    private EfficientNetClassifier(InferenceSession session,
-                                   Preprocessor<BufferedImage, Tensor> imagePreprocessor,
-                                   Labels labels, String inputName, int defaultTopK,
-                                   OutputOperator outputOperator) {
-        super(session, imagePreprocessor, labels, inputName, defaultTopK, outputOperator);
+    private EfficientNetClassifier(Parts parts) {
+        super(parts);
     }
 
     public static Builder builder() {
@@ -95,58 +81,16 @@ public class EfficientNetClassifier extends AbstractImageClassifier {
     private static final float[] EFFICIENTNET_MEAN = {127f / 255f, 127f / 255f, 127f / 255f};
     private static final float[] EFFICIENTNET_STD = {128f / 255f, 128f / 255f, 128f / 255f};
 
-    public static class Builder extends AbstractBuilder<Builder> {
+    public static class Builder extends AbstractBuilder<EfficientNetClassifier, Builder> {
+
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
 
         @Override
-        protected Builder self() {
-            return this;
-        }
-
         public EfficientNetClassifier build() {
-            if (session == null) {
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                try (ResolvedModel model = source.open(id, List.of("model.onnx"))) {
-                    loadFromDirectory(model);
-                }
-            }
-            validate();
-            return new EfficientNetClassifier(session, preprocessor, labels, inputName, defaultTopK, outputOperator);
-        }
-
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
-            }
-
-            Path modelPath = dir.resolve("model.onnx");
-            if (!Files.exists(modelPath)) {
-                throw new ModelSourceException("Model file not found: " + modelPath);
-            }
-
-            this.session = sessionConfigurer != null
-                    ? InferenceSession.create(model, "model.onnx", sessionConfigurer)
-                    : InferenceSession.create(model, "model.onnx");
-            try {
-                if (this.inputName == null) {
-                    this.inputName = session.inputNames().iterator().next();
-                }
-
-                Path labelsPath = dir.resolve("labels.txt");
-                if (Files.exists(labelsPath)) {
-                    this.labels = Labels.fromFile(labelsPath);
-                }
-
-                this.preprocessor = detectPipeline(session, this.inputName,
-                        EFFICIENTNET_MEAN, EFFICIENTNET_STD);
-                this.outputOperator = OutputOperator.identity();
-            } catch (Exception e) {
-                this.session.close();
-                this.session = null;
-                throw e;
-            }
+            return load(List.of("model.onnx"), files -> new EfficientNetClassifier(
+                    parts(files, EFFICIENTNET_MEAN, EFFICIENTNET_STD, OutputOperator.identity())));
         }
     }
 }

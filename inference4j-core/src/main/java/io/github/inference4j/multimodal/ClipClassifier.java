@@ -18,12 +18,10 @@ package io.github.inference4j.multimodal;
 
 import io.github.inference4j.ZeroShotClassifier;
 import io.github.inference4j.exception.InferenceException;
-import io.github.inference4j.model.HuggingFaceModelSource;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.processing.MathOps;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.vision.Classification;
+import io.github.inference4j.model.AbstractModelBuilder;
+import io.github.inference4j.model.ModelFiles;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -62,7 +60,7 @@ import java.util.List;
 public class ClipClassifier implements ZeroShotClassifier<BufferedImage, Classification> {
 
     private final ClipImageEncoder imageEncoder;
-    private final io.github.inference4j.multimodal.ClipTextEncoder textEncoder;
+    private final ClipTextEncoder textEncoder;
 
     private ClipClassifier(ClipImageEncoder imageEncoder, ClipTextEncoder textEncoder) {
         this.imageEncoder = imageEncoder;
@@ -98,8 +96,7 @@ public class ClipClassifier implements ZeroShotClassifier<BufferedImage, Classif
 
     @Override
     public void close() {
-        imageEncoder.close();
-        textEncoder.close();
+        ModelFiles.closeAll(imageEncoder, textEncoder);
     }
 
     private float[][] encodeLabels(List<String> labels) {
@@ -140,16 +137,17 @@ public class ClipClassifier implements ZeroShotClassifier<BufferedImage, Classif
         }
     }
 
-    public static class Builder {
+    public static class Builder extends AbstractModelBuilder<ClipClassifier, Builder> {
         private static final String DEFAULT_MODEL_ID = "inference4j/clip-vit-base-patch32";
         private static final List<String> MODEL_FILES =
                 List.of("vision_model.onnx", "text_model.onnx", "vocab.json", "merges.txt");
 
         private ClipImageEncoder imageEncoder;
         private ClipTextEncoder textEncoder;
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
 
         Builder imageEncoder(ClipImageEncoder imageEncoder) {
             this.imageEncoder = imageEncoder;
@@ -161,80 +159,15 @@ public class ClipClassifier implements ZeroShotClassifier<BufferedImage, Classif
             return this;
         }
 
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
-
+        @Override
         public ClipClassifier build() {
-            if (imageEncoder == null && textEncoder == null) {
-                // Both encoders read one snapshot, so an update between them cannot mix two revisions
-                ModelSource source = modelSource != null ? modelSource : HuggingFaceModelSource.defaultInstance();
-                try (ResolvedModel model = source.open(modelId != null ? modelId : DEFAULT_MODEL_ID, MODEL_FILES)) {
-                    return build(new OpenedSource(model));
-                }
+            if (imageEncoder != null && textEncoder != null) {
+                return new ClipClassifier(imageEncoder, textEncoder);
             }
-            return build(modelSource);
-        }
-
-        private ClipClassifier build(ModelSource source) {
-            if (imageEncoder == null) {
-                ClipImageEncoder.Builder imageBuilder = ClipImageEncoder.builder();
-                if (source != null) imageBuilder.modelSource(source);
-                if (modelId != null) imageBuilder.modelId(modelId);
-                if (sessionConfigurer != null) imageBuilder.sessionOptions(sessionConfigurer);
-                imageEncoder = imageBuilder.build();
-            }
-
-            try {
-                if (textEncoder == null) {
-                    ClipTextEncoder.Builder textBuilder = ClipTextEncoder.builder();
-                    if (source != null) textBuilder.modelSource(source);
-                    if (modelId != null) textBuilder.modelId(modelId);
-                    if (sessionConfigurer != null) textBuilder.sessionOptions(sessionConfigurer);
-                    textEncoder = textBuilder.build();
-                }
-            } catch (Exception e) {
-                imageEncoder.close();
-                throw e;
-            }
-
-            return new ClipClassifier(imageEncoder, textEncoder);
-        }
-    }
-
-    /** A source that hands out the one model directory already opened, whatever the id and files. */
-    private static final class OpenedSource implements ModelSource {
-
-        private final ResolvedModel model;
-
-        OpenedSource(ResolvedModel model) {
-            this.model = model;
-        }
-
-        @Override
-        public Path resolve(String modelId) {
-            return model.directory();
-        }
-
-        @Override
-        public ResolvedModel open(String modelId) {
-            return model.retain();
-        }
-
-        @Override
-        public ResolvedModel open(String modelId, List<String> requiredFiles) {
-            return model.retain();
+            // Both encoders read one opened snapshot, so an update between them cannot mix two revisions
+            return load(MODEL_FILES, files -> new ClipClassifier(
+                    imageEncoder != null ? imageEncoder : ClipImageEncoder.create(files, null),
+                    textEncoder != null ? textEncoder : ClipTextEncoder.create(files, null, null)));
         }
     }
 }

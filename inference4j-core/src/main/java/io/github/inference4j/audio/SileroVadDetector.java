@@ -16,16 +16,12 @@
 
 package io.github.inference4j.audio;
 
-import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.InferenceSession;
-import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.model.ResolvedModel;
 import io.github.inference4j.preprocessing.audio.AudioData;
-import io.github.inference4j.session.SessionConfigurer;
 import io.github.inference4j.Tensor;
-import io.github.inference4j.exception.ModelSourceException;
+import io.github.inference4j.model.AbstractModelBuilder;
+import io.github.inference4j.preprocessing.audio.AudioTransformPipeline;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -344,11 +340,7 @@ public class SileroVadDetector implements VoiceActivityDetector {
     /**
      * Builder for configuring SileroVadDetector instances.
      */
-    public static class Builder {
-        private InferenceSession session;
-        private ModelSource modelSource;
-        private String modelId;
-        private SessionConfigurer sessionConfigurer;
+    public static class Builder extends AbstractModelBuilder<SileroVadDetector, Builder> {
         private int sampleRate = DEFAULT_SAMPLE_RATE;
         private int windowSizeSamples = DEFAULT_WINDOW_SIZE_SAMPLES;
         private float threshold = DEFAULT_THRESHOLD;
@@ -356,24 +348,12 @@ public class SileroVadDetector implements VoiceActivityDetector {
         private float minSilenceDuration = DEFAULT_MIN_SILENCE_DURATION;
         private float speechPadding = DEFAULT_SPEECH_PADDING;
 
+        public Builder() {
+            super(DEFAULT_MODEL_ID);
+        }
+
         Builder session(InferenceSession session) {
-            this.session = session;
-            return this;
-        }
-
-        public Builder sessionOptions(SessionConfigurer sessionConfigurer) {
-            this.sessionConfigurer = sessionConfigurer;
-            return this;
-        }
-
-        public Builder modelSource(ModelSource modelSource) {
-            this.modelSource = modelSource;
-            return this;
-        }
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
+            return useSession("model.onnx", session);
         }
 
         public Builder sampleRate(int sampleRate) {
@@ -415,37 +395,15 @@ public class SileroVadDetector implements VoiceActivityDetector {
             return this;
         }
 
+        @Override
         public SileroVadDetector build() {
-            if (session == null) {
-                ModelSource source = modelSource != null
-                        ? modelSource : HuggingFaceModelSource.defaultInstance();
-                String id = modelId != null ? modelId : DEFAULT_MODEL_ID;
-                try (ResolvedModel model = source.open(id, List.of("model.onnx"))) {
-                    loadFromDirectory(model);
-                }
-            }
             int contextSize = (sampleRate == 16000) ? 64 : 32;
-            io.github.inference4j.preprocessing.audio.AudioTransformPipeline pipeline = io.github.inference4j.preprocessing.audio.AudioTransformPipeline.builder()
+            AudioTransformPipeline pipeline = AudioTransformPipeline.builder()
                     .resample(sampleRate)
                     .build();
-            return new SileroVadDetector(session, sampleRate, windowSizeSamples,
-                    contextSize, threshold, minSpeechDuration, minSilenceDuration, speechPadding, pipeline);
-        }
-
-        private void loadFromDirectory(ResolvedModel model) {
-            Path dir = model.directory();
-            if (!Files.isDirectory(dir)) {
-                throw new ModelSourceException("Model directory not found: " + dir);
-            }
-
-            String modelFile = Files.exists(dir.resolve("model.onnx")) ? "model.onnx" : "silero_vad.onnx";
-            if (!Files.exists(dir.resolve(modelFile))) {
-                throw new ModelSourceException("Model file not found in: " + dir);
-            }
-
-            this.session = sessionConfigurer != null
-                    ? InferenceSession.create(model, modelFile, sessionConfigurer)
-                    : InferenceSession.create(model, modelFile);
+            return load(List.of("model.onnx"), files -> new SileroVadDetector(files.session("model.onnx"),
+                    sampleRate, windowSizeSamples, contextSize, threshold, minSpeechDuration, minSilenceDuration,
+                    speechPadding, pipeline));
         }
     }
 }
