@@ -16,11 +16,14 @@
 package io.github.inference4j.autoconfigure;
 
 import io.github.inference4j.autoconfigure.Inference4jProperties.ObjectDetectorProperties;
+import io.github.inference4j.autoconfigure.Inference4jProperties.PoseDetectorProperties;
 import io.github.inference4j.vision.CraftTextDetector;
 import io.github.inference4j.vision.DetrDetector;
 import io.github.inference4j.vision.ImageClassifier;
 import io.github.inference4j.vision.ObjectDetector;
+import io.github.inference4j.vision.PoseDetector;
 import io.github.inference4j.vision.ResNetClassifier;
+import io.github.inference4j.vision.RtmoPoseDetector;
 import io.github.inference4j.vision.TextDetector;
 import io.github.inference4j.vision.Yolo26Detector;
 import io.github.inference4j.vision.YoloV8Detector;
@@ -63,6 +66,19 @@ public class Inference4jVisionAutoConfiguration {
 			case YOLOV8 -> YoloV8Detector.builder().modelId(modelId).build();
 			case YOLO26 -> Yolo26Detector.builder().modelId(modelId).build();
 		};
+	}
+
+	@Bean
+	@Lazy
+	@ConditionalOnMissingBean(PoseDetector.class)
+	@ConditionalOnProperty(prefix = "inference4j.vision.pose-detector", name = "enabled", havingValue = "true")
+	public PoseDetector poseDetector(Inference4jProperties properties) {
+		PoseDetectorProperties pose = properties.getVision().getPoseDetector();
+		RtmoPoseDetector.Builder builder = RtmoPoseDetector.builder().modelId(pose.getModelId());
+		if (pose.getConfidenceThreshold() != null) {
+			builder.confidenceThreshold(pose.getConfidenceThreshold());
+		}
+		return builder.build();
 	}
 
 	@Bean

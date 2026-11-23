@@ -67,6 +67,15 @@ class Inference4jPropertiesTest {
     }
 
     @Test
+    void defaultsVisionPoseDetectorIsRtmoS() {
+        Inference4jProperties properties = new Inference4jProperties();
+
+        assertThat(properties.getVision().getPoseDetector().isEnabled()).isFalse();
+        assertThat(properties.getVision().getPoseDetector().getModelId()).isEqualTo("inference4j/rtmo-s-coco");
+        assertThat(properties.getVision().getPoseDetector().getConfidenceThreshold()).isNull();
+    }
+
+    @Test
     void objectDetectorFallsBackToTheArchitectureDefaultModelId() {
         Inference4jProperties.ObjectDetectorProperties detector = new Inference4jProperties.ObjectDetectorProperties();
 
