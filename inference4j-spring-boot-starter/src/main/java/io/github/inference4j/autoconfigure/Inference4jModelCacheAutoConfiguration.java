@@ -15,6 +15,7 @@
  */
 package io.github.inference4j.autoconfigure;
 
+import io.github.inference4j.dashboard.ModelCacheService;
 import io.github.inference4j.model.HuggingFaceModelSource;
 import io.github.inference4j.model.ModelCache;
 
@@ -28,8 +29,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Auto-configuration for the model cache: a {@link ModelCache} bean, and the {@code models} actuator endpoint over
- * it when Spring Boot Actuator is on the classpath.
+ * Auto-configuration for the model cache: a {@link ModelCache} bean, the {@link ModelCacheService} that the web
+ * tier runs its operations on, and the {@code models} actuator endpoint over it when Spring Boot Actuator is on the
+ * classpath.
  */
 @AutoConfiguration
 public class Inference4jModelCacheAutoConfiguration {
@@ -45,6 +47,13 @@ public class Inference4jModelCacheAutoConfiguration {
 		return source != null ? source.cache() : ModelCache.defaultCache();
 	}
 
+	/** The cache operations shared by the actuator endpoint and the dashboard; closing it stops running updates. */
+	@Bean
+	@ConditionalOnMissingBean
+	public ModelCacheService inference4jModelCacheService(ModelCache modelCache) {
+		return new ModelCacheService(modelCache);
+	}
+
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(name = {
 			"org.springframework.boot.actuate.endpoint.annotation.Endpoint",
@@ -55,8 +64,8 @@ public class Inference4jModelCacheAutoConfiguration {
 		@Bean
 		@ConditionalOnMissingBean
 		@ConditionalOnAvailableEndpoint
-		public ModelsEndpoint modelsEndpoint(ModelCache modelCache) {
-			return new ModelsEndpoint(modelCache);
+		public ModelsEndpoint modelsEndpoint(ModelCacheService modelCacheService) {
+			return new ModelsEndpoint(modelCacheService);
 		}
 
 	}

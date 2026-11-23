@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>inference4j dashboard</title>
+  <link rel="stylesheet" href="vendor/chartist-1.5.0.css">
+  <link rel="stylesheet" href="dashboard.css">
+  <script src="vendor/chartist-1.5.0.min.js"></script>
+  <script src="dashboard.js"></script>
+  <script defer src="vendor/alpine-3.17.5.min.js"></script>
+</head>
+<body x-data="dashboard" x-cloak>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l8-4 8 4v10l-8 4-8-4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 7l8 4 8-4M12 11v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span>inference4j</span>
+    </div>
+    <nav>
+      <template x-for="s in sections" :key="s.id">
+        <a href="#" :class="{ active: section === s.id }" @click.prevent="section = s.id">
+          <span class="nav-icon" x-html="s.icon"></span><span x-text="s.label"></span>
+        </a>
+      </template>
+    </nav>
+    <div class="sidebar-foot">
+      <span class="pill" :class="readOnly ? 'pill-muted' : 'pill-warn'" x-text="readOnly ? 'Read-only' : 'Writes enabled'"></span>
+    </div>
+  </aside>
+
+  <main>
+    <!-- Cache -->
+    <section x-show="section === 'cache'">
+      <header class="page-head">
+        <div>
+          <h1>Model cache</h1>
+          <p class="muted">Models downloaded from the Hugging Face Hub, and the disk they use.</p>
+        </div>
+        <div class="head-actions">
+          <span class="muted small" x-show="loadedAt" x-text="'Updated ' + ago(loadedAt)"></span>
+          <button class="btn" @click="load()" :disabled="loading">
+            <svg viewBox="0 0 24 24" :class="{ spin: loading }"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Refresh
+          </button>
+        </div>
+      </header>
+
+      <div class="banner error" x-show="loadError" x-text="loadError"></div>
+
+      <!-- Overview -->
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">Cache size</div>
+          <div class="stat-value" x-text="bytes(summary.sizeBytes)"></div>
+          <div class="stat-sub" x-show="summary.disk" x-text="percent(summary.sizeBytes, summary.disk && summary.disk.totalBytes) + ' of the disk'"></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Models</div>
+          <div class="stat-value" x-text="summary.models ?? '–'"></div>
+          <div class="stat-sub" x-text="(summary.snapshots ?? 0) + ' snapshots, ' + (summary.snapshotsInUse ?? 0) + ' in use'"></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Reclaimable</div>
+          <div class="stat-value" x-text="bytes(summary.supersededBytes)"></div>
+          <div class="stat-sub">Superseded snapshots not in use</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Free disk</div>
+          <div class="stat-value" x-text="summary.disk ? bytes(summary.disk.usableBytes) : '–'"></div>
+          <div class="stat-sub" x-show="summary.disk" x-text="'of ' + bytes(summary.disk && summary.disk.totalBytes)"></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Attention</div>
+          <div class="stat-value">
+            <span x-text="(summary.updatesAvailable ?? 0) + (summary.stale ?? 0)"></span>
+          </div>
+          <div class="stat-sub" x-text="(summary.updatesAvailable ?? 0) + ' with updates, ' + (summary.stale ?? 0) + ' stale'"></div>
+        </div>
+      </div>
+
+      <div class="charts">
+        <div class="card">
+          <div class="card-head"><h2>Disk usage</h2><span class="muted small" x-text="summary.disk ? bytes(summary.disk.totalBytes) + ' volume' : ''"></span></div>
+          <template x-if="summary.disk">
+            <div class="donut-wrap">
+              <div class="donut-box">
+                <div id="disk-chart" class="donut"></div>
+                <div class="donut-center">
+                  <strong x-text="percent(summary.disk.totalBytes - summary.disk.usableBytes, summary.disk.totalBytes)"></strong>
+                  <span class="muted small">used</span>
+                </div>
+              </div>
+              <ul class="legend">
+                <li><i class="sw sw-a"></i><span>inference4j cache</span><b x-text="bytes(summary.sizeBytes)"></b></li>
+                <li><i class="sw sw-b"></i><span>Other files</span><b x-text="bytes(otherUsed())"></b></li>
+                <li><i class="sw sw-c"></i><span>Free</span><b x-text="bytes(summary.disk.usableBytes)"></b></li>
+              </ul>
+            </div>
+          </template>
+          <p class="empty" x-show="!summary.disk">The disk usage of the cache's volume cannot be read.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Largest models</h2><span class="muted small" x-text="models.length > topN ? 'Top ' + topN + ' of ' + models.length : ''"></span></div>
+          <div id="size-chart" class="bars"></div>
+          <p class="empty" x-show="!models.length">No models cached yet.</p>
+        </div>
+      </div>
+
+      <!-- Models -->
+      <div class="card">
+        <div class="card-head">
+          <h2>Cached models</h2>
+          <div class="head-actions">
+            <input class="search" type="search" placeholder="Filter" x-model="filter">
+            <button class="btn" x-show="!readOnly" @click="prune()" :disabled="busy.prune"
+                    :title="'Deletes superseded snapshots not in use, and unfinished downloads'">
+              Prune<span class="muted" x-show="summary.supersededBytes" x-text="' · ' + bytes(summary.supersededBytes)"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+            <tr>
+              <th class="sortable" @click="sortBy('repoId')">Model <span x-text="arrow('repoId')"></span></th>
+              <th>Revision</th>
+              <th class="num sortable" @click="sortBy('sizeBytes')">Size <span x-text="arrow('sizeBytes')"></span></th>
+              <th class="num">Snapshots</th>
+              <th class="sortable" @click="sortBy('lastChecked')">Last checked <span x-text="arrow('lastChecked')"></span></th>
+              <th>Status</th>
+              <th class="actions"></th>
+            </tr>
+            </thead>
+            <template x-for="m in visibleModels()" :key="m.repoId">
+              <tbody>
+              <tr class="row" :class="{ open: expanded[m.repoId] }" @click="toggle(m.repoId)">
+                <td>
+                  <span class="chev" aria-hidden="true">›</span>
+                  <a class="repo" :href="'https://huggingface.co/' + m.repoId" target="_blank" rel="noopener" @click.stop x-text="m.repoId"></a>
+                </td>
+                <td><code x-text="short(m.revision)"></code></td>
+                <td class="num" x-text="bytes(m.sizeBytes)"></td>
+                <td class="num" x-text="m.snapshots.length"></td>
+                <td x-text="m.lastChecked ? ago(m.lastChecked) : 'never'"></td>
+                <td>
+                  <span class="pill pill-info" x-show="m.updating">Updating…</span>
+                  <span class="pill pill-warn" x-show="!m.updating && m.updateAvailable" title="Files changed on the Hub since this snapshot">Update available</span>
+                  <span class="pill pill-danger" x-show="m.stale" title="A model in use reads an older version than a model loaded now would">Stale</span>
+                  <span class="pill pill-ok" x-show="!m.updating && !m.updateAvailable && !m.stale && m.check">Up to date</span>
+                  <span class="pill pill-muted" x-show="inUse(m)" x-text="inUse(m) + ' in use'"></span>
+                </td>
+                <td class="actions" @click.stop>
+                  <button class="btn btn-sm" @click="check(m)" :disabled="busy[m.repoId]">Check</button>
+                  <template x-if="!readOnly">
+                    <span class="btn-group">
+                      <button class="btn btn-sm" @click="update(m)" :disabled="busy[m.repoId] || m.updating">Update</button>
+                      <button class="btn btn-sm btn-danger" @click="evict(m)" :disabled="busy[m.repoId]">Evict</button>
+                    </span>
+                  </template>
+                </td>
+              </tr>
+              <tr class="detail" x-show="expanded[m.repoId]">
+                <td colspan="7">
+                  <div class="check-note" x-show="m.check">
+                    <template x-if="m.check">
+                      <span>
+                        Checked <span x-text="ago(m.check.checkedAt)"></span>:
+                        <template x-if="m.check.updateAvailable">
+                          <span>Hub is at <code x-text="short(m.check.remoteRevision)"></code>, changed files:
+                            <span x-text="m.check.changedFiles.join(', ')"></span></span>
+                        </template>
+                        <template x-if="!m.check.updateAvailable"><span>no cached file changed on the Hub.</span></template>
+                      </span>
+                    </template>
+                  </div>
+                  <div class="snapshots">
+                    <template x-for="s in m.snapshots" :key="s.revision">
+                      <div class="snapshot">
+                        <div class="snapshot-head">
+                          <code x-text="s.revision"></code>
+                          <span class="pill pill-ok" x-show="s.current">Current</span>
+                          <span class="pill pill-muted" x-show="!s.current">Superseded</span>
+                          <span class="pill pill-info" x-show="s.leases" x-text="s.leases + (s.leases === 1 ? ' lease' : ' leases')"></span>
+                          <span class="grow"></span>
+                          <span class="muted" x-text="bytes(s.sizeBytes)"></span>
+                          <button class="btn btn-sm btn-danger" x-show="!readOnly && !s.current" @click="evictSnapshot(m, s)"
+                                  :disabled="busy[m.repoId] || s.leases > 0" :title="s.leases ? 'In use' : 'Delete this snapshot'">Delete</button>
+                        </div>
+                        <ul class="files">
+                          <template x-for="f in s.files" :key="f.path">
+                            <li>
+                              <span class="file" x-text="f.path"></span>
+                              <span class="file-bar"><i :style="'width:' + share(f.sizeBytes, s.sizeBytes) + '%'"></i></span>
+                              <span class="muted num" x-text="bytes(f.sizeBytes)"></span>
+                            </li>
+                          </template>
+                        </ul>
+                      </div>
+                    </template>
+                  </div>
+                </td>
+              </tr>
+              </tbody>
+            </template>
+            <tbody x-show="!visibleModels().length">
+            <tr><td colspan="7" class="empty" x-text="models.length ? 'No model matches the filter.' : 'No models cached yet. Models are downloaded the first time they are loaded.'"></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toasts">
+  <template x-for="t in toasts" :key="t.id">
+    <div class="toast" :class="t.kind" x-text="t.text" @click="dismiss(t.id)"></div>
+  </template>
+</div>
+</body>
+</html>

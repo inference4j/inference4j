@@ -13,6 +13,8 @@ dependencies {
     compileOnly "org.springframework.boot:spring-boot-autoconfigure:${springBootVersion}"
     compileOnly "org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}"
     compileOnly 'io.micrometer:micrometer-core:1.14.4'
+    // Optional: the dashboard activates only in a Spring MVC web application
+    compileOnly "org.springframework.boot:spring-boot-starter-webmvc:${springBootVersion}"
 
     annotationProcessor "org.springframework.boot:spring-boot-configuration-processor:${springBootVersion}"
 

@@ -34,3 +34,14 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+------------------------------------------------------------------------------
+
+This product bundles Alpine.js 3.17.5 (https://github.com/alpinejs/alpine) and
+Chartist 1.5.0 (https://github.com/chartist-js/chartist) in inference4j-core's
+dashboard resources (io/github/inference4j/dashboard/static/vendor). Both are
+distributed under the MIT License; their copyright notices and license texts
+are in io/github/inference4j/dashboard/static/vendor/THIRD-PARTY-LICENSES.txt.
+
+Copyright © 2019-2025 Caleb Porzio and contributors (Alpine.js)
+Copyright (c) 2013 Gion Kunz (Chartist)
