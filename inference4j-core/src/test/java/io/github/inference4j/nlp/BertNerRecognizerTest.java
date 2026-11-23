@@ -16,25 +16,27 @@
 
 package io.github.inference4j.nlp;
 
-import io.github.inference4j.InferenceSession;
-import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.preprocessing.text.ModelConfig;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.Tokenizer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class BertNerRecognizerTest {
+
+    @TempDir
+    Path dir;
 
     // IOB2 labels matching CoNLL-2003 NER models
     private static final ModelConfig NER_CONFIG = ModelConfig.of(
@@ -245,170 +247,152 @@ class BertNerRecognizerTest {
 
     @Test
     void builder_missingTokenizer_throws() {
-        InferenceSession session = mock(InferenceSession.class);
+        ModelSource source = TestModels.model(dir, "tokens-onehot");
         assertThatThrownBy(() ->
                 BertNerRecognizer.builder()
-                        .session(session)
+                        .modelSource(source)
                         .config(NER_CONFIG)
                         .build())
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ModelSourceException.class)
+                .hasMessageContaining("vocab.txt");
     }
 
     @Test
     void builder_missingConfig_throws() {
-        InferenceSession session = mock(InferenceSession.class);
+        ModelSource source = TestModels.model(dir, "tokens-onehot");
         Tokenizer tokenizer = mock(Tokenizer.class);
         assertThatThrownBy(() ->
                 BertNerRecognizer.builder()
-                        .session(session)
+                        .modelSource(source)
                         .tokenizer(tokenizer)
                         .build())
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ModelSourceException.class)
+                .hasMessageContaining("config.json");
     }
 
     // --- Inference flow ---
+    // The fixture model gives each token a logit of 10 at the index equal to its token id, so the token ids
+    // below are the label indices: O=0, B-PER=1, I-PER=2, B-ORG=3, I-ORG=4, B-LOC=5, I-LOC=6.
 
     @Test
-    void recognize_endToEnd_withMocks() {
-        InferenceSession session = mock(InferenceSession.class);
+    void recognize_endToEnd() {
         Tokenizer tokenizer = mock(Tokenizer.class);
 
         // "John works at Google" → 4 words + [CLS] + [SEP] = 6 tokens
-        // Word IDs: -1(CLS), 0(John), 1(works), 2(at), 3(Google), -1(SEP)
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask", "token_type_ids"));
         when(tokenizer.encode(anyString(), anyInt())).thenReturn(
                 new EncodedInput(
-                        new long[]{101, 2198, 2515, 2012, 8224, 102},
+                        new long[]{0, 1, 0, 0, 3, 0},
                         new long[]{1, 1, 1, 1, 1, 1},
                         new long[]{0, 0, 0, 0, 0, 0},
                         new int[]{-1, 0, 1, 2, 3, -1}
                 ));
 
-        // Model output: [1, 6, 9] logits — John=B-PER, works=O, at=O, Google=B-ORG
-        // 9 labels: O=0, B-PER=1, I-PER=2, B-ORG=3, I-ORG=4, B-LOC=5, I-LOC=6, B-MISC=7, I-MISC=8
-        float[] logits = new float[6 * 9];
-        // Token 0 (CLS): O
-        logits[0 * 9 + 0] = 10.0f;
-        // Token 1 (John): B-PER
-        logits[1 * 9 + 1] = 10.0f;
-        // Token 2 (works): O
-        logits[2 * 9 + 0] = 10.0f;
-        // Token 3 (at): O
-        logits[3 * 9 + 0] = 10.0f;
-        // Token 4 (Google): B-ORG
-        logits[4 * 9 + 3] = 10.0f;
-        // Token 5 (SEP): O
-        logits[5 * 9 + 0] = 10.0f;
-
-        when(session.run(any())).thenReturn(
-                Map.of("logits", Tensor.fromFloats(logits, new long[]{1, 6, 9})));
-
-        BertNerRecognizer ner = BertNerRecognizer.builder()
-                .session(session)
+        try (BertNerRecognizer ner = BertNerRecognizer.builder()
+                .modelSource(TestModels.model(dir, "tokens-onehot-types"))
                 .tokenizer(tokenizer)
                 .config(NER_CONFIG)
-                .build();
+                .build()) {
+            List<NamedEntity> entities = ner.recognize("John works at Google");
 
-        List<NamedEntity> entities = ner.recognize("John works at Google");
+            assertThat(entities).hasSize(2);
+            assertThat(entities.get(0).text()).isEqualTo("John");
+            assertThat(entities.get(0).label()).isEqualTo("PER");
+            assertThat(entities.get(0).start()).isEqualTo(0);
+            assertThat(entities.get(0).end()).isEqualTo(4);
+            assertThat(entities.get(0).score()).isGreaterThan(0.99f);
 
-        assertThat(entities).hasSize(2);
-        assertThat(entities.get(0).text()).isEqualTo("John");
-        assertThat(entities.get(0).label()).isEqualTo("PER");
-        assertThat(entities.get(0).start()).isEqualTo(0);
-        assertThat(entities.get(0).end()).isEqualTo(4);
-        assertThat(entities.get(0).score()).isGreaterThan(0.99f);
-
-        assertThat(entities.get(1).text()).isEqualTo("Google");
-        assertThat(entities.get(1).label()).isEqualTo("ORG");
-        assertThat(entities.get(1).start()).isEqualTo(14);
-        assertThat(entities.get(1).end()).isEqualTo(20);
+            assertThat(entities.get(1).text()).isEqualTo("Google");
+            assertThat(entities.get(1).label()).isEqualTo("ORG");
+            assertThat(entities.get(1).start()).isEqualTo(14);
+            assertThat(entities.get(1).end()).isEqualTo(20);
+        }
     }
 
     @Test
-    void recognize_multiWordEntity_withMocks() {
-        InferenceSession session = mock(InferenceSession.class);
+    void recognize_multiWordEntity() {
         Tokenizer tokenizer = mock(Tokenizer.class);
 
-        // "New York" → 2 words + [CLS] + [SEP] = 4 tokens
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
+        // "New York" → 2 words + [CLS] + [SEP] = 4 tokens: B-LOC, I-LOC
         when(tokenizer.encode(anyString(), anyInt())).thenReturn(
                 new EncodedInput(
-                        new long[]{101, 2739, 2088, 102},
+                        new long[]{0, 5, 6, 0},
                         new long[]{1, 1, 1, 1},
                         new long[]{0, 0, 0, 0},
                         new int[]{-1, 0, 1, -1}
                 ));
 
-        float[] logits = new float[4 * 9];
-        logits[0 * 9 + 0] = 10.0f;  // CLS: O
-        logits[1 * 9 + 5] = 10.0f;  // New: B-LOC
-        logits[2 * 9 + 6] = 10.0f;  // York: I-LOC
-        logits[3 * 9 + 0] = 10.0f;  // SEP: O
+        try (BertNerRecognizer ner = recognizer(tokenizer)) {
+            List<NamedEntity> entities = ner.recognize("New York");
 
-        when(session.run(any())).thenReturn(
-                Map.of("logits", Tensor.fromFloats(logits, new long[]{1, 4, 9})));
-
-        BertNerRecognizer ner = BertNerRecognizer.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .config(NER_CONFIG)
-                .build();
-
-        List<NamedEntity> entities = ner.recognize("New York");
-
-        assertThat(entities).hasSize(1);
-        assertThat(entities.get(0).text()).isEqualTo("New York");
-        assertThat(entities.get(0).label()).isEqualTo("LOC");
+            assertThat(entities).hasSize(1);
+            assertThat(entities.get(0).text()).isEqualTo("New York");
+            assertThat(entities.get(0).label()).isEqualTo("LOC");
+        }
     }
 
     @Test
     void recognize_noEntities_returnsEmptyList() {
-        InferenceSession session = mock(InferenceSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
 
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
         when(tokenizer.encode(anyString(), anyInt())).thenReturn(
                 new EncodedInput(
-                        new long[]{101, 2023, 102},
+                        new long[]{0, 0, 0},
                         new long[]{1, 1, 1},
                         new long[]{0, 0, 0},
                         new int[]{-1, 0, -1}
                 ));
 
-        float[] logits = new float[3 * 9];
-        logits[0 * 9 + 0] = 10.0f;  // CLS: O
-        logits[1 * 9 + 0] = 10.0f;  // "this": O
-        logits[2 * 9 + 0] = 10.0f;  // SEP: O
-
-        when(session.run(any())).thenReturn(
-                Map.of("logits", Tensor.fromFloats(logits, new long[]{1, 3, 9})));
-
-        BertNerRecognizer ner = BertNerRecognizer.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .config(NER_CONFIG)
-                .build();
-
-        List<NamedEntity> entities = ner.recognize("this");
-
-        assertThat(entities).isEmpty();
+        try (BertNerRecognizer ner = recognizer(tokenizer)) {
+            assertThat(ner.recognize("this")).isEmpty();
+        }
     }
 
-    // --- Close delegation ---
-
     @Test
-    void close_delegatesToSession() {
-        InferenceSession session = mock(InferenceSession.class);
+    void strideLabelsEveryTokenAcrossWindows() {
+        // 8 words, 10 tokens with [CLS] and [SEP]: longer than maxLength 6, so it runs in windows of 4 tokens
         Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(
+                        new long[]{0, 1, 0, 0, 3, 0, 0, 5, 6, 0},
+                        new long[]{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+                        new long[10],
+                        new int[]{-1, 0, 1, 2, 3, 4, 5, 6, 7, -1}
+                ));
 
-        BertNerRecognizer ner = BertNerRecognizer.builder()
-                .session(session)
+        try (BertNerRecognizer ner = BertNerRecognizer.builder()
+                .modelSource(TestModels.model(dir, "tokens-onehot"))
                 .tokenizer(tokenizer)
                 .config(NER_CONFIG)
-                .build();
+                .maxLength(6)
+                .stride(2)
+                .build()) {
+            List<NamedEntity> entities = ner.recognize("Alice met the Acme team in New York");
+
+            assertThat(entities).extracting(NamedEntity::text, NamedEntity::label).containsExactly(
+                    tuple("Alice", "PER"), tuple("Acme", "ORG"), tuple("New York", "LOC"));
+        }
+    }
+
+    // --- Close ---
+
+    @Test
+    void closedRecognizerRejectsRecognize() {
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{0, 0, 0}, new long[]{1, 1, 1}, new long[]{0, 0, 0},
+                        new int[]{-1, 0, -1}));
+        BertNerRecognizer ner = recognizer(tokenizer);
 
         ner.close();
 
-        verify(session).close();
+        assertThatThrownBy(() -> ner.recognize("this")).isInstanceOf(IllegalStateException.class);
+    }
+
+    private BertNerRecognizer recognizer(Tokenizer tokenizer) {
+        return BertNerRecognizer.builder()
+                .modelSource(TestModels.model(dir, "tokens-onehot"))
+                .tokenizer(tokenizer)
+                .config(NER_CONFIG)
+                .build();
     }
 }

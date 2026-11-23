@@ -247,10 +247,6 @@ public class Yolo26Detector
             super(DEFAULT_MODEL_ID);
         }
 
-        Builder session(InferenceSession session) {
-            return useSession("model.onnx", session);
-        }
-
         /**
          * Class names by class index. When not set: a {@code labels.txt} or the {@code id2label} of a
          * {@code config.json} next to a custom model, otherwise the 80 COCO classes.
@@ -304,8 +300,7 @@ public class Yolo26Detector
             return load(List.of("model.onnx"), files -> {
                 InferenceSession session = files.session("model.onnx");
                 String input = inputName != null ? inputName : session.inputNames().iterator().next();
-                int fixedSize = files.directory() != null ? DetectorModels.fixedSize(session.inputShape(input)) : -1;
-                int size = DetectorModels.inputSize(inputSize, fixedSize, id);
+                int size = DetectorModels.inputSize(inputSize, DetectorModels.fixedSize(session.inputShape(input)), id);
                 Labels resolved = DetectorModels.labels(labels, files.directory(), preset);
                 return new Yolo26Detector(session, resolved, input, size, confidenceThreshold, maxDetections);
             });

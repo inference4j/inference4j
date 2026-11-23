@@ -16,23 +16,18 @@
 
 package io.github.inference4j.vision;
 
-import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.preprocessing.image.Labels;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 class Yolo26DetectorTest {
 
@@ -245,64 +240,40 @@ class Yolo26DetectorTest {
                 .isInstanceOf(ModelSourceException.class);
     }
 
-    @Test
-    void builder_inputNameDefaultsFromSession() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.inputNames()).thenReturn(Set.of("images"));
-
-        Yolo26Detector model = Yolo26Detector.builder()
-                .session(session)
-                .build();
-
-        assertThat(model).isNotNull();
-        verify(session).inputNames();
-    }
-
     // --- Inference flow ---
 
     @Test
-    void detect_bufferedImage_returnsCorrectResults() {
-        InferenceSession session = mock(InferenceSession.class);
-
-        // Single proposal: person with logit=3 (sigmoid~0.95), centered box
-        float[] logits = new float[]{3.0f, -5f, -5f, -5f, -5f};
-        float[] boxes = new float[]{0.5f, 0.5f, 0.25f, 0.25f};
-
-        Map<String, Tensor> outputs = new LinkedHashMap<>();
-        outputs.put("logits", Tensor.fromFloats(logits, new long[]{1, 1, NUM_CLASSES}));
-        outputs.put("pred_boxes", Tensor.fromFloats(boxes, new long[]{1, 1, 4}));
-        when(session.run(any())).thenReturn(outputs);
-
-        Yolo26Detector model = Yolo26Detector.builder()
-                .session(session)
-                .labels(TEST_LABELS)
-                .inputName("images")
-                .inputSize(32)
+    void detectFindsThePersonTheModelReports(@TempDir Path dir) {
+        // One query: class 0 logit 3 (sigmoid 0.953), a centered box a quarter of the image wide and high
+        try (Yolo26Detector model = Yolo26Detector.builder()
+                .modelId("acme/tiny")
+                .modelSource(TestModels.model(dir, "yolo26-one-person"))
                 .confidenceThreshold(0.5f)
-                .build();
+                .build()) {
+            List<Detection> results = model.detect(new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB));
 
-        BufferedImage image = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
-        List<Detection> results = model.detect(image);
-
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).label()).isEqualTo("person");
-        assertThat(results.get(0).confidence()).isGreaterThan(0.9f);
+            assertThat(results).singleElement().satisfies(detection -> {
+                assertThat(detection.label()).isEqualTo("person");
+                assertThat(detection.confidence()).isCloseTo(0.9526f, within(1e-4f));
+                assertThat(detection.box().x1()).isCloseTo(37.5f, within(1e-3f));
+                assertThat(detection.box().y1()).isCloseTo(37.5f, within(1e-3f));
+                assertThat(detection.box().x2()).isCloseTo(62.5f, within(1e-3f));
+                assertThat(detection.box().y2()).isCloseTo(62.5f, within(1e-3f));
+            });
+        }
     }
 
-    // --- Close delegation ---
-
     @Test
-    void close_delegatesToSession() {
-        InferenceSession session = mock(InferenceSession.class);
-
+    void closedDetectorRejectsDetect(@TempDir Path dir) {
         Yolo26Detector model = Yolo26Detector.builder()
-                .session(session)
-                .inputName("images")
+                .modelId("acme/tiny")
+                .modelSource(TestModels.model(dir, "yolo26-one-person"))
                 .build();
 
         model.close();
 
-        verify(session).close();
+        assertThatThrownBy(() -> model.detect(new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB)))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     // --- License warning ---

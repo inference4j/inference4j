@@ -16,18 +16,17 @@
 
 package io.github.inference4j.nlp;
 
-import io.github.inference4j.InferenceSession;
-import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
+import io.github.inference4j.exception.ModelSourceException;
+import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.Tokenizer;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.assertj.core.api.Assertions.within;
@@ -35,6 +34,9 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class SentenceTransformerEmbedderTest {
+
+    @TempDir
+    Path dir;
 
     @Test
     void meanPooling_averagesAcrossTokensWeightedByMask() {
@@ -98,330 +100,165 @@ class SentenceTransformerEmbedderTest {
     // --- Builder validation ---
 
     @Test
-    void builder_missingSession_throws() {
+    void builderWithoutModelIdThrows() {
         Tokenizer tokenizer = mock(Tokenizer.class);
         assertThatThrownBy(() ->
                 SentenceTransformerEmbedder.builder()
                         .tokenizer(tokenizer)
                         .build())
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("modelId");
     }
 
     @Test
     void builder_missingTokenizer_throws() {
-        InferenceSession session = mock(InferenceSession.class);
+        ModelSource source = TestModels.model(dir, "tokens-onehot");
         assertThatThrownBy(() ->
                 SentenceTransformerEmbedder.builder()
-                        .session(session)
+                        .modelId("acme/tiny")
+                        .modelSource(source)
                         .build())
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ModelSourceException.class)
+                .hasMessageContaining("vocab.txt");
     }
 
     // --- Inference flow ---
+    // The fixture model's hidden state for a token is 10 at the index of its id among 16 dimensions, so
+    // mean pooling over ids (0, 1, 1) gives [10/3, 20/3, 0, ...].
 
     @Test
     void encode_withTokenTypeIds_returnsEmbedding() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
+        // A model with token_type_ids requires them; one without would reject them
+        Tokenizer tokenizer = tokenizerReturning(0, 1, 1);
 
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask", "token_type_ids"));
-        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
-                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot-types", tokenizer).build()) {
+            float[] embedding = model.encode("hello world"); // default MEAN pooling
 
-        // Shape [1, 3, 4]: 3 tokens, 4 hidden dims
-        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f};
-        when(session.run(any())).thenReturn(
-                Map.of("output", Tensor.fromFloats(output, new long[]{1, 3, 4})));
-
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build(); // default MEAN pooling
-
-        float[] embedding = model.encode("hello world");
-
-        // MEAN of all 3 tokens (all mask=1): (1+5+9)/3, (2+6+10)/3, (3+7+11)/3, (4+8+12)/3
-        assertThat(embedding).hasSize(4);
-        assertThat(embedding[0]).isCloseTo(5f, within(0.001f));
-        assertThat(embedding[1]).isCloseTo(6f, within(0.001f));
-        assertThat(embedding[2]).isCloseTo(7f, within(0.001f));
-        assertThat(embedding[3]).isCloseTo(8f, within(0.001f));
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(session).run(captor.capture());
-        assertThat(captor.getValue()).containsKey("token_type_ids");
+            assertThat(embedding).hasSize(16);
+            assertThat(embedding).containsExactly(meanOf011(), within(1e-5f));
+        }
     }
 
     @Test
     void encode_withoutTokenTypeIds_excludesFromInputs() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
+        Tokenizer tokenizer = tokenizerReturning(0, 1, 1);
 
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
-        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
-                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
-
-        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f};
-        when(session.run(any())).thenReturn(
-                Map.of("output", Tensor.fromFloats(output, new long[]{1, 3, 4})));
-
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build();
-
-        model.encode("hello world");
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(session).run(captor.capture());
-        assertThat(captor.getValue()).doesNotContainKey("token_type_ids");
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer).build()) {
+            assertThat(model.encode("hello world")).containsExactly(meanOf011(), within(1e-5f));
+        }
     }
 
     @Test
     void encodeBatch_returnsEmbeddingsForAllTexts() {
-        InferenceSession session = mock(InferenceSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode(eq("text1"), anyInt())).thenReturn(encoded(0, 1, 1));
+        when(tokenizer.encode(eq("text2"), anyInt())).thenReturn(encoded(3, 3, 2));
 
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
-        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
-                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer).build()) {
+            List<float[]> results = model.encodeBatch(List.of("text1", "text2"));
 
-        float[] output1 = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f};
-        float[] output2 = {12f, 11f, 10f, 9f, 8f, 7f, 6f, 5f, 4f, 3f, 2f, 1f};
-        when(session.run(any()))
-                .thenReturn(Map.of("output", Tensor.fromFloats(output1, new long[]{1, 3, 4})))
-                .thenReturn(Map.of("output", Tensor.fromFloats(output2, new long[]{1, 3, 4})));
-
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build();
-
-        List<float[]> results = model.encodeBatch(List.of("text1", "text2"));
-
-        assertThat(results).hasSize(2);
-        assertThat(results.get(0)).hasSize(4);
-        assertThat(results.get(1)).hasSize(4);
-        // First result: MEAN of [1,5,9],[2,6,10],[3,7,11],[4,8,12] → [5,6,7,8]
-        assertThat(results.get(0)[0]).isCloseTo(5f, within(0.001f));
+            assertThat(results).hasSize(2);
+            assertThat(results.get(0)).containsExactly(meanOf011(), within(1e-5f));
+            float[] second = new float[16];
+            second[2] = 10f / 3;
+            second[3] = 20f / 3;
+            assertThat(results.get(1)).containsExactly(second, within(1e-5f));
+        }
     }
 
     // --- Builder setters ---
 
     @Test
     void builder_poolingStrategy_appliesCLS() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
+        Tokenizer tokenizer = tokenizerReturning(0, 1, 1);
 
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
-        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
-                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
-
-        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f};
-        when(session.run(any())).thenReturn(
-                Map.of("output", Tensor.fromFloats(output, new long[]{1, 3, 4})));
-
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer)
                 .poolingStrategy(PoolingStrategy.CLS)
-                .build();
+                .build()) {
+            float[] embedding = model.encode("hello");
 
-        float[] embedding = model.encode("hello");
-
-        // CLS returns first token: [1, 2, 3, 4]
-        assertThat(embedding).isEqualTo(new float[]{1f, 2f, 3f, 4f});
+            // CLS returns the first token: 10 at index 0
+            float[] expected = new float[16];
+            expected[0] = 10f;
+            assertThat(embedding).isEqualTo(expected);
+        }
     }
 
     @Test
     void builder_maxLength_passedToTokenizer() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
+        Tokenizer tokenizer = tokenizerReturning(1, 2);
 
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
-        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
-                new EncodedInput(new long[]{101, 102}, new long[]{1, 1}, new long[]{0, 0}));
-
-        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f};
-        when(session.run(any())).thenReturn(
-                Map.of("output", Tensor.fromFloats(output, new long[]{1, 2, 4})));
-
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .maxLength(64)
-                .build();
-
-        model.encode("hello");
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer).maxLength(64).build()) {
+            model.encode("hello");
+        }
 
         verify(tokenizer).encode("hello", 64);
-    }
-
-    @Test
-    void builder_modelId_usedWithModelSource() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
-
-        // Verify modelId and modelSource setters don't throw
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .modelId("custom/model")
-                .modelSource(id -> Path.of("/tmp"))
-                .build();
-
-        assertThat(model).isNotNull();
-    }
-
-    @Test
-    void builder_sessionOptions_accepted() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
-
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .sessionOptions(opts -> { })
-                .build();
-
-        assertThat(model).isNotNull();
     }
 
     // --- Normalize ---
 
     @Test
     void normalize_producesUnitVector() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
+        Tokenizer tokenizer = tokenizerReturning(0, 1, 1);
 
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
-        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
-                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer).normalize().build()) {
+            float[] embedding = model.encode("hello");
 
-        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f};
-        when(session.run(any())).thenReturn(
-                Map.of("output", Tensor.fromFloats(output, new long[]{1, 3, 4})));
-
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .normalize()
-                .build();
-
-        float[] embedding = model.encode("hello");
-
-        // Verify unit norm
-        float norm = 0f;
-        for (float v : embedding) {
-            norm += v * v;
+            // [1, 2, 0, ...] / sqrt(5)
+            assertThat(embedding[0]).isCloseTo((float) (1 / Math.sqrt(5)), within(1e-5f));
+            assertThat(embedding[1]).isCloseTo((float) (2 / Math.sqrt(5)), within(1e-5f));
+            float norm = 0f;
+            for (float v : embedding) {
+                norm += v * v;
+            }
+            assertThat((double) Math.sqrt(norm)).isCloseTo(1.0, within(1e-4));
         }
-        assertThat((double) Math.sqrt(norm)).isCloseTo(1.0, within(1e-4));
     }
 
     @Test
     void withoutNormalize_doesNotNormalize() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
+        Tokenizer tokenizer = tokenizerReturning(0, 1, 1);
 
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
-        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
-                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
-
-        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f};
-        when(session.run(any())).thenReturn(
-                Map.of("output", Tensor.fromFloats(output, new long[]{1, 3, 4})));
-
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build();
-
-        float[] embedding = model.encode("hello");
-
-        // Without normalize, result is raw MEAN pooling (not unit norm)
-        assertThat(embedding[0]).isCloseTo(5f, within(0.001f));
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer).build()) {
+            // Without normalize, result is raw MEAN pooling (not unit norm)
+            assertThat(model.encode("hello")[0]).isCloseTo(10f / 3, within(0.001f));
+        }
     }
 
     // --- Text prefix ---
 
     @Test
     void textPrefix_prependedBeforeEncoding() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
+        Tokenizer tokenizer = tokenizerReturning(1, 2);
 
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
-        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
-                new EncodedInput(new long[]{101, 102}, new long[]{1, 1}, new long[]{0, 0}));
-
-        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f};
-        when(session.run(any())).thenReturn(
-                Map.of("output", Tensor.fromFloats(output, new long[]{1, 2, 4})));
-
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer)
                 .textPrefix("query: ")
-                .build();
-
-        model.encode("hello");
+                .build()) {
+            model.encode("hello");
+        }
 
         verify(tokenizer).encode("query: hello", 512);
     }
 
     @Test
     void withoutTextPrefix_encodesAsIs() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
+        Tokenizer tokenizer = tokenizerReturning(1, 2);
 
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
-        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
-                new EncodedInput(new long[]{101, 102}, new long[]{1, 1}, new long[]{0, 0}));
-
-        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f};
-        when(session.run(any())).thenReturn(
-                Map.of("output", Tensor.fromFloats(output, new long[]{1, 2, 4})));
-
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build();
-
-        model.encode("hello");
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer).build()) {
+            model.encode("hello");
+        }
 
         verify(tokenizer).encode("hello", 512);
     }
 
     // --- Per-call prefix ---
 
-    private static EncodedInput encoded(long... ids) {
-        long[] mask = new long[ids.length];
-        java.util.Arrays.fill(mask, 1L);
-        return new EncodedInput(ids, mask, new long[ids.length]);
-    }
-
-    private static InferenceSession shortSession() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
-        when(session.run(any())).thenReturn(
-                Map.of("output", Tensor.fromFloats(new float[]{1f, 2f, 3f, 4f}, new long[]{1, 2, 2})));
-        return session;
-    }
-
-    private static Tokenizer shortTokenizer() {
-        Tokenizer tokenizer = mock(Tokenizer.class);
-        when(tokenizer.encode(anyString(), anyInt())).thenReturn(encoded(101, 102));
-        return tokenizer;
-    }
-
     @Test
     void perCallPrefixReplacesTheBuilderPrefix() {
-        Tokenizer tokenizer = shortTokenizer();
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(shortSession()).tokenizer(tokenizer).textPrefix("query: ").build();
-
-        model.encode("hello", "passage: ");
+        Tokenizer tokenizer = tokenizerReturning(1, 2);
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer).textPrefix("query: ").build()) {
+            model.encode("hello", "passage: ");
+        }
 
         verify(tokenizer).encode("passage: hello", 512);
         verify(tokenizer, never()).encode(eq("query: hello"), anyInt());
@@ -429,24 +266,23 @@ class SentenceTransformerEmbedderTest {
 
     @Test
     void nullPerCallPrefixMeansNoPrefix() {
-        Tokenizer tokenizer = shortTokenizer();
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(shortSession()).tokenizer(tokenizer).textPrefix("query: ").build();
-
-        model.encode("hello", null);
+        Tokenizer tokenizer = tokenizerReturning(1, 2);
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer).textPrefix("query: ").build()) {
+            model.encode("hello", null);
+        }
 
         verify(tokenizer).encode("hello", 512);
     }
 
     @Test
     void encodeBatchAppliesThePerCallPrefixToEveryTextInOrder() {
-        Tokenizer tokenizer = shortTokenizer();
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(shortSession()).tokenizer(tokenizer).build();
+        Tokenizer tokenizer = tokenizerReturning(1, 2);
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer).build()) {
+            List<float[]> embeddings = model.encodeBatch(List.of("a", "b"), "search_document: ");
 
-        List<float[]> embeddings = model.encodeBatch(List.of("a", "b"), "search_document: ");
+            assertThat(embeddings).hasSize(2);
+        }
 
-        assertThat(embeddings).hasSize(2);
         var order = inOrder(tokenizer);
         order.verify(tokenizer).encode("search_document: a", 512);
         order.verify(tokenizer).encode("search_document: b", 512);
@@ -454,74 +290,67 @@ class SentenceTransformerEmbedderTest {
 
     @Test
     void runStillAppliesTheBuilderPrefix() {
-        Tokenizer tokenizer = shortTokenizer();
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(shortSession()).tokenizer(tokenizer).textPrefix("query: ").build();
-
-        model.run("hello");
+        Tokenizer tokenizer = tokenizerReturning(1, 2);
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer).textPrefix("query: ").build()) {
+            model.run("hello");
+        }
 
         verify(tokenizer).encode("query: hello", 512);
     }
 
     // maxLength 8 with a 2-token prefix leaves 4 content tokens per window; 10 content tokens with
-    // stride 2 give windows starting at 0, 2, 4 and 6.
+    // stride 2 give windows starting at 0, 2, 4 and 6. Ids: [CLS] 14, [SEP] 15, prefix 12 and 13, content 1..10.
 
     @Test
-    @SuppressWarnings("unchecked")
     void strideRepeatsThePerCallPrefixInEveryWindow() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
-        when(session.run(any())).thenReturn(
-                Map.of("output", Tensor.fromFloats(new float[8], new long[]{1, 8, 1})));
         Tokenizer tokenizer = mock(Tokenizer.class);
         when(tokenizer.encode("p: long text", Integer.MAX_VALUE))
-                .thenReturn(encoded(101, 50, 51, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 102));
-        when(tokenizer.encode("p: ", Integer.MAX_VALUE)).thenReturn(encoded(101, 50, 51, 102));
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(session).tokenizer(tokenizer).maxLength(8).stride(2).build();
+                .thenReturn(encoded(14, 12, 13, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15));
+        when(tokenizer.encode("p: ", Integer.MAX_VALUE)).thenReturn(encoded(14, 12, 13, 15));
 
-        model.encode("long text", "p: ");
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer)
+                .maxLength(8).stride(2).build()) {
+            float[] embedding = model.encode("long text", "p: ");
 
-        ArgumentCaptor<Map<String, Tensor>> inputs = ArgumentCaptor.forClass(Map.class);
-        verify(session, times(4)).run(inputs.capture());
-        List<long[]> windows = new ArrayList<>();
-        inputs.getAllValues().forEach(in -> windows.add(in.get("input_ids").toLongs()));
-        assertThat(windows).containsExactly(
-                new long[]{101, 50, 51, 1, 2, 3, 4, 102},
-                new long[]{101, 50, 51, 3, 4, 5, 6, 102},
-                new long[]{101, 50, 51, 5, 6, 7, 8, 102},
-                new long[]{101, 50, 51, 7, 8, 9, 10, 102});
+            // Each window of 8 tokens pools to 10/8 at its ids. The windows are averaged weighted by the tokens
+            // each owns (3, 2, 2 and 3 of the 10), so [CLS], [SEP] and the prefix (in every window) keep 10/8,
+            // and a content token keeps 10/8 x the owned share of the windows it appears in
+            float window = 10f / 8;
+            float[] expected = new float[16];
+            float[] shareOfWindowsWithToken = {0, .3f, .3f, .5f, .5f, .4f, .4f, .5f, .5f, .3f, .3f};
+            for (int id = 1; id <= 10; id++) {
+                expected[id] = window * shareOfWindowsWithToken[id];
+            }
+            for (int id = 12; id <= 15; id++) {
+                expected[id] = window;
+            }
+            assertThat(embedding).containsExactly(expected, within(1e-5f));
+        }
     }
 
     @Test
     void strideRejectsAPerCallPrefixThatLeavesNoRoomBeyondTheStride() {
         Tokenizer tokenizer = mock(Tokenizer.class);
         when(tokenizer.encode("long prefix: long text", Integer.MAX_VALUE))
-                .thenReturn(encoded(101, 50, 51, 52, 53, 1, 2, 3, 4, 5, 6, 102));
-        when(tokenizer.encode("long prefix: ", Integer.MAX_VALUE)).thenReturn(encoded(101, 50, 51, 52, 53, 102));
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(shortSession()).tokenizer(tokenizer).maxLength(8).stride(2).build();
-
-        assertThatThrownBy(() -> model.encode("long text", "long prefix: "))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("stride 2");
+                .thenReturn(encoded(14, 11, 12, 13, 0, 1, 2, 3, 4, 5, 6, 15));
+        when(tokenizer.encode("long prefix: ", Integer.MAX_VALUE)).thenReturn(encoded(14, 11, 12, 13, 0, 15));
+        try (SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizer)
+                .maxLength(8).stride(2).build()) {
+            assertThatThrownBy(() -> model.encode("long text", "long prefix: "))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("stride 2");
+        }
     }
 
-    // --- Close delegation ---
+    // --- Close ---
 
     @Test
-    void close_delegatesToSession() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
-
-        SentenceTransformerEmbedder model = SentenceTransformerEmbedder.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build();
+    void closedEmbedderRejectsEncode() {
+        SentenceTransformerEmbedder model = embedder("tokens-onehot", tokenizerReturning(0, 1, 1)).build();
 
         model.close();
 
-        verify(session).close();
+        assertThatThrownBy(() -> model.encode("hello")).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -536,40 +365,32 @@ class SentenceTransformerEmbedderTest {
 
     // --- Matryoshka dimensions ---
 
-    private static SentenceTransformerEmbedder.Builder meanPooledBuilder() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
-        when(tokenizer.encode(anyString(), anyInt())).thenReturn(
-                new EncodedInput(new long[]{101, 2023, 102}, new long[]{1, 1, 1}, new long[]{0, 0, 0}));
-        // Mean over the three tokens is [5, 6, 7, 8]
-        float[] output = {1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f};
-        when(session.run(any())).thenReturn(
-                Map.of("output", Tensor.fromFloats(output, new long[]{1, 3, 4})));
-        return SentenceTransformerEmbedder.builder().session(session).tokenizer(tokenizer);
+    /** Mean pooling over ids (0, 1, 1): [10/3, 20/3, 0, ...] in 16 dimensions. */
+    private SentenceTransformerEmbedder.Builder meanPooledBuilder() {
+        return embedder("tokens-onehot", tokenizerReturning(0, 1, 1));
     }
 
     @Test
     void dimensionsKeepsTheLeadingValues() {
         try (var model = meanPooledBuilder().dimensions(2).build()) {
-            assertThat(model.encode("hello")).containsExactly(5f, 6f);
+            assertThat(model.encode("hello")).containsExactly(new float[]{10f / 3, 20f / 3}, within(1e-5f));
         }
     }
 
     @Test
     void dimensionsRenormalizesAfterTruncation() {
         try (var model = meanPooledBuilder().dimensions(2).normalize().build()) {
-            float norm = (float) Math.sqrt(61);
-            assertThat(model.encode("hello")).containsExactly(new float[]{5f / norm, 6f / norm}, within(1e-6f));
+            float norm = (float) Math.sqrt(5);
+            assertThat(model.encode("hello")).containsExactly(new float[]{1f / norm, 2f / norm}, within(1e-6f));
         }
     }
 
     @Test
     void dimensionsLargerThanTheEmbeddingFails() {
-        try (var model = meanPooledBuilder().dimensions(5).build()) {
+        try (var model = meanPooledBuilder().dimensions(17).build()) {
             assertThatThrownBy(() -> model.encode("hello"))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("embedding size (4)");
+                    .hasMessageContaining("embedding size (16)");
         }
     }
 
@@ -577,5 +398,33 @@ class SentenceTransformerEmbedderTest {
     void dimensionsMustBePositive() {
         assertThatThrownBy(() -> SentenceTransformerEmbedder.builder().dimensions(0))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // --- Helpers ---
+
+    private SentenceTransformerEmbedder.Builder embedder(String fixture, Tokenizer tokenizer) {
+        return SentenceTransformerEmbedder.builder()
+                .modelId("acme/tiny")
+                .modelSource(TestModels.model(dir, fixture))
+                .tokenizer(tokenizer);
+    }
+
+    private static Tokenizer tokenizerReturning(long... ids) {
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode(anyString(), anyInt())).thenReturn(encoded(ids));
+        return tokenizer;
+    }
+
+    private static EncodedInput encoded(long... ids) {
+        long[] mask = new long[ids.length];
+        Arrays.fill(mask, 1L);
+        return new EncodedInput(ids, mask, new long[ids.length]);
+    }
+
+    private static float[] meanOf011() {
+        float[] expected = new float[16];
+        expected[0] = 10f / 3;
+        expected[1] = 20f / 3;
+        return expected;
     }
 }

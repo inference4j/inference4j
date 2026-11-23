@@ -169,45 +169,35 @@ Choose your base:
 
 ### 2. Define the builder
 
+Every builder offers the same three shared options, then the task's own options, then `build()`:
+
 ```java
-public static Builder builder() {
-    return new Builder();
-}
-
-public static class Builder {
-    private String modelId = "inference4j/resnet50-v1-7";  // sensible default
-    private ModelSource modelSource;
-    private SessionConfigurer sessionConfigurer;
-    // ... task-specific fields ...
-
-    public Builder modelId(String modelId) { this.modelId = modelId; return this; }
-    public Builder modelSource(ModelSource modelSource) { this.modelSource = modelSource; return this; }
-    public Builder sessionOptions(SessionConfigurer sc) { this.sessionConfigurer = sc; return this; }
-
-    // package-private — not part of the public API
-    Builder session(InferenceSession session) { this.session = session; return this; }
-
-    public ResNetClassifier build() {
-        // 1. Resolve model files
-        if (session == null) {
-            ModelSource source = modelSource != null ? modelSource
-                : HuggingFaceModelSource.defaultInstance();
-            Path modelDir = source.resolve(modelId);
-            session = InferenceSession.of(modelDir.resolve("model.onnx"), sessionConfigurer);
-        }
-        // 2. Load task-specific resources (labels, vocab, config)
-        // 3. Build preprocessor and postprocessor
-        // 4. Return new instance
-        return new ResNetClassifier(session, preprocessor, labels, ...);
-    }
+try (ResNetClassifier classifier = ResNetClassifier.builder()
+        .modelId("inference4j/resnet50-v1-7")     // sensible default; any id the ModelSource understands
+        .modelSource(new LocalModelSource(dir))   // defaults to HuggingFace
+        .sessionOptions(opts -> opts.addCoreML()) // ONNX Runtime options for the model's sessions
+        // ... task-specific options: labels, preprocessor, inputName, topK ...
+        .build()) {
+    classifier.classify(image);
 }
 ```
+
+`build()` validates the options, opens the model directory through the `ModelSource`, checks that every required
+file is there (failing with a `ModelSourceException` that names the missing file), opens the ONNX sessions, loads
+the companion files the options did not supply (labels, vocabulary, config), and closes everything it opened if any
+step fails. Start from the builder of the closest existing wrapper, such as `DepthAnythingEstimator.Builder`, and
+copy its structure: the shared loading support it extends is internal to inference4j and may change between
+releases.
 
 Key conventions:
 
 - **Default model ID** — every wrapper has a sensible default pointing to the `inference4j` HuggingFace org
-- **`.session()` is package-private** — the public API uses `modelId` + `modelSource` + `sessionOptions`
-- **Auto-load resources** — labels, vocabulary, config are loaded from the model directory in `build()`
+- **Public options only** — the builder exposes `modelId`, `modelSource`, `sessionOptions` and task options; never
+  a way to pass in an `InferenceSession`
+- **Auto-load resources** — labels, vocabulary, config are loaded from the model directory in `build()`, unless set
+  on the builder
+- **Tests use fixtures** — tests build the wrapper from a tiny ONNX fixture in `src/test/resources/fixtures`
+  through the public builder
 
 ### 3. Wire preprocessing
 
@@ -272,7 +262,7 @@ Postprocessor<InferenceContext<BufferedImage>, List<Classification>> postprocess
 4. **Implement postprocessing** — convert output tensors to a meaningful Java result type
 5. **Add a builder** with `modelId`, `modelSource`, `sessionOptions`, and task-specific options
 6. **Host the ONNX model** under the `inference4j` HuggingFace org with required companion files
-7. **Write tests** — unit tests with mocked session, integration tests with the real model
+7. **Write tests** — unit tests against a tiny ONNX fixture, integration tests with the real model
 8. **Add Spring Boot auto-configuration** if the wrapper should be available as a managed bean
 
 !!! tip "Sharing your wrapper"

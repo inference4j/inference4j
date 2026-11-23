@@ -16,20 +16,16 @@
 
 package io.github.inference4j.nlp;
 
-import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.tokenizer.EncodedInput;
 import io.github.inference4j.tokenizer.Tokenizer;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
-
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.assertj.core.api.Assertions.within;
@@ -37,6 +33,9 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class MiniLMSearchRerankerTest {
+
+    @TempDir
+    Path dir;
 
     @Test
     void toScore_positiveLogit_highScore() {
@@ -103,168 +102,131 @@ class MiniLMSearchRerankerTest {
 
     @Test
     void builder_missingTokenizer_throws() {
-        InferenceSession session = mock(InferenceSession.class);
+        ModelSource source = TestModels.model(dir, "tokens-echo");
         assertThatThrownBy(() ->
                 MiniLMSearchReranker.builder()
-                        .session(session)
+                        .modelSource(source)
                         .build())
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ModelSourceException.class)
+                .hasMessageContaining("vocab.txt");
     }
 
     @Test
     void builder_maxLength_passedToTokenizer() {
-        InferenceSession session = mock(InferenceSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
-
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
         when(tokenizer.encode(anyString(), anyString(), anyInt())).thenReturn(
                 new EncodedInput(
                         new long[]{101, 102},
                         new long[]{1, 1},
                         new long[]{0, 0}));
-        when(session.run(any())).thenReturn(
-                Map.of("logits", Tensor.fromFloats(new float[]{1.0f}, new long[]{1, 1})));
 
-        MiniLMSearchReranker model = MiniLMSearchReranker.builder()
-                .session(session)
+        try (MiniLMSearchReranker model = MiniLMSearchReranker.builder()
+                .modelSource(TestModels.model(dir, "tokens-echo"))
                 .tokenizer(tokenizer)
                 .maxLength(256)
-                .build();
-
-        model.score("query", "doc");
+                .build()) {
+            model.score("query", "doc");
+        }
 
         verify(tokenizer).encode("query", "doc", 256);
-    }
-
-    @Test
-    void builder_modelIdAndModelSource_accepted() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
-
-        MiniLMSearchReranker model = MiniLMSearchReranker.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .modelId("custom/reranker")
-                .modelSource(id -> Path.of("/tmp"))
-                .build();
-
-        assertThat(model).isNotNull();
-    }
-
-    @Test
-    void builder_sessionOptions_accepted() {
-        InferenceSession session = mock(InferenceSession.class);
-        Tokenizer tokenizer = mock(Tokenizer.class);
-
-        MiniLMSearchReranker model = MiniLMSearchReranker.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .sessionOptions(opts -> { })
-                .build();
-
-        assertThat(model).isNotNull();
     }
 
     // --- Inference flow ---
 
     @Test
     void score_withTokenTypeIds_returnsCorrectScore() {
-        InferenceSession session = mock(InferenceSession.class);
+        // The fixture model's logit is the sum of the second segment's token ids: 2 + 1 = 3
         Tokenizer tokenizer = mock(Tokenizer.class);
-
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask", "token_type_ids"));
         when(tokenizer.encode(anyString(), anyString(), anyInt())).thenReturn(
                 new EncodedInput(
-                        new long[]{101, 2023, 102, 2003, 102},
+                        new long[]{9, 7, 9, 2, 1},
                         new long[]{1, 1, 1, 1, 1},
                         new long[]{0, 0, 0, 1, 1}));
-        when(session.run(any())).thenReturn(
-                Map.of("logits", Tensor.fromFloats(new float[]{2.5f}, new long[]{1, 1})));
 
-        MiniLMSearchReranker model = MiniLMSearchReranker.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build();
-
-        float score = model.score("query", "document");
-
-        float expectedScore = (float) (1.0 / (1.0 + Math.exp(-2.5)));
-        assertThat(score).isCloseTo(expectedScore, within(1e-5f));
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(session).run(captor.capture());
-        assertThat(captor.getValue()).containsKey("token_type_ids");
+        try (MiniLMSearchReranker model = reranker("tokens-passage-sum", tokenizer)) {
+            assertThat(model.score("query", "document")).isCloseTo(sigmoid(3), within(1e-6f));
+        }
     }
 
     @Test
     void score_withoutTokenTypeIds_excludesFromInputs() {
-        InferenceSession session = mock(InferenceSession.class);
+        // The fixture model has no token_type_ids input, which ONNX Runtime would reject; its first logit is the
+        // first token id
         Tokenizer tokenizer = mock(Tokenizer.class);
-
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
         when(tokenizer.encode(anyString(), anyString(), anyInt())).thenReturn(
                 new EncodedInput(
-                        new long[]{101, 2023, 102, 2003, 102},
+                        new long[]{2, 2023, 102, 2003, 102},
                         new long[]{1, 1, 1, 1, 1},
                         new long[]{0, 0, 0, 1, 1}));
-        when(session.run(any())).thenReturn(
-                Map.of("logits", Tensor.fromFloats(new float[]{-1.0f}, new long[]{1, 1})));
 
-        MiniLMSearchReranker model = MiniLMSearchReranker.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build();
-
-        model.score("query", "document");
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, Tensor>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(session).run(captor.capture());
-        assertThat(captor.getValue()).doesNotContainKey("token_type_ids");
+        try (MiniLMSearchReranker model = reranker("tokens-echo", tokenizer)) {
+            assertThat(model.score("query", "document")).isCloseTo(sigmoid(2), within(1e-6f));
+        }
     }
 
     @Test
     void scoreBatch_returnsScoresForAllDocuments() {
-        InferenceSession session = mock(InferenceSession.class);
         Tokenizer tokenizer = mock(Tokenizer.class);
-
-        when(session.inputNames()).thenReturn(Set.of("input_ids", "attention_mask"));
-        when(tokenizer.encode(anyString(), anyString(), anyInt())).thenReturn(
+        when(tokenizer.encode(eq("query"), eq("doc1"), anyInt())).thenReturn(
                 new EncodedInput(
-                        new long[]{101, 2023, 102, 2003, 102},
+                        new long[]{0, 5, 0, 3, 0},
                         new long[]{1, 1, 1, 1, 1},
                         new long[]{0, 0, 0, 1, 1}));
-        when(session.run(any()))
-                .thenReturn(Map.of("logits", Tensor.fromFloats(new float[]{2.5f}, new long[]{1, 1})))
-                .thenReturn(Map.of("logits", Tensor.fromFloats(new float[]{-1.0f}, new long[]{1, 1})));
+        when(tokenizer.encode(eq("query"), eq("doc2"), anyInt())).thenReturn(
+                new EncodedInput(
+                        new long[]{0, 5, 0, 0, 0},
+                        new long[]{1, 1, 1, 1, 1},
+                        new long[]{0, 0, 0, 1, 1}));
 
-        MiniLMSearchReranker model = MiniLMSearchReranker.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build();
+        try (MiniLMSearchReranker model = reranker("tokens-passage-sum", tokenizer)) {
+            float[] scores = model.scoreBatch("query", List.of("doc1", "doc2"));
 
-        float[] scores = model.scoreBatch("query", List.of("doc1", "doc2"));
-
-        assertThat(scores).hasSize(2);
-        assertThat(scores[0]).isGreaterThan(0.5f);
-        assertThat(scores[1]).isLessThan(0.5f);
+            assertThat(scores).containsExactly(new float[]{sigmoid(3), 0.5f}, within(1e-6f));
+        }
     }
 
-    // --- Close delegation ---
+    @Test
+    void strideScoresEveryPassageAndKeepsTheBest() {
+        // [CLS] q [SEP] leaves 8 - 3 - 1 = 4 tokens per passage; passages of 4 sharing 2 tokens over the 8
+        // document tokens sum to 1, 0 and 2, while the whole document would sum to 3
+        Tokenizer tokenizer = mock(Tokenizer.class);
+        when(tokenizer.encode("query", Integer.MAX_VALUE)).thenReturn(
+                new EncodedInput(new long[]{0, 7, 0}, new long[]{1, 1, 1}, new long[3]));
+        when(tokenizer.encode("document", Integer.MAX_VALUE)).thenReturn(
+                new EncodedInput(new long[]{0, 1, 0, 0, 0, 0, 0, 0, 2, 0}, new long[10], new long[10]));
+
+        try (MiniLMSearchReranker model = MiniLMSearchReranker.builder()
+                .modelSource(TestModels.model(dir, "tokens-passage-sum"))
+                .tokenizer(tokenizer)
+                .maxLength(8)
+                .stride(2)
+                .build()) {
+            assertThat(model.score("query", "document")).isCloseTo(sigmoid(2), within(1e-6f));
+        }
+    }
+
+    // --- Close ---
 
     @Test
-    void close_delegatesToSession() {
-        InferenceSession session = mock(InferenceSession.class);
+    void closedRerankerRejectsScore() {
         Tokenizer tokenizer = mock(Tokenizer.class);
-
-        MiniLMSearchReranker model = MiniLMSearchReranker.builder()
-                .session(session)
-                .tokenizer(tokenizer)
-                .build();
+        when(tokenizer.encode(anyString(), anyString(), anyInt())).thenReturn(
+                new EncodedInput(new long[]{101, 102}, new long[]{1, 1}, new long[]{0, 0}));
+        MiniLMSearchReranker model = reranker("tokens-echo", tokenizer);
 
         model.close();
 
-        verify(session).close();
+        assertThatThrownBy(() -> model.score("query", "doc")).isInstanceOf(IllegalStateException.class);
+    }
+
+    private MiniLMSearchReranker reranker(String fixture, Tokenizer tokenizer) {
+        return MiniLMSearchReranker.builder()
+                .modelSource(TestModels.model(dir, fixture))
+                .tokenizer(tokenizer)
+                .build();
+    }
+
+    private static float sigmoid(double logit) {
+        return (float) (1.0 / (1.0 + Math.exp(-logit)));
     }
 }

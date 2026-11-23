@@ -142,32 +142,15 @@ public class ClipClassifier implements ZeroShotClassifier<BufferedImage, Classif
         private static final List<String> MODEL_FILES =
                 List.of("vision_model.onnx", "text_model.onnx", "vocab.json", "merges.txt");
 
-        private ClipImageEncoder imageEncoder;
-        private ClipTextEncoder textEncoder;
-
         public Builder() {
             super(DEFAULT_MODEL_ID);
         }
 
-        Builder imageEncoder(ClipImageEncoder imageEncoder) {
-            this.imageEncoder = imageEncoder;
-            return this;
-        }
-
-        Builder textEncoder(ClipTextEncoder textEncoder) {
-            this.textEncoder = textEncoder;
-            return this;
-        }
-
         @Override
         public ClipClassifier build() {
-            if (imageEncoder != null && textEncoder != null) {
-                return new ClipClassifier(imageEncoder, textEncoder);
-            }
             // Both encoders read one opened snapshot, so an update between them cannot mix two revisions
             return load(MODEL_FILES, files -> new ClipClassifier(
-                    imageEncoder != null ? imageEncoder : ClipImageEncoder.create(files, null),
-                    textEncoder != null ? textEncoder : ClipTextEncoder.create(files, null, null)));
+                    ClipImageEncoder.create(files, null), ClipTextEncoder.create(files, null, null)));
         }
     }
 }

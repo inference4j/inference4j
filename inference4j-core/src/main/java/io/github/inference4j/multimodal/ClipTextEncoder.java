@@ -141,10 +141,6 @@ public class ClipTextEncoder implements TextEmbedder {
             super(DEFAULT_MODEL_ID);
         }
 
-        Builder session(InferenceSession session) {
-            return useSession(TEXT_MODEL_FILE, session);
-        }
-
         public Builder tokenizer(Tokenizer tokenizer) {
             this.tokenizer = tokenizer;
             return this;

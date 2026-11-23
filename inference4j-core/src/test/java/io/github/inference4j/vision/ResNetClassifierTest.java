@@ -16,25 +16,16 @@
 
 package io.github.inference4j.vision;
 
-import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.processing.OutputOperator;
-import io.github.inference4j.processing.Preprocessor;
-import io.github.inference4j.Tensor;
 import io.github.inference4j.exception.ModelSourceException;
 import io.github.inference4j.preprocessing.image.Labels;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
-
-import java.awt.image.BufferedImage;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 class ResNetClassifierTest {
 
@@ -141,66 +132,5 @@ class ResNetClassifierTest {
                         .modelSource(badSource)
                         .build())
                 .isInstanceOf(ModelSourceException.class);
-    }
-
-    @Test
-    void builder_inputNameDefaultsFromSession() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.inputNames()).thenReturn(Set.of("data"));
-        when(session.inputShape("data")).thenReturn(new long[]{1, 3, 224, 224});
-
-        ResNetClassifier model = ResNetClassifier.builder()
-                .session(session)
-                .build();
-
-        assertThat(model).isNotNull();
-        verify(session).inputNames();
-    }
-
-    // --- Inference flow ---
-
-    @Test
-    void classify_bufferedImage_returnsCorrectResults() {
-        InferenceSession session = mock(InferenceSession.class);
-        @SuppressWarnings("unchecked")
-        Preprocessor<BufferedImage, Tensor> preprocessor = mock(Preprocessor.class);
-
-        Tensor inputTensor = Tensor.fromFloats(new float[]{0.5f}, new long[]{1});
-        when(preprocessor.process(any(BufferedImage.class))).thenReturn(inputTensor);
-
-        Tensor outputTensor = Tensor.fromFloats(
-                new float[]{1.0f, 5.0f, 3.0f, 0.5f, 4.0f}, new long[]{1, 5});
-        when(session.run(any())).thenReturn(Map.of("output", outputTensor));
-
-        ResNetClassifier model = ResNetClassifier.builder()
-                .session(session)
-                .preprocessor(preprocessor)
-                .labels(TEST_LABELS)
-                .inputName("input")
-                .build();
-
-        BufferedImage image = new BufferedImage(224, 224, BufferedImage.TYPE_INT_RGB);
-        List<Classification> results = model.classify(image);
-
-        assertThat(results).hasSize(5);
-        assertThat(results.get(0).label()).isEqualTo("dog");
-        assertThat(results.get(0).index()).isEqualTo(1);
-    }
-
-    // --- Close delegation ---
-
-    @Test
-    void close_delegatesToSession() {
-        InferenceSession session = mock(InferenceSession.class);
-        when(session.inputShape("input")).thenReturn(new long[]{1, 3, 224, 224});
-
-        ResNetClassifier model = ResNetClassifier.builder()
-                .session(session)
-                .inputName("input")
-                .build();
-
-        model.close();
-
-        verify(session).close();
     }
 }

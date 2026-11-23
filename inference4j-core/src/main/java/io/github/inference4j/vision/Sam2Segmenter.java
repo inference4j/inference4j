@@ -319,14 +319,6 @@ public class Sam2Segmenter implements PromptableSegmenter {
             super(DEFAULT_MODEL_ID);
         }
 
-        Builder encoderSession(InferenceSession session) {
-            return useSession(ENCODER_FILE, session);
-        }
-
-        Builder decoderSession(InferenceSession session) {
-            return useSession(DECODER_FILE, session);
-        }
-
         /**
          * Configures both ONNX Runtime sessions, e.g. to add an execution provider.
          *

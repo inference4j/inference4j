@@ -124,10 +124,6 @@ public class ClipImageEncoder
             super(DEFAULT_MODEL_ID);
         }
 
-        Builder session(InferenceSession session) {
-            return useSession(VISION_MODEL_FILE, session);
-        }
-
         public Builder preprocessor(Preprocessor<BufferedImage, Tensor> preprocessor) {
             this.preprocessor = preprocessor;
             return this;

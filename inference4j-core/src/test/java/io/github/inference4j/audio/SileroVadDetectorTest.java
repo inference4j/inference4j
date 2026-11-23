@@ -16,19 +16,17 @@
 
 package io.github.inference4j.audio;
 
-import io.github.inference4j.InferenceSession;
 import io.github.inference4j.model.ModelSource;
-import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
 import io.github.inference4j.exception.ModelSourceException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 class SileroVadDetectorTest {
 
@@ -79,103 +77,97 @@ class SileroVadDetectorTest {
     }
 
     // --- Inference flow ---
+    // The fixture model scores a window as its last sample + 0.01 x the window index (counted by the state it
+    // threads through) + 0.001 x the first context sample carried over from the previous window.
+
+    @TempDir
+    Path dir;
 
     @Test
     void detect_audioData_returnsSegments() {
-        InferenceSession session = mock(InferenceSession.class);
+        float[] audioData = new float[2048]; // 4 frames of 512 samples, all scoring above 0.9
+        Arrays.fill(audioData, 0.9f);
 
-        // Mock model to return high speech probability for all frames
-        // Shape [1] for output, shape [2, 1, 128] for state
-        float[] outputProbs = {0.9f};
-        float[] stateN = new float[2 * 1 * 128]; // State tensor dimensions
-        when(session.run(any())).thenReturn(Map.of(
-                "output", Tensor.fromFloats(outputProbs, new long[]{1}),
-                "stateN", Tensor.fromFloats(stateN, new long[]{2, 1, 128})
-        ));
-
-        SileroVadDetector vad = SileroVadDetector.builder()
-                .session(session)
+        try (SileroVadDetector vad = SileroVadDetector.builder()
+                .modelSource(TestModels.model(dir, "silero-vad"))
                 .threshold(0.5f)
                 .minSpeechDuration(0.1f)
                 .minSilenceDuration(0.1f)
-                .build();
+                .build()) {
+            List<VoiceSegment> segments = vad.detect(audioData, 16000);
 
-        // Provide enough samples to generate multiple frames (512 samples per frame at 16kHz)
-        float[] audioData = new float[2048]; // ~128ms = 4 frames
-        List<VoiceSegment> segments = vad.detect(audioData, 16000);
-
-        // Should detect speech since all frames return 0.9 probability
-        assertThat(segments).isNotEmpty();
-        verify(session, atLeastOnce()).run(any());
+            assertThat(segments).singleElement().satisfies(segment -> {
+                assertThat(segment.start()).isZero();
+                assertThat(segment.end()).isCloseTo(2048f / 16000, within(1e-6f));
+            });
+        }
     }
 
     @Test
     void detect_noSpeech_returnsEmptySegments() {
-        InferenceSession session = mock(InferenceSession.class);
-
-        // Mock model to return low speech probability for all frames
-        float[] outputProbs = {0.1f};
-        float[] stateN = new float[2 * 1 * 128];
-        when(session.run(any())).thenReturn(Map.of(
-                "output", Tensor.fromFloats(outputProbs, new long[]{1}),
-                "stateN", Tensor.fromFloats(stateN, new long[]{2, 1, 128})
-        ));
-
-        SileroVadDetector vad = SileroVadDetector.builder()
-                .session(session)
+        try (SileroVadDetector vad = SileroVadDetector.builder()
+                .modelSource(TestModels.model(dir, "silero-vad"))
                 .threshold(0.5f)
                 .minSpeechDuration(0.1f)
                 .minSilenceDuration(0.1f)
-                .build();
+                .build()) {
+            List<VoiceSegment> segments = vad.detect(new float[2048], 16000);
 
-        float[] audioData = new float[2048];
-        List<VoiceSegment> segments = vad.detect(audioData, 16000);
-
-        // Should not detect speech since all frames are below threshold
-        assertThat(segments).isEmpty();
+            assertThat(segments).isEmpty();
+        }
     }
 
     @Test
     void probabilities_returnsPerFrameProbabilities() {
-        InferenceSession session = mock(InferenceSession.class);
-
-        // Return different probabilities per frame
-        float[] stateN = new float[2 * 1 * 128];
-        when(session.run(any()))
-                .thenReturn(Map.of(
-                        "output", Tensor.fromFloats(new float[]{0.3f}, new long[]{1}),
-                        "stateN", Tensor.fromFloats(stateN, new long[]{2, 1, 128})))
-                .thenReturn(Map.of(
-                        "output", Tensor.fromFloats(new float[]{0.8f}, new long[]{1}),
-                        "stateN", Tensor.fromFloats(stateN, new long[]{2, 1, 128})));
-
-        SileroVadDetector vad = SileroVadDetector.builder()
-                .session(session)
-                .build();
-
         float[] audioData = new float[1024]; // 2 frames at 512 samples per frame
-        float[] probs = vad.probabilities(audioData, 16000);
+        audioData[511] = 0.3f;
+        audioData[1023] = 0.8f;
 
-        assertThat(probs).hasSize(2);
-        assertThat(probs[0]).isCloseTo(0.3f, within(0.001f));
-        assertThat(probs[1]).isCloseTo(0.8f, within(0.001f));
+        try (SileroVadDetector vad = detector()) {
+            float[] probs = vad.probabilities(audioData, 16000);
+
+            assertThat(probs).containsExactly(new float[]{0.30f, 0.81f}, within(1e-5f));
+        }
     }
 
-    // --- Close delegation ---
+    @Test
+    void probabilitiesThreadTheStateAndStartFreshOnEveryCall() {
+        try (SileroVadDetector vad = detector()) {
+            float[] first = vad.probabilities(new float[2048], 16000);
+            float[] second = vad.probabilities(new float[2048], 16000);
+
+            assertThat(first).containsExactly(new float[]{0f, 0.01f, 0.02f, 0.03f}, within(1e-6f));
+            assertThat(second).containsExactly(first);
+        }
+    }
 
     @Test
-    void close_delegatesToSession() {
-        InferenceSession session = mock(InferenceSession.class);
+    void eachWindowIsPrecededByTheLast64SamplesOfThePreviousOne() {
+        float[] audioData = new float[1024];
+        audioData[0] = 1f;     // would show in the first window if it had no zero context before it
+        audioData[448] = 0.5f; // first of the 64 samples carried into the second window
 
-        SileroVadDetector vad = SileroVadDetector.builder()
-                .session(session)
-                .build();
+        try (SileroVadDetector vad = detector()) {
+            float[] probs = vad.probabilities(audioData, 16000);
+
+            assertThat(probs).containsExactly(new float[]{0f, 0.01f + 0.0005f}, within(1e-6f));
+        }
+    }
+
+    // --- Close ---
+
+    @Test
+    void closedDetectorRejectsProbabilities() {
+        SileroVadDetector vad = detector();
 
         vad.close();
 
-        verify(session).close();
+        assertThatThrownBy(() -> vad.probabilities(new float[512], 16000)).isInstanceOf(IllegalStateException.class);
     }
 
+    private SileroVadDetector detector() {
+        return SileroVadDetector.builder().modelSource(TestModels.model(dir, "silero-vad")).build();
+    }
 
     // --- speech padding ---
 

@@ -264,10 +264,6 @@ public class DepthAnythingEstimator extends AbstractInferenceTask<BufferedImage,
             super(DEFAULT_MODEL_ID);
         }
 
-        Builder session(InferenceSession session) {
-            return useSession("model.onnx", session);
-        }
-
         public Builder inputName(String inputName) {
             this.inputName = inputName;
             return this;

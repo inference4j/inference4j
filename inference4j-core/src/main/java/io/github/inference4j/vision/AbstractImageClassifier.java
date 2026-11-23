@@ -194,10 +194,6 @@ public abstract class AbstractImageClassifier
             super(defaultModelId);
         }
 
-        B session(InferenceSession session) {
-            return useSession("model.onnx", session);
-        }
-
         /**
          * Turns an image into the model input. Defaults to resizing to the model's input size and normalizing with
          * the wrapper's mean and standard deviation, in the model's layout.

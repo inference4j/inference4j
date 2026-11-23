@@ -16,6 +16,7 @@
 package io.github.inference4j.vision;
 
 import io.github.inference4j.Tensor;
+import io.github.inference4j.TestModels;
 import io.github.inference4j.model.ModelSource;
 import io.github.inference4j.preprocessing.image.Labels;
 import io.github.inference4j.processing.OutputOperator;
@@ -34,11 +35,12 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 /**
  * The options of the image classifier builders, checked against a model that returns its 1 × 3 × 32 × 32 input
- * unchanged, so each of the 3,072 input values is a class score.
+ * unchanged, so each of the 3,072 input values is a class score (and its 1 × 32 × 32 × 3 channels-last twin).
  */
 class ImageClassifierBuildersTest {
 
@@ -142,6 +144,33 @@ class ImageClassifierBuildersTest {
                 assertThat(classifier.classify(new BufferedImage(64, 48, BufferedImage.TYPE_INT_RGB), 3))
                         .hasSize(3);
             }
+        }
+    }
+
+    @Test
+    void closedClassifiersRejectClassify() {
+        ResNetClassifier resNet = ResNetClassifier.builder().modelSource(source).labels(labels("custom")).build();
+        EfficientNetClassifier efficientNet = EfficientNetClassifier.builder().modelSource(source)
+                .labels(labels("custom")).build();
+        resNet.close();
+        efficientNet.close();
+
+        assertThatThrownBy(() -> resNet.classify(image())).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> efficientNet.classify(image())).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void defaultPreprocessorFollowsAChannelsLastModel(@TempDir Path nhwcDir) {
+        // A blue top-left pixel is value 2 in channels-last order, but 2 * 32 * 32 in channels-first order
+        BufferedImage image = image();
+        image.setRGB(0, 0, 0x0000FF);
+
+        try (EfficientNetClassifier classifier = EfficientNetClassifier.builder()
+                .modelSource(TestModels.model(nhwcDir, "classifier-nhwc")).labels(labels("custom")).build()) {
+            Classification top = classifier.classify(image, 1).get(0);
+
+            assertThat(top.index()).isEqualTo(2);
+            assertThat(top.confidence()).isCloseTo(1f, within(1e-5f));
         }
     }
 
