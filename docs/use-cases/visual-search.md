@@ -9,7 +9,7 @@ try (ClipClassifier classifier = ClipClassifier.builder().build()) {
     List<Classification> results = classifier.classify(
             Path.of("photo.jpg"), List.of("cat", "dog", "bird", "car", "airplane"));
     System.out.println(results.get(0).label());      // "cat"
-    System.out.println(results.get(0).confidence());  // 0.92
+    System.out.println(results.get(0).confidence());  // 0.98
 }
 ```
 
@@ -59,9 +59,12 @@ flowchart TD
     IEmb --> Sim["Dot-product similarity"]
     LEmb --> Sim
 
-    Sim --> SM["Softmax"]
+    Sim --> Scale["x logit scale (100)"]
+    Scale --> SM["Softmax"]
     SM --> Result["List&lt;Classification&gt;"]
 ```
+
+The embeddings are L2-normalized, so the dot product is a cosine similarity, which for CLIP falls in a narrow band (around 0.15 to 0.35). As in the reference implementation, the similarities are multiplied by the model's learned logit scale before the softmax (`logit_scale.exp() * image_embeds @ text_embeds.T`), which turns them into usable confidences. The default scale is 100, the trained value of the OpenAI CLIP checkpoints.
 
 ## Builder options
 
@@ -70,6 +73,7 @@ flowchart TD
 | `modelId(String)` | `String` | `inference4j/clip-vit-base-patch32` | HuggingFace model ID |
 | `modelSource(ModelSource)` | `ModelSource` | `HuggingFaceModelSource` | Where to load the model from |
 | `sessionOptions(SessionConfigurer)` | `SessionConfigurer` | Default (CPU) | ONNX Runtime session options |
+| `logitScale(float)` | `float` | `100` | Factor applied to the cosine similarities before the softmax (the model's `logit_scale.exp()`). Change it only for a checkpoint trained to a different value; it affects confidences, not ranking |
 
 ## Prompt tips
 
@@ -104,7 +108,7 @@ For use cases beyond classification — image search, image-text similarity, or 
 
 ## Alternative models
 
-The default model is `inference4j/clip-vit-base-patch32` (ViT-B/32) — the smallest and fastest variant. You can use other CLIP-compatible models by exporting them to ONNX with the same input/output layout and pointing to them via `.modelId()` or `.modelSource()`.
+The default model is `inference4j/clip-vit-base-patch32` (ViT-B/32) — the smallest and fastest variant. You can use other CLIP-compatible models by exporting them to ONNX with the same input/output layout and pointing to them via `.modelId()` or `.modelSource()`. If a checkpoint's trained `logit_scale.exp()` is not 100, pass it to `.logitScale()`.
 
 Possible variants (not yet tested with inference4j):
 

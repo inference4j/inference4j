@@ -55,7 +55,8 @@ class ClipClassifierModelTest {
 
         assertThat(results.isEmpty()).isFalse();
         assertThat(results.get(0).label()).as("Expected 'a photo of a cat' as top label, got: " + results.get(0).label()).isEqualTo("a photo of a cat");
-        assertThat(results.get(0).confidence() > 0.15f).as("Expected cat confidence > 0.15, got: " + results.get(0).confidence()).isTrue();
+        // Hugging Face CLIPModel gives 0.9926 for this image and label set
+        assertThat(results.get(0).confidence()).isGreaterThan(0.95f);
     }
 
     @Test
