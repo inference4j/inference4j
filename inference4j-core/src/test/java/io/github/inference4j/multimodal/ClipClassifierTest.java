@@ -31,6 +31,8 @@ import static org.assertj.core.api.Assertions.*;
 
 class ClipClassifierTest {
 
+    private static final float SCALE = ClipClassifier.Builder.DEFAULT_LOGIT_SCALE;
+
     @Test
     void toClassifications_returnsTopKSortedByConfidence() {
         // Image embedding pointing toward label 0
@@ -44,7 +46,7 @@ class ClipClassifierTest {
         };
         List<String> labels = List.of("cat", "dog", "car");
 
-        List<Classification> results = io.github.inference4j.multimodal.ClipClassifier.toClassifications(imageEmb, labelEmbs, labels, 3);
+        List<Classification> results = ClipClassifier.toClassifications(imageEmb, labelEmbs, labels, 3, SCALE);
 
         assertThat(results).hasSize(3);
         assertThat(results.get(0).label()).isEqualTo("cat");
@@ -65,7 +67,7 @@ class ClipClassifierTest {
         };
         List<String> labels = List.of("cat", "dog", "car");
 
-        List<Classification> results = ClipClassifier.toClassifications(imageEmb, labelEmbs, labels, 1);
+        List<Classification> results = ClipClassifier.toClassifications(imageEmb, labelEmbs, labels, 1, SCALE);
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).label()).isEqualTo("cat");
@@ -81,7 +83,7 @@ class ClipClassifierTest {
         };
         List<String> labels = List.of("cat", "dog", "bird");
 
-        List<Classification> results = ClipClassifier.toClassifications(imageEmb, labelEmbs, labels, 3);
+        List<Classification> results = ClipClassifier.toClassifications(imageEmb, labelEmbs, labels, 3, SCALE);
 
         float sum = 0f;
         for (Classification c : results) {
@@ -103,7 +105,7 @@ class ClipClassifierTest {
         };
         List<String> labels = List.of("a", "b", "c", "d");
 
-        List<Classification> results = ClipClassifier.toClassifications(imageEmb, labelEmbs, labels, 4);
+        List<Classification> results = ClipClassifier.toClassifications(imageEmb, labelEmbs, labels, 4, SCALE);
 
         for (int i = 1; i < results.size(); i++) {
             assertThat(results.get(i - 1).confidence())
@@ -128,6 +130,44 @@ class ClipClassifierTest {
             assertThat(red.get(0).label()).isEqualTo("r");
             assertThat(red.get(0).index()).isZero();
             assertThat(green.get(0).label()).isEqualTo("g");
+        }
+    }
+
+    @Test
+    void defaultLogitScaleGivesAConfidentTopLabel() {
+        try (ClipClassifier classifier = classifier()) {
+            List<Classification> red = classifier.classify(filled(0xFF0000), List.of("r", "g", "b"));
+
+            // Unscaled, the cosine similarities would spread the mass over all three labels
+            assertThat(red.get(0).confidence()).isGreaterThan(0.99f);
+            assertThat(red.stream().map(Classification::confidence).reduce(0f, Float::sum))
+                    .isCloseTo(1.0f, within(1e-5f));
+        }
+    }
+
+    @Test
+    void lowerLogitScaleFlattensConfidencesButKeepsTopLabel() {
+        TestModels.install(dir, "clip-vision", "vision_model.onnx");
+        TestModels.install(dir, "clip-text", "text_model.onnx");
+        TestModels.clipVocabulary(dir);
+        try (ClipClassifier scaled = ClipClassifier.builder().modelSource(TestModels.source(dir)).build();
+             ClipClassifier unscaled = ClipClassifier.builder().modelSource(TestModels.source(dir))
+                     .logitScale(1f).build()) {
+            List<String> labels = List.of("r", "g", "b");
+            List<Classification> sharp = scaled.classify(filled(0xFF0000), labels);
+            List<Classification> flat = unscaled.classify(filled(0xFF0000), labels);
+
+            assertThat(flat.get(0).label()).isEqualTo(sharp.get(0).label()).isEqualTo("r");
+            assertThat(flat.get(0).confidence()).isLessThan(0.9f).isLessThan(sharp.get(0).confidence());
+        }
+    }
+
+    @Test
+    void logitScaleMustBePositiveAndFinite() {
+        for (float invalid : new float[]{0f, -1f, Float.NaN, Float.POSITIVE_INFINITY}) {
+            assertThatThrownBy(() -> ClipClassifier.builder().logitScale(invalid))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("logitScale");
         }
     }
 

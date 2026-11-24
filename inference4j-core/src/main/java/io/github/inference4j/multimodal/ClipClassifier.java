@@ -53,6 +53,12 @@ import java.util.List;
  * as labels produces better results. For example, instead of {@code "cat"},
  * pass {@code "a photo of a cat"}.
  *
+ * <h2>Confidences</h2>
+ * <p>Like CLIP itself, the classifier multiplies the cosine similarities by the model's learned logit scale
+ * before the softmax ({@code logit_scale.exp() * image_embeds @ text_embeds.T} in the reference
+ * implementation). The default, {@value Builder#DEFAULT_LOGIT_SCALE}, is the trained value of the OpenAI CLIP
+ * checkpoints; set {@link Builder#logitScale(float)} for a checkpoint trained to a different value.
+ *
  * @see ClipImageEncoder
  * @see ClipTextEncoder
  * @see ZeroShotClassifier
@@ -61,10 +67,12 @@ public class ClipClassifier implements ZeroShotClassifier<BufferedImage, Classif
 
     private final ClipImageEncoder imageEncoder;
     private final ClipTextEncoder textEncoder;
+    private final float logitScale;
 
-    private ClipClassifier(ClipImageEncoder imageEncoder, ClipTextEncoder textEncoder) {
+    private ClipClassifier(ClipImageEncoder imageEncoder, ClipTextEncoder textEncoder, float logitScale) {
         this.imageEncoder = imageEncoder;
         this.textEncoder = textEncoder;
+        this.logitScale = logitScale;
     }
 
     public static Builder builder() {
@@ -82,7 +90,7 @@ public class ClipClassifier implements ZeroShotClassifier<BufferedImage, Classif
         }
         float[] imageEmbedding = imageEncoder.encode(image);
         float[][] labelEmbeddings = encodeLabels(candidateLabels);
-        return toClassifications(imageEmbedding, labelEmbeddings, candidateLabels, topK);
+        return toClassifications(imageEmbedding, labelEmbeddings, candidateLabels, topK, logitScale);
     }
 
     public List<Classification> classify(Path imagePath, List<String> candidateLabels) {
@@ -109,13 +117,14 @@ public class ClipClassifier implements ZeroShotClassifier<BufferedImage, Classif
 
     static List<Classification> toClassifications(float[] imageEmbedding,
                                                    float[][] labelEmbeddings,
-                                                   List<String> labels, int topK) {
-        float[] similarities = new float[labelEmbeddings.length];
+                                                   List<String> labels, int topK, float logitScale) {
+        // Both embeddings are L2-normalized, so the dot product is the cosine similarity
+        float[] logits = new float[labelEmbeddings.length];
         for (int i = 0; i < labelEmbeddings.length; i++) {
-            similarities[i] = MathOps.dotProduct(imageEmbedding, labelEmbeddings[i]);
+            logits[i] = logitScale * MathOps.dotProduct(imageEmbedding, labelEmbeddings[i]);
         }
 
-        float[] probabilities = MathOps.softmax(similarities);
+        float[] probabilities = MathOps.softmax(logits);
         int[] topIndices = MathOps.topK(probabilities, topK);
 
         List<Classification> results = new ArrayList<>(topIndices.length);
@@ -142,15 +151,38 @@ public class ClipClassifier implements ZeroShotClassifier<BufferedImage, Classif
         private static final List<String> MODEL_FILES =
                 List.of("vision_model.onnx", "text_model.onnx", "vocab.json", "merges.txt");
 
+        /**
+         * The trained {@code logit_scale.exp()} of the OpenAI CLIP checkpoints (training clamps it at 100).
+         */
+        public static final float DEFAULT_LOGIT_SCALE = 100f;
+
+        private float logitScale = DEFAULT_LOGIT_SCALE;
+
         public Builder() {
             super(DEFAULT_MODEL_ID);
+        }
+
+        /**
+         * Sets the factor applied to the cosine similarities before the softmax: the model's
+         * {@code logit_scale.exp()}. Defaults to {@value #DEFAULT_LOGIT_SCALE}, the trained value of the
+         * OpenAI CLIP checkpoints. Only the confidences change; the ranking does not.
+         *
+         * @param logitScale a positive, finite scale
+         * @return this builder
+         */
+        public Builder logitScale(float logitScale) {
+            if (!(logitScale > 0f) || Float.isInfinite(logitScale)) {
+                throw new IllegalArgumentException("logitScale must be positive and finite, got: " + logitScale);
+            }
+            this.logitScale = logitScale;
+            return self();
         }
 
         @Override
         public ClipClassifier build() {
             // Both encoders read one opened snapshot, so an update between them cannot mix two revisions
             return load(MODEL_FILES, files -> new ClipClassifier(
-                    ClipImageEncoder.create(files, null), ClipTextEncoder.create(files, null, null)));
+                    ClipImageEncoder.create(files, null), ClipTextEncoder.create(files, null, null), logitScale));
         }
     }
 }

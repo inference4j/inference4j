@@ -152,7 +152,7 @@ try (var detector = CraftTextDetector.builder().build()) {
 try (var classifier = ClipClassifier.builder().build()) {
     List<Classification> results = classifier.classify(
             Path.of("photo.jpg"), List.of("cat", "dog", "bird", "car"));
-    // [Classification[label=cat, confidence=0.82], ...]
+    // [Classification[label=cat, confidence=0.98], ...]
 }
 ```
 
